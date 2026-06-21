@@ -1,1 +1,0 @@
-{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/StatusBadge.tsx","./src/pages/ChaosPanel.tsx","./src/pages/Dashboard.tsx","./src/pages/WorkflowDetail.tsx"],"version":"5.9.3"}

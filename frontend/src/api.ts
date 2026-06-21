@@ -34,4 +34,9 @@ export const api = {
     }),
   chaos: () => http<ChaosState>("/api/chaos"),
   chaosPost: (path: string) => http<ChaosState>(`/api/chaos/${path}`, { method: "POST" }),
+
+  // --- V2 extensions ---
+  get: <T>(path: string) => http<T>(path),
+  post: <T>(path: string, body?: unknown) =>
+    http<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
 };

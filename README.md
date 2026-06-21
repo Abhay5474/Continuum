@@ -61,6 +61,31 @@ See **[docs/USAGE.md](docs/USAGE.md)** for a guided tour of every feature,
 including copy-paste chaos demos that kill workers and flood sinks with
 failures while the system stays correct.
 
+## V2 — AI Reliability Research Platform
+
+On top of the durable runtime, Continuum V2 adds five AI-native reliability
+capabilities (all additive, opt-in, default-off — V1 behavior is unchanged).
+Full details in **[docs/V2_EXTENSIONS.md](docs/V2_EXTENSIONS.md)**.
+
+1. **Semantic Replay Verification** — re-runs historical LLM steps against
+   today's provider and scores semantic equivalence (similarity, decision
+   intent, tools, structure, constraints). Catches drift and decision reversals
+   that deterministic replay alone cannot. `POST /api/replay/verify/{id}`
+2. **AI-Aware Model Router** — cost/latency/quality scheduler that picks the
+   provider chain *before* execution from **measured** runtime stats (no
+   hardcoded scores). `POST /api/routing/...`
+3. **AI Chaos Engineering** — first-class AI failure injection (hallucination,
+   schema/tool corruption, prompt injection, context truncation, memory
+   corruption, provider drift) with real survival metrics. `POST /api/ai-chaos/...`
+4. **Tail Latency Hedging** — cost-aware request hedging with first-success
+   arbitration to cut p99 latency. `POST /api/hedging/...`
+5. **Long-Context Memory** — hierarchical memory (working/episodic/long-term/
+   archived) with relevance ranking, compression and tier promotion. `POST /api/memory/...`
+
+Flagship cross-extension demo: inject a hallucinated decision reversal
+(Extension 3) and watch Semantic Replay Verification (Extension 1) detect it —
+`decisionConsistency` drops to 0 and the affected activities fail verification.
+
 ## Quick start (one command)
 
 ```bash

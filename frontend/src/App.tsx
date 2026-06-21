@@ -16,12 +16,24 @@ export default function App() {
               Durable AI Workflow Runtime
             </span>
           </Link>
-          <nav className="flex gap-1 ml-auto">
+          <nav className="flex flex-wrap gap-1 ml-auto">
             <NavLink to="/" end className={linkClass}>
               Dashboard
             </NavLink>
+            <NavLink to="/replay" className={linkClass}>
+              Replay Verify
+            </NavLink>
+            <NavLink to="/router" className={linkClass}>
+              Model Router
+            </NavLink>
+            <NavLink to="/memory" className={linkClass}>
+              Memory
+            </NavLink>
             <NavLink to="/chaos" className={linkClass}>
-              Chaos Lab
+              Chaos
+            </NavLink>
+            <NavLink to="/ai-chaos" className={linkClass}>
+              AI Chaos
             </NavLink>
           </nav>
         </div>

@@ -8,6 +8,7 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+*.tsbuildinfo
 
 # Env / secrets
 .env
