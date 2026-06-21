@@ -45,7 +45,7 @@ public class GeminiProvider implements LlmProvider {
 
     @Override
     public double estimateCost(String model, int promptTokens, int completionTokens) {
-        // gemini-1.5-flash approx pricing per 1K tokens.
+        // gemini-3.5-flash approx pricing per 1K tokens.
         return promptTokens / 1000.0 * 0.000075 + completionTokens / 1000.0 * 0.0003;
     }
 

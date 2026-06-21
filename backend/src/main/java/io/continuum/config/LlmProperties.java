@@ -11,8 +11,8 @@ public class LlmProperties {
     /** Ordered failover chain by provider name, e.g. [gemini, groq, mock]. */
     private List<String> failoverOrder = List.of("gemini", "groq", "mock");
 
-    private final Provider gemini = new Provider("gemini-1.5-flash", "https://generativelanguage.googleapis.com");
-    private final Provider groq = new Provider("llama-3.1-8b-instant", "https://api.groq.com/openai/v1");
+    private final Provider gemini = new Provider("gemini-3.5-flash", "https://generativelanguage.googleapis.com");
+    private final Provider groq = new Provider("llama-3.3-70b-versatile", "https://api.groq.com/openai/v1");
 
     public List<String> getFailoverOrder() {
         return failoverOrder;

@@ -46,10 +46,26 @@ development zero-config.
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | _(empty)_ | Enables the Gemini adapter |
-| `GEMINI_MODEL` | `gemini-1.5-flash` | |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | See Gemini model options below |
 | `GROQ_API_KEY` | _(empty)_ | Enables the Groq adapter |
-| `GROQ_MODEL` | `llama-3.1-8b-instant` | |
+| `GROQ_MODEL` | `llama-3.3-70b-versatile` | See Groq model options below |
 | `LLM_FAILOVER_ORDER` | `gemini,groq,mock` | Comma-separated failover chain |
+
+**Gemini model options** (`GEMINI_MODEL`):
+
+| Model id | Notes |
+| --- | --- |
+| `gemini-3.5-flash` | **Default.** Latest, most intelligent — strong agentic/coding performance |
+| `gemini-3.1-flash-lite` | Fast, budget-friendly, multimodal — high-volume tasks |
+| `gemini-2.5-flash` | Balanced workhorse with strong reasoning |
+| `gemini-2.0-flash` | Optimized earlier multimodal model |
+
+**Groq model options** (`GROQ_MODEL`):
+
+| Model id | Notes |
+| --- | --- |
+| `llama-3.3-70b-versatile` | **Default.** Latest high-quality general-purpose model |
+| `llama-3.1-8b-instant` | Fastest, lowest cost for high-volume tasks |
 
 If no API keys are set, the always-available **mock provider** is used, so the
 system is fully functional and demoable with zero keys. To demonstrate real
