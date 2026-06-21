@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: continuum
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/continuum}
+    username: ${SPRING_DATASOURCE_USERNAME:continuum}
+    password: ${SPRING_DATASOURCE_PASSWORD:continuum}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:15}
+  jpa:
+    hibernate:
+      # Flyway owns the schema; Hibernate must not touch it.
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+continuum:
+  engine:
+    poll-interval-ms: ${ENGINE_POLL_INTERVAL_MS:500}
+    batch-size: ${ENGINE_BATCH_SIZE:10}
+    recovery-interval-ms: ${ENGINE_RECOVERY_INTERVAL_MS:5000}
+    workflow-task-timeout-seconds: ${ENGINE_WORKFLOW_TASK_TIMEOUT:60}
+    workers-enabled: ${ENGINE_WORKERS_ENABLED:true}
+  llm:
+    failover-order: ${LLM_FAILOVER_ORDER:gemini,groq,mock}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-1.5-flash}
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      model: ${GROQ_MODEL:llama-3.1-8b-instant}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+server:
+  port: ${PORT:8080}
+
+logging:
+  level:
+    io.continuum: INFO
