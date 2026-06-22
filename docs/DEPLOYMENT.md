@@ -81,6 +81,16 @@ failover, configure both Gemini and Groq.
 | `ENGINE_WORKFLOW_TASK_TIMEOUT` | `60` | Visibility timeout (s) for decisions |
 | `ENGINE_WORKERS_ENABLED` | `true` | Set `false` to run an API-only node (see scaling) |
 
+### Developer Gateway (V3)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CONTINUUM_MASTER_KEY` | _(empty)_ | AES-256-GCM key for the provider-credential vault and API-key pepper. **Required in production.** If unset, the vault uses an ephemeral key (logs a loud warning) and stored secrets won't survive a restart. |
+| `CONTINUUM_ADMIN_TOKEN` | _(empty)_ | Required `X-Admin-Token` for `/api/admin/**` onboarding endpoints. If unset, admin routes are open (dev only) with a warning. |
+| `continuum.registry.discovery-cron` | `0 0 3 1 * *` | Model discovery schedule (monthly). |
+
+See **[docs/V3_GATEWAY.md](V3_GATEWAY.md)** for the full gateway feature set.
+
 ### Server
 
 | Variable | Default |

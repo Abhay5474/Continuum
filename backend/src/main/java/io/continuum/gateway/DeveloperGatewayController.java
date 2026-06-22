@@ -1,0 +1,47 @@
+package io.continuum.gateway;
+
+import io.continuum.developer.ApiKeyAuthenticationFilter;
+import io.continuum.persistence.entity.DeveloperEntity;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+/**
+ * Feature 1 — the public Developer Gateway. Authenticated by the API-key filter;
+ * the developer is resolved from the request attribute.
+ *
+ * Developers integrate once against {@code /api/gateway/chat} (or the
+ * OpenAI-shaped {@code /v1/chat/completions} alias) and Continuum handles
+ * routing, model selection, failover, BYO-key execution and observability.
+ */
+@RestController
+public class DeveloperGatewayController {
+
+    private final GatewayService gateway;
+
+    public DeveloperGatewayController(GatewayService gateway) {
+        this.gateway = gateway;
+    }
+
+    @PostMapping({"/api/gateway/chat", "/v1/chat/completions"})
+    public ResponseEntity<?> chat(@RequestBody GatewayDtos.ChatRequest request, HttpServletRequest http) {
+        DeveloperEntity developer = (DeveloperEntity) http.getAttribute(ApiKeyAuthenticationFilter.DEVELOPER_ATTRIBUTE);
+        if (developer == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "invalid_api_key", "message", "Authentication required."));
+        }
+        try {
+            return ResponseEntity.ok(gateway.chat(developer.getId(), request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "invalid_request", "message", e.getMessage()));
+        } catch (GatewayService.GatewayException e) {
+            // Upstream providers failed — generic 502, no provider internals leaked.
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("error", "upstream_unavailable",
+                            "message", "All upstream AI providers are currently unavailable. Please retry."));
+        }
+    }
+}

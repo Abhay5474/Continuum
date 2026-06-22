@@ -46,6 +46,12 @@ public class GroqProvider implements LlmProvider {
 
     @Override
     public LlmResponse complete(LlmRequest request) throws Exception {
+        return complete(request, null);
+    }
+
+    @Override
+    public LlmResponse complete(LlmRequest request, String apiKeyOverride) throws Exception {
+        String apiKey = (apiKeyOverride != null && !apiKeyOverride.isBlank()) ? apiKeyOverride : config.getApiKey();
         String model = request.model() != null ? request.model() : config.getModel();
         ObjectMapper m = http.mapper();
         ObjectNode body = m.createObjectNode();
@@ -62,7 +68,7 @@ public class GroqProvider implements LlmProvider {
 
         String url = config.getBaseUrl() + "/chat/completions";
         JsonNode resp = http.post(url, body,
-                new String[]{"Authorization", "Bearer " + config.getApiKey()}, 30);
+                new String[]{"Authorization", "Bearer " + apiKey}, 30);
 
         String text = resp.path("choices").path(0).path("message").path("content").asText("");
         int promptTokens = resp.path("usage").path("prompt_tokens").asInt(0);

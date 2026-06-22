@@ -10,6 +10,7 @@ import ReplayVerify from "./pages/ReplayVerify";
 import ModelRouter from "./pages/ModelRouter";
 import AiChaosLab from "./pages/AiChaosLab";
 import Memory from "./pages/Memory";
+import GatewayDashboard from "./pages/GatewayDashboard";
 
 const router = createBrowserRouter([
   {
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
       { path: "router", element: <ModelRouter /> },
       { path: "ai-chaos", element: <AiChaosLab /> },
       { path: "memory", element: <Memory /> },
+      { path: "gateway", element: <GatewayDashboard /> },
     ],
   },
 ]);

@@ -20,6 +20,9 @@ export default function App() {
             <NavLink to="/" end className={linkClass}>
               Dashboard
             </NavLink>
+            <NavLink to="/gateway" className={linkClass}>
+              Gateway
+            </NavLink>
             <NavLink to="/replay" className={linkClass}>
               Replay Verify
             </NavLink>

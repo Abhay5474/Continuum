@@ -67,18 +67,29 @@ public class ProviderRouter {
      * is unchanged. Real latency/token/cost/success stats are recorded per call.
      */
     public LlmResponse complete(LlmRequest request, List<String> chain) {
+        return complete(request, chain, null);
+    }
+
+    /**
+     * Try the given chain using per-provider API key overrides (e.g. a developer's
+     * own keys supplied via the gateway). A provider is attempted if an override
+     * key is present for it OR it is platform-configured. Passing {@code null}
+     * keys reproduces the platform-key behavior exactly.
+     */
+    public LlmResponse complete(LlmRequest request, List<String> chain, Map<String, String> apiKeysByProvider) {
         if (chain == null || chain.isEmpty()) {
             throw new IllegalStateException("No LLM providers available");
         }
         RuntimeException last = null;
         for (String name : chain) {
             LlmProvider provider = providers.get(name);
-            if (provider == null || !provider.isAvailable()) {
+            String overrideKey = apiKeysByProvider == null ? null : apiKeysByProvider.get(name);
+            if (provider == null || (overrideKey == null && !provider.isAvailable())) {
                 continue;
             }
             long start = System.nanoTime();
             try {
-                LlmResponse response = provider.complete(request);
+                LlmResponse response = provider.complete(request, overrideKey);
                 long ms = (System.nanoTime() - start) / 1_000_000;
                 double cost = provider.estimateCost(response.model(), response.promptTokens(), response.completionTokens());
                 record(m -> m.recordSuccess(name, ms, response.promptTokens(), response.completionTokens(), cost));

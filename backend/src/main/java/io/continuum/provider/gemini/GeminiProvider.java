@@ -51,9 +51,15 @@ public class GeminiProvider implements LlmProvider {
 
     @Override
     public LlmResponse complete(LlmRequest request) throws Exception {
+        return complete(request, null);
+    }
+
+    @Override
+    public LlmResponse complete(LlmRequest request, String apiKeyOverride) throws Exception {
         if (chaos.isPrimaryProviderDown()) {
             throw new RuntimeException("CHAOS: Gemini is down");
         }
+        String apiKey = (apiKeyOverride != null && !apiKeyOverride.isBlank()) ? apiKeyOverride : config.getApiKey();
         String model = request.model() != null ? request.model() : config.getModel();
         ObjectMapper m = http.mapper();
         ObjectNode body = m.createObjectNode();
@@ -77,7 +83,7 @@ public class GeminiProvider implements LlmProvider {
         if (request.maxTokens() != null) genConfig.put("maxOutputTokens", request.maxTokens());
         if (request.temperature() != null) genConfig.put("temperature", request.temperature());
 
-        String url = config.getBaseUrl() + "/v1beta/models/" + model + ":generateContent?key=" + config.getApiKey();
+        String url = config.getBaseUrl() + "/v1beta/models/" + model + ":generateContent?key=" + apiKey;
         JsonNode resp = http.post(url, body, new String[]{}, 30);
 
         String text = resp.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText("");

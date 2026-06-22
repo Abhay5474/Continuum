@@ -86,6 +86,30 @@ Flagship cross-extension demo: inject a hallucinated decision reversal
 (Extension 3) and watch Semantic Replay Verification (Extension 1) detect it —
 `decisionConsistency` drops to 0 and the affected activities fail verification.
 
+## V3 — Developer AI Infrastructure Gateway
+
+A developer-facing control plane on top of the engine: external apps integrate
+once and get reliability, routing, model lifecycle and observability — without
+provider SDKs. Additive and backward compatible (auth only on the gateway chat
+endpoint). Full details in **[docs/V3_GATEWAY.md](docs/V3_GATEWAY.md)**.
+
+- **Developer gateway** — `POST /api/gateway/chat` (+ OpenAI-shaped `/v1/chat/completions`).
+- **Continuum API keys** — `cnt_live_…`, stored hashed; invalid → 401.
+- **Credential vault** — developers' own provider keys encrypted AES-256-GCM,
+  decrypted only at call time, never logged or returned.
+- **Intelligent routing + model failover** — deterministic complexity scoring
+  (reuses V2 stats) and a capability-aware `(provider, model)` fallback chain
+  with per-model health.
+- **Model registry & lifecycle** — discovery seeds a vetted catalog; lifecycle
+  `DISCOVERED→TESTING→ACTIVE→DEPRECATED→REMOVED`; disappeared models auto-deprecated.
+- **Observability** — `GET /api/gateway/stats` shows requests, success rate,
+  and **failures prevented** (silent failovers) vs developer-visible failures;
+  new **Gateway** dashboard tab.
+
+Demo: a developer with an invalid Gemini key sees their request silently fail
+over across 4 Gemini models to a working one — `failuresPrevented: 4`,
+`developerVisibleFailures: 0`.
+
 ## Quick start (one command)
 
 ```bash
