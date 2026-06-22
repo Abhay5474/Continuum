@@ -11,6 +11,7 @@ import ModelRouter from "./pages/ModelRouter";
 import AiChaosLab from "./pages/AiChaosLab";
 import Memory from "./pages/Memory";
 import GatewayDashboard from "./pages/GatewayDashboard";
+import DeveloperPortal from "./pages/DeveloperPortal";
 
 const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
       { path: "ai-chaos", element: <AiChaosLab /> },
       { path: "memory", element: <Memory /> },
       { path: "gateway", element: <GatewayDashboard /> },
+      { path: "portal", element: <DeveloperPortal /> },
     ],
   },
 ]);

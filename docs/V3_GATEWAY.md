@@ -153,3 +153,61 @@ Verified at runtime against PostgreSQL: developer onboarding + key issuance;
 (DB grep finds no plaintext, metadata API hides the secret); invalid Gemini key
 → 4 silent model failovers → mock success with `failuresPrevented=4`,
 `developerVisibleFailures=0`; registry seeded with 7 models across providers.
+
+---
+
+## V3.1 — CORS, two-tier portal, and self-service vault UI
+
+### CORS preflight
+Browser apps send a credential-less `OPTIONS` preflight before a cross-origin
+`POST`. Previously the gateway/admin auth filters rejected it with `401` (no
+`Authorization` header present), so the real request never fired. Fixes:
+
+- All auth filters (`ApiKeyAuthenticationFilter`, `AdminTokenFilter`,
+  `PortalAuthFilter`) **let `OPTIONS` pass through** to the MVC CORS handler.
+- CORS is configured for both `/api/**` and `/v1/**`, allowing the
+  `Authorization` header. Preflight now returns `200` with the
+  `Access-Control-Allow-*` headers.
+
+### Two-tier accounts (multi-tenancy)
+Stateless, HMAC-signed session tokens (`PortalSessionService`, keyed by
+`CONTINUUM_MASTER_KEY`) back two roles:
+
+- **Developer** — self-service. `POST /api/portal/developer/signup|login`
+  returns a session token; the `PortalAuthFilter` scopes every
+  `/api/portal/developer/**` action to that `developer_id`. Passwords are
+  salted **PBKDF2-HMAC-SHA256** (`developer_auth` table).
+- **Operator** — `POST /api/portal/operator/login` exchanges the platform
+  admin token for an `OPERATOR` session, which `AdminTokenFilter` also accepts
+  on `/api/admin/**` (alongside `X-Admin-Token`).
+
+Verified: cross-tenant isolation (a developer sees only their own keys/creds),
+tampered tokens rejected (`401`), operator session reaches admin endpoints.
+
+### Developer portal endpoints (session-scoped)
+```
+GET  /api/portal/developer/me
+GET/POST/DELETE /api/portal/developer/keys[/{id}]          # self-service API keys
+GET/POST/DELETE /api/portal/developer/credentials[/{provider}]
+POST /api/portal/developer/credentials/{provider}/verify   # live key pre-validation
+PUT  /api/portal/developer/routing-preference              # "use my keys as primary" toggle
+POST /api/portal/developer/playground                      # sandbox (session-auth, no cnt_live_ needed)
+GET  /api/portal/developer/stats | /requests               # developer-scoped analytics
+```
+
+### "Use my provider keys as primary" toggle
+Stored per developer (`developer_auth.use_own_keys_primary`, default `true`).
+`GatewayService` honors it: when **on**, the developer's own providers are
+preferred and their decrypted keys are used (falling back to platform/mock on
+failure); when **off**, requests run on platform keys only.
+
+### Credential Vault UI (Developer Portal tab)
+- **Write-only** secret inputs (password fields); secrets are never returned —
+  the UI shows only metadata and a saved/verified indicator.
+- **Verify** button runs a live, cheapest-model probe with the stored key.
+- The routing-preference checkbox maps to the toggle above.
+- Plus self-service API-key issue/revoke, a sandbox playground, and private
+  analytics. Operator views remain on the existing **Gateway** dashboard tab.
+
+### New migration
+`V4__portal_auth.sql` adds `developer_auth` (additive; `developers` untouched).

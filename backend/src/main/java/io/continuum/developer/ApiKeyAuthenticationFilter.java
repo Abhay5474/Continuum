@@ -38,6 +38,13 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        // CORS preflight requests never carry credentials; let them through so the
+        // MVC CORS handler can answer them (otherwise the browser sees a 401 and
+        // the real request is never sent).
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
+        }
         String auth = request.getHeader("Authorization");
         String token = (auth != null && auth.startsWith("Bearer ")) ? auth.substring(7).trim() : null;
 

@@ -1,6 +1,7 @@
 package io.continuum.developer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.continuum.portal.PortalSessionService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +16,7 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Protects admin/onboarding endpoints with a static {@code CONTINUUM_ADMIN_TOKEN}
@@ -28,15 +30,35 @@ public class AdminTokenFilter extends OncePerRequestFilter {
 
     private final String adminToken;
     private final ObjectMapper mapper;
+    private final PortalSessionService sessions;
 
-    public AdminTokenFilter(String adminToken, ObjectMapper mapper) {
+    public AdminTokenFilter(String adminToken, ObjectMapper mapper, PortalSessionService sessions) {
         this.adminToken = adminToken == null ? "" : adminToken;
         this.mapper = mapper;
+        this.sessions = sessions;
+    }
+
+    /** Allow a logged-in operator (OPERATOR session token) to use admin endpoints. */
+    private boolean acceptsOperatorSession(HttpServletRequest request) {
+        String auth = request.getHeader("Authorization");
+        if (auth == null || !auth.startsWith("Bearer ")) {
+            return false;
+        }
+        Optional<PortalSessionService.Session> s = sessions.verify(auth.substring(7).trim());
+        return s.isPresent() && s.get().role() == PortalSessionService.Role.OPERATOR;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
+        }
+        if (acceptsOperatorSession(request)) {
+            chain.doFilter(request, response);
+            return;
+        }
         if (adminToken.isBlank()) {
             log.warn("CONTINUUM_ADMIN_TOKEN not set — admin endpoint {} is unprotected (dev mode)", request.getRequestURI());
             chain.doFilter(request, response);

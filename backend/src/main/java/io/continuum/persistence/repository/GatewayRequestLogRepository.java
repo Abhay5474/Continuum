@@ -32,4 +32,19 @@ public interface GatewayRequestLogRepository extends JpaRepository<GatewayReques
         long getRequests();
         double getCost();
     }
+
+    // --- developer-scoped (portal) ---
+
+    Page<GatewayRequestLogEntity> findByDeveloperIdOrderByCreatedAtDesc(String developerId, Pageable pageable);
+
+    long countByDeveloperIdAndSuccess(String developerId, boolean success);
+
+    @Query("select coalesce(sum(g.failoverCount),0) from GatewayRequestLogEntity g where g.developerId = :dev")
+    long totalFailoversForDeveloper(String dev);
+
+    @Query("select coalesce(sum(g.costUsd),0) from GatewayRequestLogEntity g where g.developerId = :dev")
+    double totalCostForDeveloper(String dev);
+
+    @Query("select coalesce(sum(g.tokens),0) from GatewayRequestLogEntity g where g.developerId = :dev")
+    long totalTokensForDeveloper(String dev);
 }

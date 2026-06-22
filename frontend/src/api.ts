@@ -40,3 +40,63 @@ export const api = {
   post: <T>(path: string, body?: unknown) =>
     http<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
 };
+
+// --- V3 developer portal: session-token auth (stored client-side) ---
+const SESSION_KEY = "continuum.portal.session";
+
+function authHeaders(): Record<string, string> {
+  const t = localStorage.getItem(SESSION_KEY);
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+async function portalHttp<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let message = `${res.status}`;
+    try {
+      message = (await res.json()).message ?? message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
+}
+
+export const portal = {
+  session: () => localStorage.getItem(SESSION_KEY),
+  setSession: (t: string | null) =>
+    t ? localStorage.setItem(SESSION_KEY, t) : localStorage.removeItem(SESSION_KEY),
+
+  async signup(name: string, email: string, password: string) {
+    const r = await portalHttp<any>("/api/portal/developer/signup", "POST", { name, email, password });
+    portal.setSession(r.sessionToken);
+    return r;
+  },
+  async login(email: string, password: string) {
+    const r = await portalHttp<any>("/api/portal/developer/login", "POST", { email, password });
+    portal.setSession(r.sessionToken);
+    return r;
+  },
+  logout: () => portal.setSession(null),
+
+  me: () => portalHttp<any>("/api/portal/developer/me", "GET"),
+  keys: () => portalHttp<any[]>("/api/portal/developer/keys", "GET"),
+  issueKey: () => portalHttp<any>("/api/portal/developer/keys", "POST"),
+  revokeKey: (id: number) => portalHttp<any>(`/api/portal/developer/keys/${id}`, "DELETE"),
+  credentials: () => portalHttp<any[]>("/api/portal/developer/credentials", "GET"),
+  storeCredential: (provider: string, secret: string) =>
+    portalHttp<any>("/api/portal/developer/credentials", "POST", { provider, secret }),
+  deleteCredential: (provider: string) =>
+    portalHttp<any>(`/api/portal/developer/credentials/${provider}`, "DELETE"),
+  verifyCredential: (provider: string) =>
+    portalHttp<any>(`/api/portal/developer/credentials/${provider}/verify`, "POST"),
+  setRoutingPreference: (useOwnKeysPrimary: boolean) =>
+    portalHttp<any>("/api/portal/developer/routing-preference", "PUT", { useOwnKeysPrimary }),
+  playground: (body: unknown) => portalHttp<any>("/api/portal/developer/playground", "POST", body),
+  stats: () => portalHttp<any>("/api/portal/developer/stats", "GET"),
+};
