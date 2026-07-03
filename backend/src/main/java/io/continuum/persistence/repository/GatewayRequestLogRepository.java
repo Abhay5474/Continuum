@@ -47,4 +47,21 @@ public interface GatewayRequestLogRepository extends JpaRepository<GatewayReques
 
     @Query("select coalesce(sum(g.tokens),0) from GatewayRequestLogEntity g where g.developerId = :dev")
     long totalTokensForDeveloper(String dev);
+
+    /** Per-provider outcomes for a developer — the arm statistics for the bandit. */
+    @Query("select g.chosenProvider as provider, " +
+           "sum(case when g.success = true then 1 else 0 end) as successes, " +
+           "sum(case when g.success = false then 1 else 0 end) as failures, " +
+           "avg(g.latencyMs) as avgLatency, avg(g.costUsd) as avgCost " +
+           "from GatewayRequestLogEntity g where g.developerId = :dev and g.chosenProvider is not null " +
+           "group by g.chosenProvider")
+    List<ProviderOutcome> providerOutcomesForDeveloper(String dev);
+
+    interface ProviderOutcome {
+        String getProvider();
+        long getSuccesses();
+        long getFailures();
+        double getAvgLatency();
+        double getAvgCost();
+    }
 }

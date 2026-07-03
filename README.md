@@ -110,6 +110,23 @@ Demo: a developer with an invalid Gemini key sees their request silently fail
 over across 4 Gemini models to a working one — `failuresPrevented: 4`,
 `developerVisibleFailures: 0`.
 
+## V4 — Autopilot (opt-in autonomous control plane)
+
+An **optional, off-by-default** intelligence layer that safely tunes a
+developer's runtime (routing, fallback, hedging, budgets, timeouts) from real
+telemetry, like an AI SRE. Full details in **[docs/V4_AUTOPILOT.md](docs/V4_AUTOPILOT.md)**.
+
+- **Opt-in & reversible** — per-developer toggle, OFF by default. When off the
+  gateway runs its exact pre-Autopilot path (guaranteed by `PolicyResolver`).
+- **Closed loop** — Observe → Infer → Propose → Verify → Canary → Promote/Rollback → Learn.
+- **Real decision engine** — Thompson-sampling contextual bandit + Bayesian
+  failure estimation + constrained optimization (not if/else).
+- **Bounded & safe** — only versioned, immutable policy bundles; verified before
+  traffic, canaried on a small %, auto-rolled-back on regression.
+- **Beginner-friendly UI** — onboarding wizard, explainer cards, one-click
+  ON/OFF, recommendations with confidence, canary meters, policy history,
+  rollback events. `/api/portal/developer/autopilot/*`
+
 ## Quick start (one command)
 
 ```bash

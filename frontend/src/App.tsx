@@ -26,6 +26,9 @@ export default function App() {
             <NavLink to="/portal" className={linkClass}>
               Developer Portal
             </NavLink>
+            <NavLink to="/autopilot" className={linkClass}>
+              Autopilot
+            </NavLink>
             <NavLink to="/replay" className={linkClass}>
               Replay Verify
             </NavLink>

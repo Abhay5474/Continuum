@@ -99,4 +99,22 @@ export const portal = {
     portalHttp<any>("/api/portal/developer/routing-preference", "PUT", { useOwnKeysPrimary }),
   playground: (body: unknown) => portalHttp<any>("/api/portal/developer/playground", "POST", body),
   stats: () => portalHttp<any>("/api/portal/developer/stats", "GET"),
+
+  // --- V4 Autopilot ---
+  autopilot: {
+    status: () => portalHttp<any>("/api/portal/developer/autopilot/status", "GET"),
+    enable: (body: unknown) => portalHttp<any>("/api/portal/developer/autopilot/enable", "POST", body),
+    disable: () => portalHttp<any>("/api/portal/developer/autopilot/disable", "POST"),
+    setAutoApply: (value: boolean) =>
+      portalHttp<any>(`/api/portal/developer/autopilot/auto-apply?value=${value}`, "PUT"),
+    propose: () => portalHttp<any>("/api/portal/developer/autopilot/propose", "POST"),
+    bundles: () => portalHttp<any[]>("/api/portal/developer/autopilot/bundles", "GET"),
+    recommendations: () => portalHttp<any[]>("/api/portal/developer/autopilot/recommendations", "GET"),
+    accept: (id: number) => portalHttp<any>(`/api/portal/developer/autopilot/recommendations/${id}/accept`, "POST"),
+    reject: (id: number) => portalHttp<any>(`/api/portal/developer/autopilot/recommendations/${id}/reject`, "POST"),
+    canary: () => portalHttp<any[]>("/api/portal/developer/autopilot/canary", "GET"),
+    rollbacks: () => portalHttp<any[]>("/api/portal/developer/autopilot/rollbacks", "GET"),
+    decisions: () => portalHttp<any[]>("/api/portal/developer/autopilot/decisions?limit=30", "GET"),
+    rollback: () => portalHttp<any>("/api/portal/developer/autopilot/rollback", "POST"),
+  },
 };

@@ -50,13 +50,18 @@ public class GatewayService {
     private final ProviderRouter router;
     private final GatewayRequestLogRepository logRepo;
     private final io.continuum.persistence.repository.DeveloperAuthRepository devAuth;
+    // Autopilot integration (additive; empty resolution ⇒ exact pre-Autopilot behaviour).
+    private final io.continuum.autopilot.PolicyResolver policyResolver;
+    private final io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
                           ModelFallbackPolicy fallbackPolicy, ProviderHealthTracker health,
                           CredentialVaultService vault, ProviderRouter router,
                           GatewayRequestLogRepository logRepo,
-                          io.continuum.persistence.repository.DeveloperAuthRepository devAuth) {
+                          io.continuum.persistence.repository.DeveloperAuthRepository devAuth,
+                          io.continuum.autopilot.PolicyResolver policyResolver,
+                          io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -67,6 +72,8 @@ public class GatewayService {
         this.router = router;
         this.logRepo = logRepo;
         this.devAuth = devAuth;
+        this.policyResolver = policyResolver;
+        this.autopilotLabels = autopilotLabels;
     }
 
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
@@ -75,6 +82,15 @@ public class GatewayService {
         double complexity = complexityEstimator.estimate(canonical).complexity();
         boolean requireVision = Boolean.TRUE.equals(req.requireVision());
         RoutingMode mode = parseMode(req.routingMode());
+
+        // Autopilot (opt-in): empty unless the developer enabled it AND has an
+        // active bundle. When empty, everything below is the exact V3 path.
+        java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> autopilot =
+                policyResolver.resolve(developerId);
+        if (autopilot.isPresent() && autopilot.get().policy().routingMode() != null
+                && (req.routingMode() == null || req.routingMode().isBlank())) {
+            mode = parseMode(autopilot.get().policy().routingMode());
+        }
 
         // "Use my provider keys as primary" preference (default true).
         boolean useOwnKeys = devAuth.findById(developerId)
@@ -85,6 +101,9 @@ public class GatewayService {
         // platform keys. Ordering otherwise uses the measured-stats scorer (reused).
         SelectionResult selection = selectionEngine.select(canonical, RoutingPolicy.of(mode));
         Map<String, Integer> providerRank = buildProviderOrder(developerId, selection, useOwnKeys);
+        if (autopilot.isPresent()) {
+            providerRank = applyAutopilotOrder(autopilot.get().policy().providerOrder(), providerRank);
+        }
 
         // Build capability-aware (provider, model) options from ACTIVE registry models.
         List<ModelFallbackPolicy.ModelOption> options = new ArrayList<>();
@@ -124,8 +143,9 @@ public class GatewayService {
                 long totalMs = (System.nanoTime() - started) / 1_000_000;
                 String reason = routingReason(complexity, mode, c, failovers);
 
-                logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), c.provider(), resp.model(),
-                        complexity, reason, totalMs, tokens, cost, true, failovers));
+                var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
+                        resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers));
+                labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
 
                 return new GatewayDtos.ChatResponse(resp.content(), c.provider(), resp.model(),
                         totalMs, tokens, cost, failovers, reason);
@@ -137,9 +157,41 @@ public class GatewayService {
                 log.warn("Gateway: {} {} failed, falling over: {}", c.provider(), c.model(), e.getMessage());
             }
         }
-        logFailure(developerId, req, complexity, mode);
+        long totalMs = (System.nanoTime() - started) / 1_000_000;
+        var failLog = logFailure(developerId, req, complexity, mode);
+        labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
         throw new GatewayException("All eligible providers failed for this request"
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
+    }
+
+    /** Reorders providers so the Autopilot policy's preferred order takes precedence. */
+    private Map<String, Integer> applyAutopilotOrder(List<String> policyOrder, Map<String, Integer> base) {
+        if (policyOrder == null || policyOrder.isEmpty()) {
+            return base;
+        }
+        Map<String, Integer> out = new HashMap<>();
+        int rank = 0;
+        for (String p : policyOrder) {
+            out.put(p, rank++);
+        }
+        int shift = rank;
+        for (var e : base.entrySet()) {
+            out.putIfAbsent(e.getKey(), shift + e.getValue());
+        }
+        return out;
+    }
+
+    private void labelForAutopilot(java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> ap,
+                                   Long gatewayRequestId, String developerId, boolean success, long latencyMs, double cost) {
+        if (ap.isEmpty()) {
+            return;
+        }
+        try {
+            autopilotLabels.save(new io.continuum.persistence.entity.AutopilotRequestLabelEntity(
+                    gatewayRequestId, developerId, ap.get().bundleId(), ap.get().canary(), success, latencyMs, cost));
+        } catch (Exception ignored) {
+            // Labeling must never break a request.
+        }
     }
 
     /**
@@ -183,11 +235,13 @@ public class GatewayService {
         return keys;
     }
 
-    private void logFailure(String developerId, GatewayDtos.ChatRequest req, double complexity, RoutingMode mode) {
+    private GatewayRequestLogEntity logFailure(String developerId, GatewayDtos.ChatRequest req,
+                                               double complexity, RoutingMode mode) {
         try {
-            logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), null, null,
+            return logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), null, null,
                     complexity, "no provider succeeded (mode " + mode + ")", 0, 0, 0, false, 0));
         } catch (Exception ignored) {
+            return null;
         }
     }
 
