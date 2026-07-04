@@ -229,7 +229,12 @@ public class GatewayService {
         Map<String, String> keys = new HashMap<>();
         for (ModelFallbackPolicy.ModelCandidate c : chain) {
             if (!keys.containsKey(c.provider())) {
-                vault.decrypt(developerId, c.provider()).ifPresent(secret -> keys.put(c.provider(), secret));
+                try {
+                    vault.decrypt(developerId, c.provider()).ifPresent(secret -> keys.put(c.provider(), secret));
+                } catch (Exception e) {
+                    log.warn("Gateway: Failed to decrypt credentials for developer {} on provider {} (falling back to platform keys): {}",
+                            developerId, c.provider(), e.getMessage());
+                }
             }
         }
         return keys;

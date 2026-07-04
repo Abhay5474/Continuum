@@ -1,10 +1,12 @@
+CONTINUUM_MASTER_KEY: "dev-persistent-master-key-change-in-prod"
+
 spring:
   application:
     name: continuum
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/continuum}
-    username: ${SPRING_DATASOURCE_USERNAME:continuum}
-    password: ${SPRING_DATASOURCE_PASSWORD:continuum}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:abhay123}
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:15}
   jpa:
