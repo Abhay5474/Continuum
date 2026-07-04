@@ -19,11 +19,15 @@ const EVENT_ICON: Record<string, string> = {
 export default function WorkflowDetailPage() {
   const { id } = useParams();
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
+  const [healing, setHealing] = useState<any | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    const load = () => api.workflow(id).then(setDetail).catch((e) => setErr(String(e)));
+    const load = () => {
+      api.workflow(id).then(setDetail).catch((e) => setErr(String(e)));
+      api.get<any>(`/api/gateway/healing/workflow/${id}`).then(setHealing).catch(() => {});
+    };
     load();
     const t = setInterval(load, 1500);
     return () => clearInterval(t);
@@ -41,7 +45,44 @@ export default function WorkflowDetailPage() {
         <StatusBadge status={detail.summary.status} />
         <h1 className="text-lg font-semibold">{detail.summary.workflowType}</h1>
         <span className="font-mono text-xs text-slate-400">{detail.summary.workflowId}</span>
+        {healing?.healed && (
+          <>
+            <span className="animate-pulse rounded bg-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-indigo-300">
+              PARADOX RESOLVED
+            </span>
+            <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
+              HISTORY ALIGNED ×{healing.resolutionCount}
+            </span>
+          </>
+        )}
       </div>
+
+      {healing?.healed && (
+        <div className="rounded-lg border border-indigo-500/40 bg-panel p-4 transition-colors duration-300">
+          <div className="text-sm font-medium">Paradox Resolution Ledger (this instance)</div>
+          <div className="mt-1 text-xs text-slate-400">
+            This workflow survived a code-graph change: the replay engine virtualized the structural
+            gaps below so execution continued without errors or duplicated side effects.
+          </div>
+          <div className="mt-2 space-y-1">
+            {healing.ledger.map((l: any, i: number) => (
+              <div key={i} className="flex flex-wrap items-center gap-2 text-xs">
+                <span className={`rounded px-2 py-0.5 font-medium ${
+                  l.resolutionType === "INSERTION_MAPPED" ? "bg-emerald-500/20 text-emerald-300"
+                    : l.resolutionType === "DELETION_SKIPPED" ? "bg-amber-500/20 text-amber-300"
+                    : "bg-sky-500/20 text-sky-300"}`}>
+                  {l.resolutionType}
+                </span>
+                <span className="font-mono text-slate-300">
+                  code seq {l.virtualizedPayload?.codeSeq} → history seq {l.virtualizedPayload?.historySeq}
+                </span>
+                <span className="text-slate-500">{l.virtualizedPayload?.activityType}</span>
+                <span className="ml-auto text-slate-500">{new Date(l.createdAt).toLocaleTimeString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-lg border border-edge bg-panel">

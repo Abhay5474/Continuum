@@ -8,6 +8,8 @@ import io.continuum.core.workflow.Commands;
 import io.continuum.core.workflow.Workflow;
 import io.continuum.core.workflow.WorkflowExecutor;
 import io.continuum.core.workflow.WorkflowRegistry;
+import io.continuum.healing.ParadoxResolutionService;
+import io.continuum.healing.SequenceAlignmentSession;
 import io.continuum.persistence.entity.*;
 import io.continuum.persistence.repository.*;
 import org.slf4j.Logger;
@@ -44,17 +46,20 @@ public class WorkflowEngine {
     private final WorkflowInstanceRepository instances;
     private final ActivityTaskRepository activityTasks;
     private final WorkflowTaskRepository workflowTasks;
+    private final ParadoxResolutionService healing;
     private final Json json;
 
     public WorkflowEngine(EventStore eventStore, WorkflowExecutor executor, WorkflowRegistry registry,
                           WorkflowInstanceRepository instances, ActivityTaskRepository activityTasks,
-                          WorkflowTaskRepository workflowTasks, Json json) {
+                          WorkflowTaskRepository workflowTasks, ParadoxResolutionService healing,
+                          Json json) {
         this.eventStore = eventStore;
         this.executor = executor;
         this.registry = registry;
         this.instances = instances;
         this.activityTasks = activityTasks;
         this.workflowTasks = workflowTasks;
+        this.healing = healing;
         this.json = json;
     }
 
@@ -100,9 +105,16 @@ public class WorkflowEngine {
         ReplayState state = rebuild(history);
 
         Workflow workflow = registry.get(instance.getWorkflowType());
+
+        // Paradox Resolution Engine: align the deployed code graph with recorded
+        // history. For unchanged code the session is a pure pass-through; when a
+        // structural divergence is intercepted its micro-patch mappings are
+        // committed below, in this same transaction, under the instance lock.
+        SequenceAlignmentSession alignment = healing.openSession(workflowId, history);
         Commands.Decision decision = executor.runDecision(
                 workflow, workflowId, instance.getInput(),
-                state.completed, state.failed, state.sideEffects, state.scheduled);
+                state.completed, state.failed, state.sideEffects, state.scheduled, alignment);
+        healing.commitResolutions(alignment, instance);
 
         // Persist any non-deterministic values the workflow captured this run.
         for (Commands.RecordSideEffect se : decision.sideEffects()) {

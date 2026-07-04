@@ -43,6 +43,7 @@ public class WorkflowContext {
     private final List<Commands.RecordSideEffect> newSideEffects = new ArrayList<>();
     private Commands.ScheduleActivity pendingSchedule;
 
+    private final ReplayAligner aligner;
     private long commandCounter = 0;
 
     public WorkflowContext(String workflowId, String inputJson, Json json,
@@ -50,6 +51,16 @@ public class WorkflowContext {
                            Map<Long, String> failedActivities,
                            Map<Long, String> recordedSideEffects,
                            Set<Long> scheduledPending) {
+        this(workflowId, inputJson, json, completedResults, failedActivities,
+                recordedSideEffects, scheduledPending, ReplayAligner.IDENTITY);
+    }
+
+    public WorkflowContext(String workflowId, String inputJson, Json json,
+                           Map<Long, String> completedResults,
+                           Map<Long, String> failedActivities,
+                           Map<Long, String> recordedSideEffects,
+                           Set<Long> scheduledPending,
+                           ReplayAligner aligner) {
         this.workflowId = workflowId;
         this.inputJson = inputJson;
         this.json = json;
@@ -57,6 +68,7 @@ public class WorkflowContext {
         this.failedActivities = failedActivities;
         this.recordedSideEffects = recordedSideEffects;
         this.scheduledPending = scheduledPending;
+        this.aligner = aligner;
     }
 
     public String workflowId() {
@@ -80,7 +92,7 @@ public class WorkflowContext {
      * records the intent to schedule and suspends the workflow.
      */
     public <T> T executeActivity(String activityType, Object input, ActivityOptions options, Class<T> resultType) {
-        long seq = ++commandCounter;
+        long seq = aligner.alignActivity(++commandCounter, activityType);
 
         if (completedResults.containsKey(seq)) {
             return json.read(completedResults.get(seq), resultType);
@@ -108,7 +120,7 @@ public class WorkflowContext {
      * is identical on every replay. The supplier runs at most once, ever.
      */
     public <T> T sideEffect(Supplier<T> supplier, Class<T> type) {
-        long seq = ++commandCounter;
+        long seq = aligner.alignSideEffect(++commandCounter);
         if (recordedSideEffects.containsKey(seq)) {
             return json.read(recordedSideEffects.get(seq), type);
         }

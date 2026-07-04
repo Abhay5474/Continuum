@@ -30,10 +30,22 @@ public class WorkflowExecutor {
                                          Map<Long, String> failedActivities,
                                          Map<Long, String> recordedSideEffects,
                                          Set<Long> scheduledPending) {
+        return runDecision(workflow, workflowId, inputJson, completedResults,
+                failedActivities, recordedSideEffects, scheduledPending, ReplayAligner.IDENTITY);
+    }
+
+    public Commands.Decision runDecision(Workflow workflow,
+                                         String workflowId,
+                                         String inputJson,
+                                         Map<Long, String> completedResults,
+                                         Map<Long, String> failedActivities,
+                                         Map<Long, String> recordedSideEffects,
+                                         Set<Long> scheduledPending,
+                                         ReplayAligner aligner) {
 
         WorkflowContext ctx = new WorkflowContext(
                 workflowId, inputJson, json,
-                completedResults, failedActivities, recordedSideEffects, scheduledPending);
+                completedResults, failedActivities, recordedSideEffects, scheduledPending, aligner);
 
         try {
             Object result = workflow.execute(ctx);

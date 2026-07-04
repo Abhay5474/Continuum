@@ -127,6 +127,27 @@ telemetry, like an AI SRE. Full details in **[docs/V4_AUTOPILOT.md](docs/V4_AUTO
   ON/OFF, recommendations with confidence, canary meters, policy history,
   rollback events. `/api/portal/developer/autopilot/*`
 
+## V5.1.1 — Paradox Resolution Engine (determinism divergence auto-healing)
+
+A **compulsory, always-on** structural auto-healing layer inside the replay
+loop that eliminates the classic event-sourcing failure mode: deploying changed
+workflow code over in-flight instances. Full details in
+**[docs/V5_PARADOX_HEALING.md](docs/V5_PARADOX_HEALING.md)**.
+
+- **Divergence interception** — code↔history mismatches are caught inside the
+  decision replay before they can crash a worker.
+- **Stack-to-history diffing** — inserted / deleted / re-ordered activities are
+  classified against the recorded `ACTIVITY_SCHEDULED` stream.
+- **History virtualization** — insertions get fresh virtualized slots (fresh
+  idempotency keys ⇒ outbox/cost exactly-once preserved); deletions shift the
+  sequence cursor past obsolete records; reorders reuse recorded results.
+- **Durable resolution ledger** — micro-patch mappings committed to
+  `workflow_healing_logs` atomically with the decision, so healed instances
+  replay deterministically forever.
+- **Observability** — `GET /api/gateway/healing/status`, per-instance ledgers,
+  a dry-run verify scan, a "Paradox Resolution Ledger" dashboard panel and
+  `PARADOX RESOLVED` badges on healed workflows.
+
 ## Quick start (one command)
 
 ```bash

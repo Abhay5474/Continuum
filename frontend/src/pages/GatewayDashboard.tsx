@@ -6,6 +6,9 @@ export default function GatewayDashboard() {
   const [models, setModels] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [health, setHealth] = useState<any[]>([]);
+  const [healing, setHealing] = useState<any | null>(null);
+  const [verifyOut, setVerifyOut] = useState<any | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   // onboarding + playground state
   const [devName, setDevName] = useState("MyAIApp");
@@ -19,6 +22,18 @@ export default function GatewayDashboard() {
     api.get<any[]>("/api/models").then(setModels).catch(() => {});
     api.get<any[]>("/api/gateway/requests?limit=15").then(setRequests).catch(() => {});
     api.get<any[]>("/api/gateway/health").then(setHealth).catch(() => {});
+    api.get<any>("/api/gateway/healing/status").then(setHealing).catch(() => {});
+  };
+
+  const runVerifyScan = async () => {
+    setVerifying(true);
+    try {
+      setVerifyOut(await api.post("/api/gateway/healing/verify", {}));
+    } catch (e: any) {
+      setVerifyOut({ error: e.message ?? String(e) });
+    } finally {
+      setVerifying(false);
+    }
   };
   useEffect(() => {
     refresh();
@@ -155,6 +170,92 @@ export default function GatewayDashboard() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="rounded-lg border border-indigo-500/40 bg-panel shadow-[0_0_24px_-12px_rgba(99,102,241,0.6)] transition-shadow duration-500">
+        <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-400" />
+          </span>
+          <div>
+            <div className="font-semibold tracking-wide">Paradox Resolution Ledger</div>
+            <div className="text-xs text-slate-400">
+              Compulsory auto-healing of code↔history determinism divergence — deploys never crash in-flight workflows.
+            </div>
+          </div>
+          <button onClick={runVerifyScan} disabled={verifying}
+            className="ml-auto rounded-md bg-indigo-600 px-3 py-1.5 text-xs text-white transition-opacity hover:opacity-90 disabled:opacity-50">
+            {verifying ? "Scanning…" : "Run verification scan"}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-5">
+          <Stat label="Paradoxes resolved" value={healing?.totalResolutions ?? "—"} accent="text-indigo-300" />
+          <Stat label="Healed workflows" value={healing?.healedWorkflows ?? "—"} accent="text-emerald-300" />
+          <Stat label="Insertions mapped" value={healing?.byResolutionType?.INSERTION_MAPPED ?? "—"} />
+          <Stat label="Deletions skipped" value={healing?.byResolutionType?.DELETION_SKIPPED ?? "—"} />
+          <Stat label="Reorders aligned" value={healing?.byResolutionType?.REORDER_ALIGNED ?? "—"} />
+        </div>
+
+        <div className="px-4 pb-4">
+          <div className="text-xs uppercase tracking-wide text-slate-400">Auto-healing timeline</div>
+          <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
+            {(healing?.recentResolutions ?? []).map((r: any, i: number) => (
+              <div key={i}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-edge bg-ink/60 px-3 py-2 text-xs transition-colors duration-300 hover:border-indigo-500/50">
+                <span className="rounded bg-indigo-500/20 px-2 py-0.5 font-semibold text-indigo-300">
+                  PARADOX RESOLVED
+                </span>
+                <span className={`rounded px-2 py-0.5 font-medium ${
+                  r.resolutionType === "INSERTION_MAPPED" ? "bg-emerald-500/20 text-emerald-300"
+                    : r.resolutionType === "DELETION_SKIPPED" ? "bg-amber-500/20 text-amber-300"
+                    : "bg-sky-500/20 text-sky-300"}`}>
+                  {r.resolutionType}
+                </span>
+                <span className="rounded bg-slate-500/20 px-2 py-0.5 text-slate-300">HISTORY ALIGNED</span>
+                <span className="font-mono text-slate-300">{r.workflowId}</span>
+                <span className="text-slate-500">
+                  seq {r.codeSequence} → {r.historySequence ?? "∅"} · {r.workflowType}
+                </span>
+                <span className="ml-auto text-slate-500">
+                  {r.resolvedAt ? new Date(r.resolvedAt).toLocaleTimeString() : ""}
+                </span>
+              </div>
+            ))}
+            {(healing?.recentResolutions ?? []).length === 0 && (
+              <div className="rounded-md border border-dashed border-edge px-3 py-3 text-xs text-slate-500">
+                No divergence paradoxes detected — every deployed code graph currently matches its recorded history.
+              </div>
+            )}
+          </div>
+
+          {verifyOut && (
+            <div className="mt-3 rounded-md border border-edge bg-ink p-3 text-xs">
+              {verifyOut.error ? (
+                <span className="text-rose-300">{verifyOut.error}</span>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded px-2 py-0.5 font-semibold ${
+                      verifyOut.divergedInstances > 0
+                        ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"}`}>
+                      {verifyOut.divergedInstances > 0 ? "DIVERGENCES PENDING HEAL" : "ALL ALIGNED"}
+                    </span>
+                    <span className="text-slate-400">
+                      scanned {verifyOut.scanned} running instance(s) · {verifyOut.divergedInstances} diverged
+                    </span>
+                  </div>
+                  {verifyOut.divergedInstances > 0 && (
+                    <pre className="mt-2 max-h-40 overflow-auto text-slate-400">
+                      {JSON.stringify(verifyOut.results.filter((x: any) => x.diverged), null, 2)}
+                    </pre>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="rounded-lg border border-edge bg-panel">
