@@ -83,6 +83,8 @@ public class GatewayService {
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
         long started = System.nanoTime();
         LlmRequest canonical = normalizer.normalize(req);
+        // God Mode Twin Gate: Interpose and augment request with memory if enabled
+        canonical = godMode.augmentRequest(developerId, canonical);
         double complexity = complexityEstimator.estimate(canonical).complexity();
         boolean requireVision = Boolean.TRUE.equals(req.requireVision());
         RoutingMode mode = parseMode(req.routingMode());

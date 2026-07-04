@@ -257,6 +257,11 @@ public class MemoryEngine {
             double sim = TextEmbedder.cosine(q, embeddingOf(n));
             hits.add(new Hit("SEMANTIC", n.getText(), sim * (0.7 + 0.3 * n.getUtilityScore()), n));
         }
+        for (MemoryWorkingEntity w : working.findByDeveloperIdOrderByCreatedAtAsc(dev)) {
+            double sim = TextEmbedder.cosine(q, embedder.embed(w.getContent()));
+            // Give recent working memory a slight relevance boost
+            hits.add(new Hit("WORKING", w.getContent(), sim * 1.1, null));
+        }
         hits.sort((a, b) -> Double.compare(b.score(), a.score()));
         List<Map<String, Object>> out = new ArrayList<>();
         for (Hit h : hits.subList(0, Math.min(limit, hits.size()))) {

@@ -8,10 +8,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import io.continuum.provider.model.LlmRequest;
+import io.continuum.provider.model.Message;
+import io.continuum.provider.model.Role;
 
 /**
  * God Mode control plane: per-developer opt-in state and the transparent hooks
@@ -93,6 +98,63 @@ public class GodModeService {
         } catch (Exception e) {
             // Memory must never affect the request path.
             log.debug("god-mode observe skipped: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Twin Gate hook: Interpose on the canonical request to inject relevant memories
+     * into the system prompt. No-op if God Mode or Twin Gate is disabled.
+     */
+    public LlmRequest augmentRequest(String developerId, LlmRequest request) {
+        try {
+            Optional<GodModeConfigEntity> cfgOpt = configIfEnabled(developerId);
+            if (cfgOpt.isEmpty() || !cfgOpt.get().isTwinGateEnabled()) {
+                return request;
+            }
+            GodModeConfigEntity config = cfgOpt.get();
+
+            String lastUser = null;
+            for (int i = request.messages().size() - 1; i >= 0; i--) {
+                if (request.messages().get(i).role() == Role.USER) {
+                    lastUser = request.messages().get(i).content();
+                    break;
+                }
+            }
+
+            if (lastUser == null || lastUser.isBlank()) {
+                return request;
+            }
+
+            List<Map<String, Object>> retrieved = memory.retrieve(config, lastUser, 3);
+            if (retrieved.isEmpty()) {
+                return request;
+            }
+
+            StringBuilder context = new StringBuilder("\n\n<continuum_memory>\nRelevant memories from past interactions:\n");
+            for (Map<String, Object> mem : retrieved) {
+                context.append("- ").append(mem.get("text")).append("\n");
+            }
+            context.append("</continuum_memory>\n");
+
+            List<Message> newMessages = new ArrayList<>(request.messages());
+            boolean injected = false;
+            for (int i = newMessages.size() - 1; i >= 0; i--) {
+                Message m = newMessages.get(i);
+                if (m.role() == Role.SYSTEM) {
+                    newMessages.set(i, new Message(m.role(), m.content() + context.toString(), m.toolCalls()));
+                    injected = true;
+                    break;
+                }
+            }
+
+            if (!injected) {
+                newMessages.add(0, Message.system("Use the following memories to assist the user:" + context.toString()));
+            }
+
+            return new LlmRequest(request.model(), newMessages, request.maxTokens(), request.temperature());
+        } catch (Exception e) {
+            log.warn("Twin Gate augmentation failed, proceeding with original request: {}", e.getMessage());
+            return request;
         }
     }
 
