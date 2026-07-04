@@ -13,6 +13,7 @@ import Memory from "./pages/Memory";
 import GatewayDashboard from "./pages/GatewayDashboard";
 import DeveloperPortal from "./pages/DeveloperPortal";
 import Autopilot from "./pages/Autopilot";
+import GodMode from "./pages/GodMode";
 
 const router = createBrowserRouter([
   {
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
       { path: "gateway", element: <GatewayDashboard /> },
       { path: "portal", element: <DeveloperPortal /> },
       { path: "autopilot", element: <Autopilot /> },
+      { path: "godmode", element: <GodMode /> },
     ],
   },
 ]);

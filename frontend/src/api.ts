@@ -117,4 +117,24 @@ export const portal = {
     decisions: () => portalHttp<any[]>("/api/portal/developer/autopilot/decisions?limit=30", "GET"),
     rollback: () => portalHttp<any>("/api/portal/developer/autopilot/rollback", "POST"),
   },
+
+  // --- V5 God Mode ---
+  godmode: {
+    status: () => portalHttp<any>("/api/portal/developer/godmode/status", "GET"),
+    enable: () => portalHttp<any>("/api/portal/developer/godmode/enable", "POST"),
+    disable: () => portalHttp<any>("/api/portal/developer/godmode/disable", "POST"),
+    settings: (body: unknown) => portalHttp<any>("/api/portal/developer/godmode/settings", "PUT", body),
+    ingest: (sessionId: string, role: string, content: string) =>
+      portalHttp<any>("/api/portal/developer/godmode/memory/ingest", "POST", { sessionId, role, content }),
+    consolidate: () => portalHttp<any>("/api/portal/developer/godmode/memory/consolidate", "POST"),
+    retrieve: (query: string, limit = 5) =>
+      portalHttp<any[]>("/api/portal/developer/godmode/memory/retrieve", "POST", { query, limit }),
+    graph: () => portalHttp<any>("/api/portal/developer/godmode/memory/graph", "GET"),
+    wipe: () => portalHttp<any>("/api/portal/developer/godmode/memory", "DELETE"),
+    actions: () => portalHttp<any[]>("/api/portal/developer/godmode/actions", "GET"),
+    simulate: (scenario: string, candidateBundleId?: number, baselineBundleId?: number) =>
+      portalHttp<any>("/api/portal/developer/godmode/twin/simulate", "POST",
+        { scenario, candidateBundleId, baselineBundleId }),
+    simulations: () => portalHttp<any[]>("/api/portal/developer/godmode/twin/simulations", "GET"),
+  },
 };

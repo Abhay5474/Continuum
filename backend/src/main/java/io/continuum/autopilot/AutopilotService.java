@@ -44,13 +44,17 @@ public class AutopilotService {
     private final AutopilotTelemetryRepository telemetry;
     private final AutopilotRequestLabelRepository labels;
 
+    // Optional pre-flight gate (V5 God Mode digital twin). Absent/lazy ⇒ V4 behavior.
+    private final org.springframework.beans.factory.ObjectProvider<CanaryPreflight> canaryPreflight;
+
     public AutopilotService(AutopilotConfigRepository configRepo, PolicyBundleService bundles,
                             TelemetryAggregator aggregator, DecisionEngine decisionEngine,
                             PolicyVerifier verifier, CanaryEvaluator canaryEvaluator, Json json,
                             AutopilotDecisionRepository decisions, AutopilotRecommendationRepository recommendations,
                             AutopilotCanaryRunRepository canaries, AutopilotRollbackRepository rollbacks,
                             AutopilotFeedbackRepository feedback, AutopilotTelemetryRepository telemetry,
-                            AutopilotRequestLabelRepository labels) {
+                            AutopilotRequestLabelRepository labels,
+                            org.springframework.beans.factory.ObjectProvider<CanaryPreflight> canaryPreflight) {
         this.configRepo = configRepo;
         this.bundles = bundles;
         this.aggregator = aggregator;
@@ -65,6 +69,7 @@ public class AutopilotService {
         this.feedback = feedback;
         this.telemetry = telemetry;
         this.labels = labels;
+        this.canaryPreflight = canaryPreflight;
     }
 
     // ---- config / toggle ----
@@ -210,6 +215,21 @@ public class AutopilotService {
 
     @Transactional
     public AutopilotCanaryRunEntity startCanary(String developerId, Long candidateBundleId) {
+        // V5 God Mode digital-twin pre-flight (additive, gated): a candidate that
+        // confidently regresses in offline replay never receives live traffic.
+        // No preflight bean / God Mode off / non-veto ⇒ exact V4 path below.
+        CanaryPreflight preflight = canaryPreflight == null ? null : canaryPreflight.getIfAvailable();
+        if (preflight != null) {
+            CanaryPreflight.Result gate = preflight.check(developerId, candidateBundleId);
+            if (gate.veto()) {
+                bundles.setStatus(candidateBundleId, PolicyStatus.ARCHIVED);
+                record(developerId, "TWIN_VETO", "Canary blocked before live traffic: " + gate.reason(),
+                        null, candidateBundleId, gate.confidence());
+                log.warn("Canary for {} bundle {} vetoed by digital twin: {}",
+                        developerId, candidateBundleId, gate.reason());
+                return null;
+            }
+        }
         AutopilotConfigEntity config = getOrCreateConfig(developerId);
         PolicyBundleEntity candidate = bundles.entity(candidateBundleId).orElseThrow();
         candidate.setStatus(PolicyStatus.CANARY);

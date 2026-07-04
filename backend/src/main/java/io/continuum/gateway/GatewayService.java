@@ -53,6 +53,8 @@ public class GatewayService {
     // Autopilot integration (additive; empty resolution ⇒ exact pre-Autopilot behaviour).
     private final io.continuum.autopilot.PolicyResolver policyResolver;
     private final io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels;
+    // God Mode memory observation (additive; strict no-op unless the developer opted in).
+    private final io.continuum.godmode.GodModeService godMode;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -61,7 +63,8 @@ public class GatewayService {
                           GatewayRequestLogRepository logRepo,
                           io.continuum.persistence.repository.DeveloperAuthRepository devAuth,
                           io.continuum.autopilot.PolicyResolver policyResolver,
-                          io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels) {
+                          io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels,
+                          io.continuum.godmode.GodModeService godMode) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -74,6 +77,7 @@ public class GatewayService {
         this.devAuth = devAuth;
         this.policyResolver = policyResolver;
         this.autopilotLabels = autopilotLabels;
+        this.godMode = godMode;
     }
 
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
@@ -146,6 +150,10 @@ public class GatewayService {
                 var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
                         resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers));
                 labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
+                // God Mode (opt-in): observe the exchange into working memory.
+                // No-op (and can never throw) unless the developer enabled it.
+                godMode.observeExchange(developerId, "gateway",
+                        lastUserContent(canonical), resp.content());
 
                 return new GatewayDtos.ChatResponse(resp.content(), c.provider(), resp.model(),
                         totalMs, tokens, cost, failovers, reason);
@@ -162,6 +170,16 @@ public class GatewayService {
         labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
         throw new GatewayException("All eligible providers failed for this request"
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
+    }
+
+    private static String lastUserContent(LlmRequest canonical) {
+        for (int i = canonical.messages().size() - 1; i >= 0; i--) {
+            var m = canonical.messages().get(i);
+            if ("user".equalsIgnoreCase(m.role().name())) {
+                return m.content();
+            }
+        }
+        return null;
     }
 
     /** Reorders providers so the Autopilot policy's preferred order takes precedence. */

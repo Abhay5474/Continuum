@@ -148,6 +148,17 @@ workflow code over in-flight instances. Full details in
   a dry-run verify scan, a "Paradox Resolution Ledger" dashboard panel and
   `PARADOX RESOLVED` badges on healed workflows.
 
+## V5 — God Mode (autonomous memory & policy engine)
+
+An **opt-in, off-by-default** autonomous layer: 4-tier learned memory
+(Working → Episodic → Semantic experience graph → Archive), Memory-as-Action
+policies on the V4 Thompson-sampling machinery, and a **digital twin** that
+replays every policy candidate against real historical traffic — vetoing
+confident regressions before they receive live traffic. Ships with a full UI
+overhaul and the new **⚡ Agentic Autopilot** tab (God Mode toggle, context
+weight gauge, memory-tier flow, counterfactual multiverse timeline, experience
+graph). Full details in **[docs/V5_GOD_MODE.md](docs/V5_GOD_MODE.md)**.
+
 ## Quick start (one command)
 
 ```bash
