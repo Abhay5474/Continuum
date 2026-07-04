@@ -123,7 +123,10 @@ public class WorkflowEngine {
         }
 
         switch (decision.kind()) {
-            case SCHEDULE -> scheduleActivity(instance, decision.schedule());
+            // One event per scheduled activity, all in this same transaction —
+            // a V6 fan-out lands as N ACTIVITY_SCHEDULED rows atomically and the
+            // worker pool picks them up concurrently (FOR UPDATE SKIP LOCKED).
+            case SCHEDULE -> decision.schedules().forEach(s -> scheduleActivity(instance, s));
             case COMPLETE -> {
                 eventStore.appendLocked(instance, EventType.WORKFLOW_COMPLETED,
                         new Payloads.WorkflowCompleted(decision.result()));

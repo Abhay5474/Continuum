@@ -124,6 +124,21 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
   const configured = new Set(creds.map((c) => c.provider));
 
+  // --- V6 Consensus DAG Engine (opt-in, OFF by default) ---
+  const [v6Enabled, setV6Enabled] = useState<boolean | null>(null);
+  const [v6Guide, setV6Guide] = useState(false);
+  useEffect(() => {
+    portal.v6.status().then((s) => setV6Enabled(!!s.enabled)).catch(() => setV6Enabled(false));
+  }, []);
+  const toggleV6 = async () => {
+    try {
+      const r = v6Enabled ? await portal.v6.disable() : await portal.v6.enable();
+      setV6Enabled(!!r.enabled);
+    } catch {
+      /* keep previous state */
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -199,6 +214,63 @@ function Portal({ onLogout }: { onLogout: () => void }) {
             </span>
           </label>
         </div>
+      </div>
+
+      {/* V6 Consensus DAG Engine (opt-in, off by default) */}
+      <div className={`rounded-lg border bg-panel p-4 transition-all ${v6Enabled ? "border-neon/50 shadow-glow-cyan" : "border-edge"}`}>
+        <div className="flex flex-wrap items-center gap-3">
+          <div>
+            <div className="font-medium">
+              V6 Verification Engine <span className="text-xs text-slate-500">(Consensus DAG)</span>
+              {v6Enabled && <span className="ml-2 rounded bg-neon/15 px-2 py-0.5 text-[10px] font-bold text-neon">ACTIVE</span>}
+            </div>
+            <p className="text-xs text-slate-400">
+              Routes your gateway requests through a parallel DAG of solver and verifier nodes with
+              Bayesian conflict resolution — every answer is checked, scored, and fully auditable in
+              the <span className="text-slate-300">Execution Command Center</span>. Response format is unchanged.
+            </p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={() => setV6Guide(!v6Guide)}
+              className="rounded-md border border-edge px-3 py-1.5 text-xs hover:border-neon/50">
+              {v6Guide ? "Hide guide" : "When should I use this?"}
+            </button>
+            <button onClick={toggleV6} disabled={v6Enabled === null}
+              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
+                v6Enabled
+                  ? "bg-neon/20 text-neon ring-1 ring-neon/50"
+                  : "bg-indigo-600 text-white hover:bg-indigo-500"}`}>
+              {v6Enabled === null ? "…" : v6Enabled ? "Enabled — click to disable" : "Enable V6 Verification Engine"}
+            </button>
+          </div>
+        </div>
+
+        {v6Guide && (
+          <div className="mt-3 grid gap-3 rounded-md border border-edge bg-ink p-3 text-xs sm:grid-cols-2 animate-fade-up">
+            <div>
+              <div className="font-semibold text-emerald-300">✔ Turn it ON when…</div>
+              <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-400">
+                <li>Outputs feed <span className="text-slate-300">high-stakes actions</span>: generated SQL, Terraform/K8s configs, payment or approval logic.</li>
+                <li>You need an <span className="text-slate-300">audit trail</span> — compliance, finance, legal, healthcare ("why did the AI say this?").</li>
+                <li>Correctness matters more than latency: each request runs a multi-node verification DAG (expect seconds, not milliseconds).</li>
+                <li>You want hallucinations and contradictions <span className="text-slate-300">caught before execution</span>, with a confidence score per answer.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="font-semibold text-rose-300">✘ Keep it OFF when…</div>
+              <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-400">
+                <li>Latency-sensitive chat/UX flows — the legacy path answers in one hop.</li>
+                <li>Creative or open-ended generation, where "verification" has no ground truth.</li>
+                <li>High-volume, low-risk traffic where per-request verification cost isn't justified.</li>
+                <li>Anything already covered by your own downstream validation.</li>
+              </ul>
+              <div className="mt-2 text-slate-500">
+                Off = the exact legacy gateway path, bit for bit. Your clients never see a difference
+                in response format either way.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* api keys */}

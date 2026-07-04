@@ -55,6 +55,8 @@ public class GatewayService {
     private final io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels;
     // God Mode memory observation (additive; strict no-op unless the developer opted in).
     private final io.continuum.godmode.GodModeService godMode;
+    // V6 Consensus DAG (additive; gate is FALSE by default ⇒ exact legacy path).
+    private final io.continuum.dag.ConsensusDagService consensusDag;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -64,7 +66,8 @@ public class GatewayService {
                           io.continuum.persistence.repository.DeveloperAuthRepository devAuth,
                           io.continuum.autopilot.PolicyResolver policyResolver,
                           io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels,
-                          io.continuum.godmode.GodModeService godMode) {
+                          io.continuum.godmode.GodModeService godMode,
+                          io.continuum.dag.ConsensusDagService consensusDag) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -78,9 +81,22 @@ public class GatewayService {
         this.policyResolver = policyResolver;
         this.autopilotLabels = autopilotLabels;
         this.godMode = godMode;
+        this.consensusDag = consensusDag;
     }
 
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
+        // V6 Consensus DAG Engine (opt-in, OFF by default): when the developer
+        // enabled it in the portal, the request is verified through the DAG and
+        // returned in the identical response shape. When the flag is off — or
+        // the DAG fails for any reason — everything below is the exact legacy path.
+        if (consensusDag.enabledFor(developerId)) {
+            try {
+                return consensusDag.run(developerId, req);
+            } catch (Exception e) {
+                log.warn("V6 DAG run failed for {}, falling back to legacy path: {}",
+                        developerId, e.getMessage());
+            }
+        }
         long started = System.nanoTime();
         LlmRequest canonical = normalizer.normalize(req);
         // God Mode Twin Gate: Interpose and augment request with memory if enabled

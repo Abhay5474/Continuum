@@ -159,6 +159,17 @@ overhaul and the new **⚡ Agentic Autopilot** tab (God Mode toggle, context
 weight gauge, memory-tier flow, counterfactual multiverse timeline, experience
 graph). Full details in **[docs/V5_GOD_MODE.md](docs/V5_GOD_MODE.md)**.
 
+## V6 — The Consensus DAG Engine (verifiable AI reliability layer)
+
+An **opt-in, off-by-default** compliance-grade verification layer: gateway
+requests are compiled into a parallel DAG of solver and verifier nodes (every
+node a durable Postgres-queued activity — no threads), contradictions are
+resolved by pure Bayesian evidence aggregation (no LLM judge), and the verified
+answer returns in the identical response shape. Includes the **Execution
+Command Center** trace UI (living decision graph, causal inspector, risk
+engine, time-travel scrubber, "Collapse to Truth") and a portal toggle with a
+when-to-use guide. Full details in **[docs/V6_CONSENSUS_DAG.md](docs/V6_CONSENSUS_DAG.md)**.
+
 ## Quick start (one command)
 
 ```bash

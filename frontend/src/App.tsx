@@ -50,6 +50,9 @@ export default function App() {
             >
               ⚡ Agentic Autopilot
             </NavLink>
+            <NavLink to="/dag" className={linkClass}>
+              V6 Trace
+            </NavLink>
             <NavLink to="/replay" className={linkClass}>
               Replay Verify
             </NavLink>

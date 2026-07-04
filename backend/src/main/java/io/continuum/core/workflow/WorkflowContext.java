@@ -41,7 +41,7 @@ public class WorkflowContext {
 
     // Produced during this run:
     private final List<Commands.RecordSideEffect> newSideEffects = new ArrayList<>();
-    private Commands.ScheduleActivity pendingSchedule;
+    private final List<Commands.ScheduleActivity> pendingSchedules = new ArrayList<>();
 
     private final ReplayAligner aligner;
     private long commandCounter = 0;
@@ -105,14 +105,60 @@ public class WorkflowContext {
             throw WorkflowBlockedException.INSTANCE;
         }
         // Brand new work. Record the intent and suspend (sequential execution model).
-        this.pendingSchedule = new Commands.ScheduleActivity(
+        this.pendingSchedules.add(new Commands.ScheduleActivity(
                 seq, activityType, json.write(input),
-                options.getMaxAttempts(), options.getTimeoutSeconds());
+                options.getMaxAttempts(), options.getTimeoutSeconds()));
         throw WorkflowBlockedException.INSTANCE;
     }
 
     public <T> T executeActivity(String activityType, Object input, Class<T> resultType) {
         return executeActivity(activityType, input, ActivityOptions.defaults(), resultType);
+    }
+
+    /** One activity request inside a {@link #executeActivitiesParallel} fan-out. */
+    public record ParallelCall(String activityType, Object input, ActivityOptions options) {
+        public ParallelCall(String activityType, Object input) {
+            this(activityType, input, ActivityOptions.defaults());
+        }
+    }
+
+    /**
+     * V6 fan-out: schedule a batch of activities in ONE decision and suspend
+     * until ALL of them are recorded in history (barrier synchronization).
+     *
+     * Semantics mirror {@link #executeActivity} exactly, generalized to a batch:
+     * every call is keyed by its own command sequence; completed results replay
+     * from history; a terminal failure throws {@link ActivityFailedException};
+     * otherwise every not-yet-scheduled call is recorded as a pending schedule
+     * and the workflow parks. The engine persists all of the batch's
+     * {@code ACTIVITY_SCHEDULED} events atomically, and the existing worker
+     * pool executes them concurrently via the Postgres task queue — no
+     * in-process threads are ever involved.
+     */
+    public <T> List<T> executeActivitiesParallel(List<ParallelCall> calls, Class<T> resultType) {
+        List<T> results = new ArrayList<>(calls.size());
+        boolean allDone = true;
+        for (ParallelCall call : calls) {
+            long seq = aligner.alignActivity(++commandCounter, call.activityType());
+            if (completedResults.containsKey(seq)) {
+                results.add(json.read(completedResults.get(seq), resultType));
+                continue;
+            }
+            if (failedActivities.containsKey(seq)) {
+                throw new ActivityFailedException(call.activityType(), failedActivities.get(seq));
+            }
+            allDone = false;
+            results.add(null);
+            if (!scheduledPending.contains(seq)) {
+                this.pendingSchedules.add(new Commands.ScheduleActivity(
+                        seq, call.activityType(), json.write(call.input()),
+                        call.options().getMaxAttempts(), call.options().getTimeoutSeconds()));
+            }
+        }
+        if (allDone) {
+            return results;
+        }
+        throw WorkflowBlockedException.INSTANCE;
     }
 
     /**
@@ -149,6 +195,10 @@ public class WorkflowContext {
     }
 
     Commands.ScheduleActivity pendingSchedule() {
-        return pendingSchedule;
+        return pendingSchedules.isEmpty() ? null : pendingSchedules.get(0);
+    }
+
+    List<Commands.ScheduleActivity> pendingSchedules() {
+        return pendingSchedules;
     }
 }

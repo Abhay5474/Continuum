@@ -14,6 +14,7 @@ import GatewayDashboard from "./pages/GatewayDashboard";
 import DeveloperPortal from "./pages/DeveloperPortal";
 import Autopilot from "./pages/Autopilot";
 import GodMode from "./pages/GodMode";
+import DagCommandCenter from "./pages/DagCommandCenter";
 
 const router = createBrowserRouter([
   {
@@ -31,6 +32,8 @@ const router = createBrowserRouter([
       { path: "portal", element: <DeveloperPortal /> },
       { path: "autopilot", element: <Autopilot /> },
       { path: "godmode", element: <GodMode /> },
+      { path: "dag", element: <DagCommandCenter /> },
+      { path: "dag/:workflowId", element: <DagCommandCenter /> },
     ],
   },
 ]);

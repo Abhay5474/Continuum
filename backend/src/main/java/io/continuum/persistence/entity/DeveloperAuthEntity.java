@@ -27,6 +27,13 @@ public class DeveloperAuthEntity {
     @Column(name = "use_own_keys_primary", nullable = false)
     private boolean useOwnKeysPrimary = true;
 
+    /**
+     * V6 Consensus DAG Engine toggle. OFF by default: while false, gateway
+     * requests run the exact legacy path — no DAG is ever compiled.
+     */
+    @Column(name = "v6_dag_enabled", nullable = false)
+    private boolean v6DagEnabled = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -45,5 +52,7 @@ public class DeveloperAuthEntity {
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public boolean isUseOwnKeysPrimary() { return useOwnKeysPrimary; }
     public void setUseOwnKeysPrimary(boolean v) { this.useOwnKeysPrimary = v; }
+    public boolean isV6DagEnabled() { return v6DagEnabled; }
+    public void setV6DagEnabled(boolean v) { this.v6DagEnabled = v; }
     public Instant getCreatedAt() { return createdAt; }
 }

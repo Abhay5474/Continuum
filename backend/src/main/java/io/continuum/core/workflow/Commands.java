@@ -32,21 +32,29 @@ public final class Commands {
 
         private final Kind kind;
         private final List<RecordSideEffect> sideEffects;
-        private final ScheduleActivity schedule;
+        private final List<ScheduleActivity> schedules;
         private final String result;
         private final String error;
 
         private Decision(Kind kind, List<RecordSideEffect> sideEffects,
-                         ScheduleActivity schedule, String result, String error) {
+                         List<ScheduleActivity> schedules, String result, String error) {
             this.kind = kind;
             this.sideEffects = sideEffects;
-            this.schedule = schedule;
+            this.schedules = schedules;
             this.result = result;
             this.error = error;
         }
 
         public static Decision schedule(List<RecordSideEffect> se, ScheduleActivity s) {
-            return new Decision(Kind.SCHEDULE, se, s, null, null);
+            return new Decision(Kind.SCHEDULE, se, List.of(s), null, null);
+        }
+
+        /**
+         * V6 fan-out: one decision that schedules several activities atomically
+         * (parallel DAG nodes). The single-activity path above is unchanged.
+         */
+        public static Decision scheduleMany(List<RecordSideEffect> se, List<ScheduleActivity> ss) {
+            return new Decision(Kind.SCHEDULE, se, List.copyOf(ss), null, null);
         }
 
         public static Decision complete(List<RecordSideEffect> se, String result) {
@@ -69,8 +77,14 @@ public final class Commands {
             return sideEffects;
         }
 
+        /** The single scheduled activity (first, when a fan-out decision). */
         public ScheduleActivity schedule() {
-            return schedule;
+            return schedules == null || schedules.isEmpty() ? null : schedules.get(0);
+        }
+
+        /** All activities scheduled by this decision (size 1 outside V6 fan-out). */
+        public List<ScheduleActivity> schedules() {
+            return schedules == null ? List.of() : schedules;
         }
 
         public String result() {

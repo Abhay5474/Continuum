@@ -137,4 +137,11 @@ export const portal = {
         { scenario, candidateBundleId, baselineBundleId }),
     simulations: () => portalHttp<any[]>("/api/portal/developer/godmode/twin/simulations", "GET"),
   },
+
+  // --- V6 Consensus DAG Engine ---
+  v6: {
+    status: () => portalHttp<any>("/api/portal/developer/v6/status", "GET"),
+    enable: () => portalHttp<any>("/api/portal/developer/v6/enable", "POST"),
+    disable: () => portalHttp<any>("/api/portal/developer/v6/disable", "POST"),
+  },
 };

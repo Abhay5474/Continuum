@@ -51,8 +51,8 @@ public class WorkflowExecutor {
             Object result = workflow.execute(ctx);
             return Commands.Decision.complete(ctx.newSideEffects(), json.write(result));
         } catch (WorkflowBlockedException blocked) {
-            if (ctx.pendingSchedule() != null) {
-                return Commands.Decision.schedule(ctx.newSideEffects(), ctx.pendingSchedule());
+            if (!ctx.pendingSchedules().isEmpty()) {
+                return Commands.Decision.scheduleMany(ctx.newSideEffects(), ctx.pendingSchedules());
             }
             // Suspended while waiting on an already-scheduled activity; nothing new to do.
             return Commands.Decision.blocked(ctx.newSideEffects());
