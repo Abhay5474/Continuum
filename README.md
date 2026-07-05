@@ -170,6 +170,18 @@ Command Center** trace UI (living decision graph, causal inspector, risk
 engine, time-travel scrubber, "Collapse to Truth") and a portal toggle with a
 when-to-use guide. Full details in **[docs/V6_CONSENSUS_DAG.md](docs/V6_CONSENSUS_DAG.md)**.
 
+## V7 — Context Virtualization (the Paging MMU for AI)
+
+An **opt-in, off-by-default** OS-style MMU for LLM context: Continuum owns the
+Virtual Context Space and the model only sees a bounded L1 slice. Long
+histories page out into L2 semantic stubs (`[MEMORY_REF: …]`) backed by L3
+per-stub event streams; relevant pages are **predictively prefetched**, true
+page faults are intercepted mid-generation and lazily materialized
+(base ⊕ mutation deltas — never stale), and dirty pages flush write-behind.
+Live result: a 9k-token conversation sent as 2.7k tokens (70% reduction),
+fully transparent to the client. Includes the **Context Memory Profiler** UI.
+Full details in **[docs/V7_CONTEXT_MMU.md](docs/V7_CONTEXT_MMU.md)**.
+
 ## Quick start (one command)
 
 ```bash

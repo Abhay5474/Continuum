@@ -124,6 +124,20 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
   const configured = new Set(creds.map((c) => c.provider));
 
+  // --- V7 Context MMU (opt-in, OFF by default) ---
+  const [v7Enabled, setV7Enabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    portal.v7.status().then((s) => setV7Enabled(!!s.enabled)).catch(() => setV7Enabled(false));
+  }, []);
+  const toggleV7 = async () => {
+    try {
+      const r = v7Enabled ? await portal.v7.disable() : await portal.v7.enable();
+      setV7Enabled(!!r.enabled);
+    } catch {
+      /* keep previous state */
+    }
+  };
+
   // --- V6 Consensus DAG Engine (opt-in, OFF by default) ---
   const [v6Enabled, setV6Enabled] = useState<boolean | null>(null);
   const [v6Guide, setV6Guide] = useState(false);
@@ -271,6 +285,31 @@ function Portal({ onLogout }: { onLogout: () => void }) {
             </div>
           </div>
         )}
+      </div>
+
+      {/* V7 Context MMU (opt-in, off by default) */}
+      <div className={`rounded-lg border bg-panel p-4 transition-all ${v7Enabled ? "border-aurora/50 shadow-glow" : "border-edge"}`}>
+        <div className="flex flex-wrap items-center gap-3">
+          <div>
+            <div className="font-medium">
+              V7 Context Virtualization <span className="text-xs text-slate-500">(Paging MMU)</span>
+              {v7Enabled && <span className="ml-2 rounded bg-aurora/15 px-2 py-0.5 text-[10px] font-bold text-violet-300">ACTIVE</span>}
+            </div>
+            <p className="text-xs text-slate-400">
+              Continuum owns the Virtual Context Space: long histories are paged into semantic stubs
+              (L2) backed by immutable event streams (L3); relevant pages are prefetched and page
+              faults resolved mid-generation. Infinite-context workflows without bigger token limits —
+              inspect it live in the <span className="text-slate-300">Context Memory Profiler</span>.
+            </p>
+          </div>
+          <button onClick={toggleV7} disabled={v7Enabled === null}
+            className={`ml-auto rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
+              v7Enabled
+                ? "bg-aurora/20 text-violet-300 ring-1 ring-aurora/50"
+                : "bg-indigo-600 text-white hover:bg-indigo-500"}`}>
+            {v7Enabled === null ? "…" : v7Enabled ? "Enabled — click to disable" : "Enable V7 Context Virtualization"}
+          </button>
+        </div>
       </div>
 
       {/* api keys */}

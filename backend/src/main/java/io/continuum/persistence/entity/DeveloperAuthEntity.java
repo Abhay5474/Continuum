@@ -34,6 +34,13 @@ public class DeveloperAuthEntity {
     @Column(name = "v6_dag_enabled", nullable = false)
     private boolean v6DagEnabled = false;
 
+    /**
+     * V7 Context Virtualization (Paging MMU) toggle. OFF by default: while
+     * false, the full prompt array is passed to the model exactly as before.
+     */
+    @Column(name = "v7_mmu_enabled", nullable = false)
+    private boolean v7MmuEnabled = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -54,5 +61,7 @@ public class DeveloperAuthEntity {
     public void setUseOwnKeysPrimary(boolean v) { this.useOwnKeysPrimary = v; }
     public boolean isV6DagEnabled() { return v6DagEnabled; }
     public void setV6DagEnabled(boolean v) { this.v6DagEnabled = v; }
+    public boolean isV7MmuEnabled() { return v7MmuEnabled; }
+    public void setV7MmuEnabled(boolean v) { this.v7MmuEnabled = v; }
     public Instant getCreatedAt() { return createdAt; }
 }

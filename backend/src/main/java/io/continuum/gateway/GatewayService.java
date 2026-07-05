@@ -57,6 +57,8 @@ public class GatewayService {
     private final io.continuum.godmode.GodModeService godMode;
     // V6 Consensus DAG (additive; gate is FALSE by default ⇒ exact legacy path).
     private final io.continuum.dag.ConsensusDagService consensusDag;
+    // V7 Context MMU (additive; open() returns null unless opted in ⇒ exact legacy path).
+    private final io.continuum.mmu.ContextMMU contextMmu;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -67,7 +69,8 @@ public class GatewayService {
                           io.continuum.autopilot.PolicyResolver policyResolver,
                           io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels,
                           io.continuum.godmode.GodModeService godMode,
-                          io.continuum.dag.ConsensusDagService consensusDag) {
+                          io.continuum.dag.ConsensusDagService consensusDag,
+                          io.continuum.mmu.ContextMMU contextMmu) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -82,6 +85,7 @@ public class GatewayService {
         this.autopilotLabels = autopilotLabels;
         this.godMode = godMode;
         this.consensusDag = consensusDag;
+        this.contextMmu = contextMmu;
     }
 
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
@@ -101,6 +105,13 @@ public class GatewayService {
         LlmRequest canonical = normalizer.normalize(req);
         // God Mode Twin Gate: Interpose and augment request with memory if enabled
         canonical = godMode.augmentRequest(developerId, canonical);
+        // V7 Context MMU (opt-in, OFF by default): virtualize the context window.
+        // open() returns null unless the developer enabled it — null ⇒ the full
+        // prompt array below is exactly what it always was.
+        io.continuum.mmu.ContextMMU.MmuSession mmuSession = contextMmu.open(developerId, canonical);
+        if (mmuSession != null) {
+            canonical = mmuSession.request();
+        }
         double complexity = complexityEstimator.estimate(canonical).complexity();
         boolean requireVision = Boolean.TRUE.equals(req.requireVision());
         RoutingMode mode = parseMode(req.routingMode());
@@ -156,6 +167,17 @@ public class GatewayService {
             long attemptStart = System.nanoTime();
             try {
                 LlmResponse resp = router.complete(perModel, List.of(c.provider()), keys);
+                if (mmuSession != null) {
+                    // V7 page-fault interception: if the model requested a paged
+                    // segment, materialize it from L3 and re-dispatch (bounded).
+                    final Map<String, String> faultKeys = keys;
+                    final String provider = c.provider();
+                    final String model = c.model();
+                    resp = mmuSession.interceptFaults(resp, r -> router.complete(
+                            new LlmRequest(model, r.messages(), r.maxTokens(), r.temperature()),
+                            List.of(provider), faultKeys));
+                    mmuSession.finish(resp);
+                }
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
                 health.recordSuccess(c.provider(), c.model(), attemptMs);
 

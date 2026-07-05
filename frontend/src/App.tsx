@@ -53,6 +53,9 @@ export default function App() {
             <NavLink to="/dag" className={linkClass}>
               V6 Trace
             </NavLink>
+            <NavLink to="/mmu" className={linkClass}>
+              Context MMU
+            </NavLink>
             <NavLink to="/replay" className={linkClass}>
               Replay Verify
             </NavLink>

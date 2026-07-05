@@ -15,6 +15,7 @@ import DeveloperPortal from "./pages/DeveloperPortal";
 import Autopilot from "./pages/Autopilot";
 import GodMode from "./pages/GodMode";
 import DagCommandCenter from "./pages/DagCommandCenter";
+import MmuProfiler from "./pages/MmuProfiler";
 
 const router = createBrowserRouter([
   {
@@ -34,6 +35,7 @@ const router = createBrowserRouter([
       { path: "godmode", element: <GodMode /> },
       { path: "dag", element: <DagCommandCenter /> },
       { path: "dag/:workflowId", element: <DagCommandCenter /> },
+      { path: "mmu", element: <MmuProfiler /> },
     ],
   },
 ]);

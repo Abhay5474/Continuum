@@ -144,4 +144,11 @@ export const portal = {
     enable: () => portalHttp<any>("/api/portal/developer/v6/enable", "POST"),
     disable: () => portalHttp<any>("/api/portal/developer/v6/disable", "POST"),
   },
+
+  // --- V7 Context MMU ---
+  v7: {
+    status: () => portalHttp<any>("/api/portal/developer/v7/status", "GET"),
+    enable: () => portalHttp<any>("/api/portal/developer/v7/enable", "POST"),
+    disable: () => portalHttp<any>("/api/portal/developer/v7/disable", "POST"),
+  },
 };
