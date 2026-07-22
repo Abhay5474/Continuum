@@ -35,6 +35,10 @@ public class DeveloperGatewayController {
         }
         try {
             return ResponseEntity.ok(gateway.chat(developer.getId(), request));
+        } catch (io.continuum.firewall.PromptFirewallService.BlockedException e) {
+            // V8 Prompt Firewall blocked the request (e.g. prompt injection).
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "request_blocked", "message", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "invalid_request", "message", e.getMessage()));
         } catch (GatewayService.GatewayException e) {

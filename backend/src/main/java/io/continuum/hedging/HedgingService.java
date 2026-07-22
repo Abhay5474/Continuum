@@ -20,7 +20,9 @@ import java.util.concurrent.atomic.AtomicReference;
 public class HedgingService {
 
     private final AtomicBoolean enabled = new AtomicBoolean(false);
-    private final AtomicReference<HedgingPolicy> policy = new AtomicReference<>(HedgingPolicy.defaults());
+    // Default to the paper-faithful adaptive policy (p95 trigger, 5% cap).
+    private final AtomicReference<HedgingPolicy> policy = new AtomicReference<>(HedgingPolicy.adaptiveDefaults());
+    private final AdaptiveHedgeGovernor governor = new AdaptiveHedgeGovernor();
 
     private final ThreadPoolExecutor pool = (ThreadPoolExecutor) Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "hedge-worker");
@@ -50,7 +52,25 @@ public class HedgingService {
     }
 
     public HedgedResult execute(LlmRequest request, List<String> chain) {
-        return executor.execute(request, chain, policy.get());
+        return executor.execute(request, chain, policy.get(), governor);
+    }
+
+    /** Live adaptive-hedging telemetry for the before/after research metric. */
+    public java.util.Map<String, Object> metrics() {
+        HedgingPolicy p = policy.get();
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("adaptive", p.adaptive());
+        out.put("effectiveThresholdMs", governor.effectiveThresholdMs(p));
+        out.put("configuredThresholdMs", p.thresholdMs());
+        out.put("hedgeRateCap", p.hedgeRateCap());
+        out.put("observedHedgeRate", governor.lifetimeHedgeRate());
+        out.put("currentWindowHedgeRate", governor.currentHedgeRate());
+        out.put("latencyP50Ms", governor.p50());
+        out.put("latencyP95Ms", governor.p95());
+        out.put("latencyP99Ms", governor.p99());
+        out.put("totalRequests", governor.totalRequests());
+        out.put("totalHedged", governor.totalHedged());
+        return out;
     }
 
     @PreDestroy

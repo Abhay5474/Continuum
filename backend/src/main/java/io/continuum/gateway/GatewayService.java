@@ -59,6 +59,11 @@ public class GatewayService {
     private final io.continuum.dag.ConsensusDagService consensusDag;
     // V7 Context MMU (additive; open() returns null unless opted in ⇒ exact legacy path).
     private final io.continuum.mmu.ContextMMU contextMmu;
+    // V8 contextual+non-stationary bandit (additive; record-only, never alters routing).
+    private final io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit;
+    // V8 prompt compression + firewall (additive; pass-through unless opted in).
+    private final io.continuum.compression.PromptCompressionService compression;
+    private final io.continuum.firewall.PromptFirewallService firewall;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -70,7 +75,10 @@ public class GatewayService {
                           io.continuum.persistence.repository.AutopilotRequestLabelRepository autopilotLabels,
                           io.continuum.godmode.GodModeService godMode,
                           io.continuum.dag.ConsensusDagService consensusDag,
-                          io.continuum.mmu.ContextMMU contextMmu) {
+                          io.continuum.mmu.ContextMMU contextMmu,
+                          io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit,
+                          io.continuum.compression.PromptCompressionService compression,
+                          io.continuum.firewall.PromptFirewallService firewall) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -86,6 +94,18 @@ public class GatewayService {
         this.godMode = godMode;
         this.consensusDag = consensusDag;
         this.contextMmu = contextMmu;
+        this.contextualBandit = contextualBandit;
+        this.compression = compression;
+        this.firewall = firewall;
+    }
+
+    /** Record a routing outcome into the contextual bandit; never affects the request. */
+    private void recordBandit(double complexity, String provider, boolean success, long latencyMs, double cost) {
+        try {
+            contextualBandit.observe(complexity, provider, success, latencyMs, cost);
+        } catch (Exception ignored) {
+            // Learning must never break a request.
+        }
     }
 
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
@@ -103,6 +123,10 @@ public class GatewayService {
         }
         long started = System.nanoTime();
         LlmRequest canonical = normalizer.normalize(req);
+        // V8 Prompt Firewall (opt-in, OFF by default): redact PII and block
+        // prompt-injection BEFORE anything else touches the prompt. Pass-through
+        // when off. A blocked request throws (mapped to a clean 4xx upstream).
+        canonical = firewall.guardInbound(developerId, canonical);
         // God Mode Twin Gate: Interpose and augment request with memory if enabled
         canonical = godMode.augmentRequest(developerId, canonical);
         // V7 Context MMU (opt-in, OFF by default): virtualize the context window.
@@ -112,6 +136,9 @@ public class GatewayService {
         if (mmuSession != null) {
             canonical = mmuSession.request();
         }
+        // V8 Prompt Compression (opt-in, OFF by default): shrink context tokens.
+        // Pass-through when off; runs after paging so it compresses the final context.
+        canonical = compression.maybeCompress(developerId, canonical);
         double complexity = complexityEstimator.estimate(canonical).complexity();
         boolean requireVision = Boolean.TRUE.equals(req.requireVision());
         RoutingMode mode = parseMode(req.routingMode());
@@ -190,16 +217,21 @@ public class GatewayService {
                 var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
                         resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers));
                 labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
+                recordBandit(complexity, c.provider(), true, totalMs, cost);
+                // V8 Prompt Firewall (opt-in): scan the outbound response for leaked
+                // secrets. Pass-through when off.
+                String safeContent = firewall.guardOutbound(developerId, resp.content());
                 // God Mode (opt-in): observe the exchange into working memory.
                 // No-op (and can never throw) unless the developer enabled it.
                 godMode.observeExchange(developerId, "gateway",
-                        lastUserContent(canonical), resp.content());
+                        lastUserContent(canonical), safeContent);
 
-                return new GatewayDtos.ChatResponse(resp.content(), c.provider(), resp.model(),
+                return new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
                         totalMs, tokens, cost, failovers, reason);
             } catch (Exception e) {
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
                 health.recordFailure(c.provider(), c.model(), attemptMs, e.getMessage());
+                recordBandit(complexity, c.provider(), false, attemptMs, 0);
                 failovers++;
                 lastError = new RuntimeException(e.getMessage(), e);
                 log.warn("Gateway: {} {} failed, falling over: {}", c.provider(), c.model(), e.getMessage());

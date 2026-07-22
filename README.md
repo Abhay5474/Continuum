@@ -182,6 +182,25 @@ Live result: a 9k-token conversation sent as 2.7k tokens (70% reduction),
 fully transparent to the client. Includes the **Context Memory Profiler** UI.
 Full details in **[docs/V7_CONTEXT_MMU.md](docs/V7_CONTEXT_MMU.md)**.
 
+## V8 — Research improvements & new paper-based features
+
+Two research improvements to existing paper-based features + two new
+paper-grounded features, all additive and (for the new features) opt-in.
+Full details in **[docs/V8_RESEARCH.md](docs/V8_RESEARCH.md)**.
+
+- **Adaptive hedging** — the tail-latency hedge now fires at the live p95 and is
+  capped at a 5% hedge rate, faithful to *The Tail at Scale* (was a fixed delay).
+- **Contextual + non-stationary bandit** — provider posteriors are now kept
+  per-complexity-context and discounted over time (LinUCB / discounted Thompson
+  sampling), fixing the context-free, stationary gap in the V4 bandit.
+- **Prompt Compression (LLMLingua)** — drops low-information tokens to cut input
+  cost while protecting numbers/IDs/code; opt-in.
+- **Prompt Firewall (OWASP LLM01)** — inbound PII redaction + prompt-injection
+  blocking and outbound secret scanning; opt-in.
+- **Novel contribution harness** — `ParadoxHealingBenchmarkTest` proves the
+  self-healing replay engine over **300 mid-flight code mutations: 0 crashes, 0
+  double side-effects, 266 divergences healed.**
+
 ## Quick start (one command)
 
 ```bash

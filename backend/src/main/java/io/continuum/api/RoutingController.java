@@ -25,13 +25,40 @@ public class RoutingController {
     private final ProviderSelectionEngine engine;
     private final ProviderMetrics metrics;
     private final RoutingDecisionRepository decisions;
+    private final io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit;
 
     public RoutingController(ModelRoutingState state, ProviderSelectionEngine engine,
-                             ProviderMetrics metrics, RoutingDecisionRepository decisions) {
+                             ProviderMetrics metrics, RoutingDecisionRepository decisions,
+                             io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit) {
         this.state = state;
         this.engine = engine;
         this.metrics = metrics;
         this.decisions = decisions;
+        this.contextualBandit = contextualBandit;
+    }
+
+    /**
+     * V8 — the learned contextual + non-stationary bandit's per-context posteriors,
+     * built from real gateway outcomes (record-only; does not change routing).
+     */
+    @GetMapping("/bandit")
+    public Map<String, Object> bandit() {
+        return contextualBandit.snapshot();
+    }
+
+    /**
+     * Context-aware provider ranking: how the non-stationary bandit would order
+     * these providers for a request of the given complexity, right now.
+     */
+    @GetMapping("/bandit/suggest")
+    public Map<String, Object> banditSuggest(@RequestParam double complexity,
+                                             @RequestParam List<String> providers,
+                                             @RequestParam(defaultValue = "0.6") double wQuality,
+                                             @RequestParam(defaultValue = "0.2") double wCost,
+                                             @RequestParam(defaultValue = "0.2") double wLatency) {
+        var ctx = io.continuum.autopilot.engine.ContextualBanditEngine.Context.ofComplexity(complexity);
+        var ranked = contextualBandit.rank(ctx, providers, wQuality, wCost, wLatency);
+        return Map.of("context", ctx.name(), "ranking", ranked);
     }
 
     @GetMapping("/state")

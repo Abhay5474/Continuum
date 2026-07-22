@@ -41,6 +41,20 @@ public class DeveloperAuthEntity {
     @Column(name = "v7_mmu_enabled", nullable = false)
     private boolean v7MmuEnabled = false;
 
+    /**
+     * V8 Prompt Compression (LLMLingua-inspired) toggle. OFF by default: while
+     * false, the prompt is sent verbatim, exactly as before.
+     */
+    @Column(name = "v8_compression_enabled", nullable = false)
+    private boolean v8CompressionEnabled = false;
+
+    /**
+     * V8 Prompt Firewall (PII redaction + injection defense) toggle. OFF by
+     * default: while false, no scanning or redaction happens.
+     */
+    @Column(name = "v8_firewall_enabled", nullable = false)
+    private boolean v8FirewallEnabled = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -63,5 +77,9 @@ public class DeveloperAuthEntity {
     public void setV6DagEnabled(boolean v) { this.v6DagEnabled = v; }
     public boolean isV7MmuEnabled() { return v7MmuEnabled; }
     public void setV7MmuEnabled(boolean v) { this.v7MmuEnabled = v; }
+    public boolean isV8CompressionEnabled() { return v8CompressionEnabled; }
+    public void setV8CompressionEnabled(boolean v) { this.v8CompressionEnabled = v; }
+    public boolean isV8FirewallEnabled() { return v8FirewallEnabled; }
+    public void setV8FirewallEnabled(boolean v) { this.v8FirewallEnabled = v; }
     public Instant getCreatedAt() { return createdAt; }
 }

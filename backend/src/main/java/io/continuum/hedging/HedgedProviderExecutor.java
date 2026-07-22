@@ -42,10 +42,23 @@ public class HedgedProviderExecutor {
     }
 
     public HedgedResult execute(LlmRequest request, List<String> chain, HedgingPolicy policy) {
+        return execute(request, chain, policy, null);
+    }
+
+    /**
+     * Hedged execution with an optional adaptive {@link HedgeGovernor}. When the
+     * governor is {@code null} this is the exact original fixed-threshold race;
+     * when present, the hedge fires at the live p95 and is gated by the rate cap
+     * (V8 — <em>The Tail at Scale</em>). Either way the winner cancels its
+     * siblings (tied requests).
+     */
+    public HedgedResult execute(LlmRequest request, List<String> chain, HedgingPolicy policy,
+                                HedgeGovernor governor) {
         if (chain == null || chain.isEmpty()) {
             throw new IllegalStateException("No providers to hedge over");
         }
         long start = System.nanoTime();
+        long thresholdMs = governor == null ? policy.thresholdMs() : governor.effectiveThresholdMs(policy);
         CompletionService<Attempt> ecs = new ExecutorCompletionService<>(pool);
         List<Future<Attempt>> inflight = new ArrayList<>();
         List<String> attempted = new ArrayList<>();
@@ -56,12 +69,13 @@ public class HedgedProviderExecutor {
 
         try {
             while (!inflight.isEmpty()) {
-                // Wait up to the hedge threshold for the current leader(s).
-                Future<Attempt> done = ecs.poll(policy.thresholdMs(), TimeUnit.MILLISECONDS);
+                // Wait up to the (adaptive) hedge threshold for the current leader(s).
+                Future<Attempt> done = ecs.poll(thresholdMs, TimeUnit.MILLISECONDS);
                 if (done == null) {
-                    // Slow: hedge if allowed (bounded extra parallelism + budget).
+                    // Slow: hedge if allowed (rate cap + bounded parallelism + budget).
                     boolean canHedge = inflight.size() <= policy.maxHedges()
                             && nextIdx < chain.size()
+                            && (governor == null || governor.allowHedge(policy))
                             && budgetCheck.canAfford(attempted, chain.get(nextIdx), request, policy.perRequestBudgetUsd());
                     if (canHedge) {
                         nextIdx = launch(ecs, inflight, attempted, chain, nextIdx, request);
@@ -71,10 +85,14 @@ public class HedgedProviderExecutor {
                 inflight.remove(done);
                 Attempt attempt = done.get();
                 if (arbitrator.accept(attempt)) {
-                    cancel(inflight);
+                    cancel(inflight); // tied requests: winner cancels the losers
                     long ms = (System.nanoTime() - start) / 1_000_000;
+                    boolean hedged = attempted.size() > 1;
+                    if (governor != null) {
+                        governor.recordCompletion(ms, hedged);
+                    }
                     return new HedgedResult(attempt.response(), attempt.provider(),
-                            attempted.size() > 1, attempted.size(), ms, attempted);
+                            hedged, attempted.size(), ms, attempted);
                 }
                 // Failure -> failover to the next provider immediately (not counted as a hedge).
                 lastError = attempt.error();
