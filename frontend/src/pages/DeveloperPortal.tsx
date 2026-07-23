@@ -234,7 +234,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       {(keys.length === 0 || newKey) && (
         <div className="glass overflow-hidden p-5 animate-fade-up">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-aurora/15 px-2.5 py-0.5 text-xs font-semibold text-violet-300">
+            <span className="rounded-full bg-aurora/15 px-2.5 py-0.5 text-xs font-semibold text-indigo-300">
               Get started
             </span>
             <div className="text-sm font-semibold">Make your first call in under 2 minutes</div>
@@ -402,7 +402,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           <div>
             <div className="font-medium">
               V7 Context Virtualization <span className="text-xs text-slate-500">(Paging MMU)</span>
-              {v7Enabled && <span className="ml-2 rounded bg-aurora/15 px-2 py-0.5 text-[10px] font-bold text-violet-300">ACTIVE</span>}
+              {v7Enabled && <span className="ml-2 rounded bg-aurora/15 px-2 py-0.5 text-[10px] font-bold text-indigo-300">ACTIVE</span>}
             </div>
             <p className="text-xs text-slate-400">
               Continuum owns the Virtual Context Space: long histories are paged into semantic stubs
@@ -414,7 +414,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           <button onClick={toggleV7} disabled={v7Enabled === null}
             className={`ml-auto rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
               v7Enabled
-                ? "bg-aurora/20 text-violet-300 ring-1 ring-aurora/50"
+                ? "bg-aurora/20 text-indigo-300 ring-1 ring-aurora/50"
                 : "bg-indigo-600 text-white hover:bg-indigo-500"}`}>
             {v7Enabled === null ? "…" : v7Enabled ? "Enabled — click to disable" : "Enable V7 Context Virtualization"}
           </button>

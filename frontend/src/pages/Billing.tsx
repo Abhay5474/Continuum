@@ -121,7 +121,7 @@ export default function Billing() {
             >
               <div className="flex items-center justify-between">
                 <div className="text-sm font-bold">{p.id}</div>
-                {current && <span className="rounded-full bg-aurora/20 px-2 py-0.5 text-[10px] font-semibold text-violet-300">Current</span>}
+                {current && <span className="rounded-full bg-aurora/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">Current</span>}
               </div>
               <div className="mt-2 text-2xl font-bold">
                 ${p.monthlyPriceUsd}

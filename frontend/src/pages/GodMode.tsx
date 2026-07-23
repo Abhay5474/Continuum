@@ -102,7 +102,7 @@ export default function GodMode() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-gradient">God Mode</h1>
               {enabled && (
-                <span className="rounded-full bg-aurora/20 px-2.5 py-0.5 text-xs font-semibold text-violet-300">
+                <span className="rounded-full bg-aurora/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-300">
                   AUTONOMOUS
                 </span>
               )}
@@ -199,7 +199,7 @@ export default function GodMode() {
                 <button
                   onClick={() => portal.godmode.ingest("manual", "user", ingestText).then(() => { setIngestText(""); refresh(); })}
                   disabled={!ingestText}
-                  className="rounded-lg bg-aurora/20 px-3 py-1.5 text-xs text-violet-300 hover:bg-aurora/30 disabled:opacity-40">
+                  className="rounded-lg bg-aurora/20 px-3 py-1.5 text-xs text-indigo-300 hover:bg-aurora/30 disabled:opacity-40">
                   Ingest
                 </button>
               </div>
@@ -217,7 +217,7 @@ export default function GodMode() {
                 <Tier icon="⚡" name="Working" value={status?.memory?.working?.items ?? 0}
                   sub={`${status?.memory?.working?.tokens ?? 0} tok`} hue="text-neon" />
                 <FlowArrow label="summarize" />
-                <Tier icon="📼" name="Episodic" value={status?.memory?.episodic?.items ?? 0} sub="summaries" hue="text-violet-300" />
+                <Tier icon="📼" name="Episodic" value={status?.memory?.episodic?.items ?? 0} sub="summaries" hue="text-indigo-300" />
                 <FlowArrow label="distill" />
                 <Tier icon="🕸" name="Semantic" value={status?.memory?.semantic?.nodes ?? 0} sub="experiences" hue="text-emerald-300" />
                 <FlowArrow label="decay" />
@@ -242,7 +242,7 @@ export default function GodMode() {
                   {retrieved.map((r, i) => (
                     <div key={i} className="rounded-lg bg-ink/60 px-3 py-1.5 text-xs animate-fade-up">
                       <span className={`mr-2 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                        r.tier === "SEMANTIC" ? "bg-emerald-500/20 text-emerald-300" : "bg-violet-500/20 text-violet-300"}`}>
+                        r.tier === "SEMANTIC" ? "bg-emerald-500/20 text-emerald-300" : "bg-indigo-500/20 text-indigo-300"}`}>
                         {r.tier}
                       </span>
                       <span className="text-slate-300">{r.text}</span>
@@ -404,7 +404,7 @@ function Multiverse({ running, verdict }: { running: boolean; verdict: string | 
   const branches = [
     { d: "M 10 60 C 150 60, 250 18, 590 14", cls: "stroke-aurora/70" },
     { d: "M 10 60 C 150 60, 250 40, 590 38", cls: "stroke-neon/70" },
-    { d: "M 10 60 C 150 60, 250 84, 590 86", cls: "stroke-violet-400/50" },
+    { d: "M 10 60 C 150 60, 250 84, 590 86", cls: "stroke-indigo-400/50" },
     { d: "M 10 60 C 150 60, 250 104, 590 108", cls: "stroke-cyan-400/40" },
   ];
   const survivor = verdict === "PROMOTE" ? 0 : 1; // promoted branch or the baseline
@@ -413,7 +413,7 @@ function Multiverse({ running, verdict }: { running: boolean; verdict: string | 
       <svg viewBox="0 0 600 120" className="h-32 w-full min-w-[480px]">
         {/* baseline trunk */}
         <line x1="10" y1="60" x2="590" y2="60" stroke="#334155" strokeWidth="2" strokeDasharray="4 4" />
-        <circle cx="10" cy="60" r="5" fill="#8b5cf6">
+        <circle cx="10" cy="60" r="5" fill="#6366f1">
           {running && <animate attributeName="r" values="4;7;4" dur="1s" repeatCount="indefinite" />}
         </circle>
         {(running || verdict) &&
@@ -457,16 +457,16 @@ function ExperienceGraph({ graph }: { graph: any }) {
         const a = pos.get(e.from), b = pos.get(e.to);
         return a && b ? (
           <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-            stroke="#8b5cf6" strokeOpacity={0.15 + e.weight * 0.4} strokeWidth={1 + e.weight} />
+            stroke="#6366f1" strokeOpacity={0.15 + e.weight * 0.4} strokeWidth={1 + e.weight} />
         ) : null;
       })}
       {nodes.map((n) => {
         const p = pos.get(n.id)!;
         return (
           <g key={n.id} className="cursor-pointer">
-            <circle cx={p.x} cy={p.y} r={5 + n.utility * 6} fill="#0d1322" stroke="#22d3ee"
+            <circle cx={p.x} cy={p.y} r={5 + n.utility * 6} fill="#11141b" stroke="#3b82f6"
               strokeOpacity={0.4 + n.utility * 0.6} strokeWidth="1.5"
-              style={{ filter: "drop-shadow(0 0 4px rgba(34,211,238,0.4))" }}>
+              style={{ filter: "drop-shadow(0 0 4px rgba(59,130,246,0.4))" }}>
               <title>{n.text} (utility {(n.utility * 100).toFixed(0)}%, used {n.uses}×)</title>
             </circle>
           </g>
@@ -484,11 +484,11 @@ function VerdictBadge({ verdict }: { verdict: string }) {
 
 function actionColor(action: string) {
   switch (action) {
-    case "SUMMARIZE": return "bg-violet-500/20 text-violet-300";
+    case "SUMMARIZE": return "bg-indigo-500/20 text-indigo-300";
     case "PROMOTE": return "bg-emerald-500/20 text-emerald-300";
     case "PRUNE": return "bg-amber-500/20 text-amber-300";
     case "ARCHIVE": return "bg-slate-500/20 text-slate-300";
-    case "RETRIEVE": return "bg-cyan-500/20 text-cyan-300";
+    case "RETRIEVE": return "bg-blue-500/20 text-sky-300";
     case "STORE": return "bg-indigo-500/20 text-indigo-300";
     default: return "bg-slate-600/20 text-slate-400";
   }

@@ -48,7 +48,7 @@ export default function MmuProfiler() {
         <Tile label="Est. cost saved" value={pct(p.estimatedCostSaved)} accent="text-emerald-300" />
         <Tile label="Fault latency P50/P95" value={p.requests ? `${p.faultLatencyP50Ms}/${p.faultLatencyP95Ms}ms` : "—"} />
         <Tile label="Materialization" value={p.avgMaterializationMs != null ? `${Number(p.avgMaterializationMs).toFixed(0)}ms` : "—"} />
-        <Tile label="Compression" value={p.compressionRatio ? `${Number(p.compressionRatio).toFixed(1)}x` : "—"} accent="text-violet-300" />
+        <Tile label="Compression" value={p.compressionRatio ? `${Number(p.compressionRatio).toFixed(1)}x` : "—"} accent="text-indigo-300" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -122,7 +122,7 @@ export default function MmuProfiler() {
           <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
             {stubs.map((s) => (
               <div key={s.stubId} className="flex flex-wrap items-center gap-2 rounded-md bg-ink/60 px-3 py-1.5 text-xs">
-                <span className="font-mono text-[10px] text-violet-300">{s.stubId}</span>
+                <span className="font-mono text-[10px] text-indigo-300">{s.stubId}</span>
                 <span className="rounded bg-edge px-1.5 py-0.5 text-[10px] text-slate-400">v{s.version}</span>
                 {s.version > 1 && (
                   <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">MUTATED</span>
@@ -178,13 +178,13 @@ function HierarchyVisualizer({ profile, stubs }: { profile: any; stubs: any[] })
     <div className="mt-3 space-y-1.5">
       <Tier name="L1" desc="active token window (sent to model)" blocks={l1Blocks} color="text-neon" delay={0} />
       <MigrationArrow label={`evict → summarize${migrating ? " · live" : ""}`} active={migrating} />
-      <Tier name="L2" desc="semantic stubs [MEMORY_REF]" blocks={l2Blocks} color="text-violet-300" delay={0.2} />
+      <Tier name="L2" desc="semantic stubs [MEMORY_REF]" blocks={l2Blocks} color="text-indigo-300" delay={0.2} />
       <MigrationArrow label="page out → immutable events" active={migrating} />
       <Tier name="L3" desc="Postgres event streams (disk)" blocks={l3Blocks} color="text-slate-400" delay={0.4} />
       <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500">
         <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">↑ prefetch: {profile?.prefetches ?? 0}</span>
         <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">⚡ faults: {profile?.pageFaults ?? 0}</span>
-        <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">✎ dirty flushes: {profile?.dirtyFlushes ?? 0}</span>
+        <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-indigo-300">✎ dirty flushes: {profile?.dirtyFlushes ?? 0}</span>
       </div>
     </div>
   );

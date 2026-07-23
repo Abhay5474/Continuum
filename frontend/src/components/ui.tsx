@@ -72,7 +72,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-edge/80 px-6 py-12 text-center animate-fade-up">
-      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-aurora/10 text-2xl text-violet-300">
+      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-aurora/10 text-2xl text-indigo-300">
         {icon}
       </div>
       <div className="text-sm font-semibold text-slate-200">{title}</div>
@@ -210,7 +210,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
                 : t.kind === "error"
                 ? "border-rose-400/40 bg-rose-500/10 text-rose-200"
-                : "border-aurora/40 bg-aurora/10 text-violet-100"
+                : "border-aurora/40 bg-aurora/10 text-indigo-100"
             }`}
           >
             <span>{t.kind === "success" ? "✓" : t.kind === "error" ? "⚠" : "ℹ"}</span>

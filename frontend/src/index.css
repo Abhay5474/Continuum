@@ -4,20 +4,20 @@
 
 /* ---- theme variables: dark is the default ---- */
 :root {
-  --ink: 7 10 18;       /* #070a12 */
-  --panel: 13 19 34;    /* #0d1322 */
-  --edge: 30 39 57;     /* #1e2739 */
-  --aurora-glow: 0.1;
-  --neon-glow: 0.07;
+  --ink: 9 11 16;        /* #090b10 — neutral near-black */
+  --panel: 17 20 27;     /* #11141b — elevated surface */
+  --edge: 33 37 47;      /* #21252f — quiet neutral border */
+  --aurora-glow: 0.05;
+  --neon-glow: 0.035;
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --ink: 247 248 251;    /* near-white app background */
+  --ink: 248 249 251;    /* near-white app background */
   --panel: 255 255 255;  /* cards */
-  --edge: 224 229 238;   /* borders */
-  --aurora-glow: 0.06;
-  --neon-glow: 0.05;
+  --edge: 226 230 237;   /* borders */
+  --aurora-glow: 0.045;
+  --neon-glow: 0.03;
   color-scheme: light;
 }
 
@@ -30,10 +30,10 @@ body,
 body {
   @apply bg-ink text-slate-200;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* Ambient aurora field behind everything — premium AI product feel. */
+  /* Faint single-hue indigo wash — restrained, not a light show. */
   background-image:
-    radial-gradient(1100px 500px at 85% -10%, rgba(139, 92, 246, var(--aurora-glow)), transparent 60%),
-    radial-gradient(900px 420px at 0% 110%, rgba(34, 211, 238, var(--neon-glow)), transparent 60%);
+    radial-gradient(1200px 560px at 88% -12%, rgba(99, 102, 241, var(--aurora-glow)), transparent 62%),
+    radial-gradient(1000px 460px at -5% 112%, rgba(59, 130, 246, var(--neon-glow)), transparent 62%);
   background-attachment: fixed;
 }
 
@@ -69,13 +69,13 @@ body {
   /* Glassy elevated surface. */
   .glass {
     @apply rounded-xl border border-edge/80 bg-panel/70 backdrop-blur;
-    background-image: linear-gradient(160deg, rgba(139, 92, 246, 0.05), transparent 45%);
+    background-image: linear-gradient(160deg, rgba(99, 102, 241, 0.035), transparent 45%);
   }
 
-  /* Gradient headline text. */
+  /* Gradient headline text — subtle indigo → blue, same hue family. */
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(90deg, #c4b5fd, #22d3ee);
+    background-image: linear-gradient(90deg, #a5b4fc, #60a5fa);
   }
 
   /* Animated shimmer strip (flow arrows, loading accents). */
@@ -83,8 +83,8 @@ body {
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(139, 92, 246, 0.7),
-      rgba(34, 211, 238, 0.7),
+      rgba(99, 102, 241, 0.6),
+      rgba(59, 130, 246, 0.6),
       transparent
     );
     background-size: 200% 100%;

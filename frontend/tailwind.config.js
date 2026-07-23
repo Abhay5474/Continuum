@@ -9,13 +9,17 @@ export default {
         ink: "rgb(var(--ink) / <alpha-value>)",
         panel: "rgb(var(--panel) / <alpha-value>)",
         edge: "rgb(var(--edge) / <alpha-value>)",
-        aurora: "#8b5cf6",
-        neon: "#22d3ee",
+        // Cohesive indigo→blue accent family (single-hue, professional) rather
+        // than the previous clashing purple + neon-cyan. Names kept for
+        // backwards compatibility across components.
+        aurora: "#6366f1",
+        neon: "#3b82f6",
       },
       boxShadow: {
-        glow: "0 0 24px -6px rgba(139, 92, 246, 0.5)",
-        "glow-cyan": "0 0 24px -6px rgba(34, 211, 238, 0.45)",
-        "glow-sm": "0 0 12px -4px rgba(139, 92, 246, 0.6)",
+        // Soft, subtle elevation — no neon halos.
+        glow: "0 6px 22px -12px rgba(99, 102, 241, 0.45)",
+        "glow-cyan": "0 6px 22px -12px rgba(59, 130, 246, 0.4)",
+        "glow-sm": "0 3px 12px -8px rgba(99, 102, 241, 0.5)",
       },
       keyframes: {
         fadeUp: {
@@ -23,8 +27,8 @@ export default {
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
         glowPulse: {
-          "0%, 100%": { boxShadow: "0 0 18px -6px rgba(139, 92, 246, 0.55)" },
-          "50%": { boxShadow: "0 0 34px -4px rgba(34, 211, 238, 0.55)" },
+          "0%, 100%": { boxShadow: "0 4px 18px -10px rgba(99, 102, 241, 0.5)" },
+          "50%": { boxShadow: "0 6px 26px -10px rgba(59, 130, 246, 0.5)" },
         },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },

@@ -25,7 +25,7 @@ export default function App() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
       isActive
-        ? "bg-aurora/15 text-violet-200 shadow-glow-sm ring-1 ring-aurora/40"
+        ? "bg-aurora/15 text-indigo-200 shadow-glow-sm ring-1 ring-aurora/40"
         : "text-slate-400 hover:bg-edge/60 hover:text-slate-200"
     }`;
 
@@ -33,7 +33,7 @@ export default function App() {
     `rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
       isActive
         ? "bg-gradient-to-r from-aurora/30 to-neon/25 text-white shadow-glow ring-1 ring-aurora/50"
-        : "text-violet-300 hover:bg-aurora/10 hover:shadow-glow-sm"
+        : "text-indigo-300 hover:bg-aurora/10 hover:shadow-glow-sm"
     }`;
 
   return (

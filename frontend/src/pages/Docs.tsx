@@ -32,7 +32,7 @@ export default function Docs() {
                 onClick={() => setActive(s.id)}
                 className={`block rounded-lg px-3 py-1.5 text-sm transition-colors ${
                   active === s.id
-                    ? "bg-aurora/15 text-violet-200 ring-1 ring-aurora/30"
+                    ? "bg-aurora/15 text-indigo-200 ring-1 ring-aurora/30"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >

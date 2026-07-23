@@ -169,14 +169,14 @@ function TraceView({ workflowId }: { workflowId: string }) {
           <span className="text-[10px] uppercase tracking-wider text-slate-500">Time travel</span>
           <input type="range" min={0} max={100} value={cursor}
             onChange={(e) => setCursor(Number(e.target.value))}
-            className="flex-1 accent-violet-500" />
+            className="flex-1 accent-indigo-500" />
           <span className="w-9 text-right text-[10px] text-slate-500">{cursor}%</span>
         </div>
         <button onClick={() => setCollapsed(!collapsed)}
           className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-300 ${
             collapsed
               ? "bg-gradient-to-r from-aurora to-neon text-ink shadow-glow"
-              : "border border-aurora/50 text-violet-300 hover:shadow-glow-sm"}`}>
+              : "border border-aurora/50 text-indigo-300 hover:shadow-glow-sm"}`}>
           {collapsed ? "⟲ Expand multiverse" : "🔥 Collapse to Truth"}
         </button>
       </div>
@@ -213,7 +213,7 @@ function TraceView({ workflowId }: { workflowId: string }) {
                 {(["evidence", "computation", "dependencies"] as const).map((t) => (
                   <button key={t} onClick={() => setTab(t)}
                     className={`rounded px-2 py-1 text-[10px] capitalize transition-colors ${
-                      tab === t ? "bg-aurora/20 text-violet-300" : "text-slate-500 hover:text-slate-300"}`}>
+                      tab === t ? "bg-aurora/20 text-indigo-300" : "text-slate-500 hover:text-slate-300"}`}>
                     {t}
                   </button>
                 ))}
@@ -228,7 +228,7 @@ function TraceView({ workflowId }: { workflowId: string }) {
           <svg viewBox="0 0 920 520" className="h-[556px] w-full">
             <defs>
               <radialGradient id="nodeGlow">
-                <stop offset="0%" stopColor="rgba(139,92,246,0.35)" />
+                <stop offset="0%" stopColor="rgba(99,102,241,0.35)" />
                 <stop offset="100%" stopColor="transparent" />
               </radialGradient>
             </defs>
@@ -242,7 +242,7 @@ function TraceView({ workflowId }: { workflowId: string }) {
               const isDim = collapsed && (!spine.has(e.fromKey) || !spine.has(e.toKey));
               const color = e.edgeType === "CONTRADICTS" ? "#f87171"
                 : e.edgeType === "SUPPORTS" ? "#34d399"
-                : e.edgeType === "DEPENDS" ? "#94a3b8" : "#8b5cf6";
+                : e.edgeType === "DEPENDS" ? "#94a3b8" : "#6366f1";
               const mx = (a.x + b.x) / 2;
               const d = `M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`;
               return (
@@ -289,7 +289,7 @@ function TraceView({ workflowId }: { workflowId: string }) {
             })}
             {collapsed && (
               <text x={460} y={30} textAnchor="middle" fontSize={13} fill="#c4b5fd"
-                className="animate-fade-up" style={{ filter: "drop-shadow(0 0 8px rgba(139,92,246,0.8))" }}>
+                className="animate-fade-up" style={{ filter: "drop-shadow(0 0 8px rgba(99,102,241,0.8))" }}>
                 REASONING SPINE — final confidence {((run.finalConfidence ?? 0) * 100).toFixed(1)}%
               </text>
             )}
