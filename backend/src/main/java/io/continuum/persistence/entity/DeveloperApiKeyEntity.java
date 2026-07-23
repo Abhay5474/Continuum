@@ -38,6 +38,9 @@ public class DeveloperApiKeyEntity {
     @Column(name = "last_used_at")
     private Instant lastUsedAt;
 
+    @Column(name = "label", length = 120)
+    private String label;
+
     protected DeveloperApiKeyEntity() {
     }
 
@@ -58,4 +61,6 @@ public class DeveloperApiKeyEntity {
     public boolean isActive() { return revokedAt == null; }
     public Instant getLastUsedAt() { return lastUsedAt; }
     public void touch() { this.lastUsedAt = Instant.now(); }
+    public String getLabel() { return label; }
+    public void setLabel(String label) { this.label = label; }
 }

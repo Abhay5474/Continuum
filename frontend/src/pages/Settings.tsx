@@ -1,0 +1,243 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { portal } from "../api";
+import { useToast, Spinner, CopyButton } from "../components/ui";
+
+/**
+ * Account & settings: change password / email, manage API keys (name, last-used,
+ * revoke), invite teammates, and delete the account (GDPR).
+ */
+export default function Settings() {
+  const loggedIn = !!portal.session();
+  const nav = useNavigate();
+  const toast = useToast();
+
+  const [me, setMe] = useState<any>(null);
+  const [keys, setKeys] = useState<any[]>([]);
+  const [invites, setInvites] = useState<any[]>([]);
+
+  // forms
+  const [curPw, setCurPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [keyLabel, setKeyLabel] = useState("");
+  const [newKey, setNewKey] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState("");
+
+  const load = () => {
+    portal.me().then((m) => { setMe(m); setEmail(m.email ?? ""); }).catch(() => {});
+    portal.keys().then(setKeys).catch(() => {});
+    portal.invites().then(setInvites).catch(() => {});
+  };
+  useEffect(() => {
+    if (loggedIn) load();
+  }, [loggedIn]);
+
+  if (!loggedIn) {
+    return (
+      <div className="glass mx-auto mt-16 max-w-md p-8 text-center">
+        <div className="text-3xl">⚙️</div>
+        <h1 className="mt-2 text-lg font-semibold">Account settings</h1>
+        <p className="mt-1 text-sm text-slate-400">Sign in through the Developer Portal first.</p>
+        <a href="/portal" className="mt-4 inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-semibold text-ink">
+          Open Developer Portal →
+        </a>
+      </div>
+    );
+  }
+
+  const changePassword = async () => {
+    setPwBusy(true);
+    try {
+      await portal.changePassword(curPw, newPw);
+      toast("Password updated ✓", "success");
+      setCurPw(""); setNewPw("");
+    } catch (e: any) {
+      toast(e?.message ?? "Could not change password", "error");
+    } finally { setPwBusy(false); }
+  };
+  const changeEmail = async () => {
+    setEmailBusy(true);
+    try {
+      await portal.changeEmail(email);
+      toast("Email updated ✓", "success");
+      load();
+    } catch (e: any) {
+      toast(e?.message ?? "Could not change email", "error");
+    } finally { setEmailBusy(false); }
+  };
+  const issueKey = async () => {
+    try {
+      const r = await portal.issueKey(keyLabel || undefined);
+      setNewKey(r.apiKey);
+      setKeyLabel("");
+      toast("API key created ✓", "success");
+      portal.keys().then(setKeys);
+    } catch (e: any) {
+      toast(e?.message ?? "Could not create key", "error");
+    }
+  };
+  const revokeKey = async (id: number) => {
+    if (!confirm("Revoke this key? Apps using it will stop working immediately.")) return;
+    try {
+      await portal.revokeKey(id);
+      toast("Key revoked", "success");
+      portal.keys().then(setKeys);
+    } catch (e: any) {
+      toast(e?.message ?? "Could not revoke", "error");
+    }
+  };
+  const sendInvite = async () => {
+    try {
+      const r = await portal.invite(inviteEmail);
+      toast(`Invite created for ${r.email}`, "success");
+      setInviteEmail("");
+      portal.invites().then(setInvites);
+    } catch (e: any) {
+      toast(e?.message ?? "Could not invite", "error");
+    }
+  };
+  const deleteAccount = async () => {
+    try {
+      await portal.deleteAccount();
+      portal.logout();
+      toast("Account deleted", "success");
+      nav("/");
+    } catch (e: any) {
+      toast(e?.message ?? "Could not delete account", "error");
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6 animate-fade-up">
+      <div>
+        <h1 className="text-lg font-semibold">Account &amp; settings</h1>
+        {me && <p className="text-sm text-slate-400">{me.email} · <span className="font-mono">{me.id}</span></p>}
+      </div>
+
+      {/* API keys */}
+      <Section title="API keys" subtitle="Name a key so you remember what it's for. Keys are shown once.">
+        <div className="flex flex-wrap gap-2">
+          <input value={keyLabel} onChange={(e) => setKeyLabel(e.target.value)} placeholder="Key name (e.g. production)"
+            className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+          <button onClick={issueKey} className="rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-semibold text-ink">
+            Create key
+          </button>
+        </div>
+        {newKey && (
+          <div className="mt-2 flex items-center gap-2 rounded bg-ink p-2">
+            <code className="min-w-0 flex-1 break-all font-mono text-xs text-emerald-300">{newKey}</code>
+            <span className="whitespace-nowrap text-[10px] text-slate-500">shown once</span>
+            <CopyButton text={newKey} />
+          </div>
+        )}
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-slate-500">
+              <tr className="text-left"><th className="py-1">Name</th><th>Prefix</th><th>Last used</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              {keys.map((k) => (
+                <tr key={k.id} className="border-t border-edge/50 text-xs">
+                  <td className="py-2">{k.label || <span className="text-slate-600">unnamed</span>}</td>
+                  <td className="font-mono">{k.prefix}…</td>
+                  <td className="text-slate-400">{k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : "never"}</td>
+                  <td className={k.active ? "text-emerald-300" : "text-rose-300"}>{k.active ? "active" : "revoked"}</td>
+                  <td className="text-right">
+                    {k.active && (
+                      <button onClick={() => revokeKey(k.id)} className="rounded border border-edge px-2 py-0.5 text-rose-300 hover:bg-rose-500/10">
+                        Revoke
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {keys.length === 0 && <tr><td colSpan={5} className="py-3 text-xs text-slate-500">no keys yet</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      {/* password */}
+      <Section title="Change password">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input type="password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder="Current password"
+            className="rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+          <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password (min 6)"
+            className="rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+        </div>
+        <button onClick={changePassword} disabled={pwBusy || !curPw || !newPw}
+          className="mt-3 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+          {pwBusy && <Spinner />} Update password
+        </button>
+      </Section>
+
+      {/* email */}
+      <Section title="Change email">
+        <div className="flex flex-wrap gap-2">
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
+            className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+          <button onClick={changeEmail} disabled={emailBusy || !email}
+            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+            {emailBusy && <Spinner />} Save
+          </button>
+        </div>
+      </Section>
+
+      {/* team */}
+      <Section title="Team" subtitle="Invite a teammate to your workspace (generates an invite link).">
+        <div className="flex flex-wrap gap-2">
+          <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="teammate@example.com"
+            className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+          <button onClick={sendInvite} disabled={!inviteEmail}
+            className="rounded-lg border border-edge px-4 py-2 text-sm hover:border-aurora/50 disabled:opacity-50">
+            Invite
+          </button>
+        </div>
+        {invites.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {invites.map((i) => (
+              <div key={i.id} className="flex items-center gap-2 text-xs text-slate-400">
+                <span>{i.email}</span>
+                <span className={`rounded px-1.5 py-0.5 ${i.accepted ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"}`}>
+                  {i.accepted ? "accepted" : "pending"}
+                </span>
+                <span className="ml-auto text-slate-600">{new Date(i.createdAt).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* danger zone */}
+      <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-5">
+        <div className="text-sm font-semibold text-rose-200">Danger zone</div>
+        <p className="mt-1 text-xs text-slate-400">
+          Deleting your account permanently removes your keys, credentials, memory, billing and all data (GDPR).
+          This cannot be undone. Type <b>DELETE</b> to confirm.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="DELETE"
+            className="w-40 rounded-lg border border-rose-500/30 bg-ink px-3 py-2 text-sm outline-none focus:border-rose-400/60" />
+          <button onClick={deleteAccount} disabled={confirmDelete !== "DELETE"}
+            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-40">
+            Delete my account &amp; data
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: import("react").ReactNode }) {
+  return (
+    <div className="glass p-5">
+      <div className="text-sm font-semibold">{title}</div>
+      {subtitle && <div className="mt-0.5 text-xs text-slate-400">{subtitle}</div>}
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}

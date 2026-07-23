@@ -48,6 +48,17 @@ public interface GatewayRequestLogRepository extends JpaRepository<GatewayReques
     @Query("select coalesce(sum(g.tokens),0) from GatewayRequestLogEntity g where g.developerId = :dev")
     long totalTokensForDeveloper(String dev);
 
+    /** Tokens + cost + request count for a developer since a timestamp (billing period). */
+    @Query("select coalesce(sum(g.tokens),0) from GatewayRequestLogEntity g " +
+           "where g.developerId = :dev and g.createdAt >= :since")
+    long tokensForDeveloperSince(String dev, java.time.Instant since);
+
+    @Query("select coalesce(sum(g.costUsd),0) from GatewayRequestLogEntity g " +
+           "where g.developerId = :dev and g.createdAt >= :since")
+    double costForDeveloperSince(String dev, java.time.Instant since);
+
+    long countByDeveloperIdAndCreatedAtGreaterThanEqual(String dev, java.time.Instant since);
+
     /** Per-provider outcomes for a developer — the arm statistics for the bandit. */
     @Query("select g.chosenProvider as provider, " +
            "sum(case when g.success = true then 1 else 0 end) as successes, " +

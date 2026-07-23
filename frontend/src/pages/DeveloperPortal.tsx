@@ -219,11 +219,15 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-lg font-semibold">Developer Portal</h1>
         {me && <span className="text-sm text-slate-400">{me.email} · <span className="font-mono">{me.id}</span></span>}
-        <button onClick={() => { portal.logout(); onLogout(); }}
-          className="ml-auto rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge">Sign out</button>
+        <div className="ml-auto flex items-center gap-2">
+          <Link to="/billing" className="rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 transition-colors hover:border-neon/50 hover:text-neon">Billing</Link>
+          <Link to="/settings" className="rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 transition-colors hover:border-neon/50 hover:text-neon">Settings</Link>
+          <button onClick={() => { portal.logout(); onLogout(); }}
+            className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge">Sign out</button>
+        </div>
       </div>
 
       {/* onboarding — the magic moment: get a key → copy a snippet → first call */}

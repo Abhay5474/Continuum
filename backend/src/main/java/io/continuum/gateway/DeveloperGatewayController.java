@@ -35,6 +35,10 @@ public class DeveloperGatewayController {
         }
         try {
             return ResponseEntity.ok(gateway.chat(developer.getId(), request));
+        } catch (io.continuum.billing.BillingService.QuotaExceededException e) {
+            // Over the monthly plan quota — 402 Payment Required.
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", "quota_exceeded", "message", e.getMessage()));
         } catch (io.continuum.firewall.PromptFirewallService.BlockedException e) {
             // V8 Prompt Firewall blocked the request (e.g. prompt injection).
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

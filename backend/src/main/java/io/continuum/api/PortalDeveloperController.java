@@ -61,16 +61,27 @@ public class PortalDeveloperController {
 
     @GetMapping("/keys")
     public List<Map<String, Object>> keys(HttpServletRequest req) {
-        return developers.keysFor(dev(req)).stream().map(k -> Map.<String, Object>of(
-                "id", k.getId(), "prefix", k.getKeyPrefix(), "active", k.isActive(),
-                "createdAt", k.getCreatedAt().toString())).toList();
+        return developers.keysFor(dev(req)).stream().map(k -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", k.getId());
+            m.put("prefix", k.getKeyPrefix());
+            m.put("label", k.getLabel());
+            m.put("active", k.isActive());
+            m.put("createdAt", k.getCreatedAt().toString());
+            m.put("lastUsedAt", k.getLastUsedAt() == null ? null : k.getLastUsedAt().toString());
+            return m;
+        }).toList();
     }
 
     @PostMapping("/keys")
-    public Map<String, Object> issueKey(HttpServletRequest req) {
-        DeveloperService.IssuedKey issued = developers.issueKey(dev(req));
+    public Map<String, Object> issueKey(HttpServletRequest req, @RequestBody(required = false) IssueKey body) {
+        String label = body == null ? null : body.label();
+        DeveloperService.IssuedKey issued = developers.issueKey(dev(req), label);
         return Map.of("id", issued.id(), "apiKey", issued.plaintextKey(),
                 "warning", "Store this key now — it will not be shown again.");
+    }
+
+    public record IssueKey(String label) {
     }
 
     @DeleteMapping("/keys/{keyId}")

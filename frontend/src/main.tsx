@@ -18,6 +18,8 @@ import Autopilot from "./pages/Autopilot";
 import GodMode from "./pages/GodMode";
 import DagCommandCenter from "./pages/DagCommandCenter";
 import MmuProfiler from "./pages/MmuProfiler";
+import Billing from "./pages/Billing";
+import Settings from "./pages/Settings";
 import { ToastProvider } from "./components/ui";
 
 const router = createBrowserRouter([
@@ -38,6 +40,8 @@ const router = createBrowserRouter([
       { path: "memory", element: <Memory /> },
       { path: "gateway", element: <GatewayDashboard /> },
       { path: "portal", element: <DeveloperPortal /> },
+      { path: "billing", element: <Billing /> },
+      { path: "settings", element: <Settings /> },
       { path: "autopilot", element: <Autopilot /> },
       { path: "godmode", element: <GodMode /> },
       { path: "dag", element: <DagCommandCenter /> },

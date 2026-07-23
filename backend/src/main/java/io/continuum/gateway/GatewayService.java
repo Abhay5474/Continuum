@@ -64,6 +64,8 @@ public class GatewayService {
     // V8 prompt compression + firewall (additive; pass-through unless opted in).
     private final io.continuum.compression.PromptCompressionService compression;
     private final io.continuum.firewall.PromptFirewallService firewall;
+    // Billing quota enforcement (default FREE plan is generous ⇒ unchanged behaviour).
+    private final io.continuum.billing.BillingService billing;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -78,7 +80,8 @@ public class GatewayService {
                           io.continuum.mmu.ContextMMU contextMmu,
                           io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit,
                           io.continuum.compression.PromptCompressionService compression,
-                          io.continuum.firewall.PromptFirewallService firewall) {
+                          io.continuum.firewall.PromptFirewallService firewall,
+                          io.continuum.billing.BillingService billing) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -97,6 +100,7 @@ public class GatewayService {
         this.contextualBandit = contextualBandit;
         this.compression = compression;
         this.firewall = firewall;
+        this.billing = billing;
     }
 
     /** Record a routing outcome into the contextual bandit; never affects the request. */
@@ -109,6 +113,10 @@ public class GatewayService {
     }
 
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
+        // Billing: reject requests once the monthly token quota is exhausted
+        // (throws QuotaExceededException → mapped to 402 upstream). The default
+        // FREE plan quota is generous, so this is transparent for normal use.
+        billing.assertWithinQuota(developerId);
         // V6 Consensus DAG Engine (opt-in, OFF by default): when the developer
         // enabled it in the portal, the request is verified through the DAG and
         // returned in the identical response shape. When the flag is off — or

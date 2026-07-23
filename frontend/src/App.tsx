@@ -6,6 +6,8 @@ const NAV: [string, string, boolean?][] = [
   ["/dashboard", "Dashboard"],
   ["/gateway", "Gateway"],
   ["/portal", "Developer Portal"],
+  ["/billing", "Billing"],
+  ["/settings", "Settings"],
   ["/autopilot", "Autopilot"],
   ["/godmode", "⚡ Agentic Autopilot", true],
   ["/dag", "V6 Trace"],

@@ -42,12 +42,19 @@ public class DeveloperService {
     /** Issue a new API key. The returned plaintext is shown ONCE and never stored. */
     @Transactional
     public IssuedKey issueKey(String developerId) {
+        return issueKey(developerId, null);
+    }
+
+    public IssuedKey issueKey(String developerId, String label) {
         if (developers.findById(developerId).isEmpty()) {
             throw new IllegalArgumentException("No such developer: " + developerId);
         }
         ApiKeyHasher.GeneratedKey g = hasher.generate();
-        DeveloperApiKeyEntity entity = keys.save(
-                new DeveloperApiKeyEntity(developerId, g.prefix(), g.hash()));
+        DeveloperApiKeyEntity entity = new DeveloperApiKeyEntity(developerId, g.prefix(), g.hash());
+        if (label != null && !label.isBlank()) {
+            entity.setLabel(label.trim());
+        }
+        entity = keys.save(entity);
         return new IssuedKey(entity.getId(), g.plaintext());
     }
 

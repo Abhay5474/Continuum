@@ -86,7 +86,7 @@ export const portal = {
 
   me: () => portalHttp<any>("/api/portal/developer/me", "GET"),
   keys: () => portalHttp<any[]>("/api/portal/developer/keys", "GET"),
-  issueKey: () => portalHttp<any>("/api/portal/developer/keys", "POST"),
+  issueKey: (label?: string) => portalHttp<any>("/api/portal/developer/keys", "POST", { label }),
   revokeKey: (id: number) => portalHttp<any>(`/api/portal/developer/keys/${id}`, "DELETE"),
   credentials: () => portalHttp<any[]>("/api/portal/developer/credentials", "GET"),
   storeCredential: (provider: string, secret: string) =>
@@ -151,4 +151,16 @@ export const portal = {
     enable: () => portalHttp<any>("/api/portal/developer/v7/enable", "POST"),
     disable: () => portalHttp<any>("/api/portal/developer/v7/disable", "POST"),
   },
+
+  // --- Billing & usage ---
+  billing: () => portalHttp<any>("/api/portal/developer/billing", "GET"),
+  setPlan: (plan: string) => portalHttp<any>("/api/portal/developer/billing/plan", "PUT", { plan }),
+
+  // --- Account & settings ---
+  changePassword: (currentPassword: string, newPassword: string) =>
+    portalHttp<any>("/api/portal/developer/account/password", "POST", { currentPassword, newPassword }),
+  changeEmail: (email: string) => portalHttp<any>("/api/portal/developer/account/email", "PUT", { email }),
+  deleteAccount: () => portalHttp<any>("/api/portal/developer/account", "DELETE"),
+  invites: () => portalHttp<any[]>("/api/portal/developer/account/invites", "GET"),
+  invite: (email: string) => portalHttp<any>("/api/portal/developer/account/invites", "POST", { email }),
 };
