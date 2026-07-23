@@ -39,7 +39,7 @@ export default function WorkflowDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link to="/" className="text-sm text-slate-400 hover:text-slate-200">
+        <Link to="/dashboard" className="text-sm text-slate-400 hover:text-slate-200">
           ← Back
         </Link>
         <StatusBadge status={detail.summary.status} />
@@ -164,7 +164,7 @@ export default function WorkflowDetailPage() {
   );
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+function Panel({ title, children }: { title: string; children: import("react").ReactNode }) {
   return (
     <div className="rounded-lg border border-edge bg-panel">
       <div className="border-b border-edge px-4 py-2 text-sm font-medium">{title}</div>

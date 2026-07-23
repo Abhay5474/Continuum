@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./index.css";
 import App from "./App";
+import Landing from "./pages/Landing";
+import Docs from "./pages/Docs";
 import Dashboard from "./pages/Dashboard";
 import WorkflowDetailPage from "./pages/WorkflowDetail";
 import ChaosPanel from "./pages/ChaosPanel";
@@ -16,13 +18,18 @@ import Autopilot from "./pages/Autopilot";
 import GodMode from "./pages/GodMode";
 import DagCommandCenter from "./pages/DagCommandCenter";
 import MmuProfiler from "./pages/MmuProfiler";
+import { ToastProvider } from "./components/ui";
 
 const router = createBrowserRouter([
+  // Standalone marketing + docs (no app chrome).
+  { path: "/", element: <Landing /> },
+  { path: "/docs", element: <Docs /> },
+  // The app shell wraps every existing feature route (paths unchanged); the
+  // dashboard now lives at /dashboard.
   {
-    path: "/",
     element: <App />,
     children: [
-      { index: true, element: <Dashboard /> },
+      { path: "dashboard", element: <Dashboard /> },
       { path: "workflows/:id", element: <WorkflowDetailPage /> },
       { path: "chaos", element: <ChaosPanel /> },
       { path: "replay", element: <ReplayVerify /> },
@@ -42,6 +49,8 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <ToastProvider>
+      <RouterProvider router={router} />
+    </ToastProvider>
   </React.StrictMode>
 );

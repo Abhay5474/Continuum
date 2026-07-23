@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import type { CostReport, Meta, Stats, WorkflowSummary } from "../types";
 import StatusBadge from "../components/StatusBadge";
+import { SkeletonCards, SkeletonRows, EmptyState, ErrorState, Spinner, useToast, CodeBlock } from "../components/ui";
 
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
-    <div className="rounded-lg border border-edge bg-panel p-4">
+    <div className="rounded-lg border border-edge bg-panel p-4 transition-all hover:border-aurora/30">
       <div className="text-xs uppercase tracking-wide text-slate-400">{label}</div>
       <div className={`mt-1 text-2xl font-semibold ${accent ?? ""}`}>{value}</div>
     </div>
@@ -21,18 +22,28 @@ export default function Dashboard() {
   const [type, setType] = useState("CustomerAnalysis");
   const [customerId, setCustomerId] = useState("C-1001");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   async function refresh() {
-    const [s, w, c] = await Promise.all([api.stats(), api.workflows(), api.costs()]);
-    setStats(s);
-    setWorkflows(w);
-    setCosts(c);
+    try {
+      const [s, w, c] = await Promise.all([api.stats(), api.workflows(), api.costs()]);
+      setStats(s);
+      setWorkflows(w);
+      setCosts(c);
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load dashboard");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     api.meta().then(setMeta).catch(() => {});
-    refresh().catch(() => {});
-    const t = setInterval(() => refresh().catch(() => {}), 2000);
+    refresh();
+    const t = setInterval(() => refresh(), 2500);
     return () => clearInterval(t);
   }, []);
 
@@ -44,14 +55,37 @@ export default function Dashboard() {
           ? { customerId, notifyEmail: `${customerId}@example.com` }
           : { name: customerId };
       await api.start(type, input);
+      toast(`Started ${type}`, "success");
       await refresh();
+    } catch (e: any) {
+      toast(e?.message ?? "Failed to start workflow", "error");
     } finally {
       setBusy(false);
     }
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <SkeletonCards />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="rounded-lg border border-edge bg-panel p-4 lg:col-span-2">
+            <SkeletonRows rows={5} />
+          </div>
+          <div className="rounded-lg border border-edge bg-panel p-4">
+            <SkeletonRows rows={4} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !stats) {
+    return <ErrorState message={error} onRetry={refresh} />;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Total" value={stats?.total ?? "—"} />
         <StatCard label="Running" value={stats?.running ?? "—"} accent="text-amber-300" />
@@ -66,25 +100,42 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-lg border border-edge bg-panel">
-          <div className="border-b border-edge px-4 py-3 font-medium">Workflows</div>
-          <div className="divide-y divide-edge">
-            {workflows.length === 0 && (
-              <div className="px-4 py-6 text-sm text-slate-400">No workflows yet — start one →</div>
-            )}
-            {workflows.map((w) => (
-              <Link
-                key={w.workflowId}
-                to={`/workflows/${w.workflowId}`}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-edge/50"
-              >
-                <StatusBadge status={w.status} />
-                <span className="text-sm font-medium">{w.workflowType}</span>
-                <span className="font-mono text-xs text-slate-400">{w.workflowId.slice(0, 8)}</span>
-                <span className="ml-auto text-xs text-slate-400">{w.currentSequence} events</span>
-              </Link>
-            ))}
+        <div className="rounded-lg border border-edge bg-panel lg:col-span-2">
+          <div className="flex items-center border-b border-edge px-4 py-3">
+            <span className="font-medium">Workflows</span>
+            {error && <span className="ml-auto text-xs text-rose-400">reconnecting…</span>}
           </div>
+          {workflows.length === 0 ? (
+            <div className="p-4">
+              <EmptyState
+                icon="⟳"
+                title="No workflows yet"
+                hint="Start one from the panel on the right, or kick off the flagship crash-recovery demo from the CLI."
+              >
+                <CodeBlock
+                  language="bash"
+                  code={`curl -X POST localhost:8080/api/workflows \\
+  -H 'Content-Type: application/json' \\
+  -d '{"workflowType":"DurableDemo","input":{"name":"demo"}}'`}
+                />
+              </EmptyState>
+            </div>
+          ) : (
+            <div className="divide-y divide-edge">
+              {workflows.map((w) => (
+                <Link
+                  key={w.workflowId}
+                  to={`/workflows/${w.workflowId}`}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-edge/50"
+                >
+                  <StatusBadge status={w.status} />
+                  <span className="text-sm font-medium">{w.workflowType}</span>
+                  <span className="font-mono text-xs text-slate-400">{w.workflowId.slice(0, 8)}</span>
+                  <span className="ml-auto text-xs text-slate-400">{w.currentSequence} events</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -111,8 +162,9 @@ export default function Dashboard() {
             <button
               onClick={start}
               disabled={busy}
-              className="mt-4 w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
             >
+              {busy && <Spinner />}
               {busy ? "Starting…" : "Start workflow"}
             </button>
           </div>

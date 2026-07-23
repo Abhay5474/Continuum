@@ -4,9 +4,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#070a12",
-        panel: "#0d1322",
-        edge: "#1e2739",
+        // Surface colors are CSS-variable-driven so the whole app flips between
+        // dark (default) and light themes without touching component classes.
+        ink: "rgb(var(--ink) / <alpha-value>)",
+        panel: "rgb(var(--panel) / <alpha-value>)",
+        edge: "rgb(var(--edge) / <alpha-value>)",
         aurora: "#8b5cf6",
         neon: "#22d3ee",
       },

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { portal } from "../api";
+import { useToast, Spinner, CopyButton, CodeBlock } from "../components/ui";
 
 const PROVIDERS = ["gemini", "groq", "openai"];
 
@@ -12,52 +14,80 @@ export default function DeveloperPortal() {
 }
 
 function AuthGate({ onAuthed }: { onAuthed: () => void }) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup">("signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
 
   const submit = async () => {
     setErr("");
+    setBusy(true);
     try {
       if (mode === "signup") await portal.signup(name, email, password);
       else await portal.login(email, password);
+      toast(mode === "signup" ? "Account created 🎉" : "Welcome back", "success");
       onAuthed();
     } catch (e: any) {
       setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-md">
-      <div className="rounded-lg border border-edge bg-panel p-6">
-        <h1 className="text-lg font-semibold">Developer Portal</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Sign in to manage your API keys, provider credentials and analytics.
-        </p>
-        <div className="mt-4 flex gap-2 text-sm">
-          <button onClick={() => setMode("login")}
-            className={`rounded-md px-3 py-1.5 ${mode === "login" ? "bg-indigo-600 text-white" : "border border-edge"}`}>
-            Log in
-          </button>
-          <button onClick={() => setMode("signup")}
-            className={`rounded-md px-3 py-1.5 ${mode === "signup" ? "bg-indigo-600 text-white" : "border border-edge"}`}>
+    <div className="relative mx-auto mt-8 max-w-md animate-fade-up">
+      <div className="pointer-events-none absolute -inset-6 -z-10 rounded-3xl bg-aurora/10 blur-3xl" />
+      <div className="glass p-7">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-lg font-bold text-ink shadow-glow-sm">
+            ⟳
+          </span>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-gradient">Developer Portal</h1>
+            <p className="text-xs text-slate-400">Your API keys, credentials and analytics.</p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-1 rounded-lg border border-edge p-1 text-sm">
+          <button
+            onClick={() => setMode("signup")}
+            className={`rounded-md px-3 py-1.5 transition-all ${mode === "signup" ? "bg-gradient-to-r from-aurora to-neon font-semibold text-ink" : "text-slate-400 hover:text-slate-200"}`}
+          >
             Sign up
           </button>
+          <button
+            onClick={() => setMode("login")}
+            className={`rounded-md px-3 py-1.5 transition-all ${mode === "login" ? "bg-gradient-to-r from-aurora to-neon font-semibold text-ink" : "text-slate-400 hover:text-slate-200"}`}
+          >
+            Log in
+          </button>
         </div>
+
         {mode === "signup" && (
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name"
-            className="mt-3 w-full rounded-md border border-edge bg-ink px-3 py-2 text-sm" />
+            className="mt-4 w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
         )}
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"
-          className="mt-3 w-full rounded-md border border-edge bg-ink px-3 py-2 text-sm" />
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          className="mt-3 w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
         <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password"
-          className="mt-3 w-full rounded-md border border-edge bg-ink px-3 py-2 text-sm" />
-        <button onClick={submit} className="mt-4 w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white">
-          {mode === "signup" ? "Create account" : "Log in"}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          className="mt-3 w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+        <button
+          onClick={submit}
+          disabled={busy}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-aurora to-neon px-3 py-2.5 text-sm font-semibold text-ink shadow-glow-sm transition-transform hover:-translate-y-0.5 disabled:opacity-60"
+        >
+          {busy && <Spinner className="h-4 w-4 border-ink/40 border-t-ink" />}
+          {mode === "signup" ? "Create account →" : "Log in →"}
         </button>
-        {err && <div className="mt-2 text-sm text-rose-400">{err}</div>}
+        {err && <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-sm text-rose-300">{err}</div>}
+        <p className="mt-4 text-center text-xs text-slate-500">
+          New here? <Link to="/docs" className="text-neon hover:underline">Read the quickstart</Link>
+        </p>
       </div>
     </div>
   );
@@ -73,6 +103,9 @@ function Portal({ onLogout }: { onLogout: () => void }) {
   const [secretInputs, setSecretInputs] = useState<Record<string, string>>({});
   const [playPrompt, setPlayPrompt] = useState("Provide first aid for a dog leg injury");
   const [playOut, setPlayOut] = useState<any>(null);
+  const [playBusy, setPlayBusy] = useState(false);
+  const [madeFirstCall, setMadeFirstCall] = useState(false);
+  const toast = useToast();
 
   const refresh = () => {
     portal.me().then(setMe).catch(handleAuthErr);
@@ -89,22 +122,43 @@ function Portal({ onLogout }: { onLogout: () => void }) {
   }, []);
 
   const issueKey = async () => {
-    const r = await portal.issueKey();
-    setNewKey(r.apiKey);
-    refresh();
+    try {
+      const r = await portal.issueKey();
+      setNewKey(r.apiKey);
+      toast("API key created ✓", "success");
+      refresh();
+    } catch (e: any) {
+      toast(e.message ?? "Could not issue key", "error");
+    }
+  };
+  const revokeKey = async (id: number) => {
+    if (!confirm("Revoke this key? Apps using it will stop working immediately.")) return;
+    try {
+      await portal.revokeKey(id);
+      toast("Key revoked", "success");
+      refresh();
+    } catch (e: any) {
+      toast(e.message ?? "Could not revoke key", "error");
+    }
   };
   const storeCred = async (provider: string) => {
     const secret = secretInputs[provider];
     if (!secret) return;
-    await portal.storeCredential(provider, secret);
-    setSecretInputs({ ...secretInputs, [provider]: "" });
-    refresh();
+    try {
+      await portal.storeCredential(provider, secret);
+      setSecretInputs({ ...secretInputs, [provider]: "" });
+      toast(`${provider} key saved (encrypted)`, "success");
+      refresh();
+    } catch (e: any) {
+      toast(e.message ?? "Could not save credential", "error");
+    }
   };
   const verify = async (provider: string) => {
     setVerifyStatus({ ...verifyStatus, [provider]: { checking: true } });
     try {
       const r = await portal.verifyCredential(provider);
       setVerifyStatus({ ...verifyStatus, [provider]: r });
+      toast(r.valid ? `${provider} key verified ✓` : `${provider} key invalid`, r.valid ? "success" : "error");
     } catch (e: any) {
       setVerifyStatus({ ...verifyStatus, [provider]: { valid: false, message: e.message } });
     }
@@ -112,13 +166,23 @@ function Portal({ onLogout }: { onLogout: () => void }) {
   const toggle = async (v: boolean) => {
     await portal.setRoutingPreference(v);
     setMe({ ...me, useOwnKeysPrimary: v });
+    toast(v ? "Using your keys as primary" : "Using platform keys", "info");
   };
   const runPlay = async () => {
     setPlayOut(null);
+    setPlayBusy(true);
     try {
-      setPlayOut(await portal.playground({ model: "auto", messages: [{ role: "user", content: playPrompt }], maxTokens: 200 }));
+      const r = await portal.playground({ model: "auto", messages: [{ role: "user", content: playPrompt }], maxTokens: 200 });
+      setPlayOut(r);
+      if (!madeFirstCall) {
+        setMadeFirstCall(true);
+        toast("You made your first call! 🎉", "success");
+      }
     } catch (e: any) {
       setPlayOut({ error: e.message });
+      toast(e.message ?? "Call failed", "error");
+    } finally {
+      setPlayBusy(false);
     }
   };
 
@@ -161,6 +225,47 @@ function Portal({ onLogout }: { onLogout: () => void }) {
         <button onClick={() => { portal.logout(); onLogout(); }}
           className="ml-auto rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge">Sign out</button>
       </div>
+
+      {/* onboarding — the magic moment: get a key → copy a snippet → first call */}
+      {(keys.length === 0 || newKey) && (
+        <div className="glass overflow-hidden p-5 animate-fade-up">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-aurora/15 px-2.5 py-0.5 text-xs font-semibold text-violet-300">
+              Get started
+            </span>
+            <div className="text-sm font-semibold">Make your first call in under 2 minutes</div>
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <OnboardStep n={1} title="Create a key" done={keys.length > 0 || !!newKey}>
+              {newKey ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded bg-ink px-2 py-1 font-mono text-xs text-emerald-300">{newKey}</code>
+                  <CopyButton text={newKey} />
+                </div>
+              ) : keys.length > 0 ? (
+                <span className="text-emerald-300">You already have a key ✓</span>
+              ) : (
+                <button onClick={issueKey} className="mt-1 rounded-lg bg-gradient-to-r from-aurora to-neon px-3 py-1.5 text-xs font-semibold text-ink">
+                  Issue API key
+                </button>
+              )}
+            </OnboardStep>
+            <OnboardStep n={2} title="Copy this snippet" done={false}>
+              <div className="mt-1">
+                <CodeBlock
+                  language="bash"
+                  code={`curl $ORIGIN/api/gateway/chat \\
+  -H "Authorization: Bearer ${newKey || "cnt_live_…"}" \\
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hi!"}]}'`}
+                />
+              </div>
+            </OnboardStep>
+            <OnboardStep n={3} title="Or try it right here" done={madeFirstCall}>
+              <span>Use the sandbox below — no code needed. {madeFirstCall && <span className="text-emerald-300">First call made 🎉</span>}</span>
+            </OnboardStep>
+          </div>
+        </div>
+      )}
 
       {/* analytics */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -319,8 +424,10 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           <button onClick={issueKey} className="ml-auto rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white">Issue new key</button>
         </div>
         {newKey && (
-          <div className="mt-2 break-all rounded bg-ink p-2 font-mono text-xs text-emerald-300">
-            {newKey} <span className="text-slate-500">(shown once)</span>
+          <div className="mt-2 flex items-center gap-2 rounded bg-ink p-2">
+            <code className="min-w-0 flex-1 break-all font-mono text-xs text-emerald-300">{newKey}</code>
+            <span className="whitespace-nowrap text-[10px] text-slate-500">shown once</span>
+            <CopyButton text={newKey} />
           </div>
         )}
         <div className="mt-2 space-y-1 text-sm">
@@ -328,28 +435,60 @@ function Portal({ onLogout }: { onLogout: () => void }) {
             <div key={k.id} className="flex items-center gap-2 text-xs">
               <span className="font-mono">{k.prefix}…</span>
               <span className={k.active ? "text-emerald-300" : "text-rose-300"}>{k.active ? "active" : "revoked"}</span>
-              {k.active && <button onClick={() => portal.revokeKey(k.id).then(refresh)} className="ml-auto rounded border border-edge px-2 py-0.5 text-rose-300">Revoke</button>}
+              {k.active && (
+                <button onClick={() => revokeKey(k.id)} className="ml-auto rounded border border-edge px-2 py-0.5 text-rose-300 transition-colors hover:bg-rose-500/10">
+                  Revoke
+                </button>
+              )}
             </div>
           ))}
-          {keys.length === 0 && <div className="text-xs text-slate-500">no keys yet</div>}
+          {keys.length === 0 && <div className="text-xs text-slate-500">no keys yet — issue one above ↑</div>}
         </div>
       </div>
 
       {/* playground */}
       <div className="rounded-lg border border-edge bg-panel p-4">
         <div className="font-medium">Sandbox playground</div>
+        <p className="text-xs text-slate-400">Send a request through your gateway right now — no code required.</p>
         <textarea value={playPrompt} onChange={(e) => setPlayPrompt(e.target.value)}
-          className="mt-2 h-16 w-full rounded-md border border-edge bg-ink p-2 text-sm" />
-        <button onClick={runPlay} className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white">Send through gateway</button>
-        {playOut && <pre className="mt-2 overflow-x-auto rounded bg-ink p-2 text-xs text-slate-300">{JSON.stringify(playOut, null, 2)}</pre>}
+          className="mt-2 h-16 w-full rounded-md border border-edge bg-ink p-2 text-sm outline-none focus:border-aurora/60" />
+        <button
+          onClick={runPlay}
+          disabled={playBusy}
+          className="mt-2 flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+        >
+          {playBusy && <Spinner />}
+          {playBusy ? "Sending…" : "Send through gateway"}
+        </button>
+        {playOut ? (
+          <pre className="mt-2 overflow-x-auto rounded bg-ink p-2 text-xs text-slate-300 animate-fade-up">{JSON.stringify(playOut, null, 2)}</pre>
+        ) : (
+          !playBusy && (
+            <div className="mt-2 text-xs text-slate-600">The response will appear here.</div>
+          )
+        )}
       </div>
+    </div>
+  );
+}
+
+function OnboardStep({ n, title, done, children }: { n: number; title: string; done: boolean; children: import("react").ReactNode }) {
+  return (
+    <div className={`rounded-xl border p-3 transition-all ${done ? "border-emerald-400/40 bg-emerald-500/5" : "border-edge bg-ink/40"}`}>
+      <div className="flex items-center gap-2">
+        <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs font-bold ${done ? "bg-emerald-500/20 text-emerald-300" : "bg-gradient-to-br from-aurora to-neon text-ink"}`}>
+          {done ? "✓" : n}
+        </span>
+        <span className="text-sm font-semibold">{title}</span>
+      </div>
+      <div className="mt-2 text-xs text-slate-400">{children}</div>
     </div>
   );
 }
 
 function Stat({ label, value, accent }: { label: string; value: any; accent?: string }) {
   return (
-    <div className="rounded-lg border border-edge bg-panel p-4">
+    <div className="rounded-lg border border-edge bg-panel p-4 transition-all hover:border-aurora/30">
       <div className="text-xs uppercase text-slate-400">{label}</div>
       <div className={`mt-1 text-2xl font-semibold ${accent ?? ""}`}>{value}</div>
     </div>
