@@ -1,7 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { Micro, Readout, Plane, StateDot, Trace } from "../system/primitives";
+import { STATE, type StateKey } from "../system/tokens";
 
+/**
+ * Gateway — live request flow.
+ *
+ * The centre of this page is the stream of real requests: what was asked for,
+ * where it was actually sent, how long it took, and whether the engine had to
+ * absorb a provider failure on the way. A failover is the product's whole claim,
+ * so it is the loudest thing in the stream rather than a footnote.
+ */
 export default function GatewayDashboard() {
   const [stats, setStats] = useState<any | null>(null);
   const [models, setModels] = useState<any[]>([]);
@@ -10,38 +20,44 @@ export default function GatewayDashboard() {
   const [healing, setHealing] = useState<any | null>(null);
   const [verifyOut, setVerifyOut] = useState<any | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [series, setSeries] = useState<number[]>([]);
 
-  // playground state — the key is supplied by the developer, not minted here
+  // playground — the key is supplied by the developer, never minted here
   const [apiKey, setApiKey] = useState("");
   const [prompt, setPrompt] = useState("Provide first aid for a dog leg injury");
   const [chatOut, setChatOut] = useState<any | null>(null);
+  const [sending, setSending] = useState(false);
 
   const refresh = () => {
-    api.get<any>("/api/gateway/stats").then(setStats).catch(() => {});
+    api.get<any>("/api/gateway/stats").then((s) => {
+      setStats(s);
+      setSeries((prev) => [...prev, s?.totalRequests ?? 0].slice(-40));
+    }).catch(() => {});
     api.get<any[]>("/api/models").then(setModels).catch(() => {});
-    api.get<any[]>("/api/gateway/requests?limit=15").then(setRequests).catch(() => {});
+    api.get<any[]>("/api/gateway/requests?limit=40").then(setRequests).catch(() => {});
     api.get<any[]>("/api/gateway/health").then(setHealth).catch(() => {});
     api.get<any>("/api/gateway/healing/status").then(setHealing).catch(() => {});
   };
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 4000);
+    return () => clearInterval(t);
+  }, []);
 
   const runVerifyScan = async () => {
     setVerifying(true);
     try {
       setVerifyOut(await api.post("/api/gateway/healing/verify", {}));
     } catch (e: any) {
-      setVerifyOut({ error: e.message ?? String(e) });
+      setVerifyOut({ error: e?.message ?? String(e) });
     } finally {
       setVerifying(false);
     }
   };
-  useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 3000);
-    return () => clearInterval(t);
-  }, []);
 
   const sendChat = async () => {
     setChatOut(null);
+    setSending(true);
     try {
       const res = await fetch("/api/gateway/chat", {
         method: "POST",
@@ -51,227 +67,356 @@ export default function GatewayDashboard() {
       setChatOut(await res.json());
     } catch (e: any) {
       setChatOut({ error: String(e) });
+    } finally {
+      setSending(false);
+      refresh();
     }
   };
 
-  const lifecycle = ["DISCOVERED", "TESTING", "ACTIVE", "DEPRECATED", "REMOVED"];
   const setStatus = (id: number, status: string) =>
     api.post(`/api/models/${id}/status?status=${status}`).then(refresh);
 
+  const successRate = stats?.successRate ?? 1;
+  const maxLatency = useMemo(
+    () => Math.max(...requests.map((r) => r.latencyMs ?? 0), 1),
+    [requests]
+  );
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold">Developer Infrastructure Gateway</h1>
-        <p className="text-sm text-slate-400">
-          External apps integrate once against the Continuum gateway and get reliability, routing,
-          model lifecycle management and observability — without touching provider SDKs.
-        </p>
-      </div>
+      <header className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold tracking-tight">Gateway</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
+            One OpenAI-compatible endpoint in front of every provider. Requests are routed, retried
+            and failed over here, so your application only ever sees the result.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+          <Readout label="Requests" value={(stats?.totalRequests ?? 0).toLocaleString()} size="sm"
+            state={(stats?.totalRequests ?? 0) > 0 ? "active" : "idle"} />
+          <Readout label="Success" value={(successRate * 100).toFixed(1)} unit="%" size="sm"
+            state={successRate >= 0.99 ? "healthy" : successRate >= 0.9 ? "warning" : "critical"} />
+          <Readout label="Absorbed failures" value={stats?.failuresPrevented ?? 0} size="sm"
+            state={(stats?.failuresPrevented ?? 0) > 0 ? "healthy" : "idle"}
+            hint="Provider failures the engine handled before your app saw them" />
+          <Readout label="Reached your app" value={stats?.developerVisibleFailures ?? 0} size="sm"
+            state={(stats?.developerVisibleFailures ?? 0) > 0 ? "critical" : "healthy"} />
+          <Readout label="Tokens" value={(stats?.totalTokens ?? 0).toLocaleString()} size="sm" />
+          <Readout label="Spend" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} size="sm" />
+          <div>
+            <Micro>Throughput</Micro>
+            <div className="mt-1"><Trace points={series} state="active" width={110} height={22} /></div>
+          </div>
+        </div>
+      </header>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Requests" value={stats?.totalRequests ?? "—"} />
-        <Stat label="Success rate" value={stats ? `${Math.round(stats.successRate * 100)}%` : "—"} accent="text-emerald-300" />
-        <Stat label="Failures prevented" value={stats?.failuresPrevented ?? "—"} accent="text-indigo-300" />
-        <Stat label="Dev-visible failures" value={stats?.developerVisibleFailures ?? "—"} accent="text-rose-300" />
-        <Stat label="Tokens" value={stats?.totalTokens ?? "—"} />
-        <Stat label="Cost" value={stats ? `$${(stats.totalCostUsd ?? 0).toFixed(5)}` : "—"} />
-      </div>
+      {/* ---- live request flow: the hero ---- */}
+      <section>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <Micro>Live request flow · newest first</Micro>
+          <span className="micro">bar length is latency, relative to the slowest recent request</span>
+        </div>
+
+        {requests.length === 0 ? (
+          <Plane className="mt-2 p-8 text-center">
+            <p className="text-sm text-slate-400">
+              No gateway traffic yet. Send a request with one of your API keys below, or point your
+              app at <code className="font-mono text-xs text-neon">/api/gateway/chat</code>.
+            </p>
+          </Plane>
+        ) : (
+          <div className="mt-2 max-h-[420px] divide-y divide-edge/40 overflow-y-auto pr-1">
+            {requests.map((r) => {
+              const st: StateKey = !r.success ? "critical" : r.failoverCount > 0 ? "warning" : "healthy";
+              return (
+                <div
+                  key={r.id}
+                  title={r.routingReason ?? undefined}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[11px]"
+                >
+                  <StateDot state={st} size={6} />
+                  <span className="readout w-16 shrink-0 text-slate-600">
+                    {new Date(r.createdAt).toLocaleTimeString()}
+                  </span>
+
+                  {/* what was asked for → where it actually went */}
+                  <span className="flex min-w-0 shrink-0 items-center gap-1.5">
+                    <span className="text-slate-500">{r.requestedModel || "auto"}</span>
+                    <span className="text-slate-700">→</span>
+                    <span className="font-medium text-slate-200">
+                      {r.chosenProvider}/{r.chosenModel}
+                    </span>
+                  </span>
+
+                  {/* latency bar */}
+                  <span className="relative h-1.5 w-28 shrink-0 overflow-hidden rounded-full bg-ink">
+                    <span
+                      className="absolute inset-y-0 left-0 rounded-full"
+                      style={{
+                        width: `${((r.latencyMs ?? 0) / maxLatency) * 100}%`,
+                        background: STATE[st].color,
+                      }}
+                    />
+                  </span>
+                  <span className="readout w-14 shrink-0 text-slate-400">{r.latencyMs}ms</span>
+
+                  {r.failoverCount > 0 && (
+                    <span
+                      className="rounded px-1.5 py-0.5 font-semibold"
+                      style={{ background: `${STATE.warning.color}22`, color: STATE.warning.color }}
+                      title="A provider failed and the engine rerouted before your app saw anything"
+                    >
+                      {r.failoverCount} failover{r.failoverCount > 1 ? "s" : ""} absorbed
+                    </span>
+                  )}
+                  {!r.success && (
+                    <span
+                      className="rounded px-1.5 py-0.5 font-semibold"
+                      style={{ background: `${STATE.critical.color}22`, color: STATE.critical.color }}
+                    >
+                      failed
+                    </span>
+                  )}
+
+                  <span className="ml-auto flex items-center gap-3 text-slate-500">
+                    <span title="Scored prompt complexity">c{(r.complexity ?? 0).toFixed(2)}</span>
+                    <span className="readout">{r.tokens} tok</span>
+                    <span className="readout">${(r.costUsd ?? 0).toFixed(5)}</span>
+                  </span>
+
+                  {r.routingReason && (r.failoverCount > 0 || !r.success) && (
+                    <div className="w-full pl-[5.5rem] text-[10px] text-slate-600">{r.routingReason}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-lg border border-edge bg-panel p-4">
-          <div className="font-medium">Try the gateway</div>
-          <p className="mt-1 text-xs text-slate-400">
-            Paste one of your API keys to send a request through the gateway.{" "}
-            <Link to="/portal" className="text-neon hover:underline">Create a key →</Link>
-          </p>
-          <input
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            type="password"
-            placeholder="cnt_live_…"
-            className="mt-2 w-full rounded-md border border-edge bg-ink px-3 py-1.5 font-mono text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-aurora/60"
-          />
-          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)}
-            className="mt-2 h-16 w-full rounded-md border border-edge bg-ink p-2 text-sm text-slate-100 outline-none focus:border-aurora/60" />
-          <button onClick={sendChat} disabled={!apiKey}
-            className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-500 disabled:opacity-50">
-            POST /api/gateway/chat
-          </button>
-          {chatOut && (
-            <pre className="mt-2 overflow-x-auto rounded bg-ink p-2 text-xs text-slate-300">
-              {JSON.stringify(chatOut, null, 2)}
-            </pre>
-          )}
-        </div>
-
-        <div className="rounded-lg border border-edge bg-panel p-4">
-          <div className="font-medium">Provider / model health</div>
-          <div className="mt-2 space-y-1 text-sm">
-            {health.map((h) => (
-              <div key={h.id} className="flex items-center gap-2 text-xs">
-                <span className={`h-2 w-2 rounded-full ${h.healthScore >= 0.5 ? "bg-emerald-400" : "bg-rose-400"}`} />
-                <span className="font-mono">{h.provider}/{h.modelName}</span>
-                <span className="ml-auto text-slate-400">
-                  {h.calls} calls · {h.failures} fail · health {(h.healthScore * 100).toFixed(0)}%
-                </span>
-              </div>
-            ))}
-            {health.length === 0 && <div className="text-xs text-slate-500">no calls yet</div>}
-          </div>
-          <div className="mt-3 text-xs text-slate-400">Provider usage</div>
-          {stats?.providerUsage &&
-            Object.entries(stats.providerUsage).map(([p, v]: any) => (
-              <div key={p} className="flex justify-between text-xs">
-                <span>{p}</span>
-                <span className="text-slate-400">{v.requests} req · ${v.cost?.toFixed(5)}</span>
-              </div>
-            ))}
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-edge bg-panel">
-        <div className="border-b border-edge px-4 py-2 font-medium">Model registry & lifecycle</div>
-        <table className="w-full text-sm">
-          <thead className="text-xs text-slate-400">
-            <tr className="text-left">
-              <th className="px-4 py-2">Provider</th><th className="px-4 py-2">Model</th>
-              <th className="px-4 py-2">Status</th><th className="px-4 py-2">Context</th>
-              <th className="px-4 py-2">Lifecycle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {models.map((m) => (
-              <tr key={m.id} className="border-t border-edge/50">
-                <td className="px-4 py-2">{m.provider}</td>
-                <td className="px-4 py-2 font-mono text-xs">{m.modelName}</td>
-                <td className="px-4 py-2">{m.status}</td>
-                <td className="px-4 py-2">{m.contextWindow.toLocaleString()}</td>
-                <td className="px-4 py-2">
-                  <select value={m.status} onChange={(e) => setStatus(m.id, e.target.value)}
-                    className="rounded border border-edge bg-ink px-2 py-1 text-xs">
-                    {lifecycle.map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="rounded-lg border border-indigo-500/40 bg-panel shadow-[0_0_24px_-12px_rgba(99,102,241,0.6)] transition-shadow duration-500">
-        <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-400" />
-          </span>
-          <div>
-            <div className="font-semibold tracking-wide">Paradox Resolution Ledger</div>
-            <div className="text-xs text-slate-400">
-              Compulsory auto-healing of code↔history determinism divergence — deploys never crash in-flight workflows.
+        {/* ---- provider health ---- */}
+        <section>
+          <Micro>Provider &amp; model health</Micro>
+          {health.length === 0 ? (
+            <Plane className="mt-2 p-5 text-center text-xs text-slate-500">No calls recorded yet.</Plane>
+          ) : (
+            <div className="mt-2 space-y-1.5">
+              {health.map((h) => {
+                const score = h.healthScore ?? 1;
+                const st: StateKey =
+                  score < 0.3 ? "critical" : score < 0.7 ? "degraded" : score < 0.9 ? "warning" : "healthy";
+                const avg = h.calls ? Math.round((h.totalLatencyMs ?? 0) / h.calls) : 0;
+                return (
+                  <div key={h.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                    <StateDot state={st} size={6} />
+                    <span className="font-mono text-slate-300">
+                      {h.provider}/{h.modelName}
+                    </span>
+                    <span className="relative h-1 w-20 overflow-hidden rounded-full bg-ink">
+                      <span className="absolute inset-y-0 left-0 rounded-full"
+                        style={{ width: `${score * 100}%`, background: STATE[st].color }} />
+                    </span>
+                    <span className="ml-auto text-slate-500">
+                      {h.calls} calls · {h.failures} fail · {avg}ms
+                    </span>
+                    {h.lastError && (
+                      <div className="w-full truncate pl-4 text-[10px]" style={{ color: STATE.critical.color }}
+                        title={h.lastError}>
+                        {h.lastError}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+          )}
+
+          {stats?.providerUsage && Object.keys(stats.providerUsage).length > 0 && (
+            <div className="mt-4">
+              <Micro>Usage by provider</Micro>
+              <div className="mt-1.5 space-y-1">
+                {Object.entries(stats.providerUsage).map(([p, v]: any) => (
+                  <div key={p} className="flex items-baseline justify-between text-[11px]">
+                    <span className="text-slate-400">{p}</span>
+                    <span className="readout text-slate-500">
+                      {v.requests} req · ${Number(v.cost ?? 0).toFixed(5)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ---- self-healing ledger ---- */}
+        <section>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <Micro>Self-healing ledger</Micro>
+            <button
+              onClick={runVerifyScan}
+              disabled={verifying}
+              className="rounded border border-edge px-2.5 py-1 text-[10px] transition-colors hover:border-aurora/50 disabled:opacity-50"
+            >
+              {verifying ? "Scanning…" : "Run verification scan"}
+            </button>
           </div>
-          <button onClick={runVerifyScan} disabled={verifying}
-            className="ml-auto rounded-md bg-indigo-600 px-3 py-1.5 text-xs text-white transition-opacity hover:opacity-90 disabled:opacity-50">
-            {verifying ? "Scanning…" : "Run verification scan"}
-          </button>
-        </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+            When deployed workflow code no longer matches recorded history, the divergence is
+            reconciled automatically instead of crashing the in-flight run.
+          </p>
 
-        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-5">
-          <Stat label="Paradoxes resolved" value={healing?.totalResolutions ?? "—"} accent="text-indigo-300" />
-          <Stat label="Healed workflows" value={healing?.healedWorkflows ?? "—"} accent="text-emerald-300" />
-          <Stat label="Insertions mapped" value={healing?.byResolutionType?.INSERTION_MAPPED ?? "—"} />
-          <Stat label="Deletions skipped" value={healing?.byResolutionType?.DELETION_SKIPPED ?? "—"} />
-          <Stat label="Reorders aligned" value={healing?.byResolutionType?.REORDER_ALIGNED ?? "—"} />
-        </div>
+          <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+            <Readout label="Resolutions" value={healing?.totalResolutions ?? 0} size="sm"
+              state={(healing?.totalResolutions ?? 0) > 0 ? "active" : "idle"} />
+            <Readout label="Healed workflows" value={healing?.healedWorkflows ?? 0} size="sm"
+              state={(healing?.healedWorkflows ?? 0) > 0 ? "healthy" : "idle"} />
+            <Readout label="Insertions" value={healing?.byResolutionType?.INSERTION_MAPPED ?? 0} size="sm" />
+            <Readout label="Deletions" value={healing?.byResolutionType?.DELETION_SKIPPED ?? 0} size="sm" />
+            <Readout label="Reorders" value={healing?.byResolutionType?.REORDER_ALIGNED ?? 0} size="sm" />
+          </div>
 
-        <div className="px-4 pb-4">
-          <div className="text-xs uppercase tracking-wide text-slate-400">Auto-healing timeline</div>
-          <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
+          <div className="mt-3 max-h-56 space-y-1 overflow-y-auto pr-1">
             {(healing?.recentResolutions ?? []).map((r: any, i: number) => (
-              <div key={i}
-                className="flex flex-wrap items-center gap-2 rounded-md border border-edge bg-ink/60 px-3 py-2 text-xs transition-colors duration-300 hover:border-indigo-500/50">
-                <span className="rounded bg-indigo-500/20 px-2 py-0.5 font-semibold text-indigo-300">
-                  PARADOX RESOLVED
+              <div key={i} className="flex flex-wrap items-center gap-2 rounded px-2 py-1.5 text-[10px] hover:bg-edge/40">
+                <StateDot state="active" size={5} />
+                <span style={{ color: STATE.active.color }}>{r.resolutionType}</span>
+                <span className="font-mono text-slate-400">{r.workflowId}</span>
+                <span className="text-slate-600">
+                  seq {r.codeSequence} → {r.historySequence ?? "∅"}
                 </span>
-                <span className={`rounded px-2 py-0.5 font-medium ${
-                  r.resolutionType === "INSERTION_MAPPED" ? "bg-emerald-500/20 text-emerald-300"
-                    : r.resolutionType === "DELETION_SKIPPED" ? "bg-amber-500/20 text-amber-300"
-                    : "bg-sky-500/20 text-sky-300"}`}>
-                  {r.resolutionType}
-                </span>
-                <span className="rounded bg-slate-500/20 px-2 py-0.5 text-slate-300">HISTORY ALIGNED</span>
-                <span className="font-mono text-slate-300">{r.workflowId}</span>
-                <span className="text-slate-500">
-                  seq {r.codeSequence} → {r.historySequence ?? "∅"} · {r.workflowType}
-                </span>
-                <span className="ml-auto text-slate-500">
+                <span className="ml-auto text-slate-600">
                   {r.resolvedAt ? new Date(r.resolvedAt).toLocaleTimeString() : ""}
                 </span>
               </div>
             ))}
             {(healing?.recentResolutions ?? []).length === 0 && (
-              <div className="rounded-md border border-dashed border-edge px-3 py-3 text-xs text-slate-500">
-                No divergence paradoxes detected — every deployed code graph currently matches its recorded history.
+              <div className="rounded border border-dashed border-edge/60 px-3 py-3 text-[11px] text-slate-500">
+                No divergence detected — every deployed code graph matches its recorded history.
               </div>
             )}
           </div>
 
           {verifyOut && (
-            <div className="mt-3 rounded-md border border-edge bg-ink p-3 text-xs">
+            <Plane inset className="mt-3 p-3 text-[11px]">
               {verifyOut.error ? (
-                <span className="text-rose-300">{verifyOut.error}</span>
+                <span style={{ color: STATE.critical.color }}>{verifyOut.error}</span>
               ) : (
                 <>
-                  <div className="flex items-center gap-2">
-                    <span className={`rounded px-2 py-0.5 font-semibold ${
-                      verifyOut.divergedInstances > 0
-                        ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"}`}>
-                      {verifyOut.divergedInstances > 0 ? "DIVERGENCES PENDING HEAL" : "ALL ALIGNED"}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StateDot state={verifyOut.divergedInstances > 0 ? "warning" : "healthy"} size={6} />
+                    <span
+                      style={{
+                        color:
+                          verifyOut.divergedInstances > 0 ? STATE.warning.color : STATE.healthy.color,
+                      }}
+                    >
+                      {verifyOut.divergedInstances > 0 ? "Divergences pending heal" : "All aligned"}
                     </span>
-                    <span className="text-slate-400">
-                      scanned {verifyOut.scanned} running instance(s) · {verifyOut.divergedInstances} diverged
+                    <span className="text-slate-500">
+                      scanned {verifyOut.scanned} running instance(s)
                     </span>
                   </div>
                   {verifyOut.divergedInstances > 0 && (
-                    <pre className="mt-2 max-h-40 overflow-auto text-slate-400">
-                      {JSON.stringify(verifyOut.results.filter((x: any) => x.diverged), null, 2)}
+                    <pre className="mt-2 max-h-40 overflow-auto text-[10px] text-slate-500">
+                      {JSON.stringify((verifyOut.results ?? []).filter((x: any) => x.diverged), null, 2)}
                     </pre>
                   )}
                 </>
               )}
-            </div>
+            </Plane>
           )}
-        </div>
+        </section>
       </div>
 
-      <div className="rounded-lg border border-edge bg-panel">
-        <div className="border-b border-edge px-4 py-2 font-medium">Recent routing decisions</div>
-        <div className="divide-y divide-edge text-sm">
-          {requests.map((r) => (
-            <div key={r.id} className="px-4 py-2">
-              <div className="flex items-center gap-2">
-                <span className={`rounded px-2 py-0.5 text-xs ${r.success ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"}`}>
-                  {r.success ? "OK" : "FAIL"}
-                </span>
-                <span className="text-xs">{r.chosenProvider}/{r.chosenModel}</span>
-                {r.failoverCount > 0 && <span className="text-xs text-amber-400">{r.failoverCount} failover(s)</span>}
-                <span className="ml-auto text-xs text-slate-500">{r.latencyMs}ms</span>
-              </div>
-              <div className="text-xs text-slate-500">{r.routingReason}</div>
-            </div>
-          ))}
-          {requests.length === 0 && <div className="px-4 py-3 text-xs text-slate-500">no gateway requests yet</div>}
+      {/* ---- model registry ---- */}
+      <section>
+        <Micro>Model registry &amp; lifecycle</Micro>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-edge/60 text-left">
+                <th className="py-2"><span className="micro">Provider</span></th>
+                <th className="py-2"><span className="micro">Model</span></th>
+                <th className="py-2"><span className="micro">Status</span></th>
+                <th className="py-2 text-right"><span className="micro">Context</span></th>
+                <th className="py-2 text-right"><span className="micro">Lifecycle</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.map((m) => (
+                <tr key={m.id} className="border-b border-edge/40">
+                  <td className="py-2 text-slate-300">{m.provider}</td>
+                  <td className="py-2 font-mono text-[11px] text-slate-400">{m.modelName}</td>
+                  <td className="py-2">
+                    <span className="flex items-center gap-1.5">
+                      <StateDot state={m.status === "ACTIVE" ? "healthy" : "idle"} size={5} />
+                      <span className="text-slate-400">{m.status}</span>
+                    </span>
+                  </td>
+                  <td className="readout py-2 text-right text-slate-400">
+                    {(m.contextWindow ?? 0).toLocaleString()}
+                  </td>
+                  <td className="py-2 text-right">
+                    <select
+                      value={m.status}
+                      onChange={(e) => setStatus(m.id, e.target.value)}
+                      className="rounded border border-edge bg-ink px-2 py-1 text-[11px] text-slate-300 outline-none focus:border-aurora/60"
+                    >
+                      {["DISCOVERED", "TESTING", "ACTIVE", "DEPRECATED", "REMOVED"].map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+              {models.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-3 text-[11px] text-slate-500">no models registered</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
-    </div>
-  );
-}
+      </section>
 
-function Stat({ label, value, accent }: { label: string; value: any; accent?: string }) {
-  return (
-    <div className="rounded-lg border border-edge bg-panel p-4">
-      <div className="text-xs uppercase text-slate-400">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${accent ?? ""}`}>{value}</div>
+      {/* ---- playground ---- */}
+      <section>
+        <Micro>Send a request</Micro>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Paste one of your API keys to send a request through the gateway.{" "}
+          <Link to="/portal" className="text-neon hover:underline">Create a key →</Link>
+        </p>
+        <div className="mt-2 grid gap-2 lg:grid-cols-[280px_minmax(0,1fr)_auto]">
+          <input
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            type="password"
+            placeholder="cnt_live_…"
+            className="rounded border border-edge bg-ink px-3 py-2 font-mono text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-aurora/60"
+          />
+          <input
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="rounded border border-edge bg-ink px-3 py-2 text-sm text-slate-100 outline-none focus:border-aurora/60"
+          />
+          <button
+            onClick={sendChat}
+            disabled={!apiKey || sending}
+            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {sending ? "Sending…" : "Send"}
+          </button>
+        </div>
+        {chatOut && (
+          <Plane inset className="mt-2 max-h-64 overflow-auto p-3">
+            <pre className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate-400">
+              {JSON.stringify(chatOut, null, 2)}
+            </pre>
+          </Plane>
+        )}
+      </section>
     </div>
   );
 }
