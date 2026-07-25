@@ -10,6 +10,7 @@ const SECTIONS = [
   { id: "quickstart", label: "Quickstart" },
   { id: "auth", label: "Authentication" },
   { id: "chat", label: "Chat API" },
+  { id: "workflows", label: "Durable workflows" },
   { id: "features", label: "Features" },
   { id: "reference", label: "API reference" },
 ];
@@ -143,6 +144,82 @@ print(r.json()["response"])`}
             </div>
           </section>
 
+          <section id="workflows" className="scroll-mt-24">
+            <h2 className="text-2xl font-bold tracking-tight">Durable workflows</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
+              A workflow is a graph of HTTP calls you publish as JSON. Continuum executes it durably:
+              each step's result is recorded, so a crash resumes from the last completed step rather
+              than the beginning, retries never re-run work that already succeeded, and every call
+              carries a stable idempotency key so your service can dedupe it. Author one in the
+              console under <Link to="/workflows" className="text-indigo-300 hover:underline">Workflows</Link>,
+              or publish over the API.
+            </p>
+
+            <h3 className="mt-6 text-sm font-semibold text-slate-200">A definition</h3>
+            <CodeBlock
+              language="json"
+              code={`{
+  "description": "Reserve stock, charge, then confirm",
+  "steps": [
+    { "id": "reserve",
+      "call": { "method": "POST", "url": "https://api.acme.com/reserve",
+                "body": { "sku": "\${input.sku}" } },
+      "retries": 5, "timeoutSeconds": 30 },
+
+    { "id": "charge",
+      "call": { "method": "POST", "url": "https://api.acme.com/charge",
+                "body": { "amount": "\${input.amount}" } } },
+
+    { "id": "settle-window", "type": "WAIT", "waitSeconds": 300,
+      "dependsOn": ["charge"] },
+
+    { "id": "confirm", "dependsOn": ["reserve", "settle-window"],
+      "condition": "\${steps.charge.paid} == true",
+      "call": { "method": "POST", "url": "https://api.acme.com/confirm",
+                "body": { "hold": "\${steps.reserve.holdId}" } } }
+  ],
+  "onComplete": { "url": "https://api.acme.com/webhooks/order-done" }
+}`}
+            />
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {[
+                ["dependsOn", "Ordering. Steps that do not depend on each other run in parallel automatically — you never schedule threads yourself."],
+                ["References", "${input.field} is what the run was started with; ${steps.<id>.<field>} is an earlier step's response body. A reference used alone keeps its type; inside a longer string it is interpolated."],
+                ["condition", "A guard. Comparisons (==, !=, >, >=, <, <=) joined by and/or — no arithmetic and no function calls, because a guard is re-evaluated on replay and must be a pure function of recorded values. A false guard skips the step and records it as skipped."],
+                ["type: WAIT", "A durable timer, 1–86400 seconds. The task is simply not claimable until it is due, so a wait occupies no worker and survives a restart."],
+                ["retries / timeoutSeconds", "Per step. A 5xx or a timeout is retried with backoff; a 4xx is treated as a decision, not a blip, and fails the run immediately instead of burning retries."],
+                ["onComplete", "A callback delivered once the graph finishes, so you do not have to poll. It is an ordinary durable step, so it retries and carries its own idempotency key."],
+              ].map(([title, body]) => (
+                <div key={title} className="rounded-xl border border-edge bg-panel/50 p-4">
+                  <div className="font-mono text-xs font-semibold text-slate-100">{title}</div>
+                  <div className="mt-1 text-xs leading-relaxed text-slate-400">{body}</div>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="mt-6 text-sm font-semibold text-slate-200">Publish and run</h3>
+            <CodeBlock
+              language="bash"
+              code={`# Publish appends a new version; in-flight runs keep executing the
+# version they started with, which is what makes replay deterministic.
+curl -X POST https://api.continuum.dev/api/portal/developer/workflows/definitions/order-flow \\
+  -H "Authorization: Bearer $CONTINUUM_SESSION" \\
+  -H "Content-Type: application/json" \\
+  -d @order-flow.json
+
+curl -X POST https://api.continuum.dev/api/portal/developer/workflows/definitions/order-flow/run \\
+  -H "Authorization: Bearer $CONTINUUM_SESSION" \\
+  -H "Content-Type: application/json" \\
+  -d '{"input": {"sku": "WIDGET-1", "amount": 4999}}'
+# => {"workflowId":"…","definition":"order-flow","version":1,"status":"RUNNING"}`}
+            />
+            <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-500">
+              Step targets must be public HTTPS endpoints. Requests to loopback, private or
+              link-local addresses are rejected, and redirects are not followed.
+            </p>
+          </section>
+
           <section id="features" className="scroll-mt-24">
             <h2 className="text-2xl font-bold tracking-tight">Features</h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
@@ -188,6 +265,10 @@ print(r.json()["response"])`}
                     ["POST", "/api/portal/developer/v6/enable", "Enable the Verification Engine."],
                     ["POST", "/api/portal/developer/v7/enable", "Enable Context Virtualization."],
                     ["POST", "/api/portal/developer/v8/firewall/enable", "Enable the Prompt Firewall."],
+                    ["GET", "/api/portal/developer/workflows/definitions", "List your workflow definitions."],
+                    ["POST", "/api/portal/developer/workflows/definitions/{name}", "Publish a new version of a definition."],
+                    ["POST", "/api/portal/developer/workflows/definitions/{name}/run", "Start a durable run."],
+                    ["GET", "/api/workflows/{id}", "A run's status, event history and result."],
                   ].map(([m, p, d]) => (
                     <tr key={p} className="hover:bg-edge/30">
                       <td className="px-4 py-2">

@@ -107,7 +107,7 @@ public class WorkflowContext {
         // Brand new work. Record the intent and suspend (sequential execution model).
         this.pendingSchedules.add(new Commands.ScheduleActivity(
                 seq, activityType, json.write(input),
-                options.getMaxAttempts(), options.getTimeoutSeconds()));
+                options.getMaxAttempts(), options.getTimeoutSeconds(), options.getDelaySeconds()));
         throw WorkflowBlockedException.INSTANCE;
     }
 
@@ -152,7 +152,8 @@ public class WorkflowContext {
             if (!scheduledPending.contains(seq)) {
                 this.pendingSchedules.add(new Commands.ScheduleActivity(
                         seq, call.activityType(), json.write(call.input()),
-                        call.options().getMaxAttempts(), call.options().getTimeoutSeconds()));
+                        call.options().getMaxAttempts(), call.options().getTimeoutSeconds(),
+                        call.options().getDelaySeconds()));
             }
         }
         if (allDone) {

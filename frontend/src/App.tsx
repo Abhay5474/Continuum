@@ -17,7 +17,8 @@ const GROUPS: Group[] = [
   {
     label: "Traffic",
     items: [
-      { to: "/workflows", label: "Workflows", desc: "Durable runs, event logs and replay" },
+      { to: "/workflows", label: "Workflows", desc: "Author, publish and run durable graphs" },
+      { to: "/workflows/console", label: "Run History", desc: "Every run, its event log and replay" },
       { to: "/gateway", label: "Gateway", desc: "Live requests, providers and failover" },
       { to: "/router", label: "Routing", desc: "Model selection and tail-latency hedging" },
     ],

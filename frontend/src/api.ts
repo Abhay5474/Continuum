@@ -179,6 +179,26 @@ export const portal = {
     disable: () => portalHttp<any>("/api/portal/developer/v7/disable", "POST"),
   },
 
+  // --- Customer-defined workflows ---
+  defs: {
+    list: () => portalHttp<any[]>("/api/portal/developer/workflows/definitions", "GET"),
+    get: (name: string, version?: number) =>
+      portalHttp<any>(
+        `/api/portal/developer/workflows/definitions/${name}${version ? `?version=${version}` : ""}`,
+        "GET"
+      ),
+    publish: (name: string, spec: unknown) =>
+      portalHttp<any>(`/api/portal/developer/workflows/definitions/${name}`, "POST", spec),
+    remove: (name: string) =>
+      portalHttp<any>(`/api/portal/developer/workflows/definitions/${name}`, "DELETE"),
+    run: (name: string, input: unknown, version?: number) =>
+      portalHttp<any>(
+        `/api/portal/developer/workflows/definitions/${name}/run${version ? `?version=${version}` : ""}`,
+        "POST",
+        { input }
+      ),
+  },
+
   // --- Billing & usage ---
   billing: () => portalHttp<any>("/api/portal/developer/billing", "GET"),
   setPlan: (plan: string) => portalHttp<any>("/api/portal/developer/billing/plan", "PUT", { plan }),

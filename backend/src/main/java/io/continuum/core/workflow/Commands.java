@@ -20,7 +20,7 @@ public final class Commands {
 
     /** The workflow wants an activity executed. */
     public record ScheduleActivity(long commandSeq, String activityType, String input,
-                                   int maxAttempts, int timeoutSeconds) {
+                                   int maxAttempts, int timeoutSeconds, int delaySeconds) {
     }
 
     /**

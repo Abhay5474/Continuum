@@ -5,6 +5,7 @@ import { Micro, Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
 import FeatureToggle from "../system/FeatureToggle";
+import { elapsed, humanMs } from "../system/time";
 
 /**
  * Verification — the agent constellation.
@@ -401,7 +402,7 @@ function Constellation({ workflowId }: { workflowId: string }) {
                   {selected.startedAt && selected.completedAt && (
                     <Row
                       k="Duration"
-                      v={`${new Date(selected.completedAt).getTime() - new Date(selected.startedAt).getTime()}ms`}
+                      v={humanMs(elapsed(selected.startedAt, selected.completedAt))}
                     />
                   )}
                 </div>

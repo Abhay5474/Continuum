@@ -52,24 +52,47 @@ public class DeclarativeWorkflow implements Workflow {
         Map<String, Object> stepResults = new LinkedHashMap<>();
         scope.put("steps", stepResults);
 
+        List<String> skipped = new ArrayList<>();
+
         for (List<WorkflowSpec.Step> layer : spec.topologicalLayers()) {
+            // A guard is evaluated against values already recorded in history, so
+            // it produces the same answer on every replay. Steps whose guard is
+            // false are not scheduled at all.
+            List<WorkflowSpec.Step> live = new ArrayList<>();
+            for (WorkflowSpec.Step s : layer) {
+                boolean guardPasses = s.getCondition() == null || s.getCondition().isBlank()
+                        || Conditions.evaluate(s.getCondition(), scope);
+                if (guardPasses) {
+                    live.add(s);
+                } else {
+                    skipped.add(s.getId());
+                    // Recorded so later references resolve rather than dangling.
+                    stepResults.put(s.getId(), Map.of("skipped", true));
+                }
+            }
+            if (live.isEmpty()) {
+                continue;
+            }
+
             // Independent steps in the same layer are scheduled together; the
             // engine's parallel barrier keeps replay semantics intact.
             List<WorkflowContext.ParallelCall> calls = new ArrayList<>();
-            for (WorkflowSpec.Step s : layer) {
-                calls.add(new WorkflowContext.ParallelCall(HttpStepActivity.TYPE, toInput(ctx, s, scope),
-                        ActivityOptions.defaults()
-                                .maxAttempts(Math.max(1, s.getRetries() + 1))
-                                .timeoutSeconds(s.getTimeoutSeconds())));
+            for (WorkflowSpec.Step s : live) {
+                calls.add(s.getType() == WorkflowSpec.Kind.WAIT
+                        ? waitCall(s)
+                        : new WorkflowContext.ParallelCall(HttpStepActivity.TYPE, toInput(ctx, s, scope),
+                                ActivityOptions.defaults()
+                                        .maxAttempts(Math.max(1, s.getRetries() + 1))
+                                        .timeoutSeconds(s.getTimeoutSeconds())));
             }
 
             List<Map> results = ctx.executeActivitiesParallel(calls, Map.class);
-            for (int i = 0; i < layer.size(); i++) {
+            for (int i = 0; i < live.size(); i++) {
                 Map<String, Object> r = (Map<String, Object>) results.get(i);
                 // A step's body is what later steps reference, so ${steps.x.field}
                 // reads naturally instead of ${steps.x.body.field}.
                 Object body = r == null ? null : r.get("body");
-                stepResults.put(layer.get(i).getId(), body instanceof Map ? body : wrap(r));
+                stepResults.put(live.get(i).getId(), body instanceof Map ? body : wrap(r));
             }
         }
 
@@ -77,7 +100,37 @@ public class DeclarativeWorkflow implements Workflow {
         out.put("definition", run.definition());
         out.put("version", run.version());
         out.put("steps", stepResults);
+        out.put("skipped", skipped);
+
+        // Push the result instead of making the caller poll. Delivered as a step,
+        // so it retries and carries an idempotency key like any other call.
+        if (spec.getOnComplete() != null) {
+            Map<String, Object> payload = new LinkedHashMap<>(out);
+            payload.put("workflowId", ctx.workflowId());
+            payload.put("status", "COMPLETED");
+            WorkflowSpec.Call cb = spec.getOnComplete();
+            Map<String, String> headers = new LinkedHashMap<>();
+            cb.getHeaders().forEach((k, v) -> headers.put(k, String.valueOf(Templates.resolve(v, scope))));
+            Map<String, Object> delivery = ctx.executeActivity(HttpStepActivity.TYPE,
+                    new HttpStepActivity.Input(String.valueOf(Templates.resolve(cb.getUrl(), scope)),
+                            cb.getMethod(), headers, payload, 30, ctx.workflowId() + ":onComplete"),
+                    ActivityOptions.defaults().maxAttempts(5).timeoutSeconds(30),
+                    Map.class);
+            out.put("callbackStatus", delivery == null ? null : delivery.get("status"));
+        }
         return out;
+    }
+
+    /**
+     * A durable timer. The task is simply not claimable until it is due, so the
+     * wait occupies no worker and survives a restart like any other step.
+     */
+    private WorkflowContext.ParallelCall waitCall(WorkflowSpec.Step s) {
+        int seconds = s.getWaitSeconds() == null ? 1 : s.getWaitSeconds();
+        return new WorkflowContext.ParallelCall(
+                WaitStepActivity.TYPE,
+                new WaitStepActivity.Input(s.getId(), seconds),
+                ActivityOptions.defaults().maxAttempts(1).timeoutSeconds(30).delaySeconds(seconds));
     }
 
     private HttpStepActivity.Input toInput(WorkflowContext ctx, WorkflowSpec.Step s, Map<String, Object> scope) {

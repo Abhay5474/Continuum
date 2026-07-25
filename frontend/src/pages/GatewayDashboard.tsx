@@ -6,6 +6,7 @@ import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
 import Tabs from "../system/Tabs";
 import { Morph, Spotlight } from "../system/motion";
+import { timeOf } from "../system/time";
 
 /**
  * Gateway — live request flow.
@@ -152,7 +153,7 @@ export default function GatewayDashboard() {
                 >
                   <StateDot state={st} size={6} />
                   <span className="readout w-16 shrink-0 text-slate-600">
-                    {new Date(r.createdAt).toLocaleTimeString()}
+                    {timeOf(r.createdAt)}
                   </span>
 
                   {/* what was asked for → where it actually went */}
@@ -303,7 +304,7 @@ export default function GatewayDashboard() {
                   seq {r.codeSequence} → {r.historySequence ?? "∅"}
                 </span>
                 <span className="ml-auto text-slate-600">
-                  {r.resolvedAt ? new Date(r.resolvedAt).toLocaleTimeString() : ""}
+                  {r.resolvedAt ? timeOf(r.resolvedAt) : ""}
                 </span>
               </div>
             ))}

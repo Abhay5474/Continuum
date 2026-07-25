@@ -161,9 +161,15 @@ public class WorkflowEngine {
         eventStore.appendLocked(instance, EventType.ACTIVITY_SCHEDULED,
                 new Payloads.ActivityScheduled(s.commandSeq(), s.activityType(), s.input(),
                         s.maxAttempts(), s.timeoutSeconds(), idempotencyKey));
-        activityTasks.save(new ActivityTaskEntity(
+        ActivityTaskEntity task = new ActivityTaskEntity(
                 instance.getWorkflowId(), s.activityType(), s.commandSeq(), s.input(),
-                s.maxAttempts(), s.timeoutSeconds(), idempotencyKey));
+                s.maxAttempts(), s.timeoutSeconds(), idempotencyKey);
+        if (s.delaySeconds() > 0) {
+            // A durable timer: the row simply is not claimable until it is due, so
+            // the wait costs no worker and survives a restart.
+            task.setVisibleAt(java.time.Instant.now().plusSeconds(s.delaySeconds()));
+        }
+        activityTasks.save(task);
         log.info("Scheduled activity {} (seq {}) for workflow {}",
                 s.activityType(), s.commandSeq(), instance.getWorkflowId());
     }

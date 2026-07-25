@@ -36,22 +36,44 @@ public class WorkflowSpec {
 
     private String description;
     private List<Step> steps = new ArrayList<>();
+    private Call onComplete;
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public List<Step> getSteps() { return steps; }
     public void setSteps(List<Step> steps) { this.steps = steps == null ? new ArrayList<>() : steps; }
 
+    /**
+     * Optional callback fired once every step has finished, so a caller does not
+     * have to poll for the result. It is delivered as an ordinary durable step,
+     * which means it inherits retries and the idempotency key like anything else.
+     */
+    public Call getOnComplete() { return onComplete; }
+    public void setOnComplete(Call onComplete) { this.onComplete = onComplete; }
+
+    /** What a step does. */
+    public enum Kind { HTTP, WAIT }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Step {
         private String id;
+        private Kind type = Kind.HTTP;
         private Call call;
+        private Integer waitSeconds;
+        private String condition;
         private List<String> dependsOn = new ArrayList<>();
         private int retries = 3;
         private int timeoutSeconds = 30;
 
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
+        public Kind getType() { return type; }
+        public void setType(Kind type) { this.type = type == null ? Kind.HTTP : type; }
+        public Integer getWaitSeconds() { return waitSeconds; }
+        public void setWaitSeconds(Integer w) { this.waitSeconds = w; }
+        /** Optional guard; the step is skipped when it evaluates false. */
+        public String getCondition() { return condition; }
+        public void setCondition(String condition) { this.condition = condition; }
         public Call getCall() { return call; }
         public void setCall(Call call) { this.call = call; }
         public List<String> getDependsOn() { return dependsOn; }
@@ -107,8 +129,17 @@ public class WorkflowSpec {
             if (!ids.add(s.getId())) {
                 throw new InvalidSpecException("Duplicate step id: " + s.getId());
             }
-            if (s.getCall() == null || s.getCall().getUrl() == null || s.getCall().getUrl().isBlank()) {
+            if (s.getType() == Kind.WAIT) {
+                if (s.getWaitSeconds() == null || s.getWaitSeconds() < 1 || s.getWaitSeconds() > 86_400) {
+                    throw new InvalidSpecException(
+                            "Step '" + s.getId() + "': waitSeconds must be between 1 and 86400.");
+                }
+            } else if (s.getCall() == null || s.getCall().getUrl() == null || s.getCall().getUrl().isBlank()) {
                 throw new InvalidSpecException("Step '" + s.getId() + "' needs a call.url.");
+            }
+            if (s.getCondition() != null && !s.getCondition().isBlank()) {
+                // Fail at publish time rather than mid-run on an unparseable guard.
+                Conditions.parse(s.getCondition());
             }
             if (s.getRetries() < 0 || s.getRetries() > 25) {
                 throw new InvalidSpecException("Step '" + s.getId() + "': retries must be between 0 and 25.");
@@ -127,6 +158,9 @@ public class WorkflowSpec {
                     throw new InvalidSpecException("Step '" + s.getId() + "' depends on itself.");
                 }
             }
+        }
+        if (onComplete != null && (onComplete.getUrl() == null || onComplete.getUrl().isBlank())) {
+            throw new InvalidSpecException("onComplete needs a url.");
         }
         // A cycle would never terminate, so it is rejected rather than discovered
         // at run time.

@@ -9,6 +9,7 @@ import Docs from "./pages/Docs";
 import SignIn from "./pages/SignIn";
 import Dashboard from "./pages/Dashboard";
 import CommandCenter from "./pages/CommandCenter";
+import WorkflowBuilder from "./pages/WorkflowBuilder";
 import WorkflowDetailPage from "./pages/WorkflowDetail";
 import ChaosPanel from "./pages/ChaosPanel";
 import ReplayVerify from "./pages/ReplayVerify";
@@ -43,7 +44,11 @@ const router = createBrowserRouter([
           // The command centre is the front of the console; the workflow
           // console it replaced stays reachable at /workflows.
           { path: "dashboard", element: <CommandCenter /> },
-          { path: "workflows", element: <Dashboard /> },
+          // /workflows is now where a developer authors and runs their own
+          // definitions; the original run console keeps its own path. A static
+          // segment outranks :id, so /workflows/console is unambiguous.
+          { path: "workflows", element: <WorkflowBuilder /> },
+          { path: "workflows/console", element: <Dashboard /> },
           { path: "workflows/:id", element: <WorkflowDetailPage /> },
           { path: "chaos", element: <ChaosPanel /> },
           { path: "replay", element: <ReplayVerify /> },

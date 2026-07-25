@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { portal } from "../api";
 import { useToast, Spinner, CopyButton } from "../components/ui";
+import { dateTimeOf, dateOf } from "../system/time";
 
 /**
  * Account & settings: change password / email, manage API keys (name, last-used,
@@ -144,7 +145,7 @@ export default function Settings() {
                 <tr key={k.id} className="border-t border-edge/50 text-xs">
                   <td className="py-2">{k.label || <span className="text-slate-600">unnamed</span>}</td>
                   <td className="font-mono">{k.prefix}…</td>
-                  <td className="text-slate-400">{k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : "never"}</td>
+                  <td className="text-slate-400">{k.lastUsedAt ? dateTimeOf(k.lastUsedAt) : "never"}</td>
                   <td className={k.active ? "text-emerald-300" : "text-rose-300"}>{k.active ? "active" : "revoked"}</td>
                   <td className="text-right">
                     {k.active && (
@@ -205,7 +206,7 @@ export default function Settings() {
                 <span className={`rounded px-1.5 py-0.5 ${i.accepted ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"}`}>
                   {i.accepted ? "accepted" : "pending"}
                 </span>
-                <span className="ml-auto text-slate-600">{new Date(i.createdAt).toLocaleDateString()}</span>
+                <span className="ml-auto text-slate-600">{dateOf(i.createdAt)}</span>
               </div>
             ))}
           </div>

@@ -3,6 +3,7 @@ import { api, portal } from "../api";
 import { Micro, Readout, Plane, StateDot } from "../system/primitives";
 import { STATE } from "../system/tokens";
 import FeatureToggle from "../system/FeatureToggle";
+import { timeOf, toMillis } from "../system/time";
 
 /**
  * Context MMU — the memory space.
@@ -49,7 +50,7 @@ export default function MmuProfiler() {
   const ranked = useMemo(() => {
     const now = Date.now();
     return stubs
-      .map((s) => ({ ...s, age: now - new Date(s.updatedAt).getTime() }))
+      .map((s) => ({ ...s, age: now - (toMillis(s.updatedAt) ?? now) }))
       .sort((a, b) => a.age - b.age);
   }, [stubs]);
   const maxAge = ranked.length ? Math.max(...ranked.map((s) => s.age), 1) : 1;
@@ -223,7 +224,7 @@ Turn it on above, then send a long conversation through the gateway.
                         className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded px-2 py-1.5 text-[11px] transition-colors hover:bg-edge/40"
                       >
                         <span className="readout w-16 shrink-0 text-slate-600">
-                          {new Date(r.createdAt).toLocaleTimeString()}
+                          {timeOf(r.createdAt)}
                         </span>
                         <span className="relative h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-ink">
                           <span
@@ -282,7 +283,7 @@ Turn it on above, then send a long conversation through the gateway.
                       v={`${(selected.sourceTokens / Math.max(1, selected.stubTokens)).toFixed(1)}×`} />
                     <Row k="Version" v={`v${selected.version}${selected.version > 1 ? " · mutated" : ""}`} />
                     <Row k="Write-behind" v={selected.dirty ? "pending" : "clean"} />
-                    <Row k="Last touched" v={new Date(selected.updatedAt).toLocaleTimeString()} />
+                    <Row k="Last touched" v={timeOf(selected.updatedAt)} />
                   </dl>
                   <p className="text-[10px] leading-relaxed text-slate-600">
                     A mutated page is not rewritten in place — its stream is appended to, and the page

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { portal } from "../api";
 import { Micro, Readout, Plane, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
+import { timeOf } from "../system/time";
 
 /**
  * Adaptive Policy — the autonomous memory and policy engine.
@@ -320,7 +321,7 @@ export default function GodMode() {
                         </span>
                       )}
                       <span className="readout w-full text-[10px] text-slate-600">
-                        {a.detail} · {new Date(a.createdAt).toLocaleTimeString()}
+                        {a.detail} · {timeOf(a.createdAt)}
                       </span>
                     </div>
                   );
@@ -739,7 +740,7 @@ function SimulationRow({ sim }: { sim: any }) {
           {((sim.confidence ?? 0) * 100).toFixed(0)}% confidence
         </span>
         <span className="ml-auto readout text-[10px] text-slate-600">
-          {new Date(sim.createdAt).toLocaleTimeString()}
+          {timeOf(sim.createdAt)}
         </span>
       </div>
 
