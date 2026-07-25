@@ -114,11 +114,25 @@ public class ActivityExecutor {
                 task.getActivityType(), task.getSequenceNumber(), task.getWorkflowId());
     }
 
+    /** True when the failure (or any cause) is marked as not worth retrying. */
+    private static boolean isNonRetryable(Throwable error) {
+        for (Throwable t = error; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof io.continuum.core.activity.NonRetryableFailure) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Transactional
     public void fail(Long taskId, Throwable error) {
         ActivityTaskEntity task = activityTasks.findById(taskId).orElseThrow();
         int attempt = task.getRetryCount() + 1;
-        boolean terminal = attempt >= task.getMaxAttempts();
+        // A failure the activity marked as settled is terminal on the first
+        // attempt: retrying a rejected request only delays the outcome and
+        // multiplies load on the target.
+        boolean settled = isNonRetryable(error);
+        boolean terminal = settled || attempt >= task.getMaxAttempts();
         String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
 
         eventStore.append(task.getWorkflowId(), EventType.ACTIVITY_FAILED,
