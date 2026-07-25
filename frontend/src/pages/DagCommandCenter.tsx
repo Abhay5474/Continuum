@@ -1,396 +1,473 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
+import { Micro, Readout, Plane, StateDot } from "../system/primitives";
+import { STATE, type StateKey } from "../system/tokens";
 
 /**
- * ​Execution Command Center: the mission-control trace view for
- * ConsensusDag workflow runs ONLY. Center canvas = the live probabilistic
- * decision graph; left = Causal Inspector; right = Risk + Confidence engine;
- * top = run strip with the time-travel scrubber and "Collapse to Truth".
+ * Verification — the agent constellation.
+ *
+ * A question is decomposed into claims; each claim gets a solver, each solver a
+ * set of verifiers, and the evidence is aggregated in log-odds space into a
+ * single confidence. That pipeline is a layered DAG, so it is drawn as one:
+ * evidence flows left to right and the constellation collapses into a verdict.
+ *
+ * Contradictions are the interesting part, so they are drawn as tension — a
+ * curved dashed edge into an explicit conflict node — rather than as another
+ * grey line.
  */
-export default function DagCommandCenter() {
-  const { workflowId } = useParams();
-  return workflowId ? <TraceView workflowId={workflowId} /> : <RunList />;
+
+type Node = {
+  nodeKey: string;
+  nodeType: string;
+  claimId: number | null;
+  label: string;
+  status: string;
+  validity: number | null;
+  outputJson: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+type Edge = { fromKey: string; toKey: string; edgeType: string; weight: number };
+
+/** Pipeline order — the x axis of the constellation. */
+const LAYER: Record<string, number> = {
+  PLANNER: 0,
+  SOLVER: 1,
+  CONFLICT: 2,
+  VERIFIER: 3,
+  AGGREGATOR: 4,
+  SYNTHESIS: 5,
+};
+const LAYER_LABEL = ["Plan", "Solve", "Conflict", "Verify", "Aggregate", "Answer"];
+
+/** Short code shown inside a node when it has no claim number of its own. */
+const TYPE_CODE: Record<string, string> = {
+  PLANNER: "P",
+  AGGREGATOR: "\u03A3", // sigma — evidence summed in log-odds space
+  SYNTHESIS: "A",
+  CONFLICT: "!",
+};
+
+/** Caption under a node: the verifier's check name, or the stage. */
+function caption(n: Node): string {
+  if (n.nodeType === "VERIFIER") return (n.label.split("\u00B7")[0] || "check").trim().toLowerCase().replace(/_/g, " ");
+  if (n.nodeType === "SOLVER") return `claim ${n.claimId}`;
+  if (n.nodeType === "PLANNER") return "decompose";
+  if (n.nodeType === "AGGREGATOR") return "bayesian";
+  if (n.nodeType === "SYNTHESIS") return "answer";
+  if (n.nodeType === "CONFLICT") return "conflict";
+  return n.nodeType.toLowerCase();
 }
 
-/* ---------------- run list (entry point) ---------------- */
+function statusState(status: string): StateKey {
+  if (status === "PASS" || status === "DONE") return "healthy";
+  if (status === "FAIL") return "critical";
+  if (status === "UNCERTAIN") return "warning";
+  return "idle";
+}
 
-function RunList() {
+export default function DagCommandCenter() {
+  const { workflowId } = useParams();
   const [runs, setRuns] = useState<any[]>([]);
+
   useEffect(() => {
     const load = () => api.get<any[]>("/api/dag/runs").then(setRuns).catch(() => {});
     load();
-    const t = setInterval(load, 4000);
+    const t = setInterval(load, 5000);
     return () => clearInterval(t);
   }, []);
+
+  if (workflowId) return <Constellation workflowId={workflowId} />;
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold text-gradient">​Execution Command Center</h1>
-        <p className="text-sm text-slate-400">
-          Every request verified by the Consensus DAG Engine leaves a full forensic trace: solver and
-          verifier nodes, the contradiction graph, and the Bayesian resolution. Select a run to open
-          its command center. (Enable the engine per developer in the Developer Portal.)
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-lg font-semibold tracking-tight">Verification</h1>
+        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-400">
+          High-stakes questions are decomposed into claims, solved in parallel, checked by
+          independent verifiers, and resolved into a single confidence by Bayesian aggregation — no
+          model is asked to grade another. Every run leaves a full evidence trail.
         </p>
-      </div>
-      <div className="glass divide-y divide-edge/60">
-        {runs.map((r) => (
-          <Link key={r.id} to={`/dag/${r.workflowId}`}
-            className="flex flex-wrap items-center gap-3 px-4 py-3 transition-colors hover:bg-aurora/5">
-            <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-              r.status === "COMPLETED" ? "bg-emerald-500/20 text-emerald-300"
-                : r.status === "RUNNING" ? "bg-sky-500/20 text-sky-300 animate-pulse"
-                : "bg-rose-500/20 text-rose-300"}`}>{r.status}</span>
-            <span className="max-w-md truncate text-sm text-slate-300">{r.prompt}</span>
-            {r.finalConfidence != null && (
-              <span className="text-xs text-neon">{(r.finalConfidence * 100).toFixed(1)}%</span>
-            )}
-            <span className="text-xs text-slate-500">{r.claimCount} claims · {r.nodeCount} nodes</span>
-            <span className="ml-auto font-mono text-[10px] text-slate-600">{r.workflowId}</span>
-          </Link>
-        ))}
-        {runs.length === 0 && (
-          <div className="px-4 py-8 text-center text-xs text-slate-500">
-            No verification runs yet. Enable the Verification Engine in the Developer Portal, then send a
-            gateway request — its verification trace will appear here.
+      </header>
+
+      {runs.length === 0 ? (
+        <Plane className="p-8 text-center">
+          <Micro>No verification runs</Micro>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
+            Enable the Verification Engine in API Keys &amp; Providers, then send a gateway request.
+            Each verified answer is recorded here with its full constellation.
+          </p>
+        </Plane>
+      ) : (
+        <section>
+          <Micro>Runs · newest first</Micro>
+          <div className="mt-2 divide-y divide-edge/50">
+            {runs.map((r) => {
+              const conf = r.finalConfidence ?? 0;
+              const s: StateKey =
+                r.status !== "COMPLETED"
+                  ? "active"
+                  : conf >= 0.85
+                  ? "healthy"
+                  : conf >= 0.6
+                  ? "warning"
+                  : "critical";
+              return (
+                <Link
+                  key={r.workflowId}
+                  to={`/dag/${r.workflowId}`}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-3 transition-colors hover:bg-edge/40"
+                >
+                  <StateDot state={s} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-300">
+                    {r.prompt || <span className="text-slate-600">no prompt recorded</span>}
+                  </span>
+                  <span className="readout text-sm font-semibold" style={{ color: STATE[s].color }}>
+                    {r.finalConfidence != null ? `${(conf * 100).toFixed(1)}%` : "—"}
+                  </span>
+                  <span className="micro w-20 text-right">{r.uncertainty ?? "—"}</span>
+                  <span className="readout w-24 text-right text-[10px] text-slate-600">
+                    {r.claimCount} claims · {r.nodeCount} nodes
+                  </span>
+                </Link>
+              );
+            })}
           </div>
-        )}
-      </div>
+        </section>
+      )}
     </div>
   );
 }
 
-/* ---------------- the command center ---------------- */
-
-const TYPE_STYLE: Record<string, { fill: string; ring: string; icon: string }> = {
-  PLANNER: { fill: "#1e293b", ring: "#94a3b8", icon: "◈" },
-  SOLVER: { fill: "#172554", ring: "#3b82f6", icon: "S" },
-  VERIFIER: { fill: "#1c1917", ring: "#eab308", icon: "⚖" },
-  CONFLICT: { fill: "#450a0a", ring: "#ef4444", icon: "!" },
-  AGGREGATOR: { fill: "#2e1065", ring: "#a855f7", icon: "Σ" },
-  SYNTHESIS: { fill: "#022c22", ring: "#34d399", icon: "✍" },
-};
-
-function statusRing(node: any): string {
-  if (node.nodeType === "VERIFIER") {
-    return node.status === "PASS" ? "#34d399" : node.status === "FAIL" ? "#ef4444" : "#eab308";
-  }
-  if (node.status === "FAIL") return "#ef4444";
-  return TYPE_STYLE[node.nodeType]?.ring ?? "#64748b";
-}
-
-function TraceView({ workflowId }: { workflowId: string }) {
+function Constellation({ workflowId }: { workflowId: string }) {
   const [trace, setTrace] = useState<any | null>(null);
-  const [selected, setSelected] = useState<any | null>(null);
-  const [tab, setTab] = useState<"evidence" | "computation" | "dependencies">("evidence");
-  const [collapsed, setCollapsed] = useState(false);
-  const [cursor, setCursor] = useState(100); // time-travel percentage
+  const [sel, setSel] = useState<string | null>(null);
 
   useEffect(() => {
     const load = () => api.get<any>(`/api/dag/trace/${workflowId}`).then(setTrace).catch(() => {});
     load();
-    const t = setInterval(load, 3000);
+    const t = setInterval(load, 4000);
     return () => clearInterval(t);
   }, [workflowId]);
 
-  const nodes: any[] = trace?.nodes ?? [];
-  const edges: any[] = trace?.edges ?? [];
   const run = trace?.run;
+  const nodes: Node[] = trace?.nodes ?? [];
+  const edges: Edge[] = trace?.edges ?? [];
 
-  // ---- layered layout ----
-  const layout = useMemo(() => {
-    const cols: Record<string, number> = {
-      PLANNER: 70, SOLVER: 250, VERIFIER: 470, CONFLICT: 470, AGGREGATOR: 690, SYNTHESIS: 850,
-    };
-    const byCol: Record<number, any[]> = {};
+  const W = 1000;
+  const H = 560;
+
+  // ---- layout: pipeline stage on x, claim grouping on y ----
+  const laid = useMemo(() => {
+    if (!nodes.length) return [];
+    const byLayer = new Map<number, Node[]>();
     nodes.forEach((n) => {
-      const x = cols[n.nodeType] ?? 470;
-      (byCol[x] = byCol[x] ?? []).push(n);
+      const l = LAYER[n.nodeType] ?? 1;
+      if (!byLayer.has(l)) byLayer.set(l, []);
+      byLayer.get(l)!.push(n);
     });
-    const pos = new Map<string, { x: number; y: number }>();
-    Object.entries(byCol).forEach(([x, list]) => {
+    // Keep a claim's nodes vertically aligned so a column reads as one claim.
+    byLayer.forEach((list) =>
+      list.sort((a, b) => (a.claimId ?? 99) - (b.claimId ?? 99) || a.nodeKey.localeCompare(b.nodeKey))
+    );
+    const maxLayer = LAYER_LABEL.length - 1;
+    const out: (Node & { x: number; y: number })[] = [];
+    byLayer.forEach((list, layer) => {
+      const x = 70 + (layer / maxLayer) * (W - 150);
       list.forEach((n, i) => {
-        pos.set(n.nodeKey, { x: Number(x), y: 60 + ((520 - 120) * (i + 0.5)) / list.length });
+        const y = list.length === 1 ? H / 2 : 70 + (i / (list.length - 1)) * (H - 140);
+        out.push({ ...n, x, y });
       });
     });
-    return pos;
+    return out;
   }, [nodes]);
 
-  // ---- time travel: order nodes by start time ----
-  const timeline = useMemo(() => {
-    const stamps = nodes
-      .map((n) => (n.startedAt ? new Date(n.startedAt).getTime() : null))
-      .filter((t): t is number => t !== null)
-      .sort((a, b) => a - b);
-    return stamps;
-  }, [nodes]);
-  const cutoff = useMemo(() => {
-    if (timeline.length === 0 || cursor >= 100) return Infinity;
-    const idx = Math.floor((cursor / 100) * timeline.length);
-    return idx <= 0 ? -Infinity : timeline[Math.min(idx, timeline.length) - 1];
-  }, [cursor, timeline]);
-  const visible = (n: any) => {
-    if (cursor >= 100) return true;
-    if (!n.startedAt) return cursor >= 99; // derived nodes appear at the end
-    return new Date(n.startedAt).getTime() <= cutoff;
-  };
+  const posOf = useMemo(() => {
+    const m = new Map<string, { x: number; y: number }>();
+    laid.forEach((n) => m.set(n.nodeKey, { x: n.x, y: n.y }));
+    return m;
+  }, [laid]);
 
-  // ---- collapse to truth: the surviving reasoning spine ----
-  const spine: Set<string> = useMemo(() => {
-    const agg = nodes.find((n) => n.nodeKey === "aggregator");
-    const keys = new Set<string>(["planner", "aggregator", "synthesis"]);
+  const selected = laid.find((n) => n.nodeKey === sel) ?? null;
+  const conf = run?.finalConfidence ?? 0;
+  const confState: StateKey = conf >= 0.85 ? "healthy" : conf >= 0.6 ? "warning" : "critical";
+
+  const contradictions = nodes.filter((n) => n.nodeType === "CONFLICT").length;
+  const verifiers = nodes.filter((n) => n.nodeType === "VERIFIER");
+  const passed = verifiers.filter((n) => n.status === "PASS").length;
+  const risks: string[] = useMemo(() => {
     try {
-      const parsed = JSON.parse(agg?.outputJson ?? "{}");
-      (parsed.spine ?? []).forEach((id: number) => keys.add(`solver-${id}`));
-    } catch { /* no spine yet */ }
-    return keys;
-  }, [nodes]);
-  const dimmed = (n: any) => collapsed && !spine.has(n.nodeKey);
-
-  const riskFlags: string[] = useMemo(() => {
-    try { return JSON.parse(run?.riskFlagsJson ?? "[]"); } catch { return []; }
+      const v = run?.riskFlagsJson ? JSON.parse(run.riskFlagsJson) : [];
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch {
+      return [];
+    }
   }, [run]);
 
-  if (!trace || !run) {
-    return <div className="py-16 text-center text-sm text-slate-500">Loading trace…</div>;
-  }
-
   return (
-    <div className="space-y-3">
-      {/* ---- TOP BAR: mission control strip ---- */}
-      <div className="glass flex flex-wrap items-center gap-3 px-4 py-2.5">
-        <Link to="/dag" className="text-xs text-slate-400 hover:text-slate-200">← Runs</Link>
-        <span className="font-mono text-xs text-slate-400">{run.workflowId}</span>
-        <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-          run.status === "COMPLETED" ? "bg-emerald-500/20 text-emerald-300"
-            : run.status === "RUNNING" ? "bg-sky-500/20 text-sky-300 animate-pulse"
-            : "bg-rose-500/20 text-rose-300"}`}>{run.status}</span>
-        <div className="mx-2 flex min-w-[220px] flex-1 items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-slate-500">Time travel</span>
-          <input type="range" min={0} max={100} value={cursor}
-            onChange={(e) => setCursor(Number(e.target.value))}
-            className="flex-1 accent-indigo-500" />
-          <span className="w-9 text-right text-[10px] text-slate-500">{cursor}%</span>
+    <div className="space-y-5">
+      <header className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <Link to="/dag" className="micro transition-colors hover:text-slate-300">
+            ← All runs
+          </Link>
+          <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">
+            {run?.prompt || "Verification run"}
+          </h1>
+          <span className="font-mono text-[10px] text-slate-600">{workflowId}</span>
         </div>
-        <button onClick={() => setCollapsed(!collapsed)}
-          className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-300 ${
-            collapsed
-              ? "bg-gradient-to-r from-aurora to-neon text-ink shadow-glow"
-              : "border border-aurora/50 text-indigo-300 hover:shadow-glow-sm"}`}>
-          {collapsed ? "Expand branches" : "Collapse to result"}
-        </button>
-      </div>
+        {run && (
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+            <Readout label="Confidence" value={`${(conf * 100).toFixed(1)}%`} state={confState} />
+            <Readout label="Uncertainty" value={run.uncertainty ?? "—"} size="sm" />
+            <Readout label="Claims" value={run.claimCount} size="sm" />
+            <Readout
+              label="Verifiers passed"
+              value={`${passed}/${verifiers.length}`}
+              size="sm"
+              state={verifiers.length && passed === verifiers.length ? "healthy" : "warning"}
+            />
+            <Readout label="Contradictions" value={contradictions} size="sm"
+              state={contradictions > 0 ? "warning" : "idle"} />
+          </div>
+        )}
+      </header>
 
-      <div className="grid gap-3 lg:grid-cols-[280px_1fr_260px]">
-        {/* ---- LEFT: causal inspector ---- */}
-        <div className="glass max-h-[560px] overflow-y-auto p-3">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Causal Inspector</div>
-          {!selected ? (
-            <div className="mt-6 text-center text-xs text-slate-500">
-              Click any node on the canvas to inspect its inputs, structured outputs and evidence.
+      {!trace ? (
+        <Plane className="p-8 text-center text-sm text-slate-500">Loading constellation…</Plane>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <section>
+            <div className="grid-field rounded-lg border border-edge/60">
+              <svg viewBox={`0 0 ${W} ${H}`} className="w-full" onClick={() => setSel(null)}>
+                {/* pipeline stage guides */}
+                {LAYER_LABEL.map((l, i) => {
+                  const x = 70 + (i / (LAYER_LABEL.length - 1)) * (W - 150);
+                  const occupied = laid.some((n) => (LAYER[n.nodeType] ?? 1) === i);
+                  return (
+                    <g key={l} opacity={occupied ? 1 : 0.45}>
+                      <line x1={x} y1={34} x2={x} y2={H - 24} stroke="currentColor"
+                        className="text-slate-700" strokeOpacity={0.18} strokeDasharray="2 8" />
+                      <text x={x} y={22} textAnchor="middle" className="text-[9px]"
+                        style={{ letterSpacing: "0.14em", fill: "rgb(var(--topo-label))" }}>
+                        {l.toUpperCase()}
+                      </text>
+                      {!occupied && (
+                        <text x={x} y={H / 2} textAnchor="middle" className="text-[9px]"
+                          style={{ fill: "rgb(var(--topo-label-off))" }}>
+                          none
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* ---- evidence edges ---- */}
+                {edges.map((e, i) => {
+                  const a = posOf.get(e.fromKey);
+                  const b = posOf.get(e.toKey);
+                  if (!a || !b) return null;
+                  const contradicts = e.edgeType === "CONTRADICTS";
+                  const supports = e.edgeType === "SUPPORTS";
+                  const dim = sel !== null && sel !== e.fromKey && sel !== e.toKey;
+                  const color = contradicts
+                    ? STATE.critical.color
+                    : supports
+                    ? STATE.healthy.color
+                    : STATE.active.color;
+                  // Contradictions bow away from the flow so tension is visible.
+                  const mx = (a.x + b.x) / 2;
+                  const my = (a.y + b.y) / 2 + (contradicts ? -46 : 0);
+                  return (
+                    <path
+                      key={i}
+                      d={`M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}`}
+                      fill="none"
+                      stroke={color}
+                      strokeOpacity={dim ? 0.07 : contradicts ? 0.65 : 0.3 + e.weight * 0.35}
+                      strokeWidth={contradicts ? 1.4 : 0.8 + e.weight * 1.2}
+                      strokeDasharray={contradicts ? "4 4" : undefined}
+                      style={{ transition: "stroke-opacity 320ms" }}
+                    />
+                  );
+                })}
+
+                {/* ---- agent nodes ---- */}
+                {laid.map((n) => {
+                  const st = statusState(n.status);
+                  const color = STATE[st].color;
+                  const isSel = sel === n.nodeKey;
+                  const dim = sel !== null && !isSel;
+                  const isTerminal = n.nodeType === "AGGREGATOR" || n.nodeType === "SYNTHESIS";
+                  const r = isTerminal ? 26 : n.nodeType === "CONFLICT" ? 14 : 18;
+                  return (
+                    <g
+                      key={n.nodeKey}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        setSel(isSel ? null : n.nodeKey);
+                      }}
+                      className="cursor-pointer"
+                      opacity={dim ? 0.28 : 1}
+                      style={{ transition: "opacity 320ms" }}
+                    >
+                      {n.nodeType === "CONFLICT" && (
+                        <circle cx={n.x} cy={n.y} r={6} fill={color} className="incident-pulse" />
+                      )}
+                      {isSel && (
+                        <circle cx={n.x} cy={n.y} r={r + 7} fill="none" stroke={color} strokeOpacity={0.5} />
+                      )}
+                      <circle cx={n.x} cy={n.y} r={r} style={{ fill: "rgb(var(--topo-node))" }} fillOpacity={0.95} />
+                      <circle cx={n.x} cy={n.y} r={r} fill="none" stroke={color}
+                        strokeOpacity={0.75} strokeWidth={isSel ? 1.8 : 1.1} />
+                      {/* validity arc — how strong this node's evidence is */}
+                      {n.validity != null && (
+                        <circle
+                          cx={n.x}
+                          cy={n.y}
+                          r={r - 4}
+                          fill="none"
+                          stroke={color}
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeDasharray={`${(2 * Math.PI * (r - 4) * Math.max(0, Math.min(1, n.validity))).toFixed(1)} 999`}
+                          transform={`rotate(-90 ${n.x} ${n.y})`}
+                        />
+                      )}
+                      {isTerminal && n.validity != null && (
+                        <text x={n.x} y={n.y + 4} textAnchor="middle" className="text-[11px] font-semibold"
+                          style={{ fill: "rgb(var(--topo-text))" }}>
+                          {(n.validity * 100).toFixed(0)}
+                        </text>
+                      )}
+                      {n.claimId != null && !isTerminal && (
+                        <text x={n.x} y={n.y + 4} textAnchor="middle" className="text-[10px] font-semibold"
+                          style={{ fill: "rgb(var(--topo-text))" }}>
+                          {n.claimId}
+                        </text>
+                      )}
+                      {n.claimId == null && !(isTerminal && n.validity != null) && (
+                        <text x={n.x} y={n.y + 4} textAnchor="middle" className="text-[11px] font-semibold"
+                          style={{ fill: "rgb(var(--topo-text))" }}>
+                          {TYPE_CODE[n.nodeType] ?? ""}
+                        </text>
+                      )}
+                      <text x={n.x} y={n.y + r + 13} textAnchor="middle" className="text-[9px]"
+                        style={{ fill: "rgb(var(--topo-label))" }}>
+                        {caption(n)}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
             </div>
-          ) : (
-            <div className="mt-2 space-y-2 animate-fade-up" key={selected.nodeKey}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{TYPE_STYLE[selected.nodeType]?.icon}</span>
-                <div>
-                  <div className="text-sm font-medium">{selected.nodeKey}</div>
-                  <div className="text-[10px] text-slate-500">{selected.nodeType}</div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <Legend color={STATE.healthy.color} label="passed" />
+              <Legend color={STATE.warning.color} label="uncertain" />
+              <Legend color={STATE.critical.color} label="failed / contradiction" />
+              <span className="text-[10px] text-slate-500">arc = evidence strength · claim number inside solvers and verifiers · confidence inside the aggregate</span>
+            </div>
+
+            {run?.verdict && (
+              <div className="mt-4">
+                <Micro>Synthesised answer</Micro>
+                <Plane inset className="mt-2 p-4">
+                  <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-300">{run.verdict}</p>
+                </Plane>
+              </div>
+            )}
+          </section>
+
+          {/* ---- evidence inspector ---- */}
+          <aside className="space-y-4">
+            <Micro>Evidence</Micro>
+            {selected ? (
+              <div className="settle space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StateDot state={statusState(selected.status)} />
+                  <span className="text-sm font-semibold text-slate-200">{selected.nodeType}</span>
+                  {selected.claimId != null && <span className="micro">claim {selected.claimId}</span>}
+                </div>
+                <p className="text-[12px] leading-relaxed text-slate-300">{selected.label}</p>
+                <div className="space-y-2">
+                  <Row k="Status" v={selected.status} />
+                  {selected.validity != null && (
+                    <Row k="Evidence strength" v={`${(selected.validity * 100).toFixed(1)}%`} />
+                  )}
+                  {selected.startedAt && selected.completedAt && (
+                    <Row
+                      k="Duration"
+                      v={`${new Date(selected.completedAt).getTime() - new Date(selected.startedAt).getTime()}ms`}
+                    />
+                  )}
+                </div>
+                {selected.outputJson && <Output json={selected.outputJson} />}
+              </div>
+            ) : (
+              <Plane className="p-4 text-[11px] leading-relaxed text-slate-500">
+                Select a node to read the evidence it produced.
+              </Plane>
+            )}
+
+            {risks.length > 0 && (
+              <div>
+                <Micro>Risk flags</Micro>
+                <div className="mt-2 space-y-1">
+                  {risks.map((r, i) => (
+                    <div key={i} className="flex items-start gap-2 text-[11px] text-slate-400">
+                      <span className="mt-1">
+                        <StateDot state="warning" size={6} />
+                      </span>
+                      <span>{r}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className={`rounded px-2 py-0.5 font-bold ${
-                  selected.status === "PASS" || selected.status === "DONE"
-                    ? "bg-emerald-500/20 text-emerald-300"
-                    : selected.status === "FAIL" ? "bg-rose-500/20 text-rose-300"
-                    : "bg-amber-500/20 text-amber-300"}`}>{selected.status}</span>
-                {selected.validity != null && (
-                  <span className="text-slate-400">validity {(selected.validity * 100).toFixed(0)}%</span>
-                )}
-              </div>
-              <div className="text-xs text-slate-400">{selected.label}</div>
-              <div className="flex gap-1">
-                {(["evidence", "computation", "dependencies"] as const).map((t) => (
-                  <button key={t} onClick={() => setTab(t)}
-                    className={`rounded px-2 py-1 text-[10px] capitalize transition-colors ${
-                      tab === t ? "bg-aurora/20 text-indigo-300" : "text-slate-500 hover:text-slate-300"}`}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-              <InspectorTab node={selected} tab={tab} edges={edges} />
-            </div>
-          )}
-        </div>
-
-        {/* ---- CENTER: the living decision graph ---- */}
-        <div className="glass relative overflow-hidden p-1">
-          <svg viewBox="0 0 920 520" className="h-[556px] w-full">
-            <defs>
-              <radialGradient id="nodeGlow">
-                <stop offset="0%" stopColor="rgba(99,102,241,0.35)" />
-                <stop offset="100%" stopColor="transparent" />
-              </radialGradient>
-            </defs>
-            {/* edges: weighted probability flows with animated particles */}
-            {edges.map((e: any, i: number) => {
-              const a = layout.get(e.fromKey);
-              const b = layout.get(e.toKey);
-              const fromN = nodes.find((n) => n.nodeKey === e.fromKey);
-              const toN = nodes.find((n) => n.nodeKey === e.toKey);
-              if (!a || !b || !fromN || !toN || !visible(fromN) || !visible(toN)) return null;
-              const isDim = collapsed && (!spine.has(e.fromKey) || !spine.has(e.toKey));
-              const color = e.edgeType === "CONTRADICTS" ? "#f87171"
-                : e.edgeType === "SUPPORTS" ? "#34d399"
-                : e.edgeType === "DEPENDS" ? "#94a3b8" : "#6366f1";
-              const mx = (a.x + b.x) / 2;
-              const d = `M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`;
-              return (
-                <g key={i} style={{ opacity: isDim ? 0.06 : 1, transition: "opacity 600ms ease" }}>
-                  <path d={d} fill="none" stroke={color} strokeOpacity={0.35}
-                    strokeWidth={0.8 + e.weight * 2.4} />
-                  {!isDim && (
-                    <circle r={2.2} fill={color} style={{ filter: `drop-shadow(0 0 3px ${color})` }}>
-                      <animateMotion dur={`${2.2 + (i % 5) * 0.4}s`} repeatCount="indefinite" path={d} />
-                    </circle>
-                  )}
-                </g>
-              );
-            })}
-            {/* nodes */}
-            {nodes.map((n: any) => {
-              const p = layout.get(n.nodeKey);
-              if (!p || !visible(n)) return null;
-              const style = TYPE_STYLE[n.nodeType] ?? TYPE_STYLE.PLANNER;
-              const ring = statusRing(n);
-              const justFailed = n.status === "FAIL" && cursor < 100;
-              return (
-                <g key={n.nodeKey} transform={`translate(${p.x},${p.y})`}
-                  onClick={() => setSelected(n)} className="cursor-pointer"
-                  style={{ opacity: dimmed(n) ? 0.1 : 1, transition: "opacity 600ms ease" }}>
-                  {run.status === "RUNNING" && <circle r={26} fill="url(#nodeGlow)" className="animate-pulse" />}
-                  <circle r={16} fill={style.fill} stroke={ring} strokeWidth={selected?.nodeKey === n.nodeKey ? 3 : 1.8}
-                    className={justFailed ? "animate-pulse" : ""}
-                    style={{ filter: `drop-shadow(0 0 ${collapsed && spine.has(n.nodeKey) ? 10 : 5}px ${ring}66)` }} />
-                  <text textAnchor="middle" dy={5} fontSize={13}>{style.icon}</text>
-                  {n.nodeType === "AGGREGATOR" && n.validity != null && (
-                    <g transform="translate(-24, 22)">
-                      <rect width={48} height={5} rx={2.5} fill="#1e2739" />
-                      <rect width={48 * n.validity} height={5} rx={2.5} fill="#a855f7"
-                        style={{ transition: "width 800ms ease" }} />
-                    </g>
-                  )}
-                  <text textAnchor="middle" dy={n.nodeType === "AGGREGATOR" ? 40 : 30}
-                    fontSize={7.5} fill="#64748b">
-                    {n.nodeKey.length > 22 ? n.nodeKey.slice(0, 22) + "…" : n.nodeKey}
-                  </text>
-                </g>
-              );
-            })}
-            {collapsed && (
-              <text x={460} y={30} textAnchor="middle" fontSize={13} fill="#c4b5fd"
-                className="animate-fade-up" style={{ filter: "drop-shadow(0 0 8px rgba(99,102,241,0.8))" }}>
-                REASONING SPINE — final confidence {((run.finalConfidence ?? 0) * 100).toFixed(1)}%
-              </text>
             )}
-          </svg>
+          </aside>
         </div>
-
-        {/* ---- RIGHT: risk + confidence engine ---- */}
-        <div className="glass space-y-3 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Risk + Confidence</div>
-          <div className="rounded-lg border border-edge bg-ink p-3 text-center">
-            <div className="text-3xl font-bold"
-              style={{ color: `hsl(${(run.finalConfidence ?? 0) * 140} 80% 60%)` }}>
-              {run.finalConfidence != null ? `${(run.finalConfidence * 100).toFixed(1)}%` : "—"}
-            </div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-500">Final confidence</div>
-            <div className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
-              run.uncertainty === "LOW" ? "bg-emerald-500/20 text-emerald-300"
-                : run.uncertainty === "MEDIUM" ? "bg-amber-500/20 text-amber-300"
-                : "bg-rose-500/20 text-rose-300"}`}>
-              Uncertainty: {run.uncertainty ?? "?"}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            {riskFlags.map((f, i) => (
-              <div key={i} className={`rounded-md border px-2.5 py-1.5 text-xs ${
-                f.startsWith("✔") ? "border-emerald-500/30 text-emerald-300"
-                  : f.startsWith("✘") ? "border-rose-500/40 text-rose-300"
-                  : "border-amber-500/40 text-amber-300"}`}>{f}</div>
-            ))}
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-500">Verified answer</div>
-            <pre className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-ink p-2 text-[10px] leading-relaxed text-slate-300">
-              {run.verdict ?? "(pending)"}
-            </pre>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
-function InspectorTab({ node, tab, edges }: { node: any; tab: string; edges: any[] }) {
-  const output = useMemo(() => {
-    try { return JSON.parse(node.outputJson ?? "null"); } catch { return node.outputJson; }
-  }, [node]);
-
-  if (tab === "dependencies") {
-    const incoming = edges.filter((e) => e.toKey === node.nodeKey);
-    const outgoing = edges.filter((e) => e.fromKey === node.nodeKey);
-    return (
-      <div className="space-y-1 text-[11px]">
-        {incoming.map((e, i) => (
-          <div key={`i${i}`} className="text-slate-400">
-            ⬅ <span className="font-mono">{e.fromKey}</span>
-            <span className={e.edgeType === "CONTRADICTS" ? "text-rose-400" : "text-slate-500"}> ({e.edgeType}, w={e.weight.toFixed(2)})</span>
-          </div>
-        ))}
-        {outgoing.map((e, i) => (
-          <div key={`o${i}`} className="text-slate-400">
-            ➡ <span className="font-mono">{e.toKey}</span>
-            <span className={e.edgeType === "CONTRADICTS" ? "text-rose-400" : "text-slate-500"}> ({e.edgeType}, w={e.weight.toFixed(2)})</span>
-          </div>
-        ))}
-        {incoming.length + outgoing.length === 0 && <div className="text-slate-600">no edges</div>}
-      </div>
-    );
-  }
-  if (tab === "computation") {
-    return (
-      <div className="space-y-1 text-[11px] text-slate-400">
-        {node.startedAt && <div>scheduled: {new Date(node.startedAt).toLocaleTimeString()}</div>}
-        {node.completedAt && <div>completed: {new Date(node.completedAt).toLocaleTimeString()}</div>}
-        {output?.provider && <div>provider: <span className="font-mono">{output.provider}/{output.model}</span></div>}
-        {output?.tokens != null && <div>tokens: {output.tokens} · cost ${Number(output.costUsd ?? 0).toFixed(6)}</div>}
-        {output?.confidence != null && <div>self-confidence: {(output.confidence * 100).toFixed(0)}%</div>}
-        <pre className="mt-1 max-h-56 overflow-auto rounded bg-ink p-2 text-[10px] text-slate-300">
-          {typeof output === "string" ? output : JSON.stringify(output, null, 2)}
-        </pre>
-      </div>
-    );
-  }
-  // evidence tab
-  const failureModes: string[] = output?.failureModes ?? [];
-  const evidence: string[] = output?.evidence ?? output?.notes ?? [];
+function Output({ json }: { json: string }) {
+  const parsed = useMemo(() => {
+    try {
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  }, [json]);
+  if (!parsed || typeof parsed !== "object") return null;
   return (
-    <div className="space-y-1 text-[11px]">
-      {failureModes.map((f, i) => (
-        <div key={`f${i}`} className="rounded border border-rose-500/40 px-2 py-1 text-rose-300">✘ {f}</div>
-      ))}
-      {evidence.map((e, i) => (
-        <div key={`e${i}`} className="rounded border border-edge px-2 py-1 text-slate-400">· {e}</div>
-      ))}
-      {output?.reasoning && (
-        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-ink p-2 text-[10px] text-slate-300">
-          {output.reasoning}
+    <div>
+      <Micro>Output</Micro>
+      <Plane inset className="mt-1.5 max-h-64 overflow-auto p-3">
+        <pre className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate-400">
+          {JSON.stringify(parsed, null, 2)}
         </pre>
-      )}
-      {failureModes.length + evidence.length === 0 && !output?.reasoning && (
-        <div className="text-slate-600">no structured evidence recorded</div>
-      )}
+      </Plane>
     </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-baseline justify-between border-b border-edge/40 pb-1.5">
+      <span className="micro">{k}</span>
+      <span className="readout text-xs text-slate-200">{v}</span>
+    </div>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+      {label}
+    </span>
   );
 }
