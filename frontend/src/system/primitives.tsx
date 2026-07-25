@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { STATE, type StateKey } from "./tokens";
+import { CountUp } from "./motion";
 
 /**
  * Instrument primitives.
@@ -48,6 +49,9 @@ export function Readout({
   size?: "sm" | "md" | "lg";
 }) {
   const sizes = { sm: "text-lg", md: "text-2xl", lg: "text-4xl" };
+  // A plain number rolls to its new value so a change is visible; anything
+  // already formatted (strings, elements) is rendered as given.
+  const body = typeof value === "number" ? <CountUp value={value} /> : value;
   return (
     <div title={hint}>
       <Micro>{label}</Micro>
@@ -56,7 +60,7 @@ export function Readout({
           className={`readout font-semibold ${sizes[size]}`}
           style={{ color: state === "idle" ? undefined : STATE[state].color }}
         >
-          {value}
+          {body}
         </span>
         {unit && <span className="text-xs text-slate-500">{unit}</span>}
       </div>

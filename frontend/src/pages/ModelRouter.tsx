@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { Micro, Readout, Plane, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
+import Tabs from "../system/Tabs";
+import { Morph } from "../system/motion";
 
 /**
  * Routing — the provider network.
@@ -11,11 +13,11 @@ import { STATE, type StateKey } from "../system/tokens";
  * call share), how healthy each destination is, and what the bandit currently
  * believes about them.
  *
- * The belief panel plots the real Beta posteriors the sampler draws from —
- * Beta(discountedSuccesses+1, discountedFailures+1) per (context, provider).
- * Overlapping curves mean the bandit is still exploring; separated curves mean
- * it has settled. Nothing here is a stand-in: if the bandit has no observations
- * for a context, that context is reported as unobserved.
+ * The belief panel shows the real Beta posteriors the sampler draws from —
+ * Beta(discountedSuccesses+1, discountedFailures+1) per (context, provider) —
+ * ranked, as an interval and a mean. Overlapping intervals mean the bandit is
+ * still exploring. If it has no observations for a context, that context is
+ * reported as unobserved rather than drawn.
  */
 
 const MODES = ["LOW_COST", "LOW_LATENCY", "HIGH_QUALITY", "BALANCED"];
@@ -25,7 +27,14 @@ const CONTEXTS = ["SIMPLE", "MODERATE", "COMPLEX"];
 const SERIES = ["#4C8BF5", "#7DA9FF", "#38BDF8", "#A5B4FC", "#60A5FA", "#93C5FD"];
 const seriesColor = (i: number) => SERIES[i % SERIES.length];
 
+const RT_TABS = [
+  ["network", "Dispatch"],
+  ["learning", "Learning & hedging"],
+  ["probe", "Probe"],
+] as const;
+
 export default function ModelRouter() {
+  const [tab, setTab] = useState<"network" | "learning" | "probe">("network");
   const [routing, setRouting] = useState<any | null>(null);
   const [providers, setProviders] = useState<any[]>([]);
   const [health, setHealth] = useState<any[]>([]);
@@ -131,6 +140,10 @@ export default function ModelRouter() {
         </div>
       </header>
 
+      <Tabs items={RT_TABS} tab={tab} setTab={setTab} />
+
+      <Morph k={tab}>
+        {tab === "network" && (<>
       {/* ---- the network ---- */}
       <section>
         <Micro>Dispatch network · edge weight is measured call share</Micro>
@@ -211,13 +224,15 @@ export default function ModelRouter() {
         </section>
       )}
 
+        </>)}
+        {tab === "learning" && (<>
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ---- bandit beliefs ---- */}
         <section>
           <Micro>Bandit belief · Beta posterior per context</Micro>
           <p className="mt-0.5 text-[10px] text-slate-600">
             {bandit?.nonStationary ? `discounted γ=${bandit.gamma} · tracks drift` : "undiscounted"} ·
-            overlapping curves = still exploring
+            wider interval = less certain · overlap = still exploring
           </p>
           <div className="mt-3 space-y-4">
             {CONTEXTS.map((c) => {
@@ -292,6 +307,8 @@ export default function ModelRouter() {
         </section>
       </div>
 
+        </>)}
+        {tab === "probe" && (<>
       {/* ---- routing probe ---- */}
       <section>
         <Micro>Probe · score a prompt without sending it</Micro>
@@ -369,6 +386,8 @@ export default function ModelRouter() {
           </p>
         )}
       </section>
+        </>)}
+      </Morph>
     </div>
   );
 }
@@ -463,53 +482,71 @@ function Network({
  * Beta posteriors for one context. Curves are the actual densities the sampler
  * draws from, normalised to the panel height.
  */
+/**
+ * What the bandit believes for one context.
+ *
+ * This was five overlapping density curves in a small panel, which was pretty
+ * and unreadable — you could not tell which arm was ahead. It is now a ranked
+ * bar per provider: the bar spans the 95% credible interval and the marker is
+ * the mean, so the leader, the spread and the overlap are all readable at a
+ * glance. Same posterior, legible ordering.
+ */
 function BetaPanel({ row, colorOf }: { row: Record<string, any>; colorOf: Map<string, string> }) {
-  const W = 460;
-  const H = 56;
-  const entries = Object.entries(row);
-
-  const curves = entries.map(([provider, a]: [string, any]) => {
-    const alpha = (a.discountedSuccesses ?? 0) + 1;
-    const beta = (a.discountedFailures ?? 0) + 1;
-    const N = 90;
-    const ys: number[] = [];
-    for (let i = 0; i <= N; i++) {
-      const x = i / N;
-      // Unnormalised Beta density; the panel is scaled to the max so the shape
-      // (and therefore the uncertainty) is what reads, not the absolute value.
-      const logPdf = (alpha - 1) * Math.log(Math.max(x, 1e-9)) + (beta - 1) * Math.log(Math.max(1 - x, 1e-9));
-      ys.push(Math.exp(logPdf));
-    }
-    const peak = Math.max(...ys, 1e-9);
-    return { provider, ys: ys.map((v) => v / peak), mean: alpha / (alpha + beta), a };
-  });
+  const arms = Object.entries(row)
+    .map(([provider, a]: [string, any]) => {
+      const alpha = (a.discountedSuccesses ?? 0) + 1;
+      const beta = (a.discountedFailures ?? 0) + 1;
+      const mean = alpha / (alpha + beta);
+      // Normal approximation to the Beta interval — adequate at this scale and
+      // far cheaper than sampling on every poll.
+      const sd = Math.sqrt((alpha * beta) / ((alpha + beta) ** 2 * (alpha + beta + 1)));
+      return {
+        provider,
+        mean,
+        lo: Math.max(0, mean - 1.96 * sd),
+        hi: Math.min(1, mean + 1.96 * sd),
+        obs: a.updates ?? 0,
+        latency: Math.round(a.avgLatencyMs ?? 0),
+      };
+    })
+    .sort((x, y) => y.mean - x.mean);
 
   return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full">
-        <line x1={0} y1={H - 1} x2={W} y2={H - 1} stroke="currentColor" className="text-slate-700" strokeOpacity={0.3} />
-        {curves.map((c, i) => {
-          const color = colorOf.get(c.provider) ?? seriesColor(i);
-          const d = c.ys
-            .map((v, j) => `${j === 0 ? "M" : "L"} ${((j / (c.ys.length - 1)) * W).toFixed(1)} ${(H - 2 - v * (H - 8)).toFixed(1)}`)
-            .join(" ");
-          return (
-            <g key={c.provider}>
-              <path d={`${d} L ${W} ${H - 1} L 0 ${H - 1} Z`} fill={color} opacity={0.1} />
-              <path d={d} fill="none" stroke={color} strokeWidth={1.3} />
-              <line x1={c.mean * W} y1={H - 1} x2={c.mean * W} y2={8} stroke={color} strokeOpacity={0.45}
-                strokeDasharray="2 3" />
-            </g>
-          );
-        })}
-      </svg>
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
-        {curves.map((c, i) => (
-          <span key={c.provider} className="flex items-center gap-1.5 text-[10px] text-slate-500">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: colorOf.get(c.provider) ?? seriesColor(i) }} />
-            {c.provider} · {(c.mean * 100).toFixed(0)}% · {c.a.updates} obs · {Math.round(c.a.avgLatencyMs ?? 0)}ms
-          </span>
-        ))}
+    <div className="mt-1.5 space-y-1.5">
+      {arms.map((a, i) => {
+        const color = colorOf.get(a.provider) ?? seriesColor(i);
+        const leading = i === 0 && arms.length > 1;
+        return (
+          <div key={a.provider} className="grid grid-cols-[96px_minmax(0,1fr)_92px] items-center gap-2">
+            <span className="flex items-center gap-1.5 truncate text-[11px]">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+              <span className={leading ? "text-slate-200" : "text-slate-400"}>{a.provider}</span>
+            </span>
+
+            <span className="relative h-4">
+              <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-edge" />
+              {/* 95% credible interval */}
+              <span
+                className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full transition-all duration-500"
+                style={{ left: `${a.lo * 100}%`, width: `${Math.max(0.6, (a.hi - a.lo) * 100)}%`, background: `${color}44` }}
+              />
+              {/* posterior mean */}
+              <span
+                className="absolute top-1/2 h-3 w-[2px] -translate-y-1/2 rounded transition-all duration-500"
+                style={{ left: `${a.mean * 100}%`, background: color }}
+              />
+            </span>
+
+            <span className="readout text-right text-[10px] text-slate-500">
+              {(a.mean * 100).toFixed(0)}% · {a.obs} obs
+            </span>
+          </div>
+        );
+      })}
+      <div className="flex justify-between text-[9px] text-slate-600">
+        <span>0%</span>
+        <span>bar = 95% interval · tick = mean</span>
+        <span>100%</span>
       </div>
     </div>
   );

@@ -127,6 +127,23 @@ body {
       linear-gradient(90deg, rgb(var(--grid) / var(--grid-alpha)) 1px, transparent 1px);
     background-size: 32px 32px;
   }
+  /* Cursor-reactive depth. The light is painted from CSS variables the motion
+     system writes on pointermove, so it stays off the main thread. */
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--ma, 0);
+    transition: opacity 300ms ease;
+    background: radial-gradient(
+      260px circle at var(--mx, 50%) var(--my, 50%),
+      rgb(76 139 245 / 0.55),
+      transparent 70%
+    );
+  }
+
   /* Instrument micro-label: wide-tracked uppercase, the voice of the system. */
   .micro {
     @apply text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500;

@@ -4,6 +4,8 @@ import { api } from "../api";
 import { Micro, Readout, Plane, StateDot, Trace } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
+import Tabs from "../system/Tabs";
+import { Morph, Spotlight } from "../system/motion";
 
 /**
  * Gateway — live request flow.
@@ -13,7 +15,15 @@ import DataView from "../system/DataView";
  * absorb a provider failure on the way. A failover is the product's whole claim,
  * so it is the loudest thing in the stream rather than a footnote.
  */
+const GW_TABS = [
+  ["flow", "Request flow"],
+  ["health", "Health"],
+  ["models", "Models"],
+  ["send", "Send a request"],
+] as const;
+
 export default function GatewayDashboard() {
+  const [tab, setTab] = useState<"flow" | "health" | "models" | "send">("flow");
   const [stats, setStats] = useState<any | null>(null);
   const [models, setModels] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
@@ -111,6 +121,10 @@ export default function GatewayDashboard() {
         </div>
       </header>
 
+      <Tabs items={GW_TABS} tab={tab} setTab={setTab} />
+
+      <Morph k={tab}>
+        {tab === "flow" && (<>
       {/* ---- live request flow: the hero ---- */}
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -126,7 +140,8 @@ export default function GatewayDashboard() {
             </p>
           </Plane>
         ) : (
-          <div className="mt-2 max-h-[420px] divide-y divide-edge/40 overflow-y-auto pr-1">
+          <Spotlight className="mt-2 max-h-[420px] overflow-y-auto rounded-lg pr-1">
+            <div className="divide-y divide-edge/40">
             {requests.map((r) => {
               const st: StateKey = !r.success ? "critical" : r.failoverCount > 0 ? "warning" : "healthy";
               return (
@@ -191,10 +206,12 @@ export default function GatewayDashboard() {
                 </div>
               );
             })}
-          </div>
+            </div>
+          </Spotlight>
         )}
       </section>
-
+        </>)}
+        {tab === "health" && (<>
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ---- provider health ---- */}
         <section>
@@ -329,6 +346,8 @@ export default function GatewayDashboard() {
         </section>
       </div>
 
+        </>)}
+        {tab === "models" && (<>
       {/* ---- model registry ---- */}
       <section>
         <Micro>Model registry &amp; lifecycle</Micro>
@@ -380,6 +399,8 @@ export default function GatewayDashboard() {
         </div>
       </section>
 
+        </>)}
+        {tab === "send" && (<>
       {/* ---- playground ---- */}
       <section>
         <Micro>Send a request</Micro>
@@ -414,6 +435,8 @@ export default function GatewayDashboard() {
           </Plane>
         )}
       </section>
+        </>)}
+      </Morph>
     </div>
   );
 }

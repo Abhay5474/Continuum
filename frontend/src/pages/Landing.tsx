@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Reveal, CodeBlock, ThemeToggle } from "../components/ui";
+import { Magnetic, ParallaxLayer } from "../system/motion";
 
 /**
  * The front door. Standalone marketing page (no app chrome) — says what
@@ -14,7 +15,10 @@ export default function Landing() {
       {/* ---------- HERO ---------- */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 -z-10">
-          <div className="absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-aurora/20 blur-[120px] animate-glow-pulse" />
+          <ParallaxLayer
+            speed={0.18}
+            className="absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-aurora/20 blur-[120px] animate-glow-pulse"
+          />
           <div className="absolute top-40 right-0 h-[360px] w-[360px] rounded-full bg-neon/10 blur-[100px]" />
         </div>
         <div className="mx-auto max-w-6xl px-6 pt-20 pb-16 text-center sm:pt-28">
@@ -32,12 +36,14 @@ export default function Landing() {
             verified answers and huge cost savings — without changing your code.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3 animate-fade-up">
-            <Link
-              to="/signin"
-              className="rounded-xl bg-gradient-to-r from-aurora to-neon px-6 py-3 text-sm font-semibold text-ink shadow-glow transition-transform hover:-translate-y-0.5"
-            >
-              Get your API key →
-            </Link>
+            <Magnetic pull={7}>
+              <Link
+                to="/signin"
+                className="inline-block rounded-xl bg-gradient-to-r from-aurora to-neon px-6 py-3 text-sm font-semibold text-ink shadow-glow"
+              >
+                Get your API key →
+              </Link>
+            </Magnetic>
             <Link
               to="/docs"
               className="rounded-xl border border-edge px-6 py-3 text-sm font-medium text-slate-200 transition-colors hover:border-neon/50 hover:text-neon"
