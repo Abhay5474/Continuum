@@ -1,495 +1,851 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
+import { Micro, Readout, Plane, StateDot, Meter } from "../system/primitives";
+import { STATE, type StateKey } from "../system/tokens";
 
 /**
- * Adaptive Policy: the autonomous memory & policy engine.
- * Opt-in, reversible, OFF by default. Visualizes the invisible: memory tiers,
- * context weight, MemAct decisions and the counterfactual multiverse simulator.
+ * Adaptive Policy — the autonomous memory and policy engine.
+ *
+ * Opt-in, reversible, off by default. The page is organised around the four
+ * questions the engine actually answers:
+ *
+ *   1. What does it remember?  — the tier cascade and context pressure
+ *   2. How does it decide?     — the MemAct posteriors that pick the next action
+ *   3. Can a change be proven safe? — digital-twin replay, baseline vs candidate
+ *   4. What has it learned?    — the experience graph
+ *
+ * Everything drawn here is measured. Where the engine reports no observations
+ * for an action or tier, that is stated rather than filled in.
  */
+
+const MEMACT_ACTIONS = [
+  { key: "SUMMARIZE_NOW", label: "Summarize now", desc: "Fold working memory into an episode" },
+  { key: "DEFER", label: "Defer", desc: "Leave working memory alone for now" },
+  { key: "PRUNE_DUPLICATES", label: "Prune duplicates", desc: "Collapse near-identical semantic nodes" },
+  { key: "PROMOTE_EXPERIENCE", label: "Promote experience", desc: "Lift an episode into the experience graph" },
+  { key: "ARCHIVE_COLD", label: "Archive cold", desc: "Move decayed memory to cold storage" },
+];
+
+const SCENARIOS = [
+  { key: "HISTORICAL_REPLAY", label: "Historical replay", desc: "Replay real traffic against both policies" },
+  { key: "PROVIDER_OUTAGE", label: "Provider outage", desc: "Degrade the busiest provider mid-replay" },
+  { key: "HALLUCINATION_STORM", label: "Hallucination storm", desc: "Inject model-quality failures" },
+];
+
+const TIERS = [
+  { key: "working", label: "Working", unit: "items", desc: "Live conversation turns, bounded by the context budget" },
+  { key: "episodic", label: "Episodic", unit: "items", desc: "Summarised episodes" },
+  { key: "semantic", label: "Semantic", unit: "nodes", desc: "Distilled, reusable experience" },
+  { key: "archive", label: "Archive", unit: "spans", desc: "Cold storage — retained, not retrieved" },
+];
+
+function verdictState(v: string): StateKey {
+  if (v === "PROMOTE") return "healthy";
+  if (v === "ROLLBACK") return "critical";
+  return "warning";
+}
+
 export default function GodMode() {
   const loggedIn = !!portal.session();
+
   const [status, setStatus] = useState<any | null>(null);
-  const [graph, setGraph] = useState<any | null>(null);
   const [actions, setActions] = useState<any[]>([]);
   const [sims, setSims] = useState<any[]>([]);
-  const [err, setErr] = useState("");
-  const [pinch, setPinch] = useState(0); // increments trigger the gauge pinch animation
-  const [simRunning, setSimRunning] = useState<string | null>(null);
-  const [lastSim, setLastSim] = useState<any | null>(null);
-  const [wizardStep, setWizardStep] = useState(0);
+  const [graph, setGraph] = useState<any | null>(null);
+
+  const [busy, setBusy] = useState(false);
+  const [scenario, setScenario] = useState("HISTORICAL_REPLAY");
+  const [lastConsolidation, setLastConsolidation] = useState<any | null>(null);
   const [ingestText, setIngestText] = useState("");
   const [retrieveQ, setRetrieveQ] = useState("");
-  const [retrieved, setRetrieved] = useState<any[]>([]);
-  const prevWorking = useRef<number>(0);
+  const [retrieved, setRetrieved] = useState<any[] | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const refresh = () => {
-    if (!loggedIn) return;
-    portal.godmode.status().then((s) => {
-      const w = s?.memory?.working?.items ?? 0;
-      if (prevWorking.current > w && w >= 0) setPinch((p) => p + 1); // memory compressed
-      prevWorking.current = w;
-      setStatus(s);
-    }).catch((e) => setErr(String(e.message ?? e)));
+    portal.godmode.status().then(setStatus).catch(() => {});
     portal.godmode.actions().then(setActions).catch(() => {});
     portal.godmode.simulations().then(setSims).catch(() => {});
     portal.godmode.graph().then(setGraph).catch(() => {});
   };
   useEffect(() => {
+    if (!loggedIn) return;
     refresh();
-    const t = setInterval(refresh, 4000);
+    const t = setInterval(refresh, 6000);
     return () => clearInterval(t);
   }, [loggedIn]);
 
   const enabled = !!status?.enabled;
-  const fill = status?.memory?.contextFillFraction ?? 0;
+  const mem = status?.memory ?? {};
+  const memAct = status?.memAct ?? {};
+  const quotas = status?.quotas ?? {};
+  const ttls = status?.ttls ?? {};
+
+  const fill = mem.contextFillFraction ?? 0;
+  const fillState: StateKey = fill >= 0.9 ? "critical" : fill >= 0.7 ? "warning" : fill > 0 ? "active" : "idle";
+
+  // The engine picks the action with the highest conservative (95% lower) bound,
+  // so that is what we surface as "next action" rather than the posterior mean.
+  const nextAction = useMemo(() => {
+    let best: { key: string; lower: number } | null = null;
+    for (const a of MEMACT_ACTIONS) {
+      const row = memAct[a.key];
+      if (!row) continue;
+      const lower = row.lower95 ?? 0;
+      if (!best || lower > best.lower) best = { key: a.key, lower };
+    }
+    return best;
+  }, [memAct]);
 
   const toggle = async () => {
-    setErr("");
+    setBusy(true);
     try {
       setStatus(enabled ? await portal.godmode.disable() : await portal.godmode.enable());
-      setWizardStep(0);
-    } catch (e: any) {
-      setErr(e.message ?? String(e));
+      refresh();
+    } finally {
+      setBusy(false);
     }
   };
 
-  const runSim = async (scenario: string) => {
-    setSimRunning(scenario);
-    setLastSim(null);
+  const setSetting = async (patch: any) => {
+    setBusy(true);
+    try {
+      setStatus(
+        await portal.godmode.settings({
+          memactEnabled: status?.memactEnabled,
+          twinGateEnabled: status?.twinGateEnabled,
+          contextBudgetTokens: status?.contextBudgetTokens,
+          ...patch,
+        })
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runSimulation = async () => {
+    setBusy(true);
+    setNote(null);
     try {
       const sim = await portal.godmode.simulate(scenario);
-      // Let the multiverse branches animate before revealing the collapse.
-      setTimeout(() => {
-        setLastSim(sim);
-        setSimRunning(null);
-        refresh();
-      }, 1700);
+      setSims((prev) => [sim, ...prev]);
+      setNote(`${scenario.replace(/_/g, " ").toLowerCase()} → ${sim.verdict}`);
     } catch (e: any) {
-      setErr(e.message ?? String(e));
-      setSimRunning(null);
+      setNote(e?.message ?? "Simulation failed");
+    } finally {
+      setBusy(false);
     }
   };
 
-  const streaming = useMemo(
-    () => actions.some((a) => Date.now() - new Date(a.createdAt).getTime() < 30000),
-    [actions]
-  );
+  const consolidate = async () => {
+    setBusy(true);
+    try {
+      setLastConsolidation(await portal.godmode.consolidate());
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (!loggedIn) {
     return (
-      <div className="glass mx-auto mt-16 max-w-lg p-8 text-center animate-fade-up">
-        
-        <h1 className="mt-2 text-xl font-semibold text-gradient">Adaptive Policy</h1>
+      <Plane className="mx-auto mt-16 max-w-md p-8 text-center">
+        <Micro>Adaptive Policy</Micro>
         <p className="mt-2 text-sm text-slate-400">
-          The autonomous memory &amp; policy engine is scoped to your developer account.
-          Sign in through the Developer Portal to continue.
+          The autonomous memory and policy engine is scoped to your account.
         </p>
-        <Link to="/portal"
-          className="mt-4 inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-medium text-ink">
-          Open Developer Portal →
+        <Link to="/signin" className="mt-4 inline-block rounded border border-edge px-4 py-2 text-sm hover:border-aurora/50">
+          Sign in →
         </Link>
-      </div>
+      </Plane>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* ---- hero: the Adaptive Policy toggle ---- */}
-      <div className={`glass relative overflow-hidden p-6 animate-fade-up ${enabled ? "animate-glow-pulse" : ""}`}>
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="min-w-[260px] flex-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-gradient">Adaptive Policy</h1>
-              {enabled && (
-                <span className="rounded-full bg-aurora/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-300">
-                  AUTONOMOUS
-                </span>
+    <div className="space-y-7">
+      {/* ---- header + master control ---- */}
+      <header className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold tracking-tight">Adaptive Policy</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
+            An autonomous layer that manages its own memory and proposes its own policy changes. It
+            summarises, distils and forgets under quotas you set, and no proposal reaches live
+            traffic until a digital-twin replay says it is safe.
+          </p>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={busy}
+          className="flex items-center gap-2.5 rounded border px-4 py-2 text-sm transition-colors disabled:opacity-50"
+          style={{
+            borderColor: enabled ? `${STATE.healthy.color}66` : "rgb(var(--edge))",
+            color: enabled ? STATE.healthy.color : undefined,
+          }}
+        >
+          <StateDot state={enabled ? "healthy" : "idle"} />
+          {enabled ? "Engine running" : "Engine off"}
+        </button>
+      </header>
+
+      {!enabled ? (
+        <Plane className="p-8 text-center">
+          <Micro>Off by default</Micro>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-slate-400">
+            Nothing is retained and no policy is proposed while the engine is off. Turning it on
+            begins recording gateway exchanges into the memory tiers for your account only — you can
+            wipe everything at any time.
+          </p>
+        </Plane>
+      ) : (
+        <>
+          {/* ================= 1 · MEMORY ================= */}
+          <section>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <Micro>Memory · context pressure drives every decision</Micro>
+              <span className="micro">
+                budget {Number(mem.contextBudgetTokens ?? 0).toLocaleString()} tokens
+              </span>
+            </div>
+
+            {/* the pressure gauge — the causal driver of consolidation */}
+            <div className="mt-2 flex flex-wrap items-end gap-6">
+              <div className="min-w-[240px] flex-1">
+                <div className="flex items-baseline justify-between">
+                  <span className="readout text-2xl font-semibold" style={{ color: STATE[fillState].color }}>
+                    {(fill * 100).toFixed(0)}%
+                  </span>
+                  <span className="readout text-[11px] text-slate-500">
+                    {Number(mem.working?.tokens ?? 0).toLocaleString()} /{" "}
+                    {Number(mem.contextBudgetTokens ?? 0).toLocaleString()} tokens in working memory
+                  </span>
+                </div>
+                <div className="mt-1.5">
+                  <Meter value={fill} state={fillState} height={6} />
+                </div>
+                <p className="mt-1.5 text-[11px] text-slate-500">
+                  {fill >= 0.7
+                    ? "Above the comfortable band — the engine is likely to summarise on its next pass."
+                    : "Within budget — the engine will defer summarisation."}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+                <Readout label="Next action" size="sm"
+                  value={nextAction ? MEMACT_ACTIONS.find((a) => a.key === nextAction.key)?.label ?? "—" : "—"}
+                  state={nextAction ? "active" : "idle"}
+                  hint="Chosen by the highest 95% lower bound, not the highest mean" />
+                <Readout label="Experience nodes" value={mem.semantic?.nodes ?? 0} size="sm"
+                  state={(mem.semantic?.nodes ?? 0) > 0 ? "healthy" : "idle"} />
+                <Readout label="Decisions logged" value={actions.length} size="sm" />
+              </div>
+            </div>
+
+            {/* the cascade */}
+            <div className="mt-5">
+              <Cascade mem={mem} quotas={quotas} last={lastConsolidation} />
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[10px] text-slate-500">
+              <span>
+                TTL — working {ttls.workingMinutes}m · episodic {ttls.episodicDays}d · semantic{" "}
+                {ttls.semanticDays}d
+              </span>
+              <span>
+                Quota — working {quotas.working} · episodic {quotas.episodic} · semantic{" "}
+                {quotas.semanticNodes}
+              </span>
+            </div>
+          </section>
+
+          {/* ================= 2 · POLICY ================= */}
+          <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <Micro>MemAct policy · what the engine believes about each action</Micro>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                  <input
+                    type="checkbox"
+                    checked={!!status?.memactEnabled}
+                    onChange={(e) => setSetting({ memactEnabled: e.target.checked })}
+                    className="accent-aurora"
+                  />
+                  MemAct enabled
+                </label>
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                Each action carries a Beta posterior over "did this help?". The bar spans the
+                conservative 95% lower bound up to the mean — a wide bar means the action is still
+                unproven, and the engine picks on the lower bound so it does not act on optimism.
+              </p>
+
+              <div className="mt-3 space-y-2.5">
+                {MEMACT_ACTIONS.map((a) => {
+                  const row = memAct[a.key];
+                  const chosen = nextAction?.key === a.key;
+                  return (
+                    <PosteriorBar
+                      key={a.key}
+                      label={a.label}
+                      desc={a.desc}
+                      row={row}
+                      chosen={chosen}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* decision ledger */}
+            <div>
+              <Micro>Decision ledger</Micro>
+              <p className="mt-1 text-[11px] text-slate-500">Every autonomous action, with its reward.</p>
+              <div className="mt-2 max-h-[340px] space-y-px overflow-y-auto pr-1">
+                {actions.map((a) => {
+                  const r = a.reward;
+                  const st: StateKey = r == null ? "idle" : r > 0.05 ? "healthy" : r < -0.05 ? "critical" : "warning";
+                  return (
+                    <div key={a.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded px-2 py-1.5 text-[11px] hover:bg-edge/40">
+                      <StateDot state={st} size={5} />
+                      <span className="font-medium text-slate-300">{a.action}</span>
+                      {a.tier && <span className="text-slate-600">{a.tier}</span>}
+                      {r != null && (
+                        <span className="readout ml-auto" style={{ color: STATE[st].color }}>
+                          {r > 0 ? "+" : ""}
+                          {r.toFixed(2)}
+                        </span>
+                      )}
+                      <span className="readout w-full text-[10px] text-slate-600">
+                        {a.detail} · {new Date(a.createdAt).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  );
+                })}
+                {actions.length === 0 && (
+                  <div className="rounded border border-dashed border-edge/60 px-3 py-4 text-[11px] text-slate-500">
+                    No autonomous actions yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* ================= 3 · DIGITAL TWIN ================= */}
+          <section>
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <Micro>Digital twin · prove a policy change before it sees traffic</Micro>
+              <label className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                <input
+                  type="checkbox"
+                  checked={!!status?.twinGateEnabled}
+                  onChange={(e) => setSetting({ twinGateEnabled: e.target.checked })}
+                  className="accent-aurora"
+                />
+                Gate promotions on the twin
+              </label>
+            </div>
+            <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-500">
+              A candidate policy is replayed against your real recorded traffic alongside the current
+              one. The verdict compares both arms; a confident regression is vetoed before any live
+              request is affected.
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-end gap-2">
+              <div>
+                <Micro>Scenario</Micro>
+                <select
+                  value={scenario}
+                  onChange={(e) => setScenario(e.target.value)}
+                  className="mt-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-aurora/60"
+                >
+                  {SCENARIOS.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className="pb-2 text-[10px] text-slate-500">
+                {SCENARIOS.find((s) => s.key === scenario)?.desc}
+              </span>
+              <button
+                onClick={runSimulation}
+                disabled={busy}
+                className="ml-auto rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {busy ? "Replaying…" : "Run simulation"}
+              </button>
+            </div>
+            {note && <p className="mt-2 text-[11px] text-slate-400">{note}</p>}
+
+            <div className="mt-4 space-y-3">
+              {sims.map((s) => (
+                <SimulationRow key={s.id} sim={s} />
+              ))}
+              {sims.length === 0 && (
+                <Plane className="p-6 text-center text-[11px] text-slate-500">
+                  No simulations yet. A replay needs recorded gateway traffic to draw from.
+                </Plane>
               )}
             </div>
-            <p className="mt-1 max-w-xl text-sm text-slate-400">
-              A self-tuning intelligence layer: 4-tier learned memory, Memory-as-Action policies,
-              and a digital twin that proves every policy offline before it touches live traffic.
-              Opt-in. Reversible. Off means <span className="text-slate-300">bit-identical</span> to
-              the classic gateway.
-            </p>
-          </div>
-          {/* the powerful toggle */}
-          <button onClick={toggle} aria-label="Toggle Adaptive Policy"
-            className={`relative h-16 w-32 shrink-0 rounded-full border transition-all duration-500 ${
-              enabled
-                ? "border-transparent bg-gradient-to-r from-aurora to-neon shadow-glow"
-                : "border-edge bg-ink"
-            }`}>
-            <span className={`absolute top-1.5 flex h-[52px] w-[52px] items-center justify-center rounded-full
-              text-xl transition-all duration-500 ${
-                enabled ? "left-[72px] bg-ink text-neon" : "left-1.5 bg-panel text-slate-500"
-              }`}>
-              ⚡
-            </span>
-            <span className={`absolute inset-y-0 flex items-center text-xs font-bold tracking-widest ${
-              enabled ? "left-4 text-ink" : "right-4 text-slate-500"
-            }`}>
-              {enabled ? "ON" : "OFF"}
-            </span>
-          </button>
-        </div>
-        {err && <div className="mt-3 text-xs text-rose-400">{err}</div>}
-      </div>
+          </section>
 
-      {/* ---- onboarding wizard when off ---- */}
-      {!enabled && (
-        <div className="glass p-6 animate-fade-up">
-          <div className="text-sm font-medium">What happens when you switch it on?</div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {[
-              ["\u25C6", "It remembers", "Gateway exchanges flow into a 4-tier memory: working context is summarized into episodes, distilled into an experience graph, and archived — bounded by TTLs and quotas you control."],
-              ["🌌", "It simulates", "Before any policy change reaches production, a digital twin replays it against your real historical traffic and vetoes confident regressions — the same Bayesian rules as a live canary."],
-              ["🛡️", "It stays safe", "Every autonomous action is audited. Nothing is shared across tenants. One click turns it off and restores the exact pre-God-Mode path."],
-            ].map(([icon, title, text], i) => (
-              <button key={title as string} onClick={() => setWizardStep(i)}
-                className={`rounded-xl border p-4 text-left transition-all ${
-                  wizardStep === i ? "border-aurora/60 bg-aurora/5 shadow-glow-sm" : "border-edge bg-ink/40 hover:border-aurora/30"
-                }`}>
-                <div className="text-2xl">{icon}</div>
-                <div className="mt-2 text-sm font-semibold">{title}</div>
-                <div className="mt-1 text-xs leading-relaxed text-slate-400">{text}</div>
-              </button>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center gap-3">
-            <div className="flex gap-1.5">
-              {[0, 1, 2].map((i) => (
-                <span key={i} className={`h-1.5 w-6 rounded-full transition-colors ${wizardStep >= i ? "bg-aurora" : "bg-edge"}`} />
-              ))}
+          {/* ================= 4 · EXPERIENCE GRAPH ================= */}
+          <section>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <Micro>Experience graph · what generalised into reusable knowledge</Micro>
+              <span className="micro">node size is utility · ring is times used</span>
             </div>
-            {wizardStep < 2 ? (
-              <button onClick={() => setWizardStep(wizardStep + 1)}
-                className="ml-auto rounded-lg border border-edge px-4 py-1.5 text-sm hover:border-aurora/50">
-                Next
-              </button>
+            {(graph?.nodes ?? []).length === 0 ? (
+              <Plane className="mt-2 p-6 text-center text-[11px] text-slate-500">
+                Nothing has been distilled yet. Episodes are promoted into the graph once they prove
+                repeatedly useful.
+              </Plane>
             ) : (
-              <button onClick={toggle}
-                className="ml-auto rounded-lg bg-gradient-to-r from-aurora to-neon px-5 py-1.5 text-sm font-semibold text-ink shadow-glow">
-                Enable Adaptive Policy
-              </button>
+              <div className="mt-2 grid-field rounded-lg border border-edge/60">
+                <ExperienceGraph graph={graph} />
+              </div>
             )}
-          </div>
-        </div>
-      )}
+          </section>
 
-      {enabled && (
-        <>
-          {/* ---- live row: context gauge + memory tiers ---- */}
-          <div className="grid gap-6 lg:grid-cols-3 animate-fade-up">
-            <div className="glass p-5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">Context Weight</div>
-                <StreamIndicator active={streaming} />
+          {/* ================= operations ================= */}
+          <section>
+            <Micro>Operations</Micro>
+            <div className="mt-2 grid gap-4 lg:grid-cols-3">
+              <div>
+                <span className="text-[11px] text-slate-400">Ingest a turn</span>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    value={ingestText}
+                    onChange={(e) => setIngestText(e.target.value)}
+                    placeholder="text to remember"
+                    className="min-w-0 flex-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-aurora/60"
+                  />
+                  <button
+                    disabled={!ingestText}
+                    onClick={() =>
+                      portal.godmode.ingest("manual", "user", ingestText).then(() => {
+                        setIngestText("");
+                        refresh();
+                      })
+                    }
+                    className="rounded border border-edge px-3 py-1.5 text-xs hover:border-aurora/50 disabled:opacity-40"
+                  >
+                    Ingest
+                  </button>
+                </div>
               </div>
-              <ContextGauge fill={fill} pinchKey={pinch} />
-              <div className="mt-1 text-center text-xs text-slate-500">
-                {status?.memory?.working?.tokens ?? 0} / {status?.contextBudgetTokens ?? 0} working tokens
-                {pinch > 0 && <span className="ml-1 text-neon">· compressed ×{pinch}</span>}
+
+              <div>
+                <span className="text-[11px] text-slate-400">Retrieve</span>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    value={retrieveQ}
+                    onChange={(e) => setRetrieveQ(e.target.value)}
+                    placeholder="query the memory"
+                    className="min-w-0 flex-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-aurora/60"
+                  />
+                  <button
+                    disabled={!retrieveQ}
+                    onClick={() => portal.godmode.retrieve(retrieveQ).then(setRetrieved)}
+                    className="rounded border border-edge px-3 py-1.5 text-xs hover:border-aurora/50 disabled:opacity-40"
+                  >
+                    Search
+                  </button>
+                </div>
               </div>
-              <div className="mt-3 flex gap-2">
-                <input value={ingestText} onChange={(e) => setIngestText(e.target.value)}
-                  placeholder="Feed the working memory…"
-                  className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-1.5 text-xs" />
+
+              <div className="flex items-end gap-2">
                 <button
-                  onClick={() => portal.godmode.ingest("manual", "user", ingestText).then(() => { setIngestText(""); refresh(); })}
-                  disabled={!ingestText}
-                  className="rounded-lg bg-aurora/20 px-3 py-1.5 text-xs text-indigo-300 hover:bg-aurora/30 disabled:opacity-40">
-                  Ingest
+                  onClick={consolidate}
+                  disabled={busy}
+                  className="rounded border border-edge px-3 py-1.5 text-xs hover:border-aurora/50 disabled:opacity-50"
+                >
+                  Run consolidation
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm("Wipe every memory tier for your account? This cannot be undone.")) {
+                      portal.godmode.wipe().then(() => {
+                        setRetrieved(null);
+                        setLastConsolidation(null);
+                        refresh();
+                      });
+                    }
+                  }}
+                  className="rounded border px-3 py-1.5 text-xs transition-colors"
+                  style={{ borderColor: `${STATE.critical.color}55`, color: STATE.critical.color }}
+                >
+                  Wipe memory
                 </button>
               </div>
             </div>
 
-            <div className="glass p-5 lg:col-span-2">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">Memory Hierarchy</div>
-                <button onClick={() => portal.godmode.consolidate().then(refresh)}
-                  className="rounded-lg border border-edge px-3 py-1 text-xs hover:border-neon/50 hover:text-neon">
-                  Consolidate now ⟳
-                </button>
-              </div>
-              <div className="mt-4 flex items-stretch gap-2">
-                <Tier icon="\u25CF" name="Working" value={status?.memory?.working?.items ?? 0}
-                  sub={`${status?.memory?.working?.tokens ?? 0} tok`} hue="text-neon" />
-                <FlowArrow label="summarize" />
-                <Tier icon="📼" name="Episodic" value={status?.memory?.episodic?.items ?? 0} sub="summaries" hue="text-indigo-300" />
-                <FlowArrow label="distill" />
-                <Tier icon="🕸" name="Semantic" value={status?.memory?.semantic?.nodes ?? 0} sub="experiences" hue="text-emerald-300" />
-                <FlowArrow label="decay" />
-                <Tier icon="🧊" name="Archive" value={status?.memory?.archive?.spans ?? 0} sub="cold spans" hue="text-slate-400" />
-              </div>
-              <div className="mt-4 flex gap-2">
-                <input value={retrieveQ} onChange={(e) => setRetrieveQ(e.target.value)}
-                  placeholder="Query long-term memory…"
-                  className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-1.5 text-xs" />
-                <button onClick={() => portal.godmode.retrieve(retrieveQ).then(setRetrieved)}
-                  disabled={!retrieveQ}
-                  className="rounded-lg bg-neon/15 px-3 py-1.5 text-xs text-neon hover:bg-neon/25 disabled:opacity-40">
-                  Retrieve
-                </button>
-                <button onClick={() => { if (confirm("Wipe all memory tiers for your account?")) portal.godmode.wipe().then(refresh); }}
-                  className="rounded-lg border border-rose-500/30 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/10">
-                  Wipe
-                </button>
-              </div>
-              {retrieved.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {retrieved.map((r, i) => (
-                    <div key={i} className="rounded-lg bg-ink/60 px-3 py-1.5 text-xs animate-fade-up">
-                      <span className={`mr-2 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                        r.tier === "SEMANTIC" ? "bg-emerald-500/20 text-emerald-300" : "bg-indigo-500/20 text-indigo-300"}`}>
-                        {r.tier}
-                      </span>
-                      <span className="text-slate-300">{r.text}</span>
-                      <span className="ml-2 text-slate-500">{(r.score * 100).toFixed(0)}%</span>
+            {retrieved && (
+              <div className="mt-3">
+                <Micro>Retrieved · ranked by relevance</Micro>
+                <div className="mt-1.5 space-y-1">
+                  {retrieved.map((r: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2 rounded px-2 py-1.5 text-[11px] hover:bg-edge/40">
+                      <span className="micro w-16 shrink-0">{r.tier}</span>
+                      <span className="min-w-0 flex-1 text-slate-400">{r.text}</span>
+                      {r.score != null && (
+                        <span className="readout shrink-0 text-slate-500">{Number(r.score).toFixed(3)}</span>
+                      )}
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ---- the multiverse simulator ---- */}
-          <div className="glass p-5 animate-fade-up">
-            <div className="flex flex-wrap items-center gap-3">
-              <div>
-                <div className="text-sm font-medium">Counterfactual Multiverse — Digital Twin</div>
-                <div className="text-xs text-slate-500">
-                  Replays candidate policies against your real historical traffic. Verdicts use the exact
-                  Bayesian canary rules — offline, before live traffic.
+                  {retrieved.length === 0 && (
+                    <div className="text-[11px] text-slate-500">No matches in memory.</div>
+                  )}
                 </div>
               </div>
-              <div className="ml-auto flex gap-2">
-                {["HISTORICAL_REPLAY", "PROVIDER_OUTAGE", "HALLUCINATION_STORM"].map((s) => (
-                  <button key={s} onClick={() => runSim(s)} disabled={!!simRunning}
-                    className="rounded-lg border border-edge px-3 py-1.5 text-xs hover:border-aurora/60 hover:shadow-glow-sm disabled:opacity-40">
-                    {s === "HISTORICAL_REPLAY" ? "▶ Replay history" : s === "PROVIDER_OUTAGE" ? "⚠ Outage stress" : "👻 Hallucination storm"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <Multiverse running={!!simRunning} verdict={lastSim?.verdict ?? null} />
-            {lastSim && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs animate-fade-up">
-                <VerdictBadge verdict={lastSim.verdict} />
-                <span className="text-slate-400">{lastSim.reason}</span>
-                <span className="ml-auto text-slate-500">
-                  {lastSim.replayedRequests} simulated requests · {lastSim.scenario}
-                </span>
-              </div>
             )}
-            {sims.length > 0 && (
-              <div className="mt-3 max-h-36 space-y-1 overflow-y-auto">
-                {sims.map((s) => (
-                  <div key={s.id} className="flex items-center gap-2 rounded-lg bg-ink/50 px-3 py-1.5 text-xs">
-                    <VerdictBadge verdict={s.verdict} />
-                    <span className="text-slate-500">{s.scenario}</span>
-                    <span className="truncate text-slate-400">{s.reason}</span>
-                    <span className="ml-auto whitespace-nowrap text-slate-600">
-                      {new Date(s.createdAt).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ---- experience graph + MemAct ---- */}
-          <div className="grid gap-6 lg:grid-cols-2 animate-fade-up">
-            <div className="glass p-5">
-              <div className="text-sm font-medium">Experience Graph</div>
-              <ExperienceGraph graph={graph} />
-            </div>
-            <div className="glass p-5">
-              <div className="text-sm font-medium">Memory-as-Action policy (Thompson sampling)</div>
-              <div className="mt-3 space-y-2">
-                {status?.memAct && Object.entries(status.memAct).map(([name, v]: any) => (
-                  <div key={name} className="text-xs">
-                    <div className="flex justify-between text-slate-400">
-                      <span>{name.replace(/_/g, " ").toLowerCase()}</span>
-                      <span>{(v.posteriorMean * 100).toFixed(0)}% · {v.successes}✓ {v.failures}✗</span>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink">
-                      <div className="h-full rounded-full bg-gradient-to-r from-aurora to-neon transition-all duration-700"
-                        style={{ width: `${v.posteriorMean * 100}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 text-xs font-medium text-slate-400">Autonomous action feed</div>
-              <div className="mt-1 max-h-40 space-y-1 overflow-y-auto">
-                {actions.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2 text-xs">
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${actionColor(a.action)}`}>{a.action}</span>
-                    {a.tier && <span className="text-slate-500">{a.tier}</span>}
-                    <span className="truncate text-slate-400">{a.detail}</span>
-                    <span className="ml-auto whitespace-nowrap text-slate-600">
-                      {new Date(a.createdAt).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
-                {actions.length === 0 && <div className="text-xs text-slate-600">no autonomous actions yet</div>}
-              </div>
-            </div>
-          </div>
+          </section>
         </>
       )}
     </div>
   );
 }
 
-/* ---------- visual components ---------- */
-
-function ContextGauge({ fill, pinchKey }: { fill: number; pinchKey: number }) {
-  const pct = Math.max(0, Math.min(1, fill));
-  const hue = 140 - pct * 140; // green → red
-  const R = 70, C = Math.PI * R; // half circle
-  return (
-    <div key={pinchKey} className={`mx-auto mt-2 w-44 ${pinchKey > 0 ? "animate-pinch" : ""}`}>
-      <svg viewBox="0 0 180 100" className="w-full">
-        <path d="M 20 95 A 70 70 0 0 1 160 95" fill="none" stroke="#1e2739" strokeWidth="12" strokeLinecap="round" />
-        <path d="M 20 95 A 70 70 0 0 1 160 95" fill="none"
-          stroke={`hsl(${hue} 85% 55%)`} strokeWidth="12" strokeLinecap="round"
-          strokeDasharray={`${C}`} strokeDashoffset={`${C * (1 - pct)}`}
-          style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1), stroke 900ms ease",
-            filter: `drop-shadow(0 0 6px hsl(${hue} 85% 55% / 0.7))` }} />
-        <text x="90" y="78" textAnchor="middle" fontSize="24" fontWeight="700" fill={`hsl(${hue} 85% 65%)`}>
-          {(pct * 100).toFixed(0)}%
-        </text>
-        <text x="90" y="94" textAnchor="middle" fontSize="9" fill="#64748b">context window</text>
-      </svg>
-    </div>
-  );
-}
-
-function StreamIndicator({ active }: { active: boolean }) {
-  return (
-    <div className="flex items-center gap-1.5" title={active ? "tokens streaming" : "idle"}>
-      {[0, 1, 2].map((i) => (
-        <span key={i}
-          className={`h-1.5 w-1.5 rounded-full ${active ? "bg-neon animate-stream-dot shadow-glow-cyan" : "bg-edge"}`}
-          style={{ animationDelay: `${i * 0.2}s` }} />
-      ))}
-      <span className={`text-[10px] ${active ? "text-neon" : "text-slate-600"}`}>{active ? "LIVE" : "IDLE"}</span>
-    </div>
-  );
-}
-
-function Tier({ icon, name, value, sub, hue }: { icon: string; name: string; value: number; sub: string; hue: string }) {
-  return (
-    <div className="flex-1 rounded-xl border border-edge bg-ink/50 p-3 text-center transition-all hover:border-aurora/40 hover:shadow-glow-sm">
-      <div className="text-lg">{icon}</div>
-      <div className={`text-xl font-bold ${hue}`}>{value}</div>
-      <div className="text-xs font-medium">{name}</div>
-      <div className="text-[10px] text-slate-500">{sub}</div>
-    </div>
-  );
-}
-
-function FlowArrow({ label }: { label: string }) {
-  return (
-    <div className="flex w-12 shrink-0 flex-col items-center justify-center gap-1">
-      <div className="shimmer-line h-0.5 w-full rounded-full" />
-      <span className="text-[9px] text-slate-500">{label}</span>
-    </div>
-  );
-}
-
-function Multiverse({ running, verdict }: { running: boolean; verdict: string | null }) {
-  const branches = [
-    { d: "M 10 60 C 150 60, 250 18, 590 14", cls: "stroke-aurora/70" },
-    { d: "M 10 60 C 150 60, 250 40, 590 38", cls: "stroke-neon/70" },
-    { d: "M 10 60 C 150 60, 250 84, 590 86", cls: "stroke-indigo-400/50" },
-    { d: "M 10 60 C 150 60, 250 104, 590 108", cls: "stroke-cyan-400/40" },
+/**
+ * The tier cascade. Block width is that tier's occupancy against its quota, so
+ * a tier approaching its limit is visibly full. Arrows carry the transition
+ * counts from the last consolidation when one has been run.
+ */
+function Cascade({ mem, quotas, last }: { mem: any; quotas: any; last: any | null }) {
+  const occupancy = (key: string) => {
+    if (key === "working") return { n: mem.working?.items ?? 0, cap: quotas.working ?? 0 };
+    if (key === "episodic") return { n: mem.episodic?.items ?? 0, cap: quotas.episodic ?? 0 };
+    if (key === "semantic") return { n: mem.semantic?.nodes ?? 0, cap: quotas.semanticNodes ?? 0 };
+    return { n: mem.archive?.spans ?? 0, cap: 0 };
+  };
+  const transitions = [
+    { label: "summarise", n: last?.summarized },
+    { label: "promote", n: last?.promoted },
+    { label: "archive", n: last?.archived },
   ];
-  const survivor = verdict === "PROMOTE" ? 0 : 1; // promoted branch or the baseline
-  return (
-    <div className="mt-4 overflow-x-auto">
-      <svg viewBox="0 0 600 120" className="h-32 w-full min-w-[480px]">
-        {/* baseline trunk */}
-        <line x1="10" y1="60" x2="590" y2="60" stroke="#334155" strokeWidth="2" strokeDasharray="4 4" />
-        <circle cx="10" cy="60" r="5" fill="#6366f1">
-          {running && <animate attributeName="r" values="4;7;4" dur="1s" repeatCount="indefinite" />}
-        </circle>
-        {(running || verdict) &&
-          branches.map((b, i) => (
-            <path key={`${b.d}-${running}-${verdict}`} d={b.d} fill="none" strokeWidth="2"
-              className={`${b.cls} ${running ? "animate-branch-grow" : verdict && i !== survivor ? "animate-collapse" : ""}`}
-              strokeDasharray="600" strokeDashoffset={running ? undefined : "0"}
-              style={{ animationDelay: `${i * 0.15}s` }} />
-          ))}
-        {verdict && !running && (
-          <circle cx="590" cy={survivor === 0 ? 14 : 38} r="5"
-            fill={verdict === "PROMOTE" ? "#34d399" : verdict === "ROLLBACK" ? "#fb7185" : "#facc15"}>
-            <animate attributeName="opacity" values="0.4;1;0.4" dur="1.6s" repeatCount="indefinite" />
-          </circle>
-        )}
-        <text x="14" y="50" fontSize="9" fill="#64748b">now</text>
-        <text x="540" y="58" fontSize="9" fill="#64748b">{running ? "simulating…" : "futures"}</text>
-      </svg>
-    </div>
-  );
-}
 
-function ExperienceGraph({ graph }: { graph: any }) {
-  const nodes: any[] = (graph?.nodes ?? []).slice(0, 12);
-  const edges: any[] = graph?.edges ?? [];
-  if (nodes.length === 0) {
-    return (
-      <div className="mt-6 rounded-lg border border-dashed border-edge py-8 text-center text-xs text-slate-600">
-        No experiences distilled yet — memories become graph nodes as episodes are consolidated.
-      </div>
-    );
-  }
-  const pos = new Map<number, { x: number; y: number }>();
-  nodes.forEach((n, i) => {
-    const a = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-    pos.set(n.id, { x: 150 + 105 * Math.cos(a), y: 120 + 88 * Math.sin(a) });
-  });
   return (
-    <svg viewBox="0 0 300 240" className="mt-2 w-full">
-      {edges.map((e, i) => {
-        const a = pos.get(e.from), b = pos.get(e.to);
-        return a && b ? (
-          <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-            stroke="#6366f1" strokeOpacity={0.15 + e.weight * 0.4} strokeWidth={1 + e.weight} />
-        ) : null;
-      })}
-      {nodes.map((n) => {
-        const p = pos.get(n.id)!;
+    <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch">
+      {TIERS.map((t, i) => {
+        const { n, cap } = occupancy(t.key);
+        const frac = cap ? Math.min(1, n / cap) : 0;
+        const st: StateKey = cap && frac >= 0.9 ? "warning" : n > 0 ? "active" : "idle";
         return (
-          <g key={n.id} className="cursor-pointer">
-            <circle cx={p.x} cy={p.y} r={5 + n.utility * 6} fill="#11141b" stroke="#3b82f6"
-              strokeOpacity={0.4 + n.utility * 0.6} strokeWidth="1.5"
-              style={{ filter: "drop-shadow(0 0 4px rgba(59,130,246,0.4))" }}>
-              <title>{n.text} (utility {(n.utility * 100).toFixed(0)}%, used {n.uses}×)</title>
-            </circle>
-          </g>
+          <div key={t.key} className="flex flex-1 items-stretch gap-2">
+            <div className="min-w-0 flex-1">
+              <Plane className="h-full p-3">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[11px] font-medium text-slate-300">{t.label}</span>
+                  <span className="readout text-lg font-semibold" style={{ color: STATE[st].color }}>
+                    {n}
+                  </span>
+                </div>
+                <div className="mt-1.5">
+                  {cap ? (
+                    <>
+                      <Meter value={frac} state={st} height={3} />
+                      <div className="mt-1 text-[9px] text-slate-600">
+                        {n} / {cap} {t.unit}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-[9px] text-slate-600">{n} {t.unit} · unbounded</div>
+                  )}
+                </div>
+                <p className="mt-1.5 text-[10px] leading-snug text-slate-600">{t.desc}</p>
+              </Plane>
+            </div>
+
+            {i < TIERS.length - 1 && (
+              <div className="flex shrink-0 flex-col items-center justify-center px-0.5">
+                <span className="text-slate-700">→</span>
+                <span className="mt-0.5 whitespace-nowrap text-[8px] uppercase tracking-wider text-slate-600">
+                  {transitions[i].label}
+                </span>
+                {transitions[i].n != null && (
+                  <span
+                    className="readout text-[10px] font-semibold"
+                    style={{ color: transitions[i].n! > 0 ? STATE.healthy.color : "#5A6478" }}
+                  >
+                    {transitions[i].n}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         );
       })}
-    </svg>
+    </div>
   );
 }
 
-function VerdictBadge({ verdict }: { verdict: string }) {
-  const cls = verdict === "PROMOTE" ? "bg-emerald-500/20 text-emerald-300"
-    : verdict === "ROLLBACK" ? "bg-rose-500/20 text-rose-300" : "bg-amber-500/20 text-amber-300";
-  return <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${cls}`}>{verdict}</span>;
+/**
+ * One MemAct action's posterior, drawn as the interval the engine reasons over:
+ * the bar runs from the conservative 95% lower bound to the posterior mean.
+ */
+function PosteriorBar({
+  label,
+  desc,
+  row,
+  chosen,
+}: {
+  label: string;
+  desc: string;
+  row: any;
+  chosen: boolean;
+}) {
+  const observed = row && (row.successes ?? 0) + (row.failures ?? 0) > 0;
+  const mean = row?.posteriorMean ?? 0;
+  const lower = row?.lower95 ?? 0;
+  const color = chosen ? STATE.active.color : observed ? STATE.healthy.color : STATE.idle.color;
+
+  return (
+    <div
+      className="rounded px-2 py-2 transition-colors"
+      style={chosen ? { background: `${STATE.active.color}12` } : undefined}
+    >
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="text-[11px] font-medium text-slate-300">{label}</span>
+        {chosen && (
+          <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold"
+            style={{ background: `${STATE.active.color}22`, color: STATE.active.color }}>
+            next
+          </span>
+        )}
+        <span className="ml-auto readout text-[10px] text-slate-500">
+          {observed ? `${row.successes}✓ / ${row.failures}✗` : "no observations"}
+        </span>
+      </div>
+
+      <div className="relative mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink">
+        {/* the interval the engine reasons over */}
+        <div
+          className="absolute inset-y-0 rounded-full transition-all duration-500"
+          style={{
+            left: `${lower * 100}%`,
+            width: `${Math.max(0, (mean - lower) * 100)}%`,
+            background: `${color}66`,
+          }}
+        />
+        {/* the conservative bound it actually decides on */}
+        <div className="absolute inset-y-0 w-0.5" style={{ left: `${lower * 100}%`, background: color }} />
+      </div>
+
+      <div className="mt-1 flex items-baseline justify-between text-[9px] text-slate-600">
+        <span>{desc}</span>
+        <span className="readout">
+          lower {(lower * 100).toFixed(0)}% · mean {(mean * 100).toFixed(0)}%
+        </span>
+      </div>
+    </div>
+  );
 }
 
-function actionColor(action: string) {
-  switch (action) {
-    case "SUMMARIZE": return "bg-indigo-500/20 text-indigo-300";
-    case "PROMOTE": return "bg-emerald-500/20 text-emerald-300";
-    case "PRUNE": return "bg-amber-500/20 text-amber-300";
-    case "ARCHIVE": return "bg-slate-500/20 text-slate-300";
-    case "RETRIEVE": return "bg-blue-500/20 text-sky-300";
-    case "STORE": return "bg-indigo-500/20 text-indigo-300";
-    default: return "bg-slate-600/20 text-slate-400";
-  }
+/** Baseline vs candidate for one twin replay, with the verdict. */
+function SimulationRow({ sim }: { sim: any }) {
+  const parse = (s: string | null) => {
+    try {
+      return s ? JSON.parse(s) : null;
+    } catch {
+      return null;
+    }
+  };
+  const base = parse(sim.baselineMetricsJson);
+  const cand = parse(sim.candidateMetricsJson);
+  const st = verdictState(sim.verdict);
+
+  const rate = (m: any) => {
+    const t = (m?.successes ?? 0) + (m?.failures ?? 0);
+    return t ? (m.successes ?? 0) / t : 0;
+  };
+
+  const rows = (base && cand
+    ? [
+        { label: "Success rate", b: rate(base), c: rate(cand), fmt: (v: number) => `${(v * 100).toFixed(1)}%`, higherBetter: true },
+        { label: "Avg latency", b: base.avgLatencyMs ?? 0, c: cand.avgLatencyMs ?? 0, fmt: (v: number) => `${v.toFixed(0)}ms`, higherBetter: false },
+        { label: "Avg cost", b: base.avgCostUsd ?? 0, c: cand.avgCostUsd ?? 0, fmt: (v: number) => `$${v.toFixed(6)}`, higherBetter: false },
+      ]
+    : []
+  ).filter((r) => r.b > 0 || r.c > 0);
+
+  return (
+    <Plane className="p-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <StateDot state={st} />
+        <span className="text-sm font-semibold" style={{ color: STATE[st].color }}>
+          {sim.verdict}
+        </span>
+        <span className="micro">{String(sim.scenario).replace(/_/g, " ").toLowerCase()}</span>
+        <span className="readout text-[10px] text-slate-500">
+          {Number(sim.replayedRequests ?? 0).toLocaleString()} replayed ·{" "}
+          {((sim.confidence ?? 0) * 100).toFixed(0)}% confidence
+        </span>
+        <span className="ml-auto readout text-[10px] text-slate-600">
+          {new Date(sim.createdAt).toLocaleTimeString()}
+        </span>
+      </div>
+
+      {sim.reason && <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">{sim.reason}</p>}
+
+      {rows.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {rows.map((r) => {
+            const max = Math.max(r.b, r.c, 1e-9);
+            const better = r.higherBetter ? r.c > r.b : r.c < r.b;
+            const changed = Math.abs(r.c - r.b) > 1e-9;
+            return (
+              <div key={r.label} className="grid grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-2 text-[10px]">
+                <span className="micro">{r.label}</span>
+                <div className="space-y-1">
+                  <Bar frac={r.b / max} color="#5A6478" caption={`baseline ${r.fmt(r.b)}`} />
+                  <Bar
+                    frac={r.c / max}
+                    color={changed ? (better ? STATE.healthy.color : STATE.critical.color) : STATE.active.color}
+                    caption={`candidate ${r.fmt(r.c)}`}
+                  />
+                </div>
+                <span
+                  className="readout w-14 text-right"
+                  style={{
+                    color: !changed ? "#5A6478" : better ? STATE.healthy.color : STATE.critical.color,
+                  }}
+                >
+                  {!changed ? "—" : `${better ? "better" : "worse"}`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Plane>
+  );
+}
+
+function Bar({ frac, color, caption }: { frac: number; color: string; caption: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-ink">
+        <span
+          className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500"
+          style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%`, background: color }}
+        />
+      </span>
+      <span className="w-36 shrink-0 text-slate-500">{caption}</span>
+    </div>
+  );
+}
+
+/**
+ * Experience graph. Nodes are laid out on a utility spiral — the most useful
+ * knowledge sits at the centre — because utility is the property that decides
+ * what survives pruning.
+ */
+function ExperienceGraph({ graph }: { graph: any }) {
+  const W = 1000;
+  const nodes: any[] = graph?.nodes ?? [];
+  const edges: any[] = graph?.edges ?? [];
+  const [sel, setSel] = useState<number | null>(null);
+
+  // The spiral only needs as much room as it actually uses; a tall empty field
+  // around a handful of nodes reads as a rendering fault rather than as a small
+  // graph.
+  const spiralRadius = nodes.length <= 1 ? 0 : 26 + Math.sqrt(nodes.length - 1) * 46;
+  const H = Math.round(Math.max(150, Math.min(420, spiralRadius * 1.35 + 120)));
+
+  const laid = useMemo(() => {
+    const sorted = [...nodes].sort((a, b) => (b.utility ?? 0) - (a.utility ?? 0));
+    const cx = W / 2;
+    const cy = H / 2;
+    return sorted.map((n, i) => {
+      // Golden-angle spiral: rank by utility, highest nearest the centre.
+      const a = i * 2.399963;
+      const r = i === 0 ? 0 : 26 + Math.sqrt(i) * 46;
+      return { ...n, x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r * 0.62 };
+    });
+  }, [nodes]);
+
+  const posOf = useMemo(() => {
+    const m = new Map<number, { x: number; y: number }>();
+    laid.forEach((n) => m.set(n.id, { x: n.x, y: n.y }));
+    return m;
+  }, [laid]);
+
+  const selected = laid.find((n) => n.id === sel) ?? null;
+  const maxUses = Math.max(...nodes.map((n) => n.uses ?? 0), 1);
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: H }} onClick={() => setSel(null)}>
+        {edges.map((e, i) => {
+          const a = posOf.get(e.from);
+          const b = posOf.get(e.to);
+          if (!a || !b) return null;
+          const dim = sel !== null && sel !== e.from && sel !== e.to;
+          return (
+            <line
+              key={i}
+              x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+              stroke={STATE.active.color}
+              strokeOpacity={dim ? 0.05 : 0.12 + (e.weight ?? 0) * 0.35}
+              strokeWidth={0.6 + (e.weight ?? 0) * 1.6}
+            />
+          );
+        })}
+        {laid.map((n) => {
+          const util = Math.max(0, Math.min(1, n.utility ?? 0));
+          const r = 7 + util * 15;
+          const isSel = sel === n.id;
+          const dim = sel !== null && !isSel;
+          return (
+            <g
+              key={n.id}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                setSel(isSel ? null : n.id);
+              }}
+              className="cursor-pointer"
+              opacity={dim ? 0.25 : 1}
+              style={{ transition: "opacity 300ms" }}
+            >
+              <circle cx={n.x} cy={n.y} r={r} fill={STATE.active.color}
+                fillOpacity={0.12 + util * 0.3} stroke={STATE.active.color}
+                strokeOpacity={isSel ? 0.95 : 0.5} strokeWidth={isSel ? 1.8 : 1} />
+              {/* usage ring — how often this knowledge has actually been reused */}
+              {(n.uses ?? 0) > 0 && (
+                <circle
+                  cx={n.x} cy={n.y} r={r + 3.5} fill="none"
+                  stroke={STATE.healthy.color} strokeWidth={1.4} strokeLinecap="round"
+                  strokeDasharray={`${(2 * Math.PI * (r + 3.5) * ((n.uses ?? 0) / maxUses)).toFixed(1)} 999`}
+                  transform={`rotate(-90 ${n.x} ${n.y})`}
+                />
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
+      <aside className="p-3">
+        <Micro>Node</Micro>
+        {selected ? (
+          <div className="settle mt-2 space-y-2">
+            <span className="micro">{selected.kind}</span>
+            <p className="text-[11px] leading-relaxed text-slate-300">{selected.text}</p>
+            <div className="flex items-baseline justify-between border-b border-edge/40 pb-1">
+              <span className="micro">Utility</span>
+              <span className="readout text-xs text-slate-200">{Number(selected.utility ?? 0).toFixed(3)}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-b border-edge/40 pb-1">
+              <span className="micro">Times used</span>
+              <span className="readout text-xs text-slate-200">{selected.uses ?? 0}</span>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+            {nodes.length} node{nodes.length === 1 ? "" : "s"}, {edges.length} relation
+            {edges.length === 1 ? "" : "s"}. Select one to read it.
+          </p>
+        )}
+      </aside>
+    </div>
+  );
 }
