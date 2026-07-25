@@ -108,6 +108,9 @@ export const portal = {
   },
   logout: () => portal.setSession(null),
 
+  /** Escape hatch for portal-scoped reads that have no dedicated helper. */
+  get: <T>(path: string) => portalHttp<T>(path, "GET"),
+
   me: () => portalHttp<any>("/api/portal/developer/me", "GET"),
   keys: () => portalHttp<any[]>("/api/portal/developer/keys", "GET"),
   issueKey: (label?: string) => portalHttp<any>("/api/portal/developer/keys", "POST", { label }),

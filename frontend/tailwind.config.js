@@ -9,17 +9,18 @@ export default {
         ink: "rgb(var(--ink) / <alpha-value>)",
         panel: "rgb(var(--panel) / <alpha-value>)",
         edge: "rgb(var(--edge) / <alpha-value>)",
-        // Cohesive indigo→blue accent family (single-hue, professional) rather
-        // than the previous clashing purple + neon-cyan. Names kept for
-        // backwards compatibility across components.
-        aurora: "#6366f1",
-        neon: "#3b82f6",
+        // One system accent — a cool signal blue, deliberately free of the
+        // purple cast that reads as "AI product". Everything else that carries
+        // colour in this UI is a system state (see src/system/tokens.ts).
+        // Names kept for backwards compatibility across existing components.
+        aurora: "#4C8BF5",
+        neon: "#7DA9FF",
       },
       boxShadow: {
         // Soft, subtle elevation — no neon halos.
-        glow: "0 6px 22px -12px rgba(99, 102, 241, 0.45)",
-        "glow-cyan": "0 6px 22px -12px rgba(59, 130, 246, 0.4)",
-        "glow-sm": "0 3px 12px -8px rgba(99, 102, 241, 0.5)",
+        glow: "0 8px 30px -16px rgba(76, 139, 245, 0.5)",
+        "glow-cyan": "0 8px 30px -16px rgba(125, 169, 255, 0.42)",
+        "glow-sm": "0 4px 14px -10px rgba(76, 139, 245, 0.55)",
       },
       keyframes: {
         fadeUp: {
@@ -27,8 +28,8 @@ export default {
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
         glowPulse: {
-          "0%, 100%": { boxShadow: "0 4px 18px -10px rgba(99, 102, 241, 0.5)" },
-          "50%": { boxShadow: "0 6px 26px -10px rgba(59, 130, 246, 0.5)" },
+          "0%, 100%": { boxShadow: "0 4px 18px -10px rgba(76, 139, 245, 0.5)" },
+          "50%": { boxShadow: "0 6px 26px -10px rgba(125, 169, 255, 0.5)" },
         },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },

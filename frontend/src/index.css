@@ -4,9 +4,17 @@
 
 /* ---- theme variables: dark is the default ---- */
 :root {
-  --ink: 9 11 16;        /* #090b10 — neutral near-black */
-  --panel: 17 20 27;     /* #11141b — elevated surface */
-  --edge: 33 37 47;      /* #21252f — quiet neutral border */
+  --ink: 6 8 12;         /* #06080c — instrument black */
+  --panel: 14 17 24;     /* #0e1118 — recessed plane */
+  --edge: 30 35 46;      /* #1e232e — hairline */
+  --grid: 255 255 255;   /* engineering grid, used at very low alpha */
+  --grid-alpha: 0.022;
+  /* Topology surfaces. SVG can't use the slate utilities, so the node fill and
+     label colours are variables that flip with the theme. */
+  --topo-node: 14 17 24;
+  --topo-text: 226 232 240;
+  --topo-label: 133 147 171;
+  --topo-label-off: 74 82 101;
   --aurora-glow: 0.05;
   --neon-glow: 0.035;
   color-scheme: dark;
@@ -14,8 +22,14 @@
 
 :root[data-theme="light"] {
   --ink: 248 249 251;    /* near-white app background */
-  --panel: 255 255 255;  /* cards */
-  --edge: 226 230 237;   /* borders */
+  --panel: 255 255 255;  /* planes */
+  --edge: 226 230 237;   /* hairlines */
+  --grid: 15 23 42;
+  --grid-alpha: 0.035;
+  --topo-node: 255 255 255;
+  --topo-text: 15 23 42;
+  --topo-label: 71 85 105;
+  --topo-label-off: 148 163 184;
   --aurora-glow: 0.045;
   --neon-glow: 0.03;
   color-scheme: light;
@@ -32,8 +46,8 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* Faint single-hue indigo wash — restrained, not a light show. */
   background-image:
-    radial-gradient(1200px 560px at 88% -12%, rgba(99, 102, 241, var(--aurora-glow)), transparent 62%),
-    radial-gradient(1000px 460px at -5% 112%, rgba(59, 130, 246, var(--neon-glow)), transparent 62%);
+    radial-gradient(1200px 560px at 88% -12%, rgba(76, 139, 245, var(--aurora-glow)), transparent 62%),
+    radial-gradient(1000px 460px at -5% 112%, rgba(125, 169, 255, var(--neon-glow)), transparent 62%);
   background-attachment: fixed;
 }
 
@@ -90,20 +104,55 @@ body {
 }
 
 @layer components {
-  /* Glassy elevated surface. */
+  /* ---- instrument surfaces -------------------------------------------------
+     Planes are recessed and defined by hairlines rather than floated with
+     shadows, so the interface reads as one continuous surface with depth
+     instead of a tray of cards. */
+  .plane {
+    @apply rounded-lg border border-edge/70;
+    background:
+      linear-gradient(180deg, rgb(var(--panel) / 0.85), rgb(var(--panel) / 0.6));
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.03);
+  }
+  /* A plane that reads as cut *into* the surface — used for readouts/wells. */
+  .well {
+    @apply rounded-lg border border-edge/60;
+    background: rgb(var(--ink) / 0.55);
+    box-shadow: inset 0 1px 3px 0 rgb(0 0 0 / 0.35);
+  }
+  /* Fine engineering grid — establishes the spatial field behind the topology. */
+  .grid-field {
+    background-image:
+      linear-gradient(rgb(var(--grid) / var(--grid-alpha)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--grid) / var(--grid-alpha)) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  /* Instrument micro-label: wide-tracked uppercase, the voice of the system. */
+  .micro {
+    @apply text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500;
+  }
+  /* Telemetry numerals — tabular so digits don't jitter as values update. */
+  .readout {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Retained for pages not yet migrated: now an instrument plane, not glass. */
   .glass {
-    @apply rounded-xl border border-edge/80 bg-panel/70 backdrop-blur;
-    background-image: linear-gradient(160deg, rgba(99, 102, 241, 0.035), transparent 45%);
+    @apply rounded-lg border border-edge/70;
+    background:
+      linear-gradient(180deg, rgb(var(--panel) / 0.85), rgb(var(--panel) / 0.6));
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.03);
   }
 
   /* Gradient headline text — subtle indigo → blue, same hue family. */
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(90deg, #a5b4fc, #60a5fa);
+    background-image: linear-gradient(90deg, #cfe0ff, #7DA9FF);
   }
   /* The light-mode tints would be near-invisible on paper; deepen them. */
   :root[data-theme="light"] .text-gradient {
-    background-image: linear-gradient(90deg, #4f46e5, #2563eb);
+    background-image: linear-gradient(90deg, #2563eb, #1d4ed8);
   }
 
   /* Animated shimmer strip (flow arrows, loading accents). */
@@ -111,12 +160,58 @@ body {
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(99, 102, 241, 0.6),
-      rgba(59, 130, 246, 0.6),
+      rgba(76, 139, 245, 0.6),
+      rgba(125, 169, 255, 0.6),
       transparent
     );
     background-size: 200% 100%;
     @apply animate-shimmer;
+  }
+}
+
+/* ---- system motion --------------------------------------------------------
+   Every animation below represents a real system event. Nothing here loops for
+   decoration: the components that use these classes only mount them when the
+   corresponding telemetry says the event is happening. */
+
+/* A subsystem carrying live traffic breathes; an idle one is still. */
+@keyframes coreBreath {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50%      { transform: scale(1.035); opacity: 1; }
+}
+.core-breath { animation: coreBreath var(--breath, 4s) ease-in-out infinite; }
+
+/* Concentric rings of the Core, rotating at the rate the system is working. */
+@keyframes coreSpin { to { transform: rotate(360deg); } }
+.core-spin { animation: coreSpin var(--spin, 60s) linear infinite; transform-origin: center; }
+.core-spin-rev { animation: coreSpin var(--spin, 90s) linear infinite reverse; transform-origin: center; }
+
+/* A degraded node loses coherence — the ring stutters rather than glowing. */
+@keyframes degrade {
+  0%, 100% { opacity: 0.9; }
+  42%      { opacity: 0.35; }
+  46%      { opacity: 0.8; }
+  70%      { opacity: 0.4; }
+}
+.degrading { animation: degrade 1.9s ease-in-out infinite; }
+
+/* An incident pulse expands once per detected event. */
+@keyframes incidentPulse {
+  0%   { r: 6; opacity: 0.55; }
+  100% { r: 34; opacity: 0; }
+}
+.incident-pulse { animation: incidentPulse 1.8s ease-out infinite; }
+
+/* Readouts settle rather than pop when a value changes. */
+@keyframes settle {
+  0%   { opacity: 0; transform: translateY(3px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.settle { animation: settle 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .core-breath, .core-spin, .core-spin-rev, .degrading, .incident-pulse, .settle {
+    animation: none !important;
   }
 }
 

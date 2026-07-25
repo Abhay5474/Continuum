@@ -8,6 +8,7 @@ import Landing from "./pages/Landing";
 import Docs from "./pages/Docs";
 import SignIn from "./pages/SignIn";
 import Dashboard from "./pages/Dashboard";
+import CommandCenter from "./pages/CommandCenter";
 import WorkflowDetailPage from "./pages/WorkflowDetail";
 import ChaosPanel from "./pages/ChaosPanel";
 import ReplayVerify from "./pages/ReplayVerify";
@@ -39,7 +40,10 @@ const router = createBrowserRouter([
       {
         element: <App />,
         children: [
-          { path: "dashboard", element: <Dashboard /> },
+          // The command centre is the front of the console; the workflow
+          // console it replaced stays reachable at /workflows.
+          { path: "dashboard", element: <CommandCenter /> },
+          { path: "workflows", element: <Dashboard /> },
           { path: "workflows/:id", element: <WorkflowDetailPage /> },
           { path: "chaos", element: <ChaosPanel /> },
           { path: "replay", element: <ReplayVerify /> },

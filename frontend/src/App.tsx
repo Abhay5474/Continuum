@@ -17,6 +17,7 @@ const GROUPS: Group[] = [
   {
     label: "Traffic",
     items: [
+      { to: "/workflows", label: "Workflows", desc: "Durable runs, event logs and replay" },
       { to: "/gateway", label: "Gateway", desc: "Live requests, providers and failover" },
       { to: "/router", label: "Routing", desc: "Model selection and tail-latency hedging" },
     ],
@@ -98,7 +99,7 @@ export default function App() {
           {/* primary nav */}
           <nav className="hidden items-center gap-0.5 lg:flex">
             <NavLink to="/dashboard" className={({ isActive }) => topLink(isActive)}>
-              Overview
+              Command Centre
             </NavLink>
 
             {GROUPS.map((g) => (
@@ -167,7 +168,7 @@ export default function App() {
         {/* mobile menu */}
         {mobileOpen && (
           <nav className="max-h-[70vh] overflow-y-auto border-t border-edge/60 bg-panel/95 px-4 py-3 lg:hidden">
-            <MobileLink to="/dashboard" label="Overview" />
+            <MobileLink to="/dashboard" label="Command Centre" />
             {GROUPS.map((g) => (
               <div key={g.label} className="mt-3">
                 <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
