@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../api";
+import { api, portal } from "../api";
 import { Micro, Readout, Plane, StateDot } from "../system/primitives";
 import { STATE } from "../system/tokens";
+import FeatureToggle from "../system/FeatureToggle";
 
 /**
  * Context MMU — the memory space.
@@ -55,19 +56,21 @@ export default function MmuProfiler() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-lg font-semibold tracking-tight">Context MMU · Memory Space</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          Working set stays resident · the rest pages out to stubs and faults back on reference
-        </p>
+      <header className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold tracking-tight">Context MMU</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Working set stays resident · the rest pages out and faults back on reference
+          </p>
+        </div>
+        <FeatureToggle status={portal.v7.status} enable={portal.v7.enable} disable={portal.v7.disable} />
       </header>
 
       {!active ? (
         <Plane className="p-8 text-center">
           <Micro>Address space idle</Micro>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-            No virtualized requests yet. Enable the Context Optimizer, then send a long conversation
-            through the gateway — every paged request lands here.
+Turn it on above, then send a long conversation through the gateway.
           </p>
         </Plane>
       ) : (

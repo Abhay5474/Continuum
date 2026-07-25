@@ -61,6 +61,7 @@ export default function GodMode() {
   const [retrieveQ, setRetrieveQ] = useState("");
   const [retrieved, setRetrieved] = useState<any[] | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [tab, setTab] = useState<"memory" | "policy" | "twin" | "graph" | "ops">("memory");
 
   const refresh = () => {
     portal.godmode.status().then(setStatus).catch(() => {});
@@ -195,6 +196,10 @@ export default function GodMode() {
         </Plane>
       ) : (
         <>
+          <Tabs tab={tab} setTab={setTab} />
+
+          {tab === "memory" && (
+            <>
           {/* ================= 1 · MEMORY ================= */}
           <section>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -254,6 +259,11 @@ export default function GodMode() {
             </div>
           </section>
 
+            </>
+          )}
+
+          {tab === "policy" && (
+            <>
           {/* ================= 2 · POLICY ================= */}
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div>
@@ -324,6 +334,11 @@ export default function GodMode() {
             </div>
           </section>
 
+            </>
+          )}
+
+          {tab === "twin" && (
+            <>
           {/* ================= 3 · DIGITAL TWIN ================= */}
           <section>
             <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -382,6 +397,11 @@ export default function GodMode() {
             </div>
           </section>
 
+            </>
+          )}
+
+          {tab === "graph" && (
+            <>
           {/* ================= 4 · EXPERIENCE GRAPH ================= */}
           <section>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -399,6 +419,11 @@ export default function GodMode() {
             )}
           </section>
 
+            </>
+          )}
+
+          {tab === "ops" && (
+            <>
           {/* ================= operations ================= */}
           <section>
             <Micro>Operations</Micro>
@@ -492,8 +517,49 @@ export default function GodMode() {
               </div>
             )}
           </section>
+            </>
+          )}
+
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Section switcher. The engine has four distinct stories plus its controls;
+ * stacking all of them on one scroll made the page unreadable, so only one is
+ * shown at a time.
+ */
+function Tabs({
+  tab,
+  setTab,
+}: {
+  tab: string;
+  setTab: (t: any) => void;
+}) {
+  const items = [
+    ["memory", "Memory"],
+    ["policy", "Policy"],
+    ["twin", "Digital twin"],
+    ["graph", "Experience"],
+    ["ops", "Controls"],
+  ] as const;
+  return (
+    <div className="flex flex-wrap gap-1 border-b border-edge/60">
+      {items.map(([k, label]) => (
+        <button
+          key={k}
+          onClick={() => setTab(k)}
+          className="-mb-px border-b-2 px-3 py-2 text-xs font-medium transition-colors"
+          style={{
+            borderColor: tab === k ? STATE.active.color : "transparent",
+            color: tab === k ? "rgb(226 232 240)" : undefined,
+          }}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

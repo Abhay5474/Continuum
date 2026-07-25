@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../api";
+import { api, portal } from "../api";
 import { Micro, Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
+import FeatureToggle from "../system/FeatureToggle";
 
 /**
  * Verification — the agent constellation.
@@ -83,19 +84,21 @@ export default function DagCommandCenter() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-lg font-semibold tracking-tight">Verification</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          Claims solved in parallel · checked by independent verifiers · resolved by Bayesian aggregation
-        </p>
+      <header className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold tracking-tight">Verification</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Claims solved in parallel · verified independently · resolved by Bayesian aggregation
+          </p>
+        </div>
+        <FeatureToggle status={portal.v6.status} enable={portal.v6.enable} disable={portal.v6.disable} />
       </header>
 
       {runs.length === 0 ? (
         <Plane className="p-8 text-center">
           <Micro>No verification runs</Micro>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-            Enable the Verification Engine in API Keys &amp; Providers, then send a gateway request.
-            Each verified answer is recorded here with its full constellation.
+Turn it on above, then send a gateway request.
           </p>
         </Plane>
       ) : (
