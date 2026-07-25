@@ -167,10 +167,8 @@ export default function GodMode() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight">Adaptive Policy</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
-            An autonomous layer that manages its own memory and proposes its own policy changes. It
-            summarises, distils and forgets under quotas you set, and no proposal reaches live
-            traffic until a digital-twin replay says it is safe.
+          <p className="mt-0.5 text-sm text-slate-500">
+            Self-managing memory · policy proposals gated by digital-twin replay
           </p>
         </div>
         <button
@@ -190,10 +188,9 @@ export default function GodMode() {
       {!enabled ? (
         <Plane className="p-8 text-center">
           <Micro>Off by default</Micro>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-slate-400">
-            Nothing is retained and no policy is proposed while the engine is off. Turning it on
-            begins recording gateway exchanges into the memory tiers for your account only — you can
-            wipe everything at any time.
+          <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">
+            Nothing is retained while off. Enabling records gateway exchanges into your account's
+            memory tiers only — wipe at any time.
           </p>
         </Plane>
       ) : (
@@ -272,10 +269,8 @@ export default function GodMode() {
                   MemAct enabled
                 </label>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                Each action carries a Beta posterior over "did this help?". The bar spans the
-                conservative 95% lower bound up to the mean — a wide bar means the action is still
-                unproven, and the engine picks on the lower bound so it does not act on optimism.
+              <p className="mt-0.5 text-[10px] text-slate-600">
+                bar = 95% lower bound → mean · wider is less proven · chosen on the lower bound
               </p>
 
               <div className="mt-3 space-y-2.5">
@@ -298,7 +293,7 @@ export default function GodMode() {
             {/* decision ledger */}
             <div>
               <Micro>Decision ledger</Micro>
-              <p className="mt-1 text-[11px] text-slate-500">Every autonomous action, with its reward.</p>
+
               <div className="mt-2 max-h-[340px] space-y-px overflow-y-auto pr-1">
                 {actions.map((a) => {
                   const r = a.reward;
@@ -343,10 +338,8 @@ export default function GodMode() {
                 Gate promotions on the twin
               </label>
             </div>
-            <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-500">
-              A candidate policy is replayed against your real recorded traffic alongside the current
-              one. The verdict compares both arms; a confident regression is vetoed before any live
-              request is affected.
+            <p className="mt-0.5 text-[10px] text-slate-600">
+              candidate replayed against real recorded traffic · confident regressions are vetoed
             </p>
 
             <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -397,8 +390,7 @@ export default function GodMode() {
             </div>
             {(graph?.nodes ?? []).length === 0 ? (
               <Plane className="mt-2 p-6 text-center text-[11px] text-slate-500">
-                Nothing has been distilled yet. Episodes are promoted into the graph once they prove
-                repeatedly useful.
+                Nothing distilled yet — episodes promote once repeatedly useful.
               </Plane>
             ) : (
               <div className="mt-2 grid-field rounded-lg border border-edge/60">

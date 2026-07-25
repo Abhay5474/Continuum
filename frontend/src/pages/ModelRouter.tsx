@@ -101,10 +101,8 @@ export default function ModelRouter() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight">Routing</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
-            Each request is scored against the available providers and dispatched to the best fit for
-            the current objective. A non-stationary contextual bandit learns from the outcomes, and
-            tail-latency hedging covers the slow tail.
+          <p className="mt-0.5 text-sm text-slate-500">
+            Scored per request · non-stationary contextual bandit · tail-latency hedging
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
@@ -217,11 +215,9 @@ export default function ModelRouter() {
         {/* ---- bandit beliefs ---- */}
         <section>
           <Micro>Bandit belief · Beta posterior per context</Micro>
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-            {bandit?.nonStationary
-              ? `Discounted at γ=${bandit.gamma} so old outcomes fade — the sampler tracks drift rather than averaging over all history.`
-              : "Undiscounted — every observation counts equally."}{" "}
-            Overlapping curves mean the arms are still being explored.
+          <p className="mt-0.5 text-[10px] text-slate-600">
+            {bandit?.nonStationary ? `discounted γ=${bandit.gamma} · tracks drift` : "undiscounted"} ·
+            overlapping curves = still exploring
           </p>
           <div className="mt-3 space-y-4">
             {CONTEXTS.map((c) => {
@@ -255,9 +251,8 @@ export default function ModelRouter() {
               {hedging?.enabled ? "On" : "Off"}
             </button>
           </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-            A second request is issued only once the first exceeds the trigger, and only while the
-            hedge rate stays under its cap — extra load is bounded by design.
+          <p className="mt-0.5 text-[10px] text-slate-600">
+            second request fires past the trigger, capped by hedge rate
           </p>
 
           {hedgeMetrics ? (

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Micro, Readout, Plane, StateDot, Trace } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
+import DataView from "../system/DataView";
 
 /**
  * Gateway — live request flow.
@@ -87,9 +88,8 @@ export default function GatewayDashboard() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight">Gateway</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
-            One OpenAI-compatible endpoint in front of every provider. Requests are routed, retried
-            and failed over here, so your application only ever sees the result.
+          <p className="mt-0.5 text-sm text-slate-500">
+            One OpenAI-compatible endpoint · routed, retried and failed over before your app sees it
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
@@ -262,9 +262,8 @@ export default function GatewayDashboard() {
               {verifying ? "Scanning…" : "Run verification scan"}
             </button>
           </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-            When deployed workflow code no longer matches recorded history, the divergence is
-            reconciled automatically instead of crashing the in-flight run.
+          <p className="mt-0.5 text-[10px] text-slate-600">
+            code/history divergence reconciled instead of crashing in-flight runs
           </p>
 
           <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
@@ -319,9 +318,9 @@ export default function GatewayDashboard() {
                     </span>
                   </div>
                   {verifyOut.divergedInstances > 0 && (
-                    <pre className="mt-2 max-h-40 overflow-auto text-[10px] text-slate-500">
-                      {JSON.stringify((verifyOut.results ?? []).filter((x: any) => x.diverged), null, 2)}
-                    </pre>
+                    <div className="mt-2 max-h-52 overflow-y-auto">
+                      <DataView value={(verifyOut.results ?? []).filter((x: any) => x.diverged)} />
+                    </div>
                   )}
                 </>
               )}
@@ -410,10 +409,8 @@ export default function GatewayDashboard() {
           </button>
         </div>
         {chatOut && (
-          <Plane inset className="mt-2 max-h-64 overflow-auto p-3">
-            <pre className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate-400">
-              {JSON.stringify(chatOut, null, 2)}
-            </pre>
+          <Plane inset className="mt-2 max-h-[420px] overflow-y-auto p-3">
+            <DataView value={chatOut} />
           </Plane>
         )}
       </section>

@@ -1,3 +1,4 @@
+import DataView from "../system/DataView";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { ChaosState } from "../types";
@@ -70,7 +71,7 @@ export default function ChaosPanel() {
 
       <div className="rounded-lg border border-edge bg-panel p-4">
         <div className="mb-2 text-sm font-medium">Current chaos state</div>
-        <pre className="text-xs text-slate-300">{JSON.stringify(state, null, 2)}</pre>
+        <DataView value={state} />
       </div>
     </div>
   );

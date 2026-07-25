@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Micro, Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
+import DataView from "../system/DataView";
 
 /**
  * Verification — the agent constellation.
@@ -84,10 +85,8 @@ export default function DagCommandCenter() {
     <div className="space-y-6">
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Verification</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-400">
-          High-stakes questions are decomposed into claims, solved in parallel, checked by
-          independent verifiers, and resolved into a single confidence by Bayesian aggregation — no
-          model is asked to grade another. Every run leaves a full evidence trail.
+        <p className="mt-0.5 text-sm text-slate-500">
+          Claims solved in parallel · checked by independent verifiers · resolved by Bayesian aggregation
         </p>
       </header>
 
@@ -237,7 +236,7 @@ function Constellation({ workflowId }: { workflowId: string }) {
       {!trace ? (
         <Plane className="p-8 text-center text-sm text-slate-500">Loading constellation…</Plane>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
           <section>
             <div className="grid-field rounded-lg border border-edge/60">
               <svg viewBox={`0 0 ${W} ${H}`} className="w-full" onClick={() => setSel(null)}>
@@ -445,10 +444,8 @@ function Output({ json }: { json: string }) {
   return (
     <div>
       <Micro>Output</Micro>
-      <Plane inset className="mt-1.5 max-h-64 overflow-auto p-3">
-        <pre className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate-400">
-          {JSON.stringify(parsed, null, 2)}
-        </pre>
+      <Plane inset className="mt-1.5 max-h-[420px] overflow-y-auto p-3">
+        <DataView value={parsed} />
       </Plane>
     </div>
   );

@@ -57,10 +57,8 @@ export default function MmuProfiler() {
     <div className="space-y-6">
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Context MMU · Memory Space</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-400">
-          Context is virtualized: only the working set stays inside the model's window, the rest is
-          paged out to semantic stubs and faulted back in when referenced. Enable it per developer in
-          API Keys &amp; Providers.
+        <p className="mt-0.5 text-sm text-slate-500">
+          Working set stays resident · the rest pages out to stubs and faults back on reference
         </p>
       </header>
 

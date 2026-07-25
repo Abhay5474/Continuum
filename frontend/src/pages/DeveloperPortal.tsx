@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
 import { useToast, Spinner, CopyButton, CodeBlock } from "../components/ui";
+import DataView from "../system/DataView";
 
 const PROVIDERS = ["gemini", "groq", "openai"];
 
@@ -460,7 +461,9 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           {playBusy ? "Sending…" : "Send through gateway"}
         </button>
         {playOut ? (
-          <pre className="mt-2 overflow-x-auto rounded bg-ink p-2 text-xs text-slate-300 animate-fade-up">{JSON.stringify(playOut, null, 2)}</pre>
+          <div className="mt-2 max-h-[420px] overflow-y-auto rounded border border-edge/60 bg-ink p-3 animate-fade-up">
+            <DataView value={playOut} />
+          </div>
         ) : (
           !playBusy && (
             <div className="mt-2 text-xs text-slate-600">The response will appear here.</div>

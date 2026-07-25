@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import type { WorkflowDetail } from "../types";
 import StatusBadge from "../components/StatusBadge";
+import DataView from "../system/DataView";
 
 const EVENT_ICON: Record<string, string> = {
   WORKFLOW_STARTED: "\u25B6",       // ▶
@@ -148,9 +149,7 @@ export default function WorkflowDetailPage() {
 
           {detail.result && (
             <Panel title="Result">
-              <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs text-slate-300">
-                {JSON.stringify(detail.result, null, 2)}
-              </pre>
+              <DataView value={detail.result} />
             </Panel>
           )}
           {detail.error && (
