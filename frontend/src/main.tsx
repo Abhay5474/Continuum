@@ -3,8 +3,10 @@ import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./index.css";
 import App from "./App";
+import RequireAuth from "./components/RequireAuth";
 import Landing from "./pages/Landing";
 import Docs from "./pages/Docs";
+import SignIn from "./pages/SignIn";
 import Dashboard from "./pages/Dashboard";
 import WorkflowDetailPage from "./pages/WorkflowDetail";
 import ChaosPanel from "./pages/ChaosPanel";
@@ -23,30 +25,38 @@ import Settings from "./pages/Settings";
 import { ToastProvider } from "./components/ui";
 
 const router = createBrowserRouter([
-  // Standalone marketing + docs (no app chrome).
+  // Public: marketing, docs and authentication.
   { path: "/", element: <Landing /> },
   { path: "/docs", element: <Docs /> },
-  // The app shell wraps every existing feature route (paths unchanged); the
-  // dashboard now lives at /dashboard.
+  { path: "/signin", element: <SignIn /> },
+
+  // Console. Every route below requires a session — the APIs behind them are
+  // tenant-scoped, so an anonymous visitor has nothing legitimate to render.
+  // Paths are unchanged so existing links keep working.
   {
-    element: <App />,
+    element: <RequireAuth />,
     children: [
-      { path: "dashboard", element: <Dashboard /> },
-      { path: "workflows/:id", element: <WorkflowDetailPage /> },
-      { path: "chaos", element: <ChaosPanel /> },
-      { path: "replay", element: <ReplayVerify /> },
-      { path: "router", element: <ModelRouter /> },
-      { path: "ai-chaos", element: <AiChaosLab /> },
-      { path: "memory", element: <Memory /> },
-      { path: "gateway", element: <GatewayDashboard /> },
-      { path: "portal", element: <DeveloperPortal /> },
-      { path: "billing", element: <Billing /> },
-      { path: "settings", element: <Settings /> },
-      { path: "autopilot", element: <Autopilot /> },
-      { path: "godmode", element: <GodMode /> },
-      { path: "dag", element: <DagCommandCenter /> },
-      { path: "dag/:workflowId", element: <DagCommandCenter /> },
-      { path: "mmu", element: <MmuProfiler /> },
+      {
+        element: <App />,
+        children: [
+          { path: "dashboard", element: <Dashboard /> },
+          { path: "workflows/:id", element: <WorkflowDetailPage /> },
+          { path: "chaos", element: <ChaosPanel /> },
+          { path: "replay", element: <ReplayVerify /> },
+          { path: "router", element: <ModelRouter /> },
+          { path: "ai-chaos", element: <AiChaosLab /> },
+          { path: "memory", element: <Memory /> },
+          { path: "gateway", element: <GatewayDashboard /> },
+          { path: "portal", element: <DeveloperPortal /> },
+          { path: "billing", element: <Billing /> },
+          { path: "settings", element: <Settings /> },
+          { path: "autopilot", element: <Autopilot /> },
+          { path: "godmode", element: <GodMode /> },
+          { path: "dag", element: <DagCommandCenter /> },
+          { path: "dag/:workflowId", element: <DagCommandCenter /> },
+          { path: "mmu", element: <MmuProfiler /> },
+        ],
+      },
     ],
   },
 ]);

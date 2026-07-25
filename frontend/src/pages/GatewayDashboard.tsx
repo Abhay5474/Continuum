@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 
 export default function GatewayDashboard() {
@@ -10,12 +11,10 @@ export default function GatewayDashboard() {
   const [verifyOut, setVerifyOut] = useState<any | null>(null);
   const [verifying, setVerifying] = useState(false);
 
-  // onboarding + playground state
-  const [devName, setDevName] = useState("MyAIApp");
+  // playground state — the key is supplied by the developer, not minted here
   const [apiKey, setApiKey] = useState("");
   const [prompt, setPrompt] = useState("Provide first aid for a dog leg injury");
   const [chatOut, setChatOut] = useState<any | null>(null);
-  const [msg, setMsg] = useState("");
 
   const refresh = () => {
     api.get<any>("/api/gateway/stats").then(setStats).catch(() => {});
@@ -40,17 +39,6 @@ export default function GatewayDashboard() {
     const t = setInterval(refresh, 3000);
     return () => clearInterval(t);
   }, []);
-
-  const onboard = async () => {
-    try {
-      const dev: any = await api.post("/api/admin/developers", { name: devName, email: "" });
-      const key: any = await api.post(`/api/admin/developers/${dev.id}/keys`);
-      setApiKey(key.apiKey);
-      setMsg(`Created ${dev.id}. API key issued (shown once).`);
-    } catch (e: any) {
-      setMsg("Onboarding failed: " + (e.message ?? e));
-    }
-  };
 
   const sendChat = async () => {
     setChatOut(null);
@@ -91,24 +79,22 @@ export default function GatewayDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border border-edge bg-panel p-4">
-          <div className="font-medium">Quick start</div>
-          <div className="mt-2 flex gap-2">
-            <input value={devName} onChange={(e) => setDevName(e.target.value)}
-              className="flex-1 rounded-md border border-edge bg-ink px-3 py-1.5 text-sm" />
-            <button onClick={onboard} className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white">
-              Create developer + key
-            </button>
-          </div>
-          {apiKey && (
-            <div className="mt-2 break-all rounded bg-ink p-2 font-mono text-xs text-emerald-300">{apiKey}</div>
-          )}
-          {msg && <div className="mt-1 text-xs text-slate-400">{msg}</div>}
-
-          <div className="mt-4 font-medium">Try the gateway</div>
+          <div className="font-medium">Try the gateway</div>
+          <p className="mt-1 text-xs text-slate-400">
+            Paste one of your API keys to send a request through the gateway.{" "}
+            <Link to="/portal" className="text-neon hover:underline">Create a key →</Link>
+          </p>
+          <input
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            type="password"
+            placeholder="cnt_live_…"
+            className="mt-2 w-full rounded-md border border-edge bg-ink px-3 py-1.5 font-mono text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-aurora/60"
+          />
           <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)}
-            className="mt-2 h-16 w-full rounded-md border border-edge bg-ink p-2 text-sm" />
+            className="mt-2 h-16 w-full rounded-md border border-edge bg-ink p-2 text-sm text-slate-100 outline-none focus:border-aurora/60" />
           <button onClick={sendChat} disabled={!apiKey}
-            className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white disabled:opacity-50">
+            className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-500 disabled:opacity-50">
             POST /api/gateway/chat
           </button>
           {chatOut && (

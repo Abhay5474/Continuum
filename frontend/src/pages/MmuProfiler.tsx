@@ -1,29 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, portal } from "../api";
+import { api } from "../api";
 
 /**
- * V7 — Context Memory Profiler: mission-control instrumentation for the
- * Paging MMU. Renders telemetry, the L1/L2/L3 hierarchy with migrating
- * blocks, and the request timeline with page-fault interrupts.
+ * Context Optimizer: instrumentation for the paging context MMU. Renders
+ * telemetry, the L1/L2/L3 hierarchy with migrating blocks, and the request
+ * timeline with page-fault interrupts.
+ *
+ * The server scopes these responses to the signed-in developer, so no tenant id
+ * is passed from the client.
  */
 export default function MmuProfiler() {
   const [profile, setProfile] = useState<any | null>(null);
   const [stubs, setStubs] = useState<any[]>([]);
-  const [me, setMe] = useState<any | null>(null);
 
   useEffect(() => {
-    portal.me().then(setMe).catch(() => {});
-  }, []);
-  useEffect(() => {
     const load = () => {
-      api.get<any>(`/api/mmu/profile${me?.id ? `?developerId=${me.id}` : ""}`)
-        .then(setProfile).catch(() => {});
-      if (me?.id) api.get<any[]>(`/api/mmu/stubs?developerId=${me.id}`).then(setStubs).catch(() => {});
+      api.get<any>("/api/mmu/profile").then(setProfile).catch(() => {});
+      api.get<any[]>("/api/mmu/stubs").then(setStubs).catch(() => {});
     };
     load();
     const t = setInterval(load, 4000);
     return () => clearInterval(t);
-  }, [me]);
+  }, []);
 
   const p = profile ?? {};
   const recent: any[] = p.recent ?? [];
@@ -32,7 +30,7 @@ export default function MmuProfiler() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-semibold text-gradient">V7 — Context Memory Profiler</h1>
+        <h1 className="text-lg font-semibold text-gradient">Context Optimizer</h1>
         <p className="text-sm text-slate-400">
           The Paging MMU in real time: L1 active window, L2 semantic stubs, L3 immutable event
           streams. Enable it per developer in the Developer Portal; every virtualized request lands
@@ -67,7 +65,7 @@ export default function MmuProfiler() {
               Request timeline
             </div>
             <div className="text-[10px] text-slate-500">
-              ⚡ = page fault · ↑ = prefetch · ✎ = dirty flush
+              ▲ = page fault · ↑ = prefetch · ✎ = dirty flush
             </div>
           </div>
           <div className="mt-3 max-h-72 space-y-1.5 overflow-y-auto pr-1">
@@ -94,7 +92,7 @@ export default function MmuProfiler() {
                   {r.pageFaults > 0 && (
                     <span className="ml-auto flex items-center gap-1 rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300 animate-pulse"
                       title="page fault: generation suspended, page materialized from L3, resumed">
-                      ⚡ {r.pageFaults} fault · {r.faultLatencyMs}ms
+                      ▲ {r.pageFaults} fault · {r.faultLatencyMs}ms
                     </span>
                   )}
                   {r.pageFaults === 0 && (
@@ -105,7 +103,7 @@ export default function MmuProfiler() {
             })}
             {recent.length === 0 && (
               <div className="rounded-md border border-dashed border-edge px-3 py-6 text-center text-xs text-slate-500">
-                No virtualized requests yet. Enable V7 in the Developer Portal, then send a long
+                No virtualized requests yet. Enable the Context Optimizer in the Developer Portal, then send a long
                 conversation through the gateway.
               </div>
             )}
@@ -183,7 +181,7 @@ function HierarchyVisualizer({ profile, stubs }: { profile: any; stubs: any[] })
       <Tier name="L3" desc="Postgres event streams (disk)" blocks={l3Blocks} color="text-slate-400" delay={0.4} />
       <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500">
         <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">↑ prefetch: {profile?.prefetches ?? 0}</span>
-        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">⚡ faults: {profile?.pageFaults ?? 0}</span>
+        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">▲ faults: {profile?.pageFaults ?? 0}</span>
         <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-indigo-300">✎ dirty flushes: {profile?.dirtyFlushes ?? 0}</span>
       </div>
     </div>

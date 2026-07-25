@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { portal } from "../api";
 
 /**
- * V5 — "Agentic Autopilot" (God Mode): the autonomous memory & policy engine.
+ * Adaptive Policy: the autonomous memory & policy engine.
  * Opt-in, reversible, OFF by default. Visualizes the invisible: memory tiers,
  * context weight, MemAct decisions and the counterfactual multiverse simulator.
  */
@@ -79,8 +79,8 @@ export default function GodMode() {
   if (!loggedIn) {
     return (
       <div className="glass mx-auto mt-16 max-w-lg p-8 text-center animate-fade-up">
-        <div className="text-3xl">⚡</div>
-        <h1 className="mt-2 text-xl font-semibold text-gradient">Agentic Autopilot — God Mode</h1>
+        
+        <h1 className="mt-2 text-xl font-semibold text-gradient">Adaptive Policy</h1>
         <p className="mt-2 text-sm text-slate-400">
           The autonomous memory &amp; policy engine is scoped to your developer account.
           Sign in through the Developer Portal to continue.
@@ -95,12 +95,12 @@ export default function GodMode() {
 
   return (
     <div className="space-y-6">
-      {/* ---- hero: the God Mode toggle ---- */}
+      {/* ---- hero: the Adaptive Policy toggle ---- */}
       <div className={`glass relative overflow-hidden p-6 animate-fade-up ${enabled ? "animate-glow-pulse" : ""}`}>
         <div className="flex flex-wrap items-center gap-6">
           <div className="min-w-[260px] flex-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-gradient">God Mode</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-gradient">Adaptive Policy</h1>
               {enabled && (
                 <span className="rounded-full bg-aurora/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-300">
                   AUTONOMOUS
@@ -115,7 +115,7 @@ export default function GodMode() {
             </p>
           </div>
           {/* the powerful toggle */}
-          <button onClick={toggle} aria-label="Toggle God Mode"
+          <button onClick={toggle} aria-label="Toggle Adaptive Policy"
             className={`relative h-16 w-32 shrink-0 rounded-full border transition-all duration-500 ${
               enabled
                 ? "border-transparent bg-gradient-to-r from-aurora to-neon shadow-glow"
@@ -143,7 +143,7 @@ export default function GodMode() {
           <div className="text-sm font-medium">What happens when you switch it on?</div>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             {[
-              ["🧠", "It remembers", "Gateway exchanges flow into a 4-tier memory: working context is summarized into episodes, distilled into an experience graph, and archived — bounded by TTLs and quotas you control."],
+              ["\u25C6", "It remembers", "Gateway exchanges flow into a 4-tier memory: working context is summarized into episodes, distilled into an experience graph, and archived — bounded by TTLs and quotas you control."],
               ["🌌", "It simulates", "Before any policy change reaches production, a digital twin replays it against your real historical traffic and vetoes confident regressions — the same Bayesian rules as a live canary."],
               ["🛡️", "It stays safe", "Every autonomous action is audited. Nothing is shared across tenants. One click turns it off and restores the exact pre-God-Mode path."],
             ].map(([icon, title, text], i) => (
@@ -171,7 +171,7 @@ export default function GodMode() {
             ) : (
               <button onClick={toggle}
                 className="ml-auto rounded-lg bg-gradient-to-r from-aurora to-neon px-5 py-1.5 text-sm font-semibold text-ink shadow-glow">
-                Engage God Mode ⚡
+                Enable Adaptive Policy
               </button>
             )}
           </div>
@@ -214,7 +214,7 @@ export default function GodMode() {
                 </button>
               </div>
               <div className="mt-4 flex items-stretch gap-2">
-                <Tier icon="⚡" name="Working" value={status?.memory?.working?.items ?? 0}
+                <Tier icon="\u25CF" name="Working" value={status?.memory?.working?.items ?? 0}
                   sub={`${status?.memory?.working?.tokens ?? 0} tok`} hue="text-neon" />
                 <FlowArrow label="summarize" />
                 <Tier icon="📼" name="Episodic" value={status?.memory?.episodic?.items ?? 0} sub="summaries" hue="text-indigo-300" />
@@ -261,7 +261,7 @@ export default function GodMode() {
                 <div className="text-sm font-medium">Counterfactual Multiverse — Digital Twin</div>
                 <div className="text-xs text-slate-500">
                   Replays candidate policies against your real historical traffic. Verdicts use the exact
-                  V4 Bayesian canary rules — offline, before live traffic.
+                  Bayesian canary rules — offline, before live traffic.
                 </div>
               </div>
               <div className="ml-auto flex gap-2">

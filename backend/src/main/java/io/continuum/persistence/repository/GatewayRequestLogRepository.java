@@ -59,6 +59,11 @@ public interface GatewayRequestLogRepository extends JpaRepository<GatewayReques
 
     long countByDeveloperIdAndCreatedAtGreaterThanEqual(String dev, java.time.Instant since);
 
+    @Query("select g.chosenProvider as provider, count(g) as requests, coalesce(sum(g.costUsd),0) as cost " +
+           "from GatewayRequestLogEntity g where g.success = true and g.developerId = :dev " +
+           "group by g.chosenProvider")
+    List<ProviderUsage> usageByProviderForDeveloper(String dev);
+
     /** Per-provider outcomes for a developer — the arm statistics for the bandit. */
     @Query("select g.chosenProvider as provider, " +
            "sum(case when g.success = true then 1 else 0 end) as successes, " +

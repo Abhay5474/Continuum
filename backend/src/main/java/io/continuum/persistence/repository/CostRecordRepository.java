@@ -26,6 +26,24 @@ public interface CostRecordRepository extends JpaRepository<CostRecordEntity, Lo
            "FROM CostRecordEntity c GROUP BY c.provider")
     List<ProviderCostView> costByProvider();
 
+    // --- tenant-scoped (console): cost rows join to their workflow's owner ---
+
+    @Query("SELECT COALESCE(SUM(c.estimatedCostUsd), 0) FROM CostRecordEntity c WHERE c.workflowId IN " +
+           "(SELECT w.workflowId FROM WorkflowInstanceEntity w WHERE w.developerId = :dev)")
+    double totalCostForDeveloper(@Param("dev") String dev);
+
+    @Query("SELECT COALESCE(SUM(c.promptTokens + c.completionTokens), 0) FROM CostRecordEntity c WHERE c.workflowId IN " +
+           "(SELECT w.workflowId FROM WorkflowInstanceEntity w WHERE w.developerId = :dev)")
+    long totalTokensForDeveloper(@Param("dev") String dev);
+
+    @Query("SELECT c.provider AS provider, " +
+           "COALESCE(SUM(c.promptTokens + c.completionTokens),0) AS tokens, " +
+           "COALESCE(SUM(c.estimatedCostUsd),0) AS cost, COUNT(c) AS calls " +
+           "FROM CostRecordEntity c WHERE c.workflowId IN " +
+           "(SELECT w.workflowId FROM WorkflowInstanceEntity w WHERE w.developerId = :dev) " +
+           "GROUP BY c.provider")
+    List<ProviderCostView> costByProviderForDeveloper(@Param("dev") String dev);
+
     interface ProviderCostView {
         String getProvider();
         long getTokens();

@@ -33,7 +33,7 @@ export default function Landing() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3 animate-fade-up">
             <Link
-              to="/portal"
+              to="/signin"
               className="rounded-xl bg-gradient-to-r from-aurora to-neon px-6 py-3 text-sm font-semibold text-ink shadow-glow transition-transform hover:-translate-y-0.5"
             >
               Get your API key →
@@ -71,14 +71,14 @@ export default function Landing() {
       <section className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ["🛡️", "Never loses work", "Crash mid-task and it resumes exactly where it left off — no repeated work, no lost progress."],
-            ["✅", "Exactly-once", "Emails and charges fire once, even through retries and crashes. No double receipts."],
-            ["🔀", "Auto failover", "A provider goes down and Continuum switches instantly. Your users never notice."],
-            ["💸", "Big cost savings", "Right-sized routing, prompt compression and context paging cut token spend dramatically."],
+            ["shield", "Never loses work", "Crash mid-task and it resumes exactly where it left off — no repeated work, no lost progress."],
+            ["check", "Exactly-once", "Emails and charges fire once, even through retries and crashes. No double receipts."],
+            ["switch", "Auto failover", "A provider goes down and Continuum switches instantly. Your users never notice."],
+            ["savings", "Big cost savings", "Right-sized routing, prompt compression and context paging cut token spend dramatically."],
           ].map(([icon, title, body], i) => (
             <Reveal key={title} delay={i * 80}>
               <div className="glass h-full p-5 transition-all hover:-translate-y-1 hover:shadow-glow">
-                <div className="text-2xl">{icon}</div>
+                <Icon name={icon} />
                 <div className="mt-3 text-sm font-semibold">{title}</div>
                 <div className="mt-1 text-xs leading-relaxed text-slate-400">{body}</div>
               </div>
@@ -192,7 +192,7 @@ function LandingHeader() {
           </Link>
           <ThemeToggle />
           <Link
-            to="/portal"
+            to="/signin"
             className="rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-1.5 text-sm font-semibold text-ink shadow-glow-sm transition-transform hover:-translate-y-0.5"
           >
             Sign in
@@ -200,5 +200,46 @@ function LandingHeader() {
         </nav>
       </div>
     </header>
+  );
+}
+
+/**
+ * Small line icons for the value props. Inline SVG rather than emoji: emoji
+ * render differently per platform and read as informal on a product page.
+ */
+function Icon({ name }: { name: string }) {
+  const paths: Record<string, JSX.Element> = {
+    shield: <path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3z" />,
+    check: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8.5 12.5l2.5 2.5 4.5-5" />
+      </>
+    ),
+    switch: (
+      <>
+        <path d="M4 8h10l-2.5-2.5M20 16H10l2.5 2.5" />
+      </>
+    ),
+    savings: (
+      <>
+        <path d="M4 17l5-5 3.5 3.5L20 8" />
+        <path d="M15 8h5v5" />
+      </>
+    ),
+  };
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-6 w-6 text-neon"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {paths[name]}
+    </svg>
   );
 }

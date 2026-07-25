@@ -66,6 +66,15 @@ public class WorkflowEngine {
     /** Create a new workflow execution and enqueue its first decision. */
     @Transactional
     public String startWorkflow(String workflowType, String inputJson, String requestedId) {
+        return startWorkflow(workflowType, inputJson, requestedId, null);
+    }
+
+    /**
+     * Starts a workflow owned by {@code developerId}. The owner scopes the console
+     * so a tenant only sees their own executions; {@code null} means a system
+     * workflow with no tenant (operator-visible only).
+     */
+    public String startWorkflow(String workflowType, String inputJson, String requestedId, String developerId) {
         if (!registry.contains(workflowType)) {
             throw new IllegalArgumentException("Unknown workflow type: " + workflowType);
         }
@@ -78,6 +87,7 @@ public class WorkflowEngine {
         }
 
         WorkflowInstanceEntity instance = new WorkflowInstanceEntity(workflowId, workflowType, inputJson);
+        instance.setDeveloperId(developerId);
         instances.save(instance);
         eventStore.appendLocked(instance, EventType.WORKFLOW_STARTED,
                 new Payloads.WorkflowStarted(workflowType, inputJson));

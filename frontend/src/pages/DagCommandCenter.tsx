@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 
 /**
- * V6 — Execution Command Center: the mission-control trace view for
+ * ​Execution Command Center: the mission-control trace view for
  * ConsensusDag workflow runs ONLY. Center canvas = the live probabilistic
  * decision graph; left = Causal Inspector; right = Risk + Confidence engine;
  * top = run strip with the time-travel scrubber and "Collapse to Truth".
@@ -26,7 +26,7 @@ function RunList() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-semibold text-gradient">V6 — Execution Command Center</h1>
+        <h1 className="text-lg font-semibold text-gradient">​Execution Command Center</h1>
         <p className="text-sm text-slate-400">
           Every request verified by the Consensus DAG Engine leaves a full forensic trace: solver and
           verifier nodes, the contradiction graph, and the Bayesian resolution. Select a run to open
@@ -51,7 +51,7 @@ function RunList() {
         ))}
         {runs.length === 0 && (
           <div className="px-4 py-8 text-center text-xs text-slate-500">
-            No V6 runs yet. Enable the V6 Verification Engine in the Developer Portal, then send a
+            No verification runs yet. Enable the Verification Engine in the Developer Portal, then send a
             gateway request — its verification trace will appear here.
           </div>
         )}
@@ -64,9 +64,9 @@ function RunList() {
 
 const TYPE_STYLE: Record<string, { fill: string; ring: string; icon: string }> = {
   PLANNER: { fill: "#1e293b", ring: "#94a3b8", icon: "◈" },
-  SOLVER: { fill: "#172554", ring: "#3b82f6", icon: "🧠" },
+  SOLVER: { fill: "#172554", ring: "#3b82f6", icon: "S" },
   VERIFIER: { fill: "#1c1917", ring: "#eab308", icon: "⚖" },
-  CONFLICT: { fill: "#450a0a", ring: "#ef4444", icon: "⚡" },
+  CONFLICT: { fill: "#450a0a", ring: "#ef4444", icon: "!" },
   AGGREGATOR: { fill: "#2e1065", ring: "#a855f7", icon: "Σ" },
   SYNTHESIS: { fill: "#022c22", ring: "#34d399", icon: "✍" },
 };
@@ -177,7 +177,7 @@ function TraceView({ workflowId }: { workflowId: string }) {
             collapsed
               ? "bg-gradient-to-r from-aurora to-neon text-ink shadow-glow"
               : "border border-aurora/50 text-indigo-300 hover:shadow-glow-sm"}`}>
-          {collapsed ? "⟲ Expand multiverse" : "🔥 Collapse to Truth"}
+          {collapsed ? "Expand branches" : "Collapse to result"}
         </button>
       </div>
 

@@ -19,10 +19,14 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Protects admin/onboarding endpoints with a static {@code CONTINUUM_ADMIN_TOKEN}
- * presented via {@code X-Admin-Token}. If the token is unset (local dev), access
- * is allowed with a warning so onboarding is frictionless; in any real deployment
- * the token must be configured.
+ * Protects admin endpoints with a static {@code CONTINUUM_ADMIN_TOKEN} presented
+ * via {@code X-Admin-Token}, or an {@code OPERATOR} session.
+ *
+ * <p>This filter used to fail <em>open</em>: an unset token meant every admin
+ * endpoint was anonymous, so anyone could list all accounts, mint developers and
+ * issue API keys. It now fails <em>closed</em> — with no token configured the admin
+ * surface is simply unavailable. Nothing legitimate is lost: developers onboard
+ * through {@code /api/portal/developer/signup}, which is the supported public path.
  */
 public class AdminTokenFilter extends OncePerRequestFilter {
 
@@ -60,19 +64,23 @@ public class AdminTokenFilter extends OncePerRequestFilter {
             return;
         }
         if (adminToken.isBlank()) {
-            log.warn("CONTINUUM_ADMIN_TOKEN not set — admin endpoint {} is unprotected (dev mode)", request.getRequestURI());
-            chain.doFilter(request, response);
+            // Fail closed. An unconfigured admin token must never mean "anyone".
+            log.warn("CONTINUUM_ADMIN_TOKEN not set — admin endpoint {} refused", request.getRequestURI());
+            deny(response, "Admin access is not configured on this deployment.");
             return;
         }
         String presented = request.getHeader("X-Admin-Token");
         if (presented == null || !constantTimeEquals(presented, adminToken)) {
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            mapper.writeValue(response.getWriter(),
-                    Map.of("error", "unauthorized", "message", "Valid X-Admin-Token required."));
+            deny(response, "Valid X-Admin-Token required.");
             return;
         }
         chain.doFilter(request, response);
+    }
+
+    private void deny(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        mapper.writeValue(response.getWriter(), Map.of("error", "unauthorized", "message", message));
     }
 
     private boolean constantTimeEquals(String a, String b) {

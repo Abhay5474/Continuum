@@ -37,16 +37,40 @@ body {
   background-attachment: fixed;
 }
 
-/* In light mode, remap the slate text scale the components use so dark-on-dark
-   greys become readable dark-on-light. Aurora/neon accents stay vibrant. */
+/* In light mode, remap the light text scale the components use so dark-on-dark
+   greys become readable dark-on-light. Accents stay vibrant.
+
+   These utilities are written for a dark surface throughout the app; without the
+   remap the lightest ones (white, slate-100/200) render white-on-white and the
+   text simply disappears. */
 :root[data-theme="light"] body {
   @apply text-slate-800;
 }
+:root[data-theme="light"] .text-white { color: rgb(15 23 42); }
+:root[data-theme="light"] .text-slate-100 { color: rgb(15 23 42); }
 :root[data-theme="light"] .text-slate-200 { color: rgb(15 23 42); }
 :root[data-theme="light"] .text-slate-300 { color: rgb(30 41 59); }
 :root[data-theme="light"] .text-slate-400 { color: rgb(51 65 85); }
 :root[data-theme="light"] .text-slate-500 { color: rgb(71 85 105); }
 :root[data-theme="light"] .text-slate-600 { color: rgb(100 116 139); }
+/* Hover states that brighten toward white must darken instead. */
+:root[data-theme="light"] .hover\:text-white:hover { color: rgb(2 6 23); }
+:root[data-theme="light"] .hover\:text-slate-100:hover { color: rgb(2 6 23); }
+:root[data-theme="light"] .hover\:text-slate-200:hover { color: rgb(15 23 42); }
+
+/* Text on a filled accent button stays white — it sits on indigo, not on paper.
+   Restated after the remaps above so specificity lands the right way round. */
+:root[data-theme="light"] [class*="bg-indigo-"] .text-white,
+:root[data-theme="light"] [class*="bg-rose-"] .text-white,
+:root[data-theme="light"] button[class*="bg-indigo-"],
+:root[data-theme="light"] button[class*="bg-rose-"],
+:root[data-theme="light"] button[class*="bg-emerald-"],
+:root[data-theme="light"] a[class*="bg-indigo-"] {
+  color: rgb(255 255 255);
+}
+
+/* Placeholders need a mid grey in both themes. */
+:root[data-theme="light"] ::placeholder { color: rgb(100 116 139); }
 
 /* Slim, dark scrollbars everywhere. */
 * {
@@ -76,6 +100,10 @@ body {
   .text-gradient {
     @apply bg-clip-text text-transparent;
     background-image: linear-gradient(90deg, #a5b4fc, #60a5fa);
+  }
+  /* The light-mode tints would be near-invisible on paper; deepen them. */
+  :root[data-theme="light"] .text-gradient {
+    background-image: linear-gradient(90deg, #4f46e5, #2563eb);
   }
 
   /* Animated shimmer strip (flow arrows, loading accents). */

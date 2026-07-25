@@ -1,6 +1,7 @@
 package io.continuum.developer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.continuum.portal.ConsoleAuthFilter;
 import io.continuum.portal.PortalAuthFilter;
 import io.continuum.portal.PortalSessionService;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,9 +23,35 @@ public class GatewaySecurityConfig {
             DeveloperService developerService, ObjectMapper mapper) {
         FilterRegistrationBean<ApiKeyAuthenticationFilter> reg = new FilterRegistrationBean<>();
         reg.setFilter(new ApiKeyAuthenticationFilter(developerService, mapper));
-        // Only the developer chat endpoints require API-key auth; operator
-        // endpoints (/api/gateway/stats, /requests, /health) stay open for the dashboard.
+        // The developer chat endpoints authenticate with an API key; the console
+        // read APIs authenticate with a session (see consoleAuthFilter below).
         reg.addUrlPatterns("/api/gateway/chat", "/v1/chat/completions");
+        reg.setOrder(1);
+        return reg;
+    }
+
+    /**
+     * Console/data APIs. These were previously anonymous, which exposed every
+     * tenant's traces, stats and memory to any visitor. They now require a signed-in
+     * developer (or the engine operator) and are tenant-scoped in the controllers.
+     *
+     * <p>Deliberately NOT covered: {@code /api/meta} and {@code /api/health}, which
+     * carry only build/liveness info and are used by the public landing page.
+     */
+    @Bean
+    public FilterRegistrationBean<ConsoleAuthFilter> consoleAuthFilter(
+            PortalSessionService sessions, ObjectMapper mapper) {
+        FilterRegistrationBean<ConsoleAuthFilter> reg = new FilterRegistrationBean<>();
+        reg.setFilter(new ConsoleAuthFilter(sessions, mapper));
+        reg.addUrlPatterns(
+                "/api/workflows/*", "/api/workflows",
+                "/api/stats", "/api/costs",
+                "/api/gateway/stats", "/api/gateway/requests", "/api/gateway/health",
+                "/api/gateway/healing/*",
+                "/api/dag/*", "/api/mmu/*", "/api/memory/*",
+                "/api/replay/*", "/api/routing/*", "/api/hedging/*",
+                "/api/chaos/*", "/api/chaos", "/api/ai-chaos/*", "/api/ai-chaos",
+                "/api/models/*", "/api/models");
         reg.setOrder(1);
         return reg;
     }

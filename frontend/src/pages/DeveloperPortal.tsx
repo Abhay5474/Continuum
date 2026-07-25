@@ -28,7 +28,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
     try {
       if (mode === "signup") await portal.signup(name, email, password);
       else await portal.login(email, password);
-      toast(mode === "signup" ? "Account created 🎉" : "Welcome back", "success");
+      toast(mode === "signup" ? "Account created" : "Welcome back", "success");
       onAuthed();
     } catch (e: any) {
       setErr(e.message ?? String(e));
@@ -176,7 +176,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       setPlayOut(r);
       if (!madeFirstCall) {
         setMadeFirstCall(true);
-        toast("You made your first call! 🎉", "success");
+        toast("You made your first call", "success");
       }
     } catch (e: any) {
       setPlayOut({ error: e.message });
@@ -188,7 +188,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
   const configured = new Set(creds.map((c) => c.provider));
 
-  // --- V7 Context MMU (opt-in, OFF by default) ---
+  // --- Context Optimizer (opt-in, OFF by default) ---
   const [v7Enabled, setV7Enabled] = useState<boolean | null>(null);
   useEffect(() => {
     portal.v7.status().then((s) => setV7Enabled(!!s.enabled)).catch(() => setV7Enabled(false));
@@ -202,7 +202,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  // --- V6 Consensus DAG Engine (opt-in, OFF by default) ---
+  // --- Consensus Verification (opt-in, OFF by default) ---
   const [v6Enabled, setV6Enabled] = useState<boolean | null>(null);
   const [v6Guide, setV6Guide] = useState(false);
   useEffect(() => {
@@ -219,15 +219,10 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-lg font-semibold">Developer Portal</h1>
+      {/* Billing / Settings / Sign out live in the account menu in the header. */}
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h1 className="text-lg font-semibold">API Keys &amp; Providers</h1>
         {me && <span className="text-sm text-slate-400">{me.email} · <span className="font-mono">{me.id}</span></span>}
-        <div className="ml-auto flex items-center gap-2">
-          <Link to="/billing" className="rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 transition-colors hover:border-neon/50 hover:text-neon">Billing</Link>
-          <Link to="/settings" className="rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 transition-colors hover:border-neon/50 hover:text-neon">Settings</Link>
-          <button onClick={() => { portal.logout(); onLogout(); }}
-            className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge">Sign out</button>
-        </div>
       </div>
 
       {/* onboarding — the magic moment: get a key → copy a snippet → first call */}
@@ -265,7 +260,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
               </div>
             </OnboardStep>
             <OnboardStep n={3} title="Or try it right here" done={madeFirstCall}>
-              <span>Use the sandbox below — no code needed. {madeFirstCall && <span className="text-emerald-300">First call made 🎉</span>}</span>
+              <span>Use the sandbox below — no code needed. {madeFirstCall && <span className="text-emerald-300">First call made</span>}</span>
             </OnboardStep>
           </div>
         </div>
@@ -339,12 +334,12 @@ function Portal({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* V6 Consensus DAG Engine (opt-in, off by default) */}
+      {/* Consensus Verification (opt-in, off by default) */}
       <div className={`rounded-lg border bg-panel p-4 transition-all ${v6Enabled ? "border-neon/50 shadow-glow-cyan" : "border-edge"}`}>
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <div className="font-medium">
-              V6 Verification Engine <span className="text-xs text-slate-500">(Consensus DAG)</span>
+              Verification Engine <span className="text-xs text-slate-500">(Consensus DAG)</span>
               {v6Enabled && <span className="ml-2 rounded bg-neon/15 px-2 py-0.5 text-[10px] font-bold text-neon">ACTIVE</span>}
             </div>
             <p className="text-xs text-slate-400">
@@ -363,7 +358,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
                 v6Enabled
                   ? "bg-neon/20 text-neon ring-1 ring-neon/50"
                   : "bg-indigo-600 text-white hover:bg-indigo-500"}`}>
-              {v6Enabled === null ? "…" : v6Enabled ? "Enabled — click to disable" : "Enable V6 Verification Engine"}
+              {v6Enabled === null ? "…" : v6Enabled ? "Enabled — click to disable" : "Enable Verification Engine"}
             </button>
           </div>
         </div>
@@ -396,12 +391,12 @@ function Portal({ onLogout }: { onLogout: () => void }) {
         )}
       </div>
 
-      {/* V7 Context MMU (opt-in, off by default) */}
+      {/* Context Optimizer (opt-in, off by default) */}
       <div className={`rounded-lg border bg-panel p-4 transition-all ${v7Enabled ? "border-aurora/50 shadow-glow" : "border-edge"}`}>
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <div className="font-medium">
-              V7 Context Virtualization <span className="text-xs text-slate-500">(Paging MMU)</span>
+              Context Optimizer Virtualization <span className="text-xs text-slate-500">(Paging MMU)</span>
               {v7Enabled && <span className="ml-2 rounded bg-aurora/15 px-2 py-0.5 text-[10px] font-bold text-indigo-300">ACTIVE</span>}
             </div>
             <p className="text-xs text-slate-400">
@@ -416,7 +411,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
               v7Enabled
                 ? "bg-aurora/20 text-indigo-300 ring-1 ring-aurora/50"
                 : "bg-indigo-600 text-white hover:bg-indigo-500"}`}>
-            {v7Enabled === null ? "…" : v7Enabled ? "Enabled — click to disable" : "Enable V7 Context Virtualization"}
+            {v7Enabled === null ? "…" : v7Enabled ? "Enabled — click to disable" : "Enable Context Optimizer Virtualization"}
           </button>
         </div>
       </div>

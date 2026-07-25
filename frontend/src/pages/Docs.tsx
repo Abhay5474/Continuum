@@ -75,7 +75,7 @@ export default function Docs() {
               </div>
             </Step>
 
-            <Step n={3} title="You made your first call 🎉">
+            <Step n={3} title="You made your first call">
               You'll get back a standard chat response. Behind the scenes Continuum scored the task,
               picked a model, and would have failed over automatically if a provider was down — with
               zero changes on your side.

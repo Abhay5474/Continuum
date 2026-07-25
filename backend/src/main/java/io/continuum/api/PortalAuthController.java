@@ -41,19 +41,27 @@ public class PortalAuthController {
         return portal.login(req.email(), req.password());
     }
 
-    /** Operator login: present the platform admin token, receive an OPERATOR session. */
+    /**
+     * Operator login: present the platform admin token, receive an OPERATOR session.
+     *
+     * <p>Fails closed when no admin token is configured. Previously a blank token
+     * meant anyone could mint an OPERATOR session, and an operator session reads
+     * across every tenant — so "dev mode" silently made the whole console public.
+     */
     @PostMapping("/operator/login")
     public ResponseEntity<?> operatorLogin(@RequestBody OperatorLogin req) {
-        boolean ok = adminToken.isBlank() // dev mode: open
-                || (req.token() != null && constantTimeEquals(req.token(), adminToken));
-        if (!ok) {
+        if (adminToken.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "error", "operator_not_configured",
+                    "message", "Operator access requires CONTINUUM_ADMIN_TOKEN to be set."));
+        }
+        if (req.token() == null || !constantTimeEquals(req.token(), adminToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "unauthorized", "message", "Invalid operator token"));
         }
         return ResponseEntity.ok(Map.of(
                 "role", "OPERATOR",
-                "sessionToken", sessions.issue("operator", PortalSessionService.Role.OPERATOR),
-                "devMode", adminToken.isBlank()));
+                "sessionToken", sessions.issue("operator", PortalSessionService.Role.OPERATOR)));
     }
 
     private boolean constantTimeEquals(String a, String b) {

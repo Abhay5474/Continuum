@@ -25,7 +25,12 @@ public interface WorkflowInstanceRepository extends JpaRepository<WorkflowInstan
 
     Page<WorkflowInstanceEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
+    /** Tenant-scoped listing for the console. */
+    Page<WorkflowInstanceEntity> findByDeveloperIdOrderByCreatedAtDesc(String developerId, Pageable pageable);
+
     Page<WorkflowInstanceEntity> findByStatusOrderByCreatedAtDesc(WorkflowStatus status, Pageable pageable);
 
     long countByStatus(WorkflowStatus status);
+
+    long countByDeveloperIdAndStatus(String developerId, WorkflowStatus status);
 }

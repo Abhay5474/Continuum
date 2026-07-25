@@ -39,6 +39,21 @@ public class WorkflowQueryService {
                 .map(this::toSummary).getContent();
     }
 
+    /** Only the workflows owned by {@code developerId} — what the console shows a tenant. */
+    @Transactional(readOnly = true)
+    public List<WorkflowSummary> listForDeveloper(String developerId, int limit) {
+        return instances.findByDeveloperIdOrderByCreatedAtDesc(developerId, PageRequest.of(0, limit))
+                .map(this::toSummary).getContent();
+    }
+
+    /** The owning developer of a workflow, for authorization checks. */
+    @Transactional(readOnly = true)
+    public String ownerOf(String workflowId) {
+        return instances.findById(workflowId)
+                .orElseThrow(() -> new IllegalArgumentException("No such workflow: " + workflowId))
+                .getDeveloperId();
+    }
+
     @Transactional(readOnly = true)
     public WorkflowDetail detail(String workflowId) {
         WorkflowInstanceEntity instance = instances.findById(workflowId)
@@ -73,6 +88,16 @@ public class WorkflowQueryService {
                 .map(v -> new CostByProvider(v.getProvider(), v.getTokens(), v.getCost(), v.getCalls()))
                 .toList();
         return new CostReport(costs.totalCost(), costs.totalTokens(), byProvider);
+    }
+
+    /** Cost report limited to the workflows the given developer owns. */
+    @Transactional(readOnly = true)
+    public CostReport costReportForDeveloper(String developerId) {
+        List<CostByProvider> byProvider = costs.costByProviderForDeveloper(developerId).stream()
+                .map(v -> new CostByProvider(v.getProvider(), v.getTokens(), v.getCost(), v.getCalls()))
+                .toList();
+        return new CostReport(costs.totalCostForDeveloper(developerId),
+                costs.totalTokensForDeveloper(developerId), byProvider);
     }
 
     private WorkflowSummary toSummary(WorkflowInstanceEntity i) {

@@ -39,6 +39,13 @@ public class WorkflowInstanceEntity {
     @Column(name = "current_sequence", nullable = false)
     private long currentSequence;
 
+    /**
+     * Owning developer, or {@code null} for system/legacy workflows. Used to scope
+     * the console so a tenant only ever sees their own executions.
+     */
+    @Column(name = "developer_id", length = 64)
+    private String developerId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -110,5 +117,13 @@ public class WorkflowInstanceEntity {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getDeveloperId() {
+        return developerId;
+    }
+
+    public void setDeveloperId(String developerId) {
+        this.developerId = developerId;
     }
 }

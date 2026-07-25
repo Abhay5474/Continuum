@@ -49,7 +49,7 @@ export default function AiChaosLab() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold">AI Chaos Lab</h1>
+        <h1 className="text-lg font-semibold">Model Failure Simulation</h1>
         <p className="text-sm text-slate-400">
           Inject AI-native failures — hallucinations, schema/tool corruption, prompt injection, context
           truncation, memory corruption, provider drift — then measure whether workflows survive.

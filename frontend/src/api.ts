@@ -8,12 +8,36 @@ import type {
 } from "./types";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "";
+const SESSION_KEY = "continuum.portal.session";
 
+/** Raised when the server rejects the session, so pages can prompt a sign-in. */
+export class UnauthorizedError extends Error {
+  constructor(message = "Sign in to view this data.") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+function sessionToken(): string | null {
+  return localStorage.getItem(SESSION_KEY);
+}
+
+/**
+ * Console API calls. These are now authenticated: the backend scopes every
+ * response to the signed-in developer, so the token must travel with each request.
+ */
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = sessionToken();
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
   });
+  if (res.status === 401) throw new UnauthorizedError();
+  if (res.status === 403) throw new Error("This resource belongs to another account.");
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status}: ${text}`);
@@ -42,7 +66,6 @@ export const api = {
 };
 
 // --- V3 developer portal: session-token auth (stored client-side) ---
-const SESSION_KEY = "continuum.portal.session";
 
 function authHeaders(): Record<string, string> {
   const t = localStorage.getItem(SESSION_KEY);
@@ -62,6 +85,7 @@ async function portalHttp<T>(path: string, method: string, body?: unknown): Prom
     } catch {
       /* ignore */
     }
+    if (res.status === 401) throw new UnauthorizedError(message);
     throw new Error(message);
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);

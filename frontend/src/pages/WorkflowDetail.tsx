@@ -5,15 +5,15 @@ import type { WorkflowDetail } from "../types";
 import StatusBadge from "../components/StatusBadge";
 
 const EVENT_ICON: Record<string, string> = {
-  WORKFLOW_STARTED: "🚀",
-  ACTIVITY_SCHEDULED: "📋",
-  ACTIVITY_STARTED: "▶️",
-  ACTIVITY_COMPLETED: "✅",
-  ACTIVITY_FAILED: "⚠️",
-  RETRY_SCHEDULED: "🔁",
-  SIDE_EFFECT_RECORDED: "🎲",
-  WORKFLOW_COMPLETED: "🏁",
-  WORKFLOW_FAILED: "❌",
+  WORKFLOW_STARTED: "\u25B6",       // ▶
+  ACTIVITY_SCHEDULED: "\u25CB",     // ○
+  ACTIVITY_STARTED: "\u25D4",       // ◔
+  ACTIVITY_COMPLETED: "\u25CF",     // ●
+  ACTIVITY_FAILED: "\u25B2",        // ▲
+  RETRY_SCHEDULED: "\u21BB",        // ↻
+  SIDE_EFFECT_RECORDED: "\u25C6",   // ◆
+  WORKFLOW_COMPLETED: "\u2713",     // ✓
+  WORKFLOW_FAILED: "\u2715",        // ✕
 };
 
 export default function WorkflowDetailPage() {

@@ -148,16 +148,15 @@ workflow code over in-flight instances. Full details in
   a dry-run verify scan, a "Paradox Resolution Ledger" dashboard panel and
   `PARADOX RESOLVED` badges on healed workflows.
 
-## V5 — God Mode (autonomous memory & policy engine)
+## V5 — Adaptive Policy (autonomous memory & policy engine)
 
 An **opt-in, off-by-default** autonomous layer: 4-tier learned memory
 (Working → Episodic → Semantic experience graph → Archive), Memory-as-Action
 policies on the V4 Thompson-sampling machinery, and a **digital twin** that
 replays every policy candidate against real historical traffic — vetoing
 confident regressions before they receive live traffic. Ships with a full UI
-overhaul and the new **⚡ Agentic Autopilot** tab (God Mode toggle, context
-weight gauge, memory-tier flow, counterfactual multiverse timeline, experience
-graph). Full details in **[docs/V5_GOD_MODE.md](docs/V5_GOD_MODE.md)**.
+overhaul and the **Adaptive Policy** console page (enable toggle, context
+weight gauge, memory-tier flow, counterfactual timeline, experience graph). Full details in **[docs/V5_GOD_MODE.md](docs/V5_GOD_MODE.md)**.
 
 ## V6 — The Consensus DAG Engine (verifiable AI reliability layer)
 
@@ -200,6 +199,31 @@ Full details in **[docs/V8_RESEARCH.md](docs/V8_RESEARCH.md)**.
 - **Novel contribution harness** — `ParadoxHealingBenchmarkTest` proves the
   self-healing replay engine over **300 mid-flight code mutations: 0 crashes, 0
   double side-effects, 266 divergences healed.**
+
+## Security & multi-tenancy
+
+Every console API is authenticated and tenant-scoped. Two rules hold throughout:
+
+1. **The tenant comes from the session, never from the request.** Endpoints do
+   not accept a `developerId` parameter — it is resolved from the signed-in
+   session, so one account cannot name another and read its data. Reaching for a
+   record owned by someone else returns `403`.
+2. **Everything fails closed.** With no `CONTINUUM_ADMIN_TOKEN` configured the
+   admin surface and operator login are unavailable rather than open. Developers
+   onboard through `POST /api/portal/developer/signup`.
+
+What each role sees:
+
+| Role | Scope |
+|------|-------|
+| Anonymous | Landing page, docs, `/api/meta` only |
+| `DEVELOPER` | Their own workflows, traces, stats, memory, usage and keys |
+| `OPERATOR` | Engine-wide state (requires `CONTINUUM_ADMIN_TOKEN`) |
+
+Workflows carry an owning `developer_id` (nullable — rows created before this and
+internal system workflows have none and are operator-visible only). Memory scopes
+are namespaced per tenant server-side, so identical scope names never collide
+across accounts. `RequestScopeTest` locks these rules in.
 
 ## Quick start (one command)
 
