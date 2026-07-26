@@ -82,7 +82,10 @@ export interface WorldOptions {
   dim: string;
 }
 
-import { activeDemos } from "./activity";
+import { activeDemos, drainSurge } from "./activity";
+
+/** Camera's focal distance into the field. The type plane rides on this. */
+const BASE_DEPTH = 1050;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -121,6 +124,8 @@ export function createWorld(
   let visible = true;
   let lastFormation = -1;
   let halfFrame = false;
+  /** Transient activity handed over by the interactive explainers. */
+  let surge = 0;
 
   /** Smoothed camera state, so pointer motion feels like mass rather than a jump cut. */
   const cam = { rx: 0, ry: 0, z: 0, trx: 0, try_: 0, tz: 0 };
@@ -230,7 +235,7 @@ export function createWorld(
     // fraction of the population ends up in front of the focal plane and reads
     // as foreground. A camera parked outside the volume can only ever produce a
     // backdrop, however well it is lit.
-    const depth = z2 + 1050 + cam.z;
+    const depth = z2 + BASE_DEPTH + cam.z;
     if (depth < 60) return null;
     // Focal length. Chosen so the field fills the frame with presence rather
     // than sitting far away as a dusting of specks.
@@ -361,7 +366,11 @@ export function createWorld(
     }
     for (const e of edges) e.s += (e.strength - e.s) * 0.08;
 
-    spawnPackets(lerp(fa.flow, fb.flow, t));
+    // Work happening in an instrument is work happening in the fabric, so the
+    // field answers: more traffic and a brief lift in activity. Read once per
+    // frame and decayed here, so the response fades on its own.
+    surge = drainSurge();
+    spawnPackets(clamp(lerp(fa.flow, fb.flow, t) + surge * 1.3, 0, 2.4));
     for (const pk of packets) {
       pk.t += pk.speed;
       if (pk.t > 1) {
@@ -392,8 +401,18 @@ export function createWorld(
     return Math.exp(-Math.max(0, depth - 700) / 1500);
   }
 
-  /** The plane the page's typography occupies. Nearer than this draws in front. */
-  const TYPE_PLANE = 1250;
+  /**
+   * The plane the page's typography occupies. Nearer than this draws in front.
+   *
+   * <p>It tracks the camera rather than sitting at a fixed distance. As an
+   * absolute constant it worked at the top of the page and then failed silently:
+   * once a scene dollied in, the whole formation fell in front of it, the far
+   * canvas rendered nothing at all, and the type ended up behind every node
+   * instead of inside the field. Anchoring it to the focal distance puts the
+   * words in the middle of the volume by construction — roughly half the
+   * population in front, half behind — at every scene.
+   */
+  const typePlane = () => BASE_DEPTH + cam.z;
 
   function draw(now: number) {
     ctx.clearRect(0, 0, width, height);
@@ -425,8 +444,9 @@ export function createWorld(
     // of the frame on a phone as on a display.
     const reach = Math.min(width, height) * 0.42;
 
+    const plane = typePlane();
     /** Picks the render target by depth, which is what puts type inside the volume. */
-    const target = (depth: number) => (nctx && depth < TYPE_PLANE ? nctx : ctx);
+    const target = (depth: number) => (nctx && depth < plane ? nctx : ctx);
 
     /**
      * How much of a mark survives on the near plane.
@@ -436,7 +456,7 @@ export function createWorld(
      * attention and the page becomes hard to use — so anything drawn in front of
      * the words is heavily damped.
      */
-    const nearDamp = (depth: number) => (nctx && depth < TYPE_PLANE ? 0.42 : 1);
+    const nearDamp = (depth: number) => (nctx && depth < plane ? 0.42 : 1);
 
     /** 0..1 — how strongly the lamp falls on a projected point. */
     const lit = (sx: number, sy: number) => {
@@ -489,10 +509,11 @@ export function createWorld(
       // structure you sense rather than read. This is what makes cursor
       // proximity reveal local topology without the whole screen reacting.
       const glow = Math.max(lit(A.sx, A.sy), lit(B.sx, B.sy));
-      const alpha = e.s * (0.34 + glow * 0.7) * depthFade * nearDamp(mid);
+      // Connections carry the surge too: the paths the work is taking.
+      const alpha = e.s * (0.34 + glow * 0.7 + surge * 0.4) * depthFade * nearDamp(mid);
       if (alpha < 0.015) continue;
 
-      const near = nctx && mid < TYPE_PLANE ? 1 : 0;
+      const near = nctx && mid < plane ? 1 : 0;
       const hot = glow > 0.35 ? 1 : 0;
       const level = Math.min(EDGE_LEVELS - 1, Math.floor(alpha * EDGE_LEVELS * 1.5));
       batches[(near * 2 + hot) * EDGE_LEVELS + level].push(A.sx, A.sy, B.sx, B.sy);
@@ -561,7 +582,7 @@ export function createWorld(
 
       const r = clamp(P.k * (1.9 + n.energy * 3.4) * pulse * (1 + nearness * 2.6), 0.5, 26);
       const alpha =
-        clamp(P.k * (0.3 + n.energy * 0.55 + glow * 0.5) * haze, 0.03, 0.95) *
+        clamp(P.k * (0.3 + n.energy * 0.55 + glow * 0.5 + surge * 0.3) * haze, 0.03, 0.95) *
         // Defocused matter is dimmer as it spreads, or the foreground shouts.
         (1 - nearness * 0.72) *
         nearDamp(P.depth);

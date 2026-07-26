@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import DemoFrame, { DemoButton } from "./DemoFrame";
+import { pulse } from "../activity";
 import { clamp, seeded, useDemo } from "./useDemo";
 
 /**
@@ -113,6 +114,9 @@ export default function ConsensusDemo() {
         if (allDone) {
           s.running = false;
           s.settled = true;
+          // Convergence is the event. A confident verdict lands harder than a
+          // split one, which is the honest weighting.
+          pulse(0.4 + Math.abs(s.posterior - 0.5) * 1.2);
         }
       }
       for (const v of s.solvers) v.r += (v.tr - v.r) * 0.06;

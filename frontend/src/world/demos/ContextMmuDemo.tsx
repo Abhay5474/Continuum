@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import DemoFrame, { DemoButton } from "./DemoFrame";
+import { pulse } from "../activity";
 import { clamp, seeded, useDemo } from "./useDemo";
 
 /**
@@ -120,10 +121,14 @@ function settle(s: State, probe: Probe) {
     s.hits++;
     page.flash = 1;
     page.flashKind = "hit";
+    // A hit is the cheap, common case, so the fabric barely registers it.
+    pulse(0.06);
   } else {
     s.faults++;
     page.flash = 1;
     page.flashKind = "fault";
+    // A fault is real work: a retrieval crossing tiers, and worth seeing.
+    pulse(0.34 + from * 0.12);
     // Promotion on reference. The page becomes resident, which is the point of
     // the fault: the next reference to it is a hit.
     page.tier = 0;

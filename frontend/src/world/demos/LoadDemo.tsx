@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import DemoFrame, { DemoToggle } from "./DemoFrame";
+import { pulse } from "../activity";
 import { clamp, useDemo } from "./useDemo";
 
 /**
@@ -80,6 +81,7 @@ export default function LoadDemo() {
           // Refused at the door, immediately and cheaply. The caller learns now
           // rather than after a timeout.
           s.shed++;
+          pulse(0.03);
         } else {
           s.queue.push(0);
         }
@@ -97,7 +99,10 @@ export default function LoadDemo() {
       for (let i = 0; i < s.queue.length; i++) s.queue[i]++;
       const before = s.queue.length;
       s.queue = s.queue.filter((age) => age < TIMEOUT);
-      s.timedOut += before - s.queue.length;
+      const died = before - s.queue.length;
+      s.timedOut += died;
+      // A request dying in the queue is a failure, and should read as one.
+      if (died > 0) pulse(0.1 * died);
 
       s.inFlight = Math.min(s.queue.length, 3);
       const observed = s.queue.length / SERVICE_RATE;
