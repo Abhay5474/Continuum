@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { portal } from "./api";
 import { ThemeToggle } from "./components/ui";
 import AmbientField from "./world/AmbientField";
+import { useOperator } from "./system/OperatorAccess";
 
 /**
  * Console shell.
@@ -25,6 +26,19 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    // Everything that acts on a prompt on its way to a model: what is stripped
+    // from it, whether it needs to be sent at all, and what context travels with
+    // it. Memory and the context optimizer used to sit under "Intelligence"
+    // beside the learning features, which put four unrelated things in one menu.
+    label: "Prompt",
+    items: [
+      { to: "/guard", label: "Prompt Guard", desc: "PII redaction, injection blocking, compression" },
+      { to: "/cache", label: "Semantic Cache", desc: "Reuse answers to equivalent questions" },
+      { to: "/mmu", label: "Context Optimizer", desc: "Context virtualization and paging" },
+      { to: "/memory", label: "Memory", desc: "Long-context memory tiers" },
+    ],
+  },
+  {
     label: "Reliability",
     items: [
       { to: "/dag", label: "Verification", desc: "Consensus traces and evidence" },
@@ -36,8 +50,6 @@ const GROUPS: Group[] = [
   {
     label: "Intelligence",
     items: [
-      { to: "/memory", label: "Memory", desc: "Long-context memory tiers" },
-      { to: "/mmu", label: "Context Optimizer", desc: "Context virtualization and paging" },
       { to: "/autopilot", label: "Optimization", desc: "Adaptive routing, canary and rollback" },
       { to: "/godmode", label: "Adaptive Policy", desc: "Autonomous memory and policy engine" },
     ],
@@ -56,6 +68,7 @@ export default function App() {
   const navRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const { operator, request: requestOperator, drop: dropOperator } = useOperator();
 
   // Close any open menu on outside click, Escape, or navigation.
   useEffect(() => {
@@ -132,6 +145,18 @@ export default function App() {
             >
               Docs
             </Link>
+            {/* Elevated state is worth showing continuously: while it is on, the
+                switches in Routing change behaviour for every tenant. */}
+            {operator && (
+              <button
+                onClick={dropOperator}
+                title="Operator access is on. Click to drop it."
+                className="hidden items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-amber-300 hover:border-amber-400/60 sm:inline-flex"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                Operator
+              </button>
+            )}
             <ThemeToggle />
 
             <div className="relative hidden lg:block">
@@ -148,12 +173,27 @@ export default function App() {
                   items={ACCOUNT}
                   align="right"
                   footer={
-                    <button
-                      onClick={signOut}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-edge/50 hover:text-slate-200"
-                    >
-                      Sign out
-                    </button>
+                    <>
+                      <button
+                        onClick={operator ? dropOperator : requestOperator}
+                        className="w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-edge/50"
+                      >
+                        <div className="text-sm font-medium text-slate-200">
+                          {operator ? "Drop operator access" : "Operator access"}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {operator
+                            ? "Return to your own permissions"
+                            : "Unlock routing, hedging and the model catalogue"}
+                        </div>
+                      </button>
+                      <button
+                        onClick={signOut}
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-edge/50 hover:text-slate-200"
+                      >
+                        Sign out
+                      </button>
+                    </>
                   }
                 />
               )}
@@ -193,6 +233,12 @@ export default function App() {
                 <MobileLink key={i.to} to={i.to} label={i.label} />
               ))}
               <MobileLink to="/docs" label="Docs" />
+              <button
+                onClick={operator ? dropOperator : requestOperator}
+                className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 hover:bg-edge/50 hover:text-slate-200"
+              >
+                {operator ? "Drop operator access" : "Operator access"}
+              </button>
               <button
                 onClick={signOut}
                 className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 hover:bg-edge/50 hover:text-slate-200"

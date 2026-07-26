@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, isOperator } from "../api";
+import { api } from "../api";
+import { useOperator } from "../system/OperatorAccess";
 import { Micro, Readout, Plane, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
@@ -35,9 +36,9 @@ const RT_TABS = [
 
 export default function ModelRouter() {
   // Routing objective and hedging policy apply to the whole engine, so they are
-  // the operator's to change. Shown either way — a disabled control that
-  // explains itself beats one that returns 403.
-  const operator = isOperator();
+  // the operator's to change. Shown either way — but a disabled control that
+  // explains itself is only half an answer, so each one also offers the way in.
+  const { operator, request: unlock } = useOperator();
   const [tab, setTab] = useState<"network" | "learning" | "probe">("network");
   const [routing, setRouting] = useState<any | null>(null);
   const [providers, setProviders] = useState<any[]>([]);
@@ -122,9 +123,9 @@ export default function ModelRouter() {
           <div>
             <Micro>Router</Micro>
             <button
-              onClick={() => api.post(`/api/routing/enable?enabled=${!routing?.enabled}`).then(refresh)}
+              onClick={() => api.opPost(`/api/routing/enable?enabled=${!routing?.enabled}`).then(refresh)}
               disabled={!operator}
-              title={operator ? undefined : "Engine-wide setting — operator only"}
+              title={operator ? undefined : "Engine-wide setting — unlock operator access to change it"}
               className="mt-1 flex items-center gap-2 rounded border border-edge px-3 py-1.5 text-xs transition-colors hover:border-aurora/50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-edge"
             >
               <StateDot state={routing?.enabled ? "healthy" : "idle"} />
@@ -135,9 +136,9 @@ export default function ModelRouter() {
             <Micro>Objective</Micro>
             <select
               value={routing?.mode ?? "BALANCED"}
-              onChange={(e) => api.post(`/api/routing/mode?mode=${e.target.value}`).then(refresh)}
+              onChange={(e) => api.opPost(`/api/routing/mode?mode=${e.target.value}`).then(refresh)}
               disabled={!operator}
-              title={operator ? undefined : "Engine-wide setting — operator only"}
+              title={operator ? undefined : "Engine-wide setting — unlock operator access to change it"}
               className="mt-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-aurora/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {MODES.map((m) => (
@@ -147,6 +148,25 @@ export default function ModelRouter() {
           </div>
         </div>
       </header>
+
+      {/* The controls above are disabled for a developer, which used to be the
+          end of the story — the page offered no way to reach the permission it
+          required, so the switches read as broken rather than protected. */}
+      {!operator && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-2.5 text-sm">
+          <span className="text-amber-300">Read-only.</span>
+          <span className="min-w-0 flex-1 text-slate-400">
+            The router and hedging apply to every tenant on this deployment and change what it
+            spends, so changing them needs operator access.
+          </span>
+          <button
+            onClick={unlock}
+            className="rounded-md border border-amber-500/40 px-2.5 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/10"
+          >
+            Unlock
+          </button>
+        </div>
+      )}
 
       <Tabs items={RT_TABS} tab={tab} setTab={setTab} />
 
@@ -267,9 +287,9 @@ export default function ModelRouter() {
           <div className="flex items-baseline justify-between gap-2">
             <Micro>Tail-latency hedging</Micro>
             <button
-              onClick={() => api.post(`/api/hedging/enable?enabled=${!hedging?.enabled}`).then(refresh)}
+              onClick={() => api.opPost(`/api/hedging/enable?enabled=${!hedging?.enabled}`).then(refresh)}
               disabled={!operator}
-              title={operator ? undefined : "Engine-wide setting — operator only"}
+              title={operator ? undefined : "Engine-wide setting — unlock operator access to change it"}
               className="flex items-center gap-1.5 rounded border border-edge px-2 py-1 text-[10px] transition-colors hover:border-aurora/50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-edge"
             >
               <StateDot state={hedging?.enabled ? "healthy" : "idle"} size={6} />

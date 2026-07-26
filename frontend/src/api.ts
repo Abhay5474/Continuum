@@ -9,6 +9,7 @@ import type {
 
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 const SESSION_KEY = "continuum.portal.session";
+const OPERATOR_KEY = "continuum.portal.operator";
 
 /** Raised when the server rejects the session, so pages can prompt a sign-in. */
 export class UnauthorizedError extends Error {
@@ -18,16 +19,50 @@ export class UnauthorizedError extends Error {
   }
 }
 
+/**
+ * Raised on a 403. Engine-wide settings are the operator's, so a developer
+ * hitting one of those switches used to get a bare "belongs to another account",
+ * which is both wrong and unactionable. Pages check {@link needsOperator} and
+ * offer to elevate instead.
+ */
+export class ForbiddenError extends Error {
+  readonly needsOperator: boolean;
+  constructor(message = "This resource belongs to another account.", needsOperator = false) {
+    super(message);
+    this.name = "ForbiddenError";
+    this.needsOperator = needsOperator;
+  }
+}
+
 function sessionToken(): string | null {
   return localStorage.getItem(SESSION_KEY);
 }
 
 /**
+ * Operator access is *additive*, not a different login.
+ *
+ * <p>An operator session has no developer id, so signing in as one would break
+ * every tenant-scoped page in the console — you would gain the routing switches
+ * and lose your keys, workflows and billing. Instead the operator token is held
+ * alongside the developer session and sent only on the engine-wide endpoints, so
+ * one person operating their own deployment can do both without switching
+ * accounts.
+ */
+function operatorToken(): string | null {
+  return localStorage.getItem(OPERATOR_KEY);
+}
+
+export const hasOperator = () => operatorToken() !== null;
+
+/**
  * Console API calls. These are now authenticated: the backend scopes every
  * response to the signed-in developer, so the token must travel with each request.
  */
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = sessionToken();
+async function http<T>(path: string, init?: RequestInit, asOperator = false): Promise<T> {
+  // On an operator-only route, prefer the elevated token when one is held; fall
+  // back to the developer session so the request still reaches the server and
+  // comes back as a 403 the UI can explain.
+  const token = (asOperator && operatorToken()) || sessionToken();
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
@@ -37,7 +72,11 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (res.status === 401) throw new UnauthorizedError();
-  if (res.status === 403) throw new Error("This resource belongs to another account.");
+  if (res.status === 403) {
+    throw asOperator
+      ? new ForbiddenError("This control changes engine-wide behaviour, so it needs operator access.", true)
+      : new ForbiddenError();
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status}: ${text}`);
@@ -63,6 +102,14 @@ export const api = {
   get: <T>(path: string) => http<T>(path),
   post: <T>(path: string, body?: unknown) =>
     http<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
+
+  /**
+   * Same as {@link post}, for endpoints the backend gates to the operator —
+   * routing, hedging and the model catalogue. Sends the elevated token when one
+   * is held.
+   */
+  opPost: <T>(path: string, body?: unknown) =>
+    http<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, true),
 };
 
 // --- V3 developer portal: session-token auth (stored client-side) ---
@@ -114,7 +161,15 @@ export function sessionRole(): "DEVELOPER" | "OPERATOR" | null {
   }
 }
 
-export const isOperator = () => sessionRole() === "OPERATOR";
+/**
+ * Whether engine-wide controls should be live.
+ *
+ * <p>True either because you signed in as the operator outright, or because you
+ * elevated on top of a developer session. Without the second case every
+ * operator-gated switch in the console was permanently disabled with no route to
+ * enabling it — the control existed but could never be used.
+ */
+export const isOperator = () => sessionRole() === "OPERATOR" || hasOperator();
 
 export const portal = {
   session: () => localStorage.getItem(SESSION_KEY),
@@ -131,7 +186,21 @@ export const portal = {
     portal.setSession(r.sessionToken);
     return r;
   },
-  logout: () => portal.setSession(null),
+  logout: () => {
+    portal.setSession(null);
+    portal.dropOperator();
+  },
+
+  // --- Operator elevation -------------------------------------------------
+  // Held alongside the developer session rather than replacing it; see
+  // operatorToken() above for why.
+  hasOperator,
+  async elevate(token: string) {
+    const r = await portalHttp<any>("/api/portal/operator/login", "POST", { token });
+    localStorage.setItem(OPERATOR_KEY, r.sessionToken);
+    return r;
+  },
+  dropOperator: () => localStorage.removeItem(OPERATOR_KEY),
 
   /** Escape hatch for portal-scoped reads that have no dedicated helper. */
   get: <T>(path: string) => portalHttp<T>(path, "GET"),
@@ -202,6 +271,28 @@ export const portal = {
     status: () => portalHttp<any>("/api/portal/developer/v7/status", "GET"),
     enable: () => portalHttp<any>("/api/portal/developer/v7/enable", "POST"),
     disable: () => portalHttp<any>("/api/portal/developer/v7/disable", "POST"),
+  },
+
+  // --- V8 Prompt firewall & compression ---
+  v8: {
+    status: () => portalHttp<any>("/api/portal/developer/v8/status", "GET"),
+    setFirewall: (on: boolean) =>
+      portalHttp<any>(`/api/portal/developer/v8/firewall/${on ? "enable" : "disable"}`, "POST"),
+    setCompression: (on: boolean) =>
+      portalHttp<any>(`/api/portal/developer/v8/compression/${on ? "enable" : "disable"}`, "POST"),
+    firewallProfile: () => portalHttp<any>("/api/portal/developer/v8/firewall/profile", "GET"),
+    compressionProfile: () => portalHttp<any>("/api/portal/developer/v8/compression/profile", "GET"),
+  },
+
+  // --- Semantic cache ---
+  cache: {
+    status: () => portalHttp<any>("/api/portal/developer/cache/status", "GET"),
+    setEnabled: (on: boolean) =>
+      portalHttp<any>(`/api/portal/developer/cache/${on ? "enable" : "disable"}`, "POST"),
+    configure: (body: { similarityThreshold?: number; ttlSeconds?: number }) =>
+      portalHttp<any>("/api/portal/developer/cache/settings", "PUT", body),
+    entries: (limit = 25) => portalHttp<any[]>(`/api/portal/developer/cache/entries?limit=${limit}`, "GET"),
+    clear: () => portalHttp<any>("/api/portal/developer/cache", "DELETE"),
   },
 
   // --- Customer-defined workflows ---

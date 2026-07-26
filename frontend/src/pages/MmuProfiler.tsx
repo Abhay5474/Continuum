@@ -59,7 +59,7 @@ export default function MmuProfiler() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Context MMU</h1>
+          <h1 className="text-lg font-semibold tracking-tight">Context Optimizer</h1>
           <p className="mt-0.5 text-sm text-slate-500">
             Working set stays resident · the rest pages out and faults back on reference
           </p>

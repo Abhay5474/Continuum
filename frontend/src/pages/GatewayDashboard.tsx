@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, isOperator } from "../api";
+import { api } from "../api";
+import { useOperator } from "../system/OperatorAccess";
 import { Micro, Readout, Plane, StateDot, Trace } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
@@ -87,9 +88,9 @@ export default function GatewayDashboard() {
 
   // The model catalogue is shared by every tenant, so retiring one is the
   // operator's call rather than any single customer's.
-  const operator = isOperator();
+  const { operator, request: unlock } = useOperator();
   const setStatus = (id: number, status: string) =>
-    api.post(`/api/models/${id}/status?status=${status}`).then(refresh);
+    api.opPost(`/api/models/${id}/status?status=${status}`).then(refresh);
 
   const successRate = stats?.successRate ?? 1;
   const maxLatency = useMemo(
@@ -354,7 +355,24 @@ export default function GatewayDashboard() {
         {tab === "models" && (<>
       {/* ---- model registry ---- */}
       <section>
-        <Micro>Model registry &amp; lifecycle</Micro>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Micro>Model registry &amp; lifecycle</Micro>
+          {operator ? (
+            <button
+              onClick={() => api.opPost("/api/models/discover").then(refresh)}
+              className="rounded border border-edge px-2.5 py-1 text-[11px] text-slate-300 hover:border-aurora/50"
+            >
+              Re-run discovery
+            </button>
+          ) : (
+            <button
+              onClick={unlock}
+              className="rounded border border-amber-500/40 px-2.5 py-1 text-[11px] text-amber-300 hover:bg-amber-500/10"
+            >
+              Read-only · unlock operator access
+            </button>
+          )}
+        </div>
         <div className="mt-2 overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -385,7 +403,7 @@ export default function GatewayDashboard() {
                       value={m.status}
                       onChange={(e) => setStatus(m.id, e.target.value)}
                       disabled={!operator}
-                      title={operator ? undefined : "Shared model catalogue — operator only"}
+                      title={operator ? undefined : "Shared model catalogue — unlock operator access to change it"}
                       className="rounded border border-edge bg-ink px-2 py-1 text-[11px] text-slate-300 outline-none focus:border-aurora/60 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {["DISCOVERED", "TESTING", "ACTIVE", "DEPRECATED", "REMOVED"].map((s) => (

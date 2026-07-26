@@ -35,6 +35,8 @@ import {
 const SIGNATURE: [string, typeof workflow][] = [
   ["/workflows", workflow],
   ["/mmu", memory],
+  ["/cache", memory],
+  ["/guard", fabric],
   ["/memory", memory],
   ["/dag", consensus],
   ["/replay", consensus],

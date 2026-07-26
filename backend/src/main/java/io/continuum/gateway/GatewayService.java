@@ -66,6 +66,9 @@ public class GatewayService {
     private final io.continuum.firewall.PromptFirewallService firewall;
     // Billing quota enforcement (default FREE plan is generous ⇒ unchanged behaviour).
     private final io.continuum.billing.BillingService billing;
+    // Semantic cache (opt-in, OFF by default): serves a previous answer when the
+    // incoming prompt means the same thing. Never on the critical path when off.
+    private final io.continuum.cache.SemanticCacheService semanticCache;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -81,7 +84,8 @@ public class GatewayService {
                           io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit,
                           io.continuum.compression.PromptCompressionService compression,
                           io.continuum.firewall.PromptFirewallService firewall,
-                          io.continuum.billing.BillingService billing) {
+                          io.continuum.billing.BillingService billing,
+                          io.continuum.cache.SemanticCacheService semanticCache) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -101,6 +105,7 @@ public class GatewayService {
         this.compression = compression;
         this.firewall = firewall;
         this.billing = billing;
+        this.semanticCache = semanticCache;
     }
 
     /** Record a routing outcome into the contextual bandit; never affects the request. */
@@ -135,6 +140,29 @@ public class GatewayService {
         // prompt-injection BEFORE anything else touches the prompt. Pass-through
         // when off. A blocked request throws (mapped to a clean 4xx upstream).
         canonical = firewall.guardInbound(developerId, canonical);
+
+        // Semantic cache (opt-in, OFF by default): if this question has already
+        // been answered, return that answer instead of paying a provider for it
+        // again. Placed after the firewall so a cached prompt is already
+        // redacted, and before routing/paging/compression — all of which exist
+        // to serve the call we are about to skip.
+        String cacheKey = lastUserContent(canonical);
+        if (semanticCache.enabledFor(developerId)) {
+            var hit = semanticCache.lookup(developerId, cacheKey, req.model());
+            if (hit.isPresent()) {
+                var h = hit.get();
+                long cachedMs = (System.nanoTime() - started) / 1_000_000;
+                // Logged like any other request, with zero cost, so usage and
+                // spend reporting stay truthful about what the cache avoided.
+                logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), h.provider(),
+                        h.model(), 0, "semantic-cache", cachedMs, 0, 0, true, 0));
+                return new GatewayDtos.ChatResponse(h.response(), h.provider(), h.model(),
+                        cachedMs, 0, 0, 0,
+                        String.format("served from semantic cache (%s match, similarity %.2f)",
+                                h.exact() ? "exact" : "near", h.similarity()));
+            }
+        }
+
         // God Mode Twin Gate: Interpose and augment request with memory if enabled
         canonical = godMode.augmentRequest(developerId, canonical);
         // V7 Context MMU (opt-in, OFF by default): virtualize the context window.
@@ -233,6 +261,11 @@ public class GatewayService {
                 // No-op (and can never throw) unless the developer enabled it.
                 godMode.observeExchange(developerId, "gateway",
                         lastUserContent(canonical), safeContent);
+
+                // Cache the answer for the next equivalent question. No-op when
+                // the cache is off, and it can never fail the request.
+                semanticCache.store(developerId, cacheKey, req.model(), c.provider(),
+                        safeContent, tokens, cost);
 
                 return new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
                         totalMs, tokens, cost, failovers, reason);

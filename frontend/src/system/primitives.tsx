@@ -216,3 +216,76 @@ export function NotInstalled({ name, note }: { name: string; note?: string }) {
     </div>
   );
 }
+
+/**
+ * The console's one on/off control.
+ *
+ * <p>Every feature that can be turned on used to draw its own switch, so they
+ * drifted — and two subsystems (the prompt firewall and prompt compression)
+ * shipped a working backend toggle with no control at all, which meant the only
+ * way to enable them was curl.
+ *
+ * <p>{@code locked} is the important part. Some settings change engine-wide
+ * behaviour and belong to the operator, so a developer's click would come back
+ * 403. Rather than hide the control or let it fail, it renders visibly locked
+ * and says what would unlock it.
+ */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  hint,
+  busy = false,
+  locked,
+  onUnlock,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  hint?: string;
+  busy?: boolean;
+  /** Why this control cannot be used right now; omit when it is usable. */
+  locked?: string;
+  /** Offered alongside {@code locked} as the way out. */
+  onUnlock?: () => void;
+}) {
+  const disabled = busy || locked !== undefined;
+  return (
+    <div className="flex min-w-0 items-start gap-3">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors ${
+          checked ? "border-aurora/60 bg-aurora/70" : "border-edge bg-edge/40"
+        } ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-aurora/60"}`}
+      >
+        <span
+          className={`h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-[18px]" : "translate-x-[3px]"
+          }`}
+        />
+      </button>
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-slate-200">{label}</div>
+        {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
+        {locked && (
+          <p className="mt-1 text-xs text-amber-400/90">
+            {locked}
+            {onUnlock && (
+              <>
+                {" "}
+                <button onClick={onUnlock} className="underline underline-offset-2 hover:text-amber-300">
+                  Unlock
+                </button>
+              </>
+            )}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

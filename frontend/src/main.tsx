@@ -25,7 +25,10 @@ import DagCommandCenter from "./pages/DagCommandCenter";
 import MmuProfiler from "./pages/MmuProfiler";
 import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
+import PromptGuard from "./pages/PromptGuard";
+import SemanticCache from "./pages/SemanticCache";
 import { ToastProvider } from "./components/ui";
+import { OperatorProvider } from "./system/OperatorAccess";
 
 const router = createBrowserRouter([
   // Public: marketing, docs and authentication.
@@ -67,6 +70,8 @@ const router = createBrowserRouter([
           { path: "dag", element: <DagCommandCenter /> },
           { path: "dag/:workflowId", element: <DagCommandCenter /> },
           { path: "mmu", element: <MmuProfiler /> },
+          { path: "guard", element: <PromptGuard /> },
+          { path: "cache", element: <SemanticCache /> },
         ],
       },
     ],
@@ -76,7 +81,9 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ToastProvider>
-      <RouterProvider router={router} />
+      <OperatorProvider>
+        <RouterProvider router={router} />
+      </OperatorProvider>
     </ToastProvider>
   </React.StrictMode>
 );

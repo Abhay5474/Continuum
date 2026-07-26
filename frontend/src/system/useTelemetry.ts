@@ -66,7 +66,7 @@ export function useTelemetry(pollMs = 4000): Telemetry {
     let alive = true;
 
     const tick = async () => {
-      const [stats, gw, health, mmu, dag, routing, aichaos, chaos, wfs, fw, god] = await Promise.all([
+      const [stats, gw, health, mmu, dag, routing, aichaos, chaos, wfs, fw, god, cache] = await Promise.all([
         soft(api.get<any>("/api/stats")),
         soft(api.get<any>("/api/gateway/stats")),
         soft(api.get<any[]>("/api/gateway/health")),
@@ -78,6 +78,7 @@ export function useTelemetry(pollMs = 4000): Telemetry {
         soft(api.get<any[]>("/api/workflows?limit=8")),
         soft(portal.get<any>("/api/portal/developer/v8/firewall/profile")),
         soft(portal.godmode.status()),
+        soft(portal.cache.status()),
       ]);
       if (!alive) return;
 
@@ -128,9 +129,11 @@ export function useTelemetry(pollMs = 4000): Telemetry {
         (chaos?.sinkFailureRate ?? 0) > 0;
 
       const firewallEvents = fw?.events ?? 0;
-      const firewallBlocked = fw?.blocked ?? 0;
+      const firewallBlocked = fw?.injectionsBlocked ?? 0;
       const memoryOn = !!god?.enabled;
       const mmuRequests = mmu?.requests ?? 0;
+      const cacheOn = !!cache?.enabled;
+      const cacheHits = cache?.hits ?? 0;
 
       const subsystems: Subsystem[] = [
         {
@@ -152,9 +155,9 @@ export function useTelemetry(pollMs = 4000): Telemetry {
           metrics: [
             { label: "Events", value: String(firewallEvents) },
             { label: "Blocked", value: String(firewallBlocked) },
-            { label: "Redacted", value: String(fw?.redacted ?? 0) },
+            { label: "Redacted", value: String(fw?.piiRedacted ?? 0) },
           ],
-          route: "/portal",
+          route: "/guard",
         },
         {
           id: "router", name: "Router", code: "RO",
@@ -222,11 +225,19 @@ export function useTelemetry(pollMs = 4000): Telemetry {
           route: "/memory",
         },
         {
-          // Named in the architecture, absent from this build. Shown, not faked.
-          id: "cache", name: "Semantic Cache", code: "SC", state: "offline", installed: false,
-          flow: 0, direction: "both",
-          summary: "Not present in this build — no semantic cache is deployed.",
-          metrics: [{ label: "Status", value: "Not installed" }],
+          id: "cache", name: "Semantic Cache", code: "SC",
+          state: cacheOn ? (cacheHits > 0 ? "active" : "healthy") : "idle",
+          installed: true, flow: cacheOn ? norm(cacheHits / 40) : 0, direction: "both",
+          summary: "Answers a repeated question from a stored answer instead of calling a provider.",
+          metrics: [
+            { label: "Engine", value: cacheOn ? "enabled" : "off" },
+            {
+              label: "Hit rate",
+              value: cache?.hitRate != null ? `${(cache.hitRate * 100).toFixed(0)}%` : "—",
+            },
+            { label: "Tokens saved", value: String(cache?.tokensSaved ?? 0) },
+          ],
+          route: "/cache",
         },
       ];
 
