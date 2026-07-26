@@ -18,7 +18,8 @@ class BillingServiceTest {
 
     private final DeveloperBillingRepository billing = mock(DeveloperBillingRepository.class);
     private final GatewayRequestLogRepository requests = mock(GatewayRequestLogRepository.class);
-    private final BillingService service = new BillingService(billing, requests);
+    private final BillingService service =
+            new BillingService(billing, requests, new UnconfiguredPaymentProvider());
 
     private void withPlan(String dev, DeveloperBillingEntity entity) {
         when(billing.findById(dev)).thenReturn(Optional.of(entity));
@@ -69,10 +70,13 @@ class BillingServiceTest {
     }
 
     @Test
-    void upgradingToProRaisesTheQuota() {
+    void movingToProRaisesTheQuota() {
+        // Self-serve upgrades now require a settled payment, so the quota change
+        // is exercised through the operator grant. That an unpaid *self-serve*
+        // upgrade is refused is asserted in PlanChangeTest.
         DeveloperBillingEntity b = new DeveloperBillingEntity("dev-1");
         withPlan("dev-1", b);
-        var updated = service.setPlan("dev-1", BillingService.Plan.PRO);
+        var updated = service.grantPlan("dev-1", BillingService.Plan.PRO, "ops@continuum.dev");
         assertEquals("PRO", updated.getPlan());
         assertEquals(BillingService.Plan.PRO.monthlyTokenQuota, updated.getMonthlyTokenQuota());
     }

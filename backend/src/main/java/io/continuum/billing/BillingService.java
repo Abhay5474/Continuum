@@ -16,8 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Billing &amp; usage metering — a mock-Stripe layer over the token/cost data the
- * gateway already records.
+ * Billing &amp; usage metering over the token/cost data the gateway already
+ * records.
  *
  * <p>Plans map to a monthly token quota. Usage is <em>derived</em> from
  * {@code gateway_requests} for the current calendar month (no separate usage
@@ -31,7 +31,6 @@ public class BillingService {
 
     private static final Logger log = LoggerFactory.getLogger(BillingService.class);
 
-    /** Mock plan catalogue. */
     public enum Plan {
         FREE(100_000, 0.0),
         PRO(2_000_000, 20.0),
@@ -53,12 +52,20 @@ public class BillingService {
         }
     }
 
+    /** How an account came to be on its plan. */
+    public static final String FREE_TIER = "FREE_TIER";
+    public static final String PAID = "PAID";
+    public static final String OPERATOR_GRANT = "OPERATOR_GRANT";
+
     private final DeveloperBillingRepository billing;
     private final GatewayRequestLogRepository requests;
+    private final PaymentProvider payments;
 
-    public BillingService(DeveloperBillingRepository billing, GatewayRequestLogRepository requests) {
+    public BillingService(DeveloperBillingRepository billing, GatewayRequestLogRepository requests,
+                          PaymentProvider payments) {
         this.billing = billing;
         this.requests = requests;
+        this.payments = payments;
     }
 
     @Transactional
@@ -67,14 +74,94 @@ public class BillingService {
                 .orElseGet(() -> billing.save(new DeveloperBillingEntity(developerId)));
     }
 
-    /** Mock upgrade/downgrade (no real payment) — sets plan + its quota. */
+    /**
+     * Moves an account between plans.
+     *
+     * <p>Downgrades apply immediately and need no payment — leaving should never
+     * be harder than joining. Upgrades require a settlement, because a plan is an
+     * entitlement to spend the operator's money on provider calls; granting one
+     * on request alone is how a free account ends up with a 200× quota. Without a
+     * configured processor an upgrade is refused outright rather than applied.
+     *
+     * @param paymentReference the checkout this upgrade was paid under
+     */
     @Transactional
-    public DeveloperBillingEntity setPlan(String developerId, Plan plan) {
+    public DeveloperBillingEntity changePlan(String developerId, Plan plan, String paymentReference) {
         DeveloperBillingEntity b = getOrCreate(developerId);
+        Plan current = planOf(b);
+
+        if (plan.monthlyPriceUsd <= current.monthlyPriceUsd) {
+            b.setPaymentReference(null);
+            b.setGrantedBy(null);
+            b.setPeriodEnd(null);
+            return apply(b, plan, plan == Plan.FREE ? FREE_TIER : PAID, developerId, "downgrade");
+        }
+
+        if (!payments.configured()) {
+            throw new PaymentProvider.PaymentNotConfiguredException(
+                    "Self-serve upgrades are unavailable: no payment processor is configured. "
+                            + "Contact the operator to have a plan applied to your account.");
+        }
+        if (paymentReference == null || paymentReference.isBlank()) {
+            throw new PaymentRequiredException("This plan requires payment. Start a checkout first.");
+        }
+        PaymentProvider.Settlement settled = payments.settlement(developerId, paymentReference)
+                .orElseThrow(() -> new PaymentRequiredException(
+                        "That payment has not settled, so the plan was not changed."));
+        if (settled.plan() != plan) {
+            // Otherwise a cheap checkout could be presented to claim a dearer plan.
+            throw new PaymentRequiredException(
+                    "That payment is for the " + settled.plan() + " plan, not " + plan + ".");
+        }
+        b.setPaymentReference(settled.reference());
+        b.setGrantedBy(null);
+        b.setPeriodEnd(settled.periodEnd());
+        return apply(b, plan, PAID, developerId, "paid upgrade");
+    }
+
+    /**
+     * Puts an account on a plan without payment. The operator's escape hatch for
+     * manual invoicing, trials and enterprise deals — recorded with who did it,
+     * so an unpaid plan is always attributable.
+     */
+    @Transactional
+    public DeveloperBillingEntity grantPlan(String developerId, Plan plan, String grantedBy) {
+        DeveloperBillingEntity b = getOrCreate(developerId);
+        b.setPaymentReference(null);
+        b.setGrantedBy(grantedBy == null ? "operator" : grantedBy);
+        return apply(b, plan, plan == Plan.FREE ? FREE_TIER : OPERATOR_GRANT, developerId, "operator grant");
+    }
+
+    /** Begins a checkout, or explains why it cannot. */
+    public PaymentProvider.Checkout startCheckout(String developerId, Plan plan) {
+        if (plan == Plan.FREE) {
+            throw new IllegalArgumentException("The free plan does not require a checkout.");
+        }
+        return payments.startCheckout(developerId, plan);
+    }
+
+    private DeveloperBillingEntity apply(DeveloperBillingEntity b, Plan plan, String source,
+                                         String developerId, String why) {
         b.setPlan(plan.name());
         b.setMonthlyTokenQuota(plan.monthlyTokenQuota);
-        log.info("Billing: developer {} moved to plan {}", developerId, plan);
+        b.setPlanSource(source);
+        log.info("Billing: developer {} moved to plan {} ({}, source {})", developerId, plan, why, source);
         return billing.save(b);
+    }
+
+    private static Plan planOf(DeveloperBillingEntity b) {
+        try {
+            return Plan.valueOf(b.getPlan());
+        } catch (Exception e) {
+            return Plan.FREE;
+        }
+    }
+
+    /** Raised when an upgrade is attempted without a settled payment. */
+    public static class PaymentRequiredException extends RuntimeException {
+        public PaymentRequiredException(String message) {
+            super(message);
+        }
     }
 
     /** Hard gate the gateway calls before serving. No-op unless over quota. */
@@ -109,6 +196,11 @@ public class BillingService {
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("plan", b.getPlan());
+        out.put("planSource", b.getPlanSource());
+        out.put("grantedBy", b.getGrantedBy());
+        out.put("periodEnd", b.getPeriodEnd());
+        out.put("paymentConfigured", payments.configured());
+        out.put("paymentProvider", payments.name());
         out.put("monthlyTokenQuota", quota);
         out.put("tokensUsed", usedTokens);
         out.put("tokensRemaining", Math.max(0, quota - usedTokens));

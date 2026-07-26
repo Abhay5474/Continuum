@@ -4,7 +4,13 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
-/** A pending teammate invite (mock — generates an invite token/link). */
+/**
+ * A pending teammate invite.
+ *
+ * <p>Expiry and revocation are not decoration: the token grants access to an
+ * account, so one that never expires is a permanent key and one that cannot be
+ * withdrawn is worse.
+ */
 @Entity
 @Table(name = "team_invites",
         indexes = @Index(name = "idx_team_invites_dev", columnList = "developer_id, created_at"))
@@ -29,13 +35,27 @@ public class TeamInviteEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
+    @Column(name = "revoked", nullable = false)
+    private boolean revoked = false;
+
+    /** The developer id created when this invite was accepted. */
+    @Column(name = "accepted_by", length = 64)
+    private String acceptedBy;
+
+    @Column(name = "accepted_at")
+    private Instant acceptedAt;
+
     protected TeamInviteEntity() {
     }
 
-    public TeamInviteEntity(String developerId, String email, String token) {
+    public TeamInviteEntity(String developerId, String email, String token, Instant expiresAt) {
         this.developerId = developerId;
         this.email = email;
         this.token = token;
+        this.expiresAt = expiresAt;
     }
 
     public Long getId() { return id; }
@@ -44,4 +64,21 @@ public class TeamInviteEntity {
     public String getToken() { return token; }
     public boolean isAccepted() { return accepted; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getExpiresAt() { return expiresAt; }
+    public boolean isRevoked() { return revoked; }
+    public void setRevoked(boolean revoked) { this.revoked = revoked; }
+    public String getAcceptedBy() { return acceptedBy; }
+    public Instant getAcceptedAt() { return acceptedAt; }
+
+    /** Marks the invite consumed. An accepted invite is never reusable. */
+    public void accept(String memberDeveloperId) {
+        this.accepted = true;
+        this.acceptedBy = memberDeveloperId;
+        this.acceptedAt = Instant.now();
+    }
+
+    /** Usable only while unaccepted, unrevoked and unexpired. */
+    public boolean isUsable(Instant now) {
+        return !accepted && !revoked && (expiresAt == null || now.isBefore(expiresAt));
+    }
 }

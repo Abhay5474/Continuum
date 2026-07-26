@@ -2,6 +2,7 @@ package io.continuum.portal;
 
 import io.continuum.persistence.entity.DeveloperAuthEntity;
 import io.continuum.persistence.entity.DeveloperEntity;
+import io.continuum.persistence.repository.AccountMembershipRepository;
 import io.continuum.persistence.repository.DeveloperAuthRepository;
 import io.continuum.persistence.repository.DeveloperRepository;
 import org.springframework.stereotype.Service;
@@ -19,15 +20,31 @@ public class PortalService {
 
     private final DeveloperRepository developers;
     private final DeveloperAuthRepository auth;
+    private final AccountMembershipRepository memberships;
     private final PasswordHasher passwordHasher;
     private final PortalSessionService sessions;
 
     public PortalService(DeveloperRepository developers, DeveloperAuthRepository auth,
+                         AccountMembershipRepository memberships,
                          PasswordHasher passwordHasher, PortalSessionService sessions) {
         this.developers = developers;
         this.auth = auth;
+        this.memberships = memberships;
         this.passwordHasher = passwordHasher;
         this.sessions = sessions;
+    }
+
+    /**
+     * The account a login works in.
+     *
+     * <p>Someone who accepted an invite authenticates as themselves but operates
+     * inside the account that invited them, so the session is issued for that
+     * account and every existing tenant check lands on the right data.
+     */
+    private String accountFor(String developerId) {
+        return memberships.findById(developerId)
+                .map(m -> m.getAccountDeveloperId())
+                .orElse(developerId);
     }
 
     @Transactional
@@ -50,8 +67,9 @@ public class PortalService {
         if (dev.isPresent()) {
             DeveloperAuthEntity a = auth.findById(dev.get().getId()).orElse(null);
             if (a != null && passwordHasher.matches(password, a.getPasswordHash())) {
-                return new LoginResult(dev.get().getId(), dev.get().getName(), dev.get().getEmail(),
-                        sessions.issue(dev.get().getId(), PortalSessionService.Role.DEVELOPER));
+                String account = accountFor(dev.get().getId());
+                return new LoginResult(account, dev.get().getName(), dev.get().getEmail(),
+                        sessions.issue(account, PortalSessionService.Role.DEVELOPER));
             }
         }
         throw new IllegalArgumentException("Invalid email or password");

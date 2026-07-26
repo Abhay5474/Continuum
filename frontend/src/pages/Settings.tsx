@@ -16,6 +16,7 @@ export default function Settings() {
   const [me, setMe] = useState<any>(null);
   const [keys, setKeys] = useState<any[]>([]);
   const [invites, setInvites] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
 
   // forms
   const [curPw, setCurPw] = useState("");
@@ -32,6 +33,7 @@ export default function Settings() {
     portal.me().then((m) => { setMe(m); setEmail(m.email ?? ""); }).catch(() => {});
     portal.keys().then(setKeys).catch(() => {});
     portal.invites().then(setInvites).catch(() => {});
+    portal.members().then(setMembers).catch(() => {});
   };
   useEffect(() => {
     if (loggedIn) load();
@@ -94,12 +96,31 @@ export default function Settings() {
   const sendInvite = async () => {
     try {
       const r = await portal.invite(inviteEmail);
-      toast(`Invite created for ${r.email}`, "success");
+      // When mail is not configured the link is the deliverable, so it is shown
+      // rather than left in a response the inviter never sees.
+      toast(
+        r.emailSent ? `Invite emailed to ${r.email}` : `Invite created — copy the link to send it`,
+        "success"
+      );
       setInviteEmail("");
       portal.invites().then(setInvites);
+      portal.members().then(setMembers).catch(() => {});
     } catch (e: any) {
       toast(e?.message ?? "Could not invite", "error");
     }
+  };
+  const revokeInvite = async (id: number) => {
+    try {
+      await portal.revokeInvite(id);
+      toast("Invite revoked", "success");
+      portal.invites().then(setInvites);
+    } catch (e: any) {
+      toast(e?.message ?? "Could not revoke", "error");
+    }
+  };
+  const copyLink = (link: string) => {
+    navigator.clipboard?.writeText(new URL(link, window.location.origin).toString());
+    toast("Invite link copied", "success");
   };
   const deleteAccount = async () => {
     try {
@@ -189,7 +210,21 @@ export default function Settings() {
       </Section>
 
       {/* team */}
-      <Section title="Team" subtitle="Invite a teammate to your workspace (generates an invite link).">
+      <Section
+        title="Team"
+        subtitle="Anyone who accepts an invite signs in with their own password and works in this account."
+      >
+        {members.length > 0 && (
+          <div className="mb-3 space-y-1">
+            {members.map((m) => (
+              <div key={m.developerId} className="flex items-center gap-2 text-xs">
+                <span className="text-slate-300">{m.name}</span>
+                <span className="text-slate-500">{m.email}</span>
+                <span className="rounded bg-edge/60 px-1.5 py-0.5 text-[10px] text-slate-400">{m.role}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="teammate@example.com"
             className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
@@ -201,11 +236,35 @@ export default function Settings() {
         {invites.length > 0 && (
           <div className="mt-2 space-y-1">
             {invites.map((i) => (
-              <div key={i.id} className="flex items-center gap-2 text-xs text-slate-400">
+              <div key={i.id} className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 <span>{i.email}</span>
-                <span className={`rounded px-1.5 py-0.5 ${i.accepted ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"}`}>
-                  {i.accepted ? "accepted" : "pending"}
+                <span
+                  className={`rounded px-1.5 py-0.5 ${
+                    i.accepted
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : i.usable
+                        ? "bg-amber-500/20 text-amber-300"
+                        : "bg-slate-500/20 text-slate-400"
+                  }`}
+                >
+                  {i.accepted ? "accepted" : i.revoked ? "revoked" : i.usable ? "pending" : "expired"}
                 </span>
+                {i.inviteLink && (
+                  <>
+                    <button
+                      onClick={() => copyLink(i.inviteLink)}
+                      className="rounded border border-edge px-1.5 py-0.5 hover:border-aurora/50"
+                    >
+                      Copy link
+                    </button>
+                    <button
+                      onClick={() => revokeInvite(i.id)}
+                      className="rounded border border-rose-500/40 px-1.5 py-0.5 text-rose-300 hover:border-rose-500/70"
+                    >
+                      Revoke
+                    </button>
+                  </>
+                )}
                 <span className="ml-auto text-slate-600">{dateOf(i.createdAt)}</span>
               </div>
             ))}

@@ -39,8 +39,10 @@ public class PortalAuthFilter extends OncePerRequestFilter {
             return;
         }
         String path = request.getRequestURI();
-        // Open routes: anyone can sign up or log in.
-        if (path.endsWith("/login") || path.endsWith("/signup")) {
+        // Open routes: anyone can sign up or log in — and an invitee has no
+        // session yet, so accepting an invite cannot require one.
+        if (path.endsWith("/login") || path.endsWith("/signup")
+                || path.contains("/invites/accept") || path.contains("/invites/preview")) {
             chain.doFilter(request, response);
             return;
         }

@@ -81,9 +81,12 @@ async function portalHttp<T>(path: string, method: string, body?: unknown): Prom
   if (!res.ok) {
     let message = `${res.status}`;
     try {
-      message = (await res.json()).message ?? message;
+      const body = await res.json();
+      // The API reports failures as {error}; some handlers use {message}. Reading
+      // only one of them left the user staring at a bare status code.
+      message = body.message ?? body.error ?? message;
     } catch {
-      /* ignore */
+      /* a non-JSON body leaves the status code as the best available message */
     }
     if (res.status === 401) throw new UnauthorizedError(message);
     throw new Error(message);
@@ -232,4 +235,19 @@ export const portal = {
   deleteAccount: () => portalHttp<any>("/api/portal/developer/account", "DELETE"),
   invites: () => portalHttp<any[]>("/api/portal/developer/account/invites", "GET"),
   invite: (email: string) => portalHttp<any>("/api/portal/developer/account/invites", "POST", { email }),
+  revokeInvite: (id: number) => portalHttp<any>(`/api/portal/developer/account/invites/${id}`, "DELETE"),
+  members: () => portalHttp<any[]>("/api/portal/developer/account/members", "GET"),
+
+  // --- Joining someone else's account (no session yet, by definition) ---
+  previewInvite: (token: string) =>
+    portalHttp<any>(`/api/portal/developer/account/invites/preview?token=${encodeURIComponent(token)}`, "GET"),
+  async acceptInvite(token: string, name: string, password: string) {
+    const r = await portalHttp<any>("/api/portal/developer/account/invites/accept", "POST", {
+      token,
+      name,
+      password,
+    });
+    portal.setSession(r.sessionToken);
+    return r;
+  },
 };

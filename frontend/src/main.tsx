@@ -7,6 +7,7 @@ import RequireAuth from "./components/RequireAuth";
 import Landing from "./pages/Landing";
 import Docs from "./pages/Docs";
 import SignIn from "./pages/SignIn";
+import AcceptInvite from "./pages/AcceptInvite";
 import Dashboard from "./pages/Dashboard";
 import CommandCenter from "./pages/CommandCenter";
 import WorkflowBuilder from "./pages/WorkflowBuilder";
@@ -31,6 +32,8 @@ const router = createBrowserRouter([
   { path: "/", element: <Landing /> },
   { path: "/docs", element: <Docs /> },
   { path: "/signin", element: <SignIn /> },
+  // Open by necessity: an invitee has no account until they accept.
+  { path: "/accept-invite", element: <AcceptInvite /> },
 
   // Console. Every route below requires a session — the APIs behind them are
   // tenant-scoped, so an anonymous visitor has nothing legitimate to render.

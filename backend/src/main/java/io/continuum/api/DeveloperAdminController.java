@@ -1,5 +1,6 @@
 package io.continuum.api;
 
+import io.continuum.billing.BillingService;
 import io.continuum.developer.DeveloperService;
 import io.continuum.persistence.entity.DeveloperApiKeyEntity;
 import io.continuum.persistence.entity.DeveloperEntity;
@@ -22,10 +23,38 @@ public class DeveloperAdminController {
 
     private final DeveloperService developers;
     private final CredentialVaultService vault;
+    private final BillingService billing;
 
-    public DeveloperAdminController(DeveloperService developers, CredentialVaultService vault) {
+    public DeveloperAdminController(DeveloperService developers, CredentialVaultService vault,
+                                    BillingService billing) {
         this.developers = developers;
         this.vault = vault;
+        this.billing = billing;
+    }
+
+    /**
+     * Puts a developer on a plan without payment.
+     *
+     * <p>The counterpart to refusing unpaid self-serve upgrades: manual invoicing,
+     * trials and enterprise deals are real, and they belong here behind the admin
+     * token rather than on an endpoint every customer can call. The grant is
+     * recorded against whoever made it.
+     */
+    @PostMapping("/developers/{id}/plan")
+    public Map<String, Object> grantPlan(@PathVariable String id, @RequestBody GrantPlan req) {
+        BillingService.Plan plan;
+        try {
+            plan = BillingService.Plan.valueOf(req.plan().toUpperCase());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Unknown plan: " + req.plan());
+        }
+        var b = billing.grantPlan(id, plan, req.grantedBy());
+        return Map.of("developerId", id, "plan", b.getPlan(), "planSource", b.getPlanSource(),
+                "grantedBy", b.getGrantedBy() == null ? "operator" : b.getGrantedBy(),
+                "monthlyTokenQuota", b.getMonthlyTokenQuota());
+    }
+
+    public record GrantPlan(String plan, String grantedBy) {
     }
 
     @PostMapping("/developers")

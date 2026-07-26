@@ -114,6 +114,11 @@ export default function Billing() {
       <div className="grid gap-4 sm:grid-cols-3">
         {plans.map((p) => {
           const current = p.id === data?.plan;
+          // An upgrade needs a settled payment. Where the deployment cannot take
+          // one, say so on the button rather than letting it come back 402.
+          const currentPrice = plans.find((x) => x.id === data?.plan)?.monthlyPriceUsd ?? 0;
+          const isUpgrade = p.monthlyPriceUsd > currentPrice;
+          const blocked = isUpgrade && !data?.paymentConfigured;
           return (
             <div
               key={p.id}
@@ -131,7 +136,8 @@ export default function Billing() {
                 {Number(p.monthlyTokenQuota).toLocaleString()} tokens / month
               </div>
               <button
-                disabled={current || switching === p.id}
+                disabled={current || blocked || switching === p.id}
+                title={blocked ? "No payment processor is configured on this deployment" : undefined}
                 onClick={() => changePlan(p.id)}
                 className={`mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
                   current
@@ -140,14 +146,19 @@ export default function Billing() {
                 }`}
               >
                 {switching === p.id && <Spinner className="h-4 w-4 border-ink/40 border-t-ink" />}
-                {current ? "Your plan" : `Switch to ${p.id}`}
+                {current ? "Your plan" : blocked ? "Contact the operator" : isUpgrade ? `Upgrade to ${p.id}` : `Switch to ${p.id}`}
               </button>
             </div>
           );
         })}
       </div>
       <p className="text-center text-xs text-slate-600">
-        This is a mock billing integration — no real payment is processed.
+        {data?.paymentConfigured
+          ? `Payments are processed by ${data.paymentProvider}. Downgrades apply immediately.`
+          : "No payment processor is configured on this deployment, so paid plans cannot be self-served. Downgrades apply immediately; ask the operator to apply a paid plan."}
+        {data?.planSource === "OPERATOR_GRANT" && data?.grantedBy
+          ? ` Your current plan was applied by ${data.grantedBy}.`
+          : ""}
       </p>
     </div>
   );
