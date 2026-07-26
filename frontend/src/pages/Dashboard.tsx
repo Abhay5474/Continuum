@@ -69,7 +69,7 @@ export default function Dashboard() {
       <div className="space-y-6">
         <SkeletonCards />
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="rounded-lg border border-edge bg-panel p-4 lg:col-span-2">
+          <div className="min-w-0 rounded-lg border border-edge bg-panel p-4 lg:col-span-2">
             <SkeletonRows rows={5} />
           </div>
           <div className="rounded-lg border border-edge bg-panel p-4">
@@ -86,6 +86,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-up">
+      {/* This page had no heading at all — reachable from the nav as "Run
+          History" and then announcing itself as nothing. */}
+      <div>
+        <h1 className="text-lg font-semibold tracking-tight text-slate-100">Run History</h1>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Every durable run, its event log and its replay
+        </p>
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Total" value={stats?.total ?? "—"} />
         <StatCard label="Running" value={stats?.running ?? "—"} accent="text-amber-300" />
@@ -100,7 +108,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-lg border border-edge bg-panel lg:col-span-2">
+        <div className="min-w-0 rounded-lg border border-edge bg-panel lg:col-span-2">
           <div className="flex items-center border-b border-edge px-4 py-3">
             <span className="font-medium">Workflows</span>
             {error && <span className="ml-auto text-xs text-rose-400">reconnecting…</span>}

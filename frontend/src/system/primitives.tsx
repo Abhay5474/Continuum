@@ -16,6 +16,38 @@ export function Micro({ children, className = "" }: { children: ReactNode; class
 }
 
 /** A recessed instrument surface. */
+/**
+ * The heading every console page wears.
+ *
+ * <p>Seventeen pages had grown seventeen slightly different headers — some with
+ * tracking, some without, a few with an emoji, three with no heading element at
+ * all. None of that was a decision; it was drift. One component means the
+ * console reads as one instrument, and means a page with no {@code h1} cannot
+ * happen by omission.
+ *
+ * <p>{@code aside} holds whatever the page needs at the top right: a toggle, a
+ * row of readouts, a control.
+ */
+export function PageHeader({
+  title,
+  subtitle,
+  aside,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  aside?: ReactNode;
+}) {
+  return (
+    <header className="flex flex-wrap items-start gap-x-6 gap-y-3">
+      <div className="min-w-0 flex-1">
+        <h1 className="text-lg font-semibold tracking-tight text-slate-100">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+      </div>
+      {aside && <div className="flex flex-wrap items-end gap-x-6 gap-y-3">{aside}</div>}
+    </header>
+  );
+}
+
 export function Plane({
   children,
   className = "",

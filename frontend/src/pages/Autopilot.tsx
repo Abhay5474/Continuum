@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { portal } from "../api";
+import { PageHeader, Plane, Micro } from "../system/primitives";
 
 /**
  * Autopilot — beginner-friendly control plane UI. Reuses the developer session
@@ -64,15 +65,13 @@ export default function Autopilot() {
 
   return (
     <div className="space-y-6">
-      {/* header + toggle */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">🧭 Autopilot</h1>
-          <p className="text-sm text-slate-400">
-            An optional co-pilot that safely tunes your routing, fallback and cost/latency settings.
-          </p>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
+      {/* The nav calls this Optimization; the page called itself Autopilot with
+          an emoji in the heading. One name, no emoji. */}
+      <PageHeader
+        title="Optimization"
+        subtitle="Learns the best routing from your own traffic, and only changes what it can prove is better"
+        aside={
+          <div className="flex items-center gap-3">
           <span className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
             enabled ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-500/20 text-slate-300"}`}>
             {enabled ? "● Autopilot ON" : "○ Autopilot OFF"}
@@ -86,8 +85,9 @@ export default function Autopilot() {
               Turn ON…
             </button>
           )}
-        </div>
-      </div>
+          </div>
+        }
+      />
       {err && <div className="text-sm text-rose-400">{err}</div>}
 
       {/* what does it do — explainer cards */}
@@ -228,28 +228,27 @@ export default function Autopilot() {
 }
 
 function Explainer() {
-  const items = [
-    { icon: "🔀", title: "Smart routing", body: "Learns which provider/model works best for your traffic and reorders them." },
-    { icon: "🛟", title: "Safe by design", body: "Changes are verified, tried on a small % of traffic, then promoted — or rolled back automatically." },
-    { icon: "💸", title: "Cost & latency aware", body: "Respects your budgets. Tunes hedging and timeouts to hit your targets." },
-    { icon: "↩️", title: "Always reversible", body: "One click OFF returns you to standard behavior. Full history is kept." },
+  const items: [string, string][] = [
+    ["Learns from your traffic", "Which provider and model actually performs best for the requests you send, rather than a static preference."],
+    ["Proves before it promotes", "A change runs on a slice of traffic first and is kept only if it measures better. Otherwise it is rolled back."],
+    ["Spends within your budget", "Hedging and timeouts are tuned against your cost and latency targets, not maximised blindly."],
+    ["Reversible at any point", "Turning it off restores standard behaviour immediately, and every decision it made stays on the record."],
   ];
   return (
-    <div className="rounded-lg border border-edge bg-panel p-5">
-      <div className="font-medium">What does Autopilot do?</div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((i) => (
-          <div key={i.title} className="rounded-md border border-edge bg-ink p-3 transition-transform hover:-translate-y-0.5">
-            <div className="text-xl">{i.icon}</div>
-            <div className="mt-1 text-sm font-medium">{i.title}</div>
-            <div className="mt-1 text-xs text-slate-400">{i.body}</div>
+    <Plane className="p-5">
+      <Micro>What optimization does</Micro>
+      <dl className="mt-4 grid gap-x-10 gap-y-5 sm:grid-cols-2">
+        {items.map(([title, body]) => (
+          <div key={title} className="border-l border-edge pl-4">
+            <dt className="text-sm font-medium text-slate-200">{title}</dt>
+            <dd className="mt-1 text-xs leading-relaxed text-slate-500">{body}</dd>
           </div>
         ))}
-      </div>
-      <div className="mt-3 text-xs text-slate-500">
-        Autopilot is <b>off by default</b>. With it off, your app behaves exactly as it does today.
-      </div>
-    </div>
+      </dl>
+      <p className="mt-5 border-t border-edge/70 pt-4 text-xs text-slate-500">
+        Off by default. While it is off your app behaves exactly as it does today.
+      </p>
+    </Plane>
   );
 }
 

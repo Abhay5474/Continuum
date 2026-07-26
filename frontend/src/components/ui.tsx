@@ -71,13 +71,13 @@ export function EmptyState({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-edge/80 px-6 py-12 text-center animate-fade-up">
+    <div className="flex min-w-0 flex-col items-center justify-center rounded-xl border border-dashed border-edge/80 px-6 py-12 text-center animate-fade-up">
       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-aurora/10 text-2xl text-indigo-300">
         {icon}
       </div>
       <div className="text-sm font-semibold text-slate-200">{title}</div>
       {hint && <div className="mt-1 max-w-md text-xs text-slate-500">{hint}</div>}
-      {children && <div className="mt-4 w-full max-w-lg">{children}</div>}
+      {children && <div className="mt-4 w-full min-w-0 max-w-lg">{children}</div>}
     </div>
   );
 }

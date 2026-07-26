@@ -41,7 +41,7 @@ export default function Settings() {
 
   if (!loggedIn) {
     return (
-      <div className="glass mx-auto mt-16 max-w-md p-8 text-center">
+      <div className="plane mx-auto mt-16 max-w-md p-8 text-center">
         <div className="text-3xl">⚙️</div>
         <h1 className="mt-2 text-lg font-semibold">Account settings</h1>
         <p className="mt-1 text-sm text-slate-400">Sign in through the Developer Portal first.</p>
@@ -136,8 +136,8 @@ export default function Settings() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 animate-fade-up">
       <div>
-        <h1 className="text-lg font-semibold">Account &amp; settings</h1>
-        {me && <p className="text-sm text-slate-400">{me.email} · <span className="font-mono">{me.id}</span></p>}
+        <h1 className="text-lg font-semibold tracking-tight text-slate-100">Account Settings</h1>
+        {me && <p className="mt-0.5 text-sm text-slate-500">{me.email} · <span className="font-mono">{me.id}</span></p>}
       </div>
 
       {/* API keys */}
@@ -294,7 +294,7 @@ export default function Settings() {
 
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: import("react").ReactNode }) {
   return (
-    <div className="glass p-5">
+    <div className="plane p-5">
       <div className="text-sm font-semibold">{title}</div>
       {subtitle && <div className="mt-0.5 text-xs text-slate-400">{subtitle}</div>}
       <div className="mt-3">{children}</div>

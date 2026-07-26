@@ -29,8 +29,8 @@ export default function Memory() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold">Long-Context Memory</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-lg font-semibold tracking-tight text-slate-100">Memory</h1>
+        <p className="mt-0.5 text-sm text-slate-500">
           Hierarchical memory (working → episodic → long-term → archived) stored outside the context
           window. Retrieval ranks by relevance, recency and salience; compression summarizes cold memories.
         </p>

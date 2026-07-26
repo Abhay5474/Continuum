@@ -75,7 +75,7 @@ export default function SignIn() {
             Your workspace, keys and usage are private to your account.
           </p>
 
-          <div className="glass mt-6 p-6">
+          <div className="plane mt-6 p-6">
             <div className="mb-4 flex gap-1 rounded-lg bg-ink p-1">
               {tab("login", "Sign in")}
               {tab("signup", "Create account")}

@@ -34,6 +34,10 @@ export default function CommandCenter() {
       <div className="pointer-events-none absolute inset-0 grid-field opacity-70" />
 
       <div className="relative px-4 pt-5">
+        {/* The visual heading here is the state readout below, which is the
+            right call for an instrument. A screen reader still needs the page
+            named, so the heading exists — it just is not drawn twice. */}
+        <h1 className="sr-only">Command Centre</h1>
         {/* ---- system header: the one-line state of the world ---- */}
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3 border-b border-edge/60 pb-4">
           <div>

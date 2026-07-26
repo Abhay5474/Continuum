@@ -325,7 +325,7 @@ function DocsHeader() {
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-lg font-bold text-ink shadow-glow-sm">
             ⟳
           </span>
-          <span className="text-lg font-bold tracking-tight text-gradient">Continuum</span>
+          <span className="text-lg font-semibold tracking-tight text-slate-100">Continuum</span>
           <span className="hidden text-[10px] uppercase tracking-widest text-slate-500 sm:block">Docs</span>
         </Link>
         <nav className="ml-auto flex min-w-0 shrink items-center gap-1.5 sm:gap-2">

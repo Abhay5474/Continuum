@@ -42,7 +42,7 @@ export default function Billing() {
 
   if (!loggedIn) {
     return (
-      <div className="glass mx-auto mt-16 max-w-md p-8 text-center">
+      <div className="plane mx-auto mt-16 max-w-md p-8 text-center">
         <div className="text-3xl">💳</div>
         <h1 className="mt-2 text-lg font-semibold">Billing</h1>
         <p className="mt-1 text-sm text-slate-400">Sign in through the Developer Portal to view your plan and usage.</p>
@@ -56,8 +56,8 @@ export default function Billing() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="glass p-6"><SkeletonRows rows={3} /></div>
-        <div className="glass p-6"><SkeletonRows rows={3} /></div>
+        <div className="plane p-6"><SkeletonRows rows={3} /></div>
+        <div className="plane p-6"><SkeletonRows rows={3} /></div>
       </div>
     );
   }
@@ -70,16 +70,16 @@ export default function Billing() {
   return (
     <div className="space-y-6 animate-fade-up">
       <div>
-        <h1 className="text-lg font-semibold">Billing &amp; usage</h1>
-        <p className="text-sm text-slate-400">Your plan, this month's token usage, and quota.</p>
+        <h1 className="text-lg font-semibold tracking-tight text-slate-100">Billing &amp; Usage</h1>
+        <p className="mt-0.5 text-sm text-slate-500">Your plan, this month's token usage, and quota.</p>
       </div>
 
       {/* usage meter */}
-      <div className="glass p-6">
+      <div className="plane p-6">
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <div className="text-xs uppercase tracking-wide text-slate-500">Current plan</div>
-            <div className="text-2xl font-bold text-gradient">{data?.plan}</div>
+            <div className="text-2xl font-semibold text-slate-100">{data?.plan}</div>
           </div>
           <div className="ml-auto text-right">
             <div className="text-xs text-slate-500">This month</div>

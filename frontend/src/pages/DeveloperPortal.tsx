@@ -41,13 +41,13 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
   return (
     <div className="relative mx-auto mt-8 max-w-md animate-fade-up">
       <div className="pointer-events-none absolute inset-0 -z-10 rounded-3xl bg-aurora/10 blur-3xl" />
-      <div className="glass p-7">
+      <div className="plane p-7">
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-lg font-bold text-ink shadow-glow-sm">
             ⟳
           </span>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-gradient">Developer Portal</h1>
+            <h1 className="text-lg font-semibold tracking-tight text-slate-100">Developer Portal</h1>
             <p className="text-xs text-slate-400">Your API keys, credentials and analytics.</p>
           </div>
         </div>
@@ -222,13 +222,13 @@ function Portal({ onLogout }: { onLogout: () => void }) {
     <div className="space-y-6">
       {/* Billing / Settings / Sign out live in the account menu in the header. */}
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-lg font-semibold">API Keys &amp; Providers</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-slate-100">API Keys &amp; Providers</h1>
         {me && <span className="text-sm text-slate-400">{me.email} · <span className="font-mono">{me.id}</span></span>}
       </div>
 
       {/* onboarding — the magic moment: get a key → copy a snippet → first call */}
       {(keys.length === 0 || newKey) && (
-        <div className="glass overflow-hidden p-5 animate-fade-up">
+        <div className="plane overflow-hidden p-5 animate-fade-up">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-aurora/15 px-2.5 py-0.5 text-xs font-semibold text-indigo-300">
               Get started
