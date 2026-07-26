@@ -28,7 +28,16 @@ public class AiChaosEngine {
 
     private static final Logger log = LoggerFactory.getLogger(AiChaosEngine.class);
 
-    private final Map<AiFailureType, Double> rates = new ConcurrentHashMap<>();
+    /**
+     * Injection rates per tenant, plus an engine-wide profile under
+     * {@link #GLOBAL} that only the operator can arm.
+     *
+     * <p>These were global. On a shared engine that meant one developer running a
+     * hallucination drill corrupted every other tenant's model responses, which
+     * makes the feature unusable in production — the opposite of its purpose.
+     */
+    private static final String GLOBAL = "\u0000global";
+    private final Map<String, Map<AiFailureType, Double>> rates = new ConcurrentHashMap<>();
 
     private final HallucinationInjector hallucination;
     private final SchemaCorruptionInjector schema;
@@ -51,22 +60,37 @@ public class AiChaosEngine {
         this.eventRepo = eventRepo;
     }
 
+    /**
+     * Whether anything is armed for the work this thread is doing — the current
+     * tenant's own drill, or the operator's engine-wide one.
+     */
     public boolean isActive() {
-        return rates.values().stream().anyMatch(r -> r > 0);
+        String dev = io.continuum.portal.TenantContext.developerId();
+        return isActive(null) || (dev != null && isActive(dev));
     }
 
-    public void setRate(AiFailureType type, double rate) {
-        rates.put(type, Math.max(0, Math.min(1, rate)));
+    /** Whether anything is armed for the given scope (null = engine-wide). */
+    public boolean isActive(String developerId) {
+        return profile(developerId).values().stream().anyMatch(r -> r > 0);
     }
 
-    public void reset() {
-        rates.clear();
+    public void setRate(String developerId, AiFailureType type, double rate) {
+        profile(developerId).put(type, Math.max(0, Math.min(1, rate)));
     }
 
-    public Map<String, Double> state() {
+    public void reset(String developerId) {
+        profile(developerId).clear();
+    }
+
+    private Map<AiFailureType, Double> profile(String developerId) {
+        return rates.computeIfAbsent(developerId == null ? GLOBAL : developerId,
+                k -> new ConcurrentHashMap<>());
+    }
+
+    public Map<String, Double> state(String developerId) {
         Map<String, Double> out = new java.util.LinkedHashMap<>();
         for (AiFailureType t : AiFailureType.values()) {
-            out.put(t.name(), rates.getOrDefault(t, 0.0));
+            out.put(t.name(), profile(developerId).getOrDefault(t, 0.0));
         }
         return out;
     }
@@ -121,15 +145,28 @@ public class AiChaosEngine {
         return memory;
     }
 
+    /**
+     * Fires if either the current tenant's profile or the operator's global one
+     * is armed for this failure type.
+     */
     private boolean fire(AiFailureType type) {
-        double rate = rates.getOrDefault(type, 0.0);
+        String dev = io.continuum.portal.TenantContext.developerId();
+        double rate = profile(GLOBAL).getOrDefault(type, 0.0);
+        if (dev != null) {
+            Map<AiFailureType, Double> mine = rates.get(dev);
+            if (mine != null) {
+                rate = Math.max(rate, mine.getOrDefault(type, 0.0));
+            }
+        }
         return rate > 0 && ThreadLocalRandom.current().nextDouble() < rate;
     }
 
     private void record(String workflowId, AiFailureType type, Long seq, String detail) {
         log.warn("AI-CHAOS: injected {} into workflow {} (seq {})", type, workflowId, seq);
         try {
-            eventRepo.save(new AiChaosEventEntity(workflowId, type.name(), seq, detail));
+            AiChaosEventEntity row = new AiChaosEventEntity(workflowId, type.name(), seq, detail);
+            row.setDeveloperId(io.continuum.portal.TenantContext.developerId());
+            eventRepo.save(row);
         } catch (Exception e) {
             log.debug("could not persist ai-chaos event: {}", e.getMessage());
         }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../api";
+import { api, isOperator } from "../api";
 import { Micro, Readout, Plane, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
@@ -34,6 +34,10 @@ const RT_TABS = [
 ] as const;
 
 export default function ModelRouter() {
+  // Routing objective and hedging policy apply to the whole engine, so they are
+  // the operator's to change. Shown either way — a disabled control that
+  // explains itself beats one that returns 403.
+  const operator = isOperator();
   const [tab, setTab] = useState<"network" | "learning" | "probe">("network");
   const [routing, setRouting] = useState<any | null>(null);
   const [providers, setProviders] = useState<any[]>([]);
@@ -119,7 +123,9 @@ export default function ModelRouter() {
             <Micro>Router</Micro>
             <button
               onClick={() => api.post(`/api/routing/enable?enabled=${!routing?.enabled}`).then(refresh)}
-              className="mt-1 flex items-center gap-2 rounded border border-edge px-3 py-1.5 text-xs transition-colors hover:border-aurora/50"
+              disabled={!operator}
+              title={operator ? undefined : "Engine-wide setting — operator only"}
+              className="mt-1 flex items-center gap-2 rounded border border-edge px-3 py-1.5 text-xs transition-colors hover:border-aurora/50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-edge"
             >
               <StateDot state={routing?.enabled ? "healthy" : "idle"} />
               {routing?.enabled ? "Enabled" : "Disabled"}
@@ -130,7 +136,9 @@ export default function ModelRouter() {
             <select
               value={routing?.mode ?? "BALANCED"}
               onChange={(e) => api.post(`/api/routing/mode?mode=${e.target.value}`).then(refresh)}
-              className="mt-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-aurora/60"
+              disabled={!operator}
+              title={operator ? undefined : "Engine-wide setting — operator only"}
+              className="mt-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-aurora/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {MODES.map((m) => (
                 <option key={m}>{m}</option>
@@ -260,7 +268,9 @@ export default function ModelRouter() {
             <Micro>Tail-latency hedging</Micro>
             <button
               onClick={() => api.post(`/api/hedging/enable?enabled=${!hedging?.enabled}`).then(refresh)}
-              className="flex items-center gap-1.5 rounded border border-edge px-2 py-1 text-[10px] transition-colors hover:border-aurora/50"
+              disabled={!operator}
+              title={operator ? undefined : "Engine-wide setting — operator only"}
+              className="flex items-center gap-1.5 rounded border border-edge px-2 py-1 text-[10px] transition-colors hover:border-aurora/50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-edge"
             >
               <StateDot state={hedging?.enabled ? "healthy" : "idle"} size={6} />
               {hedging?.enabled ? "On" : "Off"}

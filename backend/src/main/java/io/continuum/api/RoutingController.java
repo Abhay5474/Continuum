@@ -5,7 +5,9 @@ import io.continuum.persistence.entity.RoutingDecisionEntity;
 import io.continuum.persistence.repository.RoutingDecisionRepository;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.Message;
+import io.continuum.portal.RequestScope;
 import io.continuum.routing.*;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
 
@@ -66,9 +68,16 @@ public class RoutingController {
         return Map.of("enabled", state.isEnabled(), "mode", state.getMode());
     }
 
+    /**
+     * Routing mode is engine-wide configuration, so changing it is the operator's
+     * call. A tenant flipping the mode would silently re-route every other
+     * tenant's traffic; reads stay open so a developer can see what they are on.
+     */
     @PostMapping("/enable")
     public Map<String, Object> enable(@RequestParam(defaultValue = "true") boolean enabled,
-                                      @RequestParam(required = false) RoutingMode mode) {
+                                      @RequestParam(required = false) RoutingMode mode,
+                                      HttpServletRequest req) {
+        requireOperator(req);
         state.setEnabled(enabled);
         if (mode != null) {
             state.setMode(mode);
@@ -77,7 +86,8 @@ public class RoutingController {
     }
 
     @PostMapping("/mode")
-    public Map<String, Object> setMode(@RequestParam RoutingMode mode) {
+    public Map<String, Object> setMode(@RequestParam RoutingMode mode, HttpServletRequest req) {
+        requireOperator(req);
         state.setMode(mode);
         return getState();
     }
@@ -98,9 +108,21 @@ public class RoutingController {
         return engine.select(request, RoutingPolicy.of(mode));
     }
 
+    /** The caller's own routing history; engine-wide only for the operator. */
     @GetMapping("/decisions")
-    public List<RoutingDecisionEntity> decisions(@RequestParam(defaultValue = "100") int limit) {
-        return decisions.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit)).getContent();
+    public List<RoutingDecisionEntity> decisions(@RequestParam(defaultValue = "100") int limit,
+                                                 HttpServletRequest req) {
+        PageRequest page = PageRequest.of(0, Math.max(1, Math.min(500, limit)));
+        return (RequestScope.isOperator(req)
+                ? decisions.findAllByOrderByCreatedAtDesc(page)
+                : decisions.findByDeveloperIdOrderByCreatedAtDesc(RequestScope.requireDeveloper(req), page))
+                .getContent();
+    }
+
+    private static void requireOperator(HttpServletRequest req) {
+        if (!RequestScope.isOperator(req)) {
+            throw new RequestScope.ForbiddenException();
+        }
     }
 
     public record SelectRequest(String systemPrompt, String userPrompt, RoutingMode mode, Integer maxTokens) {

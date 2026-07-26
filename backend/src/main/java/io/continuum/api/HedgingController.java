@@ -2,13 +2,19 @@ package io.continuum.api;
 
 import io.continuum.hedging.HedgingPolicy;
 import io.continuum.hedging.HedgingService;
+import io.continuum.portal.RequestScope;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 /**
- * Extension 4 — Tail Latency Hedging API. Toggle hedging and tune its threshold,
- * fan-out cap and per-request cost budget.
+ * Tail Latency Hedging API: toggle hedging and tune its threshold, fan-out cap
+ * and per-request cost budget.
+ *
+ * <p>Hedging spends real money — a hedge is a duplicate provider call — and the
+ * policy applies to the whole engine, so tuning it is the operator's decision.
+ * Developers can read the policy and the live latency metrics.
  */
 @RestController
 @RequestMapping("/api/hedging")
@@ -45,14 +51,18 @@ public class HedgingController {
                                               @RequestParam(defaultValue = "800") long thresholdMs,
                                               @RequestParam(defaultValue = "50") long minThresholdMs,
                                               @RequestParam(defaultValue = "1") int maxHedges,
-                                              @RequestParam(required = false) Double budgetUsd) {
+                                              @RequestParam(required = false) Double budgetUsd,
+                                              HttpServletRequest req) {
+        requireOperator(req);
         hedging.setPolicy(new HedgingPolicy(thresholdMs, maxHedges, budgetUsd,
                 adaptive, hedgeRateCap, minThresholdMs));
         return state();
     }
 
     @PostMapping("/enable")
-    public Map<String, Object> enable(@RequestParam(defaultValue = "true") boolean enabled) {
+    public Map<String, Object> enable(@RequestParam(defaultValue = "true") boolean enabled,
+                                      HttpServletRequest req) {
+        requireOperator(req);
         hedging.setEnabled(enabled);
         return state();
     }
@@ -60,8 +70,16 @@ public class HedgingController {
     @PostMapping("/policy")
     public Map<String, Object> policy(@RequestParam long thresholdMs,
                                       @RequestParam(defaultValue = "1") int maxHedges,
-                                      @RequestParam(required = false) Double budgetUsd) {
+                                      @RequestParam(required = false) Double budgetUsd,
+                                      HttpServletRequest req) {
+        requireOperator(req);
         hedging.setPolicy(new HedgingPolicy(thresholdMs, maxHedges, budgetUsd));
         return state();
+    }
+
+    private static void requireOperator(HttpServletRequest req) {
+        if (!RequestScope.isOperator(req)) {
+            throw new RequestScope.ForbiddenException();
+        }
     }
 }

@@ -91,6 +91,28 @@ async function portalHttp<T>(path: string, method: string, body?: unknown): Prom
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
+/**
+ * The signed-in role, read from the session token's own payload.
+ *
+ * <p>Purely to decide what to render: engine-wide settings are the operator's,
+ * so offering a developer a switch that will come back 403 is a worse experience
+ * than showing it disabled and saying why. The server enforces this regardless —
+ * nothing here is a security decision.
+ */
+export function sessionRole(): "DEVELOPER" | "OPERATOR" | null {
+  const t = localStorage.getItem(SESSION_KEY);
+  if (!t || !t.includes(".")) return null;
+  try {
+    const payload = atob(t.split(".")[0].replace(/-/g, "+").replace(/_/g, "/"));
+    const role = payload.split(":")[0];
+    return role === "OPERATOR" || role === "DEVELOPER" ? role : null;
+  } catch {
+    return null;
+  }
+}
+
+export const isOperator = () => sessionRole() === "OPERATOR";
+
 export const portal = {
   session: () => localStorage.getItem(SESSION_KEY),
   setSession: (t: string | null) =>

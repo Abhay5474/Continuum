@@ -25,6 +25,11 @@ export default function ChaosPanel() {
           Inject faults at runtime, then start workflows and watch the runtime recover. The
           guarantee: workflows still complete, and side effects still fire exactly once.
         </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Faults you arm here apply to your account's traffic only — your requests, your
+          workflows, your deliveries. Nobody else on the engine sees them, so a drill is safe
+          to run against production.
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

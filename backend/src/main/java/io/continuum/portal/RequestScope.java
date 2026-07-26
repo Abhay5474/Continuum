@@ -23,6 +23,21 @@ public final class RequestScope {
         return v == null ? null : v.toString();
     }
 
+    /**
+     * The signed-in developer, or a refusal.
+     *
+     * <p>Use this wherever {@code null} would mean "engine-wide" — returning an
+     * unscoped result because a tenant could not be resolved is exactly the
+     * failure mode that leaks one customer's data to another, so it fails closed.
+     */
+    public static String requireDeveloper(HttpServletRequest request) {
+        String id = developerId(request);
+        if (id == null) {
+            throw new ForbiddenException();
+        }
+        return id;
+    }
+
     /** True when the caller is the engine operator rather than a tenant. */
     public static boolean isOperator(HttpServletRequest request) {
         return Boolean.TRUE.equals(request.getAttribute(ConsoleAuthFilter.OPERATOR_ATTRIBUTE));

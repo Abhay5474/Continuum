@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.continuum.portal.ConsoleAuthFilter;
 import io.continuum.portal.PortalAuthFilter;
 import io.continuum.portal.PortalSessionService;
+import io.continuum.portal.RateLimitFilter;
+import io.continuum.portal.RateLimiter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +19,23 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class GatewaySecurityConfig {
+
+    /**
+     * Rate limiting, ordered ahead of every authentication filter.
+     *
+     * <p>It has to run first to be worth anything: the expensive work on the login
+     * path is verifying the password, so a limiter that only sees authenticated
+     * requests would never see the attack it exists to stop.
+     */
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilter(
+            RateLimiter limiter, PortalSessionService sessions, ObjectMapper mapper) {
+        FilterRegistrationBean<RateLimitFilter> reg = new FilterRegistrationBean<>();
+        reg.setFilter(new RateLimitFilter(limiter, sessions, mapper));
+        reg.addUrlPatterns("/api/*", "/v1/*");
+        reg.setOrder(0);
+        return reg;
+    }
 
     @Bean
     public FilterRegistrationBean<ApiKeyAuthenticationFilter> gatewayAuthFilter(

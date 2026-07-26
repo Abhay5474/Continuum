@@ -3,6 +3,8 @@ package io.continuum.semantic;
 import io.continuum.activities.LlmActivity;
 import io.continuum.common.Json;
 import io.continuum.core.event.Payloads;
+import io.continuum.declarative.DeterministicReplayVerifier;
+import io.continuum.persistence.entity.WorkflowInstanceEntity;
 import io.continuum.persistence.entity.ReplayVerificationReportEntity;
 import io.continuum.persistence.entity.WorkflowEventEntity;
 import io.continuum.persistence.repository.ReplayVerificationReportRepository;
@@ -42,24 +44,32 @@ public class SemanticReplayVerifier {
     private final ReplayVerificationReportRepository reports;
     private final SemanticComparator comparator;
     private final ProviderRouter router;
+    private final DeterministicReplayVerifier deterministic;
     private final Json json;
 
     public SemanticReplayVerifier(WorkflowEventRepository events, WorkflowInstanceRepository instances,
                                   ReplayVerificationReportRepository reports, SemanticComparator comparator,
-                                  ProviderRouter router, Json json) {
+                                  ProviderRouter router, DeterministicReplayVerifier deterministic, Json json) {
         this.events = events;
         this.instances = instances;
         this.reports = reports;
         this.comparator = comparator;
         this.router = router;
+        this.deterministic = deterministic;
         this.json = json;
     }
 
     @Transactional
     public ReplayVerificationReport verify(String workflowId, ReplayVerificationPolicy policy) {
-        if (instances.findById(workflowId).isEmpty()) {
-            throw new IllegalArgumentException("No such workflow: " + workflowId);
-        }
+        WorkflowInstanceEntity instance = instances.findById(workflowId)
+                .orElseThrow(() -> new IllegalArgumentException("No such workflow: " + workflowId));
+
+        // Steps whose inputs and results are recorded are checked by replaying the
+        // decisions rather than re-issuing the calls: re-running a charge to see
+        // whether it still charges is not a verification, it is a second charge.
+        DeterministicReplayVerifier.Result det =
+                deterministic.verify(workflowId, instance.getWorkflowType(), instance.getInput());
+
         List<WorkflowEventEntity> history = events.findByWorkflowIdOrderBySequenceNumberAsc(workflowId);
 
         // Pair LLM activity inputs (from ACTIVITY_SCHEDULED) with outputs (ACTIVITY_COMPLETED).
@@ -121,7 +131,7 @@ public class SemanticReplayVerifier {
             items.add(reports.save(report));
         }
 
-        return aggregate(workflowId, items);
+        return aggregate(workflowId, items, det);
     }
 
     /** Optional LLM-as-judge: blend a model's equivalence rating with the lexical score. */
@@ -158,9 +168,21 @@ public class SemanticReplayVerifier {
         return m.find() ? Math.min(1.0, Double.parseDouble(m.group(1))) : -1;
     }
 
-    private ReplayVerificationReport aggregate(String workflowId, List<ReplayVerificationReportEntity> items) {
+    private ReplayVerificationReport aggregate(String workflowId, List<ReplayVerificationReportEntity> items,
+                                               DeterministicReplayVerifier.Result det) {
         if (items.isEmpty()) {
-            return new ReplayVerificationReport(workflowId, 0, 0, 0, 1.0, 0.0, 1.0, items);
+            // No model calls. The verdict then rests entirely on the deterministic
+            // check — and if that had nothing to check either, the honest answer is
+            // that nothing was verified, not that everything passed.
+            if (!det.applicable() || det.checked() == 0) {
+                return new ReplayVerificationReport(workflowId,
+                        ReplayVerificationReport.NOTHING_TO_VERIFY, 0, 0, 0,
+                        null, null, null, det, items);
+            }
+            return new ReplayVerificationReport(workflowId,
+                    det.diverged() == 0 ? ReplayVerificationReport.VERIFIED : ReplayVerificationReport.DIVERGED,
+                    det.checked(), det.matched(), det.diverged(),
+                    null, null, null, det, items);
         }
         double overallSum = 0, simSum = 0, intentSum = 0;
         int intentCount = 0, passed = 0;
@@ -178,9 +200,17 @@ public class SemanticReplayVerifier {
         int n = items.size();
         double replayConfidence = overallSum / n;
         double semanticDrift = 1.0 - (simSum / n);
-        double decisionConsistency = intentCount == 0 ? 1.0 : intentSum / intentCount;
-        return new ReplayVerificationReport(workflowId, n, passed, n - passed,
-                replayConfidence, semanticDrift, decisionConsistency, items);
+        Double decisionConsistency = intentCount == 0 ? null : intentSum / intentCount;
+
+        // Both kinds of check count towards the verdict; a deterministic
+        // divergence fails the run even if every model output still matches.
+        int checked = n + det.checked();
+        int passedTotal = passed + det.matched();
+        String verdict = passedTotal == checked
+                ? ReplayVerificationReport.VERIFIED
+                : ReplayVerificationReport.DIVERGED;
+        return new ReplayVerificationReport(workflowId, verdict, checked, passedTotal, checked - passedTotal,
+                replayConfidence, semanticDrift, decisionConsistency, det, items);
     }
 
     public List<ReplayVerificationReportEntity> reportsFor(String workflowId) {

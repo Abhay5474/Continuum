@@ -1,97 +1,124 @@
 package io.continuum.chaos;
 
+import io.continuum.portal.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Centralized fault injection so the system's resilience can be demonstrated on
- * demand. Toggled at runtime via the chaos API. Everything here is a no-op
- * unless explicitly enabled, so production behavior is unaffected.
+ * Fault injection, scoped to the tenant that asked for it.
+ *
+ * <p>Fault injection used to be a single global switch. On a shared engine that
+ * made it a denial-of-service primitive: any signed-up developer could mark the
+ * primary provider down and every other tenant's traffic failed over with them.
+ * A drill has to be safe to run on a Tuesday afternoon in production, so each
+ * developer now gets their own fault profile and only their own requests,
+ * activities and deliveries see it.
+ *
+ * <p>The engine operator keeps a separate global profile for exercising the whole
+ * system. Faults compose: a tenant's request is affected if either its own
+ * profile or the global one fires.
+ *
+ * <p>The tenant comes from {@link TenantContext} rather than a parameter, because
+ * the call sites are providers, activities and outbox sinks that have no business
+ * knowing about tenancy.
  */
 @Component
 public class ChaosMonkey {
 
     private static final Logger log = LoggerFactory.getLogger(ChaosMonkey.class);
 
-    /** Probability [0,1] that any activity randomly throws before doing work. */
-    private volatile double activityFailureRate = 0.0;
+    /** The operator's engine-wide profile. */
+    private final Faults global = new Faults();
 
-    /** Probability [0,1] that an outbox sink delivery throws. */
-    private volatile double sinkFailureRate = 0.0;
-
-    /** When true, the primary LLM provider always fails (forces failover). */
-    private final AtomicBoolean primaryProviderDown = new AtomicBoolean(false);
-
-    /** Artificial latency (ms) injected into activities. */
-    private volatile long activityLatencyMs = 0;
-
-    /**
-     * If > 0, the worker is asked to "die" (throw a hard error) after this many
-     * activity executions, simulating a crash mid-flight. Counts down.
-     */
-    private final AtomicInteger crashAfterActivities = new AtomicInteger(0);
+    /** Per-developer profiles, created on first use and dropped on reset. */
+    private final Map<String, Faults> perTenant = new ConcurrentHashMap<>();
 
     public void maybeFailActivity(String activityType) {
-        if (activityLatencyMs > 0) {
-            sleep(activityLatencyMs);
+        Faults tenant = current();
+
+        long latency = Math.max(global.activityLatencyMs, tenant == null ? 0 : tenant.activityLatencyMs);
+        if (latency > 0) {
+            sleep(latency);
         }
-        if (crashAfterActivities.get() > 0 && crashAfterActivities.decrementAndGet() == 0) {
+        if (global.consumeCrash() || (tenant != null && tenant.consumeCrash())) {
             log.warn("CHAOS: simulating worker crash during activity '{}'", activityType);
             throw new SimulatedCrashError("Simulated worker crash during " + activityType);
         }
-        if (activityFailureRate > 0 && ThreadLocalRandom.current().nextDouble() < activityFailureRate) {
+        double rate = Math.max(global.activityFailureRate, tenant == null ? 0 : tenant.activityFailureRate);
+        if (rate > 0 && ThreadLocalRandom.current().nextDouble() < rate) {
             log.warn("CHAOS: injecting failure into activity '{}'", activityType);
             throw new RuntimeException("CHAOS: injected activity failure");
         }
     }
 
     public void maybeFailSink(String destination) throws Exception {
-        if (sinkFailureRate > 0 && ThreadLocalRandom.current().nextDouble() < sinkFailureRate) {
+        Faults tenant = current();
+        double rate = Math.max(global.sinkFailureRate, tenant == null ? 0 : tenant.sinkFailureRate);
+        if (rate > 0 && ThreadLocalRandom.current().nextDouble() < rate) {
             log.warn("CHAOS: injecting failure into sink '{}'", destination);
             throw new Exception("CHAOS: injected sink failure");
         }
     }
 
     public boolean isPrimaryProviderDown() {
-        return primaryProviderDown.get();
+        Faults tenant = current();
+        return global.primaryProviderDown.get() || (tenant != null && tenant.primaryProviderDown.get());
     }
 
-    public void setPrimaryProviderDown(boolean down) {
-        primaryProviderDown.set(down);
+    // --- control plane -------------------------------------------------------
+    // A null developerId addresses the operator's global profile; anything else
+    // addresses that tenant's own profile.
+
+    public void setPrimaryProviderDown(String developerId, boolean down) {
+        profile(developerId).primaryProviderDown.set(down);
     }
 
-    public void setActivityFailureRate(double rate) {
-        this.activityFailureRate = clamp(rate);
+    public void setActivityFailureRate(String developerId, double rate) {
+        profile(developerId).activityFailureRate = clamp(rate);
     }
 
-    public void setSinkFailureRate(double rate) {
-        this.sinkFailureRate = clamp(rate);
+    public void setSinkFailureRate(String developerId, double rate) {
+        profile(developerId).sinkFailureRate = clamp(rate);
     }
 
-    public void setActivityLatencyMs(long ms) {
-        this.activityLatencyMs = Math.max(0, ms);
+    public void setActivityLatencyMs(String developerId, long ms) {
+        profile(developerId).activityLatencyMs = Math.max(0, ms);
     }
 
-    public void scheduleCrashAfter(int activities) {
-        this.crashAfterActivities.set(Math.max(0, activities));
+    public void scheduleCrashAfter(String developerId, int activities) {
+        profile(developerId).crashAfterActivities.set(Math.max(0, activities));
     }
 
-    public ChaosState state() {
-        return new ChaosState(activityFailureRate, sinkFailureRate, primaryProviderDown.get(),
-                activityLatencyMs, crashAfterActivities.get());
+    /** The caller's own view: what they have armed, not what anyone else has. */
+    public ChaosState state(String developerId) {
+        Faults f = profile(developerId);
+        return new ChaosState(f.activityFailureRate, f.sinkFailureRate, f.primaryProviderDown.get(),
+                f.activityLatencyMs, f.crashAfterActivities.get(), developerId == null ? "engine" : "account");
     }
 
-    public void reset() {
-        activityFailureRate = 0;
-        sinkFailureRate = 0;
-        primaryProviderDown.set(false);
-        activityLatencyMs = 0;
-        crashAfterActivities.set(0);
+    public void reset(String developerId) {
+        if (developerId == null) {
+            global.reset();
+        } else {
+            perTenant.remove(developerId);
+        }
+    }
+
+    private Faults profile(String developerId) {
+        return developerId == null ? global : perTenant.computeIfAbsent(developerId, k -> new Faults());
+    }
+
+    /** The profile of whoever this thread is working for, if anyone. */
+    private Faults current() {
+        String dev = TenantContext.developerId();
+        return dev == null ? null : perTenant.get(dev);
     }
 
     private static double clamp(double v) {
@@ -106,8 +133,29 @@ public class ChaosMonkey {
         }
     }
 
+    /** One profile's armed faults. */
+    private static final class Faults {
+        volatile double activityFailureRate = 0.0;
+        volatile double sinkFailureRate = 0.0;
+        final AtomicBoolean primaryProviderDown = new AtomicBoolean(false);
+        volatile long activityLatencyMs = 0;
+        final AtomicInteger crashAfterActivities = new AtomicInteger(0);
+
+        boolean consumeCrash() {
+            return crashAfterActivities.get() > 0 && crashAfterActivities.decrementAndGet() == 0;
+        }
+
+        void reset() {
+            activityFailureRate = 0;
+            sinkFailureRate = 0;
+            primaryProviderDown.set(false);
+            activityLatencyMs = 0;
+            crashAfterActivities.set(0);
+        }
+    }
+
     public record ChaosState(double activityFailureRate, double sinkFailureRate, boolean primaryProviderDown,
-                             long activityLatencyMs, int crashAfterActivities) {
+                             long activityLatencyMs, int crashAfterActivities, String scope) {
     }
 
     /** Marker error so simulated crashes are distinguishable in logs/tests. */

@@ -51,7 +51,12 @@ public class PortalAuthFilter extends OncePerRequestFilter {
             return;
         }
         request.setAttribute(DEVELOPER_ID_ATTRIBUTE, session.get().subject());
-        chain.doFilter(request, response);
+        TenantContext.set(session.get().subject());
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     private String bearer(HttpServletRequest request) {

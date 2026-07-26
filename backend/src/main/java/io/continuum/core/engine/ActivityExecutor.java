@@ -10,6 +10,7 @@ import io.continuum.core.event.Payloads;
 import io.continuum.persistence.entity.*;
 import io.continuum.persistence.repository.*;
 import org.slf4j.Logger;
+import io.continuum.portal.TenantContext;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,11 +70,21 @@ public class ActivityExecutor {
         Activity activity = registry.get(task.getActivityType());
         ActivityContext ctx = new ActivityContext(
                 task.getWorkflowId(), task.getIdempotencyKey(), task.getRetryCount() + 1, json);
+        // A worker thread is doing this tenant's work, so anything tenant-scoped
+        // that runs underneath — fault injection especially — sees the right one.
+        String owner = instances.findById(task.getWorkflowId())
+                .map(WorkflowInstanceEntity::getDeveloperId)
+                .orElse(null);
+        TenantContext.set(owner);
         try {
             Object result = activity.execute(task.getInput(), ctx);
             return ActivityOutcome.success(json.write(result), ctx);
         } catch (Exception e) {
             return ActivityOutcome.failure(e, ctx);
+        } finally {
+            // Workers are pooled and long-lived; a tenant left set here would
+            // follow this thread onto the next customer's activity.
+            TenantContext.clear();
         }
     }
 

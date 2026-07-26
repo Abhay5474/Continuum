@@ -122,10 +122,14 @@ public class LlmActivity implements Activity {
 
     private void recordRoutingDecision(String workflowId, SelectionResult selection) {
         try {
-            routingDecisions.save(new RoutingDecisionEntity(
+            RoutingDecisionEntity row = new RoutingDecisionEntity(
                     workflowId, selection.mode().name(), selection.complexity(),
                     selection.chosenProvider(), String.join(",", selection.chosenChain()),
-                    json.write(selection.scores())));
+                    json.write(selection.scores()));
+            // Stamped with the tenant whose work this is, so the console can show
+            // a developer their own routing history and nobody else's.
+            row.setDeveloperId(io.continuum.portal.TenantContext.developerId());
+            routingDecisions.save(row);
         } catch (Exception ignored) {
             // Observability must never break the call.
         }

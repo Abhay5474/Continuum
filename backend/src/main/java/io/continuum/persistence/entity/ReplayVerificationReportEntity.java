@@ -112,4 +112,15 @@ public class ReplayVerificationReportEntity {
     public String getMethod() { return method; }
     public String getExplanation() { return explanation; }
     public Instant getCreatedAt() { return createdAt; }
+
+    /**
+     * The tenant this row belongs to. Null only for rows recorded before
+     * scoping existed, which are visible to the operator alone.
+     */
+    @Column(name = "developer_id", length = 64)
+    private String developerId;
+
+    public String getDeveloperId() { return developerId; }
+    public void setDeveloperId(String developerId) { this.developerId = developerId; }
+
 }

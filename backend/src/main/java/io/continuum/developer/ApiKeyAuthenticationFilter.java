@@ -58,7 +58,14 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         request.setAttribute(DEVELOPER_ATTRIBUTE, developer.get());
-        chain.doFilter(request, response);
+        // Gateway traffic is the main thing a tenant's fault drill should affect,
+        // so the tenant travels with the request thread.
+        io.continuum.portal.TenantContext.set(developer.get().getId());
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            io.continuum.portal.TenantContext.clear();
+        }
     }
 
     private Optional<DeveloperEntity> safeAuthenticate(String token) {

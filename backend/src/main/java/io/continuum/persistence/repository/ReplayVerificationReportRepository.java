@@ -13,5 +13,7 @@ public interface ReplayVerificationReportRepository extends JpaRepository<Replay
 
     Page<ReplayVerificationReportEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
+    Page<ReplayVerificationReportEntity> findByDeveloperIdOrderByCreatedAtDesc(String developerId, Pageable pageable);
+
     long countByPassed(boolean passed);
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { api, isOperator } from "../api";
 import { Micro, Readout, Plane, StateDot, Trace } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
@@ -85,6 +85,9 @@ export default function GatewayDashboard() {
     }
   };
 
+  // The model catalogue is shared by every tenant, so retiring one is the
+  // operator's call rather than any single customer's.
+  const operator = isOperator();
   const setStatus = (id: number, status: string) =>
     api.post(`/api/models/${id}/status?status=${status}`).then(refresh);
 
@@ -381,7 +384,9 @@ export default function GatewayDashboard() {
                     <select
                       value={m.status}
                       onChange={(e) => setStatus(m.id, e.target.value)}
-                      className="rounded border border-edge bg-ink px-2 py-1 text-[11px] text-slate-300 outline-none focus:border-aurora/60"
+                      disabled={!operator}
+                      title={operator ? undefined : "Shared model catalogue — operator only"}
+                      className="rounded border border-edge bg-ink px-2 py-1 text-[11px] text-slate-300 outline-none focus:border-aurora/60 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {["DISCOVERED", "TESTING", "ACTIVE", "DEPRECATED", "REMOVED"].map((s) => (
                         <option key={s}>{s}</option>

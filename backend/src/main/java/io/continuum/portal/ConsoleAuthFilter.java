@@ -65,7 +65,14 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
         } else {
             request.setAttribute(DEVELOPER_ID_ATTRIBUTE, s.subject());
         }
-        chain.doFilter(request, response);
+        // Also published thread-locally, for cross-cutting concerns that run far
+        // from the controller. Cleared unconditionally: this is a pooled thread.
+        TenantContext.set(s.role() == PortalSessionService.Role.OPERATOR ? null : s.subject());
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     private String bearer(HttpServletRequest request) {
