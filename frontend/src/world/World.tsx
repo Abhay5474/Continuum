@@ -3,37 +3,40 @@ import { createWorld } from "./engine";
 import { FORMATIONS } from "./formations";
 
 /**
- * The persistent environment behind the landing narrative.
+ * The environment the landing narrative happens inside.
  *
- * <p>Fixed to the viewport and never unmounted while the page is open, so the
- * scroll story is a camera moving through one space rather than a sequence of
- * sections that each bring their own graphic. Scroll and pointer are read here
- * and handed to the renderer as plain functions — the canvas never re-renders
- * React, and React never drives a frame.
+ * <p>Two render targets, not one. Everything further from the camera than the
+ * type plane draws behind the page; everything nearer draws in front of it. The
+ * headline therefore sits *within* the volume — matter passes across the words
+ * and behind them — which is what separates a lit space from a canvas used as
+ * wallpaper.
+ *
+ * <p>Scroll and pointer are read here and handed to the renderer as plain
+ * functions. The canvas never re-renders React and React never drives a frame.
  */
 export default function World() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const farRef = useRef<HTMLCanvasElement>(null);
+  const nearRef = useRef<HTMLCanvasElement>(null);
   const progress = useRef(0);
   const pointer = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const far = farRef.current;
+    const near = nearRef.current;
+    if (!far) return;
 
-    const accent = "#4C8BF5";
-    const dim = "#8FA3C8";
+    const world = createWorld(
+      far,
+      {
+        progress: () => progress.current,
+        pointer: () => pointer.current,
+        formations: FORMATIONS,
+        accent: "#4C8BF5",
+        dim: "#8FA3C8",
+      },
+      near ?? undefined
+    );
 
-    const world = createWorld(canvas, {
-      progress: () => progress.current,
-      pointer: () => pointer.current,
-      formations: FORMATIONS,
-      accent,
-      dim,
-    });
-
-    // Scroll and pointer are sampled into refs and read on the next frame, so a
-    // fast scroll or a moving cursor can never queue more work than the renderer
-    // consumes.
     // Progress is measured in viewport heights, not in document fraction.
     //
     // The page is one full-height entry section followed by one section per
@@ -47,6 +50,9 @@ export default function World() {
       progress.current = Math.min(1, Math.max(0, section / (FORMATIONS.length - 1)));
       world.nudge();
     };
+
+    // Sampled into a ref and read on the next frame, so moving the cursor can
+    // never queue more work than the renderer consumes.
     const onPointer = (e: PointerEvent) => {
       pointer.current = {
         x: (e.clientX / window.innerWidth) * 2 - 1,
@@ -66,17 +72,25 @@ export default function World() {
   }, []);
 
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
-      <canvas ref={canvasRef} className="h-full w-full" />
-      {/* Vignette: pulls the eye to the centre and keeps text legible over the
-          busiest part of the field without dimming the whole scene. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(125% 95% at 50% 45%, transparent 42%, rgb(var(--ink) / 0.3) 74%, rgb(var(--ink) / 0.8) 100%)",
-        }}
+    <>
+      {/* Behind the page. */}
+      <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
+        <canvas ref={farRef} className="h-full w-full" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(125% 95% at 50% 45%, transparent 42%, rgb(var(--ink) / 0.3) 74%, rgb(var(--ink) / 0.8) 100%)",
+          }}
+        />
+      </div>
+      {/* In front of it. Nothing here is interactive, so it never intercepts a
+          click — the page underneath stays fully usable. */}
+      <canvas
+        ref={nearRef}
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-20 h-full w-full"
       />
-    </div>
+    </>
   );
 }

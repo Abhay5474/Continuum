@@ -61,6 +61,10 @@ body {
   @apply text-slate-800;
 }
 :root[data-theme="light"] .text-white { color: rgb(15 23 42); }
+/* slate-50 is used for display type on the landing page. Without this it is
+   white on paper and the headline simply disappears — the same failure the
+   remaps below exist to prevent. */
+:root[data-theme="light"] .text-slate-50 { color: rgb(2 6 23); }
 :root[data-theme="light"] .text-slate-100 { color: rgb(15 23 42); }
 :root[data-theme="light"] .text-slate-200 { color: rgb(15 23 42); }
 :root[data-theme="light"] .text-slate-300 { color: rgb(30 41 59); }

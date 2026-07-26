@@ -31,7 +31,7 @@ export default function Landing() {
             Event-sourced · deterministic replay · exactly-once
           </div>
 
-          <h1 className="mx-auto mt-8 max-w-4xl text-[2.75rem] font-semibold leading-[1.05] tracking-tight text-slate-100 sm:text-7xl">
+          <h1 className="mx-auto mt-8 max-w-5xl text-[3.1rem] font-semibold leading-[0.94] tracking-[-0.035em] text-slate-50 sm:text-[7.5rem]">
             An operating layer
             <br />
             <span className="text-gradient">for AI systems.</span>

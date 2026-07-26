@@ -86,7 +86,7 @@ export function Scene({
           [side === "right" ? "right" : "left"]: 0,
           background:
             side === "center"
-              ? "radial-gradient(62% 52% at 50% 50%, rgb(var(--ink) / 0.75), transparent 76%)"
+              ? "radial-gradient(58% 54% at 50% 50%, rgb(var(--ink) / 0.9), rgb(var(--ink) / 0.6) 62%, transparent 82%)"
               : `linear-gradient(to ${side === "right" ? "left" : "right"}, rgb(var(--ink) / 0.8), rgb(var(--ink) / 0.45) 55%, transparent 88%)`,
           opacity: t,
         }}
@@ -103,13 +103,19 @@ export function Scene({
       >
         <div className="flex items-baseline gap-3">
           <span className="readout text-[11px] font-medium tracking-[0.3em] text-aurora">{index}</span>
-          <span className="text-[11px] uppercase tracking-[0.28em] text-slate-500">{label}</span>
+          <span className="h-px w-8 bg-edge" />
+          <span className="text-[10px] uppercase tracking-[0.34em] text-slate-500">{label}</span>
         </div>
-        <h2 className="mt-4 text-3xl font-semibold leading-[1.15] tracking-tight text-slate-100 sm:text-[2.6rem]">
+        {/* Display scale. The references set their headline as the loudest
+            object in the frame; a 2.6rem heading reads as a section header on a
+            website, not as a statement in a space. */}
+        <h2 className="mt-5 text-[2.4rem] font-semibold leading-[0.98] tracking-[-0.02em] text-slate-50 sm:text-[4.25rem]">
           {title}
         </h2>
-        <p className="mt-5 text-[15px] leading-relaxed text-slate-400">{body}</p>
-        {children && <div className="mt-7">{children}</div>}
+        <p className="mt-6 max-w-[46ch] text-[15px] leading-relaxed text-slate-400 sm:text-base">
+          {body}
+        </p>
+        {children && <div className="mt-9">{children}</div>}
       </div>
     </section>
   );
@@ -124,11 +130,11 @@ export function Scene({
  */
 export function Facts({ items }: { items: [string, string][] }) {
   return (
-    <dl className="flex flex-wrap gap-x-10 gap-y-4">
+    <dl className="flex flex-wrap gap-x-12 gap-y-5 border-t border-edge/70 pt-5">
       {items.map(([k, v]) => (
         <div key={k}>
-          <dt className="text-[10px] uppercase tracking-[0.22em] text-slate-600">{k}</dt>
-          <dd className="readout mt-1 text-lg font-medium text-slate-200">{v}</dd>
+          <dt className="text-[9px] uppercase tracking-[0.3em] text-slate-600">{k}</dt>
+          <dd className="readout mt-1.5 text-[15px] font-medium text-slate-200">{v}</dd>
         </div>
       ))}
     </dl>

@@ -92,8 +92,18 @@ function populationFor(width: number): number {
   return 240;
 }
 
-export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions) {
+export function createWorld(
+  canvas: HTMLCanvasElement,
+  opts: WorldOptions,
+  nearCanvas?: HTMLCanvasElement
+) {
   const ctx = canvas.getContext("2d", { alpha: true })!;
+  // A second target for everything closer to the camera than the type plane.
+  // The page's headline is a DOM layer sandwiched between the two, so the field
+  // genuinely passes in front of and behind the words instead of being a
+  // backdrop they sit on. This is the difference between a lit volume and a
+  // wallpaper, and it costs one extra canvas.
+  const nctx = nearCanvas?.getContext("2d", { alpha: true }) ?? null;
   const reduced =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -138,6 +148,11 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions) {
     canvas.width = Math.floor(width * dpr);
     canvas.height = Math.floor(height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (nearCanvas && nctx) {
+      nearCanvas.width = canvas.width;
+      nearCanvas.height = canvas.height;
+      nctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     if (nodes.length === 0 || populationFor(width) !== nodes.length) {
       build();
     }
@@ -168,7 +183,11 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions) {
     const y1 = y * cosX - z1 * sinX;
     const z2 = y * sinX + z1 * cosX;
 
-    const depth = z2 + 1350 + cam.z;
+    // Base distance is deliberately inside the field's own z-extent, so a
+    // fraction of the population ends up in front of the focal plane and reads
+    // as foreground. A camera parked outside the volume can only ever produce a
+    // backdrop, however well it is lit.
+    const depth = z2 + 1050 + cam.z;
     if (depth < 60) return null;
     // Focal length. Chosen so the field fills the frame with presence rather
     // than sitting far away as a dusting of specks.
@@ -302,26 +321,93 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions) {
     raf = requestAnimationFrame(frame);
   }
 
+  /**
+   * Where the light is, in screen space.
+   *
+   * <p>The cursor is treated as a lamp moving through the volume rather than a
+   * pointer on a surface: nodes near it brighten and swell, nodes far from it
+   * fall away. Without a light there is no read of form — every node is the same
+   * value and the field looks like confetti no matter how well it is arranged.
+   */
+  function lightAt() {
+    const ptr = opts.pointer();
+    return { x: (ptr.x * 0.5 + 0.5) * width, y: (ptr.y * 0.5 + 0.5) * height };
+  }
+
+  /** Depth cue: distant matter loses contrast to the atmosphere between. */
+  function fog(depth: number) {
+    return Math.exp(-Math.max(0, depth - 700) / 1500);
+  }
+
+  /** The plane the page's typography occupies. Nearer than this draws in front. */
+  const TYPE_PLANE = 1250;
+
   function draw(now: number) {
     ctx.clearRect(0, 0, width, height);
+    nctx?.clearRect(0, 0, width, height);
+
+    const light = lightAt();
+
+    // The lamp made visible. Very low alpha — this is the light in the medium,
+    // not a glowing blob; without it the cursor brightens things for no visible
+    // reason, which reads as a bug rather than as illumination.
+    {
+      const reachBg = Math.min(width, height) * 0.5;
+      const g = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, reachBg);
+      g.addColorStop(0, withAlpha(opts.accent, 0.06));
+      g.addColorStop(0.55, withAlpha(opts.accent, 0.018));
+      g.addColorStop(1, withAlpha(opts.accent, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(light.x - reachBg, light.y - reachBg, reachBg * 2, reachBg * 2);
+    }
+    // Reach scales with the viewport so the pool of light is the same fraction
+    // of the frame on a phone as on a display.
+    const reach = Math.min(width, height) * 0.42;
+
+    /** Picks the render target by depth, which is what puts type inside the volume. */
+    const target = (depth: number) => (nctx && depth < TYPE_PLANE ? nctx : ctx);
+
+    /**
+     * How much of a mark survives on the near plane.
+     *
+     * <p>Matter in front of the type is there to give the frame a foreground,
+     * not to be read. Left at full strength it competes with the copy for
+     * attention and the page becomes hard to use — so anything drawn in front of
+     * the words is heavily damped.
+     */
+    const nearDamp = (depth: number) => (nctx && depth < TYPE_PLANE ? 0.42 : 1);
+
+    /** 0..1 — how strongly the lamp falls on a projected point. */
+    const lit = (sx: number, sy: number) => {
+      const d = Math.hypot(sx - light.x, sy - light.y);
+      const f = 1 - Math.min(1, d / reach);
+      // Squared falloff reads as light rather than as a flat circular mask.
+      return f * f;
+    };
 
     // Project once per frame; everything downstream reads these.
     const proj = nodes.map((n) => project(n.x, n.y, n.z));
 
     // --- connections -------------------------------------------------------
-    ctx.lineWidth = 1;
     for (const e of edges) {
       if (e.s < 0.02) continue;
       const A = proj[e.a];
       const B = proj[e.b];
       if (!A || !B) continue;
-      // Depth fades the line, so the far side of the field recedes properly.
-      const depthFade = clamp((A.k + B.k) * 0.55, 0.05, 1);
-      ctx.strokeStyle = withAlpha(opts.dim, e.s * 0.5 * depthFade);
-      ctx.beginPath();
-      ctx.moveTo(A.sx, A.sy);
-      ctx.lineTo(B.sx, B.sy);
-      ctx.stroke();
+      const mid = (A.depth + B.depth) / 2;
+      const g = target(mid);
+      const depthFade = clamp((A.k + B.k) * 0.55, 0.05, 1) * fog(mid);
+      // A connection near the lamp is legible; the rest of the lattice stays as
+      // structure you sense rather than read. This is what makes cursor
+      // proximity reveal local topology without the whole screen reacting.
+      const glow = Math.max(lit(A.sx, A.sy), lit(B.sx, B.sy));
+      g.lineWidth = 1 + glow * 0.7;
+      g.strokeStyle = withAlpha(glow > 0.35 ? opts.accent : opts.dim,
+        e.s * (0.34 + glow * 0.7) * depthFade * nearDamp(mid));
+      g.beginPath();
+      g.moveTo(A.sx, A.sy);
+      g.lineTo(B.sx, B.sy);
+      g.stroke();
     }
 
     // --- packets -----------------------------------------------------------
@@ -334,11 +420,13 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions) {
       const x = lerp(A.sx, B.sx, pk.t);
       const y = lerp(A.sy, B.sy, pk.t);
       const k = lerp(A.k, B.k, pk.t);
-      const r = clamp(k * 2.1, 0.8, 3.2);
-      ctx.fillStyle = withAlpha(pk.hue, clamp(k * 0.95, 0.2, 1));
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
+      const depth = lerp(A.depth, B.depth, pk.t);
+      const g = target(depth);
+      const r = clamp(k * 2.1, 0.8, 3.4);
+      g.fillStyle = withAlpha(pk.hue, clamp(k * 0.95 * fog(depth), 0.2, 1) * nearDamp(depth));
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      g.fill();
     }
 
     // --- nodes -------------------------------------------------------------
@@ -351,22 +439,35 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions) {
       const P = proj[i];
       if (!P) continue;
       const n = nodes[i];
+      const g = target(P.depth);
+      const glow = lit(P.sx, P.sy);
+      const haze = fog(P.depth);
       const pulse = 0.75 + 0.25 * Math.sin(now * 1.6 + n.phase);
-      const r = clamp(P.k * (1.9 + n.energy * 3.4) * pulse, 0.5, 9);
-      const alpha = clamp(P.k * (0.34 + n.energy * 0.62), 0.05, 0.95);
 
-      ctx.fillStyle = withAlpha(n.energy > 0.55 ? opts.accent : opts.dim, alpha);
-      ctx.beginPath();
-      ctx.arc(P.sx, P.sy, r, 0, Math.PI * 2);
-      ctx.fill();
+      // Matter very close to the camera goes soft and large, the way an
+      // out-of-focus foreground does. It is what gives the frame a near plane.
+      const nearness = clamp((520 - P.depth) / 460, 0, 1);
 
-      // Only genuinely active nodes get a halo. If everything glowed, nothing
-      // would read as significant.
-      if (n.energy > 0.7 && P.k > 0.5) {
-        ctx.fillStyle = withAlpha(opts.accent, alpha * 0.16);
-        ctx.beginPath();
-        ctx.arc(P.sx, P.sy, r * 3.8, 0, Math.PI * 2);
-        ctx.fill();
+      const r = clamp(P.k * (1.9 + n.energy * 3.4) * pulse * (1 + nearness * 2.6), 0.5, 26);
+      const alpha =
+        clamp(P.k * (0.3 + n.energy * 0.55 + glow * 0.5) * haze, 0.03, 0.95) *
+        // Defocused matter is dimmer as it spreads, or the foreground shouts.
+        (1 - nearness * 0.72) *
+        nearDamp(P.depth);
+
+      g.fillStyle = withAlpha(n.energy > 0.55 || glow > 0.5 ? opts.accent : opts.dim, alpha);
+      g.beginPath();
+      g.arc(P.sx, P.sy, r, 0, Math.PI * 2);
+      g.fill();
+
+      // A halo only where there is genuinely something to see: an active node,
+      // in focus, standing in the light. If everything glowed, nothing would
+      // read as significant.
+      if ((n.energy > 0.7 || glow > 0.6) && P.k > 0.5 && nearness < 0.25) {
+        g.fillStyle = withAlpha(opts.accent, alpha * (0.1 + glow * 0.22));
+        g.beginPath();
+        g.arc(P.sx, P.sy, r * (3.4 + glow * 3), 0, Math.PI * 2);
+        g.fill();
       }
     }
   }
