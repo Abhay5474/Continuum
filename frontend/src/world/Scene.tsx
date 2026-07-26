@@ -24,6 +24,7 @@ export function Scene({
   body,
   side = "left",
   children,
+  aside,
 }: {
   index: string;
   label: string;
@@ -31,6 +32,8 @@ export function Scene({
   body: ReactNode;
   side?: "left" | "right" | "center";
   children?: ReactNode;
+  /** An instrument placed opposite the copy — read the claim, then drive it. */
+  aside?: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
   const [t, setT] = useState(reduced() ? 1 : 0);
@@ -71,6 +74,45 @@ export function Scene({
       : side === "center"
         ? "mx-auto text-center"
         : "mr-auto text-left";
+
+  // With an instrument alongside, the scene becomes two columns and the scrim
+  // covers the full width — there is no longer an empty side to leave open.
+  if (aside) {
+    return (
+      <section ref={ref} className="relative flex min-h-screen items-center px-6 py-24 sm:px-10">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to bottom, transparent, rgb(var(--ink) / 0.72) 16%, rgb(var(--ink) / 0.72) 84%, transparent)",
+            opacity: t,
+          }}
+        />
+        <div
+          className="relative mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2"
+          style={{
+            opacity: t,
+            transform: `translate3d(0, ${(1 - t) * 22}px, 0)`,
+            willChange: "opacity, transform",
+          }}
+        >
+          <div className={side === "right" ? "lg:order-2" : ""}>
+            <div className="flex items-baseline gap-3">
+              <span className="readout text-[11px] font-medium tracking-[0.3em] text-aurora">{index}</span>
+              <span className="h-px w-8 bg-edge" />
+              <span className="text-[10px] uppercase tracking-[0.34em] text-slate-500">{label}</span>
+            </div>
+            <h2 className="mt-5 text-[2rem] font-semibold leading-[1.02] tracking-[-0.02em] text-slate-50 sm:text-[3.1rem]">
+              {title}
+            </h2>
+            <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-slate-400">{body}</p>
+            {children && <div className="mt-7">{children}</div>}
+          </div>
+          <div className={side === "right" ? "lg:order-1" : ""}>{aside}</div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section

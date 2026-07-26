@@ -3,6 +3,11 @@ import { CodeBlock, ThemeToggle } from "../components/ui";
 import { Magnetic } from "../system/motion";
 import World from "../world/World";
 import { Facts, Scene } from "../world/Scene";
+import ContextMmuDemo from "../world/demos/ContextMmuDemo";
+import WorkflowDemo from "../world/demos/WorkflowDemo";
+import ConsensusDemo from "../world/demos/ConsensusDemo";
+import RoutingDemo from "../world/demos/RoutingDemo";
+import LoadDemo from "../world/demos/LoadDemo";
 
 /**
  * The front door.
@@ -118,6 +123,7 @@ export default function Landing() {
       <Scene
         index="03"
         label="Durable execution"
+        aside={<WorkflowDemo />}
         title={<>Work that survives the process that started it.</>}
         body={
           <>
@@ -141,6 +147,7 @@ export default function Landing() {
         index="04"
         label="Context virtualization"
         side="right"
+        aside={<ContextMmuDemo />}
         title={<>Most of what a model could see should not be resident.</>}
         body={
           <>
@@ -162,6 +169,7 @@ export default function Landing() {
       <Scene
         index="05"
         label="Verification"
+        aside={<ConsensusDemo />}
         title={<>One answer is a guess. Several that agree is evidence.</>}
         body={
           <>
@@ -176,6 +184,7 @@ export default function Landing() {
         index="06"
         label="Adaptive routing"
         side="right"
+        aside={<RoutingDemo />}
         title={<>Providers fail. Traffic should already be elsewhere.</>}
         body={
           <>
@@ -196,6 +205,29 @@ export default function Landing() {
 
       <Scene
         index="07"
+        label="Adaptive concurrency"
+        aside={<LoadDemo />}
+        title={<>Refusing work is a decision, not a failure.</>}
+        body={
+          <>
+            Past a certain arrival rate every extra request makes the others slower, and an
+            unbounded queue eventually fails all of them. Continuum holds a concurrency limit
+            derived from observed latency and refuses the excess immediately, so what is accepted
+            is still served quickly.
+          </>
+        }
+      >
+        <Facts
+          items={[
+            ["Limit", "derived from latency"],
+            ["Excess", "refused at the door"],
+            ["Failure mode", "bounded, not total"],
+          ]}
+        />
+      </Scene>
+
+      <Scene
+        index="08"
         label="Continuum"
         side="center"
         title={<>One fabric. Every guarantee.</>}

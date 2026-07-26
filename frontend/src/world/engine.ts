@@ -82,6 +82,8 @@ export interface WorldOptions {
   dim: string;
 }
 
+import { activeDemos } from "./activity";
+
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -118,9 +120,43 @@ export function createWorld(
   let running = false;
   let visible = true;
   let lastFormation = -1;
+  let halfFrame = false;
 
   /** Smoothed camera state, so pointer motion feels like mass rather than a jump cut. */
   const cam = { rx: 0, ry: 0, z: 0, trx: 0, try_: 0, tz: 0 };
+
+  /**
+   * Frame scratch, allocated once.
+   *
+   * <p>Projecting with map() and sorting a fresh array of objects every frame
+   * produced 240 short-lived allocations per frame, which is enough GC churn to
+   * cost real frames once the page also has interactive demos running. These are
+   * reused in place instead.
+   */
+  let projX = new Float32Array(0);
+  let projY = new Float32Array(0);
+  let projK = new Float32Array(0);
+  let projD = new Float32Array(0);
+  let projOk = new Uint8Array(0);
+  let order: Int32Array = new Int32Array(0);
+
+  let lampGradient: CanvasGradient | null = null;
+  let lampReach = -1;
+
+  /** Quantisation steps for edge opacity when batching. */
+  const EDGE_LEVELS = 5;
+  /** Reused per-frame edge batches: [near][hot][level] -> flat x,y pairs. */
+  const batches: number[][] = Array.from({ length: EDGE_LEVELS * 4 }, () => []);
+
+  function ensureScratch(n: number) {
+    if (projX.length === n) return;
+    projX = new Float32Array(n);
+    projY = new Float32Array(n);
+    projK = new Float32Array(n);
+    projD = new Float32Array(n);
+    projOk = new Uint8Array(n);
+    order = new Int32Array(n);
+  }
 
   function build() {
     const n = populationFor(width);
@@ -142,7 +178,14 @@ export function createWorld(
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    // Capped below the display's own ratio on purpose.
+    //
+    // The field is soft-edged blobs and low-alpha lines with no text and no hard
+    // detail, so the extra pixels of a 2x buffer are invisible here — but they
+    // are half the fill cost, and the page also runs interactive demos that do
+    // have text and do need the resolution. Measured: world and demo each hold
+    // 60fps alone and drop to 40 together at 2x; this is what buys that back.
+    dpr = Math.min(1.5, window.devicePixelRatio || 1);
     width = rect.width;
     height = rect.height;
     canvas.width = Math.floor(width * dpr);
@@ -280,6 +323,16 @@ export function createWorld(
   function frame() {
     if (!running) return;
 
+    // Half rate while an instrument is live. The world keeps simulating so it
+    // never jumps when the demo stops; it simply draws every other frame.
+    if (activeDemos() > 0) {
+      halfFrame = !halfFrame;
+      if (halfFrame) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+    }
+
     const p = opts.progress();
     const { index, next, t } = formationAt(p);
     const fa = opts.formations[index];
@@ -353,12 +406,20 @@ export function createWorld(
     // reason, which reads as a bug rather than as illumination.
     {
       const reachBg = Math.min(width, height) * 0.5;
-      const g = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, reachBg);
-      g.addColorStop(0, withAlpha(opts.accent, 0.06));
-      g.addColorStop(0.55, withAlpha(opts.accent, 0.018));
-      g.addColorStop(1, withAlpha(opts.accent, 0));
-      ctx.fillStyle = g;
-      ctx.fillRect(light.x - reachBg, light.y - reachBg, reachBg * 2, reachBg * 2);
+      // Built at the origin once and translated into place, so the gradient is
+      // not reconstructed and the fill covers only the lamp's own footprint.
+      if (!lampGradient || lampReach !== reachBg) {
+        lampReach = reachBg;
+        lampGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, reachBg);
+        lampGradient.addColorStop(0, withAlpha(opts.accent, 0.06));
+        lampGradient.addColorStop(0.55, withAlpha(opts.accent, 0.018));
+        lampGradient.addColorStop(1, withAlpha(opts.accent, 0));
+      }
+      ctx.save();
+      ctx.translate(light.x, light.y);
+      ctx.fillStyle = lampGradient;
+      ctx.fillRect(-reachBg, -reachBg, reachBg * 2, reachBg * 2);
+      ctx.restore();
     }
     // Reach scales with the viewport so the pool of light is the same fraction
     // of the frame on a phone as on a display.
@@ -385,37 +446,86 @@ export function createWorld(
       return f * f;
     };
 
-    // Project once per frame; everything downstream reads these.
-    const proj = nodes.map((n) => project(n.x, n.y, n.z));
+    // Project once per frame into preallocated buffers.
+    ensureScratch(nodes.length);
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const q = project(n.x, n.y, n.z);
+      if (q) {
+        projOk[i] = 1;
+        projX[i] = q.sx;
+        projY[i] = q.sy;
+        projK[i] = q.k;
+        projD[i] = q.depth;
+      } else {
+        projOk[i] = 0;
+        projD[i] = Infinity;
+      }
+      order[i] = i;
+    }
+    /** Reads like the old projection result, without allocating one. */
+    const proj = (i: number) =>
+      projOk[i] ? { sx: projX[i], sy: projY[i], k: projK[i], depth: projD[i] } : null;
 
     // --- connections -------------------------------------------------------
+    // Edges are batched into a handful of paths rather than stroked one at a time.
+    //
+    // A formation carries several hundred connections, and during a blend both
+    // formations' edges are live at once — over a thousand stroke calls a frame,
+    // which was the largest single cost in the renderer. Alpha is quantised into
+    // a few steps so edges that look alike are drawn together; the banding is
+    // invisible at these opacities and the draw calls drop by two orders of
+    // magnitude.
+    for (let b = 0; b < batches.length; b++) batches[b].length = 0;
+
     for (const e of edges) {
       if (e.s < 0.02) continue;
-      const A = proj[e.a];
-      const B = proj[e.b];
+      const A = proj(e.a);
+      const B = proj(e.b);
       if (!A || !B) continue;
       const mid = (A.depth + B.depth) / 2;
-      const g = target(mid);
       const depthFade = clamp((A.k + B.k) * 0.55, 0.05, 1) * fog(mid);
       // A connection near the lamp is legible; the rest of the lattice stays as
       // structure you sense rather than read. This is what makes cursor
       // proximity reveal local topology without the whole screen reacting.
       const glow = Math.max(lit(A.sx, A.sy), lit(B.sx, B.sy));
-      g.lineWidth = 1 + glow * 0.7;
-      g.strokeStyle = withAlpha(glow > 0.35 ? opts.accent : opts.dim,
-        e.s * (0.34 + glow * 0.7) * depthFade * nearDamp(mid));
-      g.beginPath();
-      g.moveTo(A.sx, A.sy);
-      g.lineTo(B.sx, B.sy);
-      g.stroke();
+      const alpha = e.s * (0.34 + glow * 0.7) * depthFade * nearDamp(mid);
+      if (alpha < 0.015) continue;
+
+      const near = nctx && mid < TYPE_PLANE ? 1 : 0;
+      const hot = glow > 0.35 ? 1 : 0;
+      const level = Math.min(EDGE_LEVELS - 1, Math.floor(alpha * EDGE_LEVELS * 1.5));
+      batches[(near * 2 + hot) * EDGE_LEVELS + level].push(A.sx, A.sy, B.sx, B.sy);
+    }
+
+    for (let near = 0; near < 2; near++) {
+      const g = near ? nctx : ctx;
+      if (!g) continue;
+      for (let hot = 0; hot < 2; hot++) {
+        for (let level = 0; level < EDGE_LEVELS; level++) {
+          const pts = batches[(near * 2 + hot) * EDGE_LEVELS + level];
+          if (pts.length === 0) continue;
+          g.lineWidth = hot ? 1.6 : 1;
+          g.strokeStyle = withAlpha(
+            hot ? opts.accent : opts.dim,
+            (level + 0.6) / (EDGE_LEVELS * 1.5)
+          );
+          g.beginPath();
+          for (let i = 0; i < pts.length; i += 4) {
+            g.moveTo(pts[i], pts[i + 1]);
+            g.lineTo(pts[i + 2], pts[i + 3]);
+          }
+          g.stroke();
+        }
+      }
     }
 
     // --- packets -----------------------------------------------------------
     for (const pk of packets) {
       const e = edges[pk.edge];
       if (!e || e.s < 0.15) continue;
-      const A = proj[e.a];
-      const B = proj[e.b];
+      const A = proj(e.a);
+      const B = proj(e.b);
       if (!A || !B) continue;
       const x = lerp(A.sx, B.sx, pk.t);
       const y = lerp(A.sy, B.sy, pk.t);
@@ -431,12 +541,13 @@ export function createWorld(
 
     // --- nodes -------------------------------------------------------------
     // Painted far-to-near so nearer nodes occlude correctly.
-    const order = nodes
-      .map((_, i) => ({ i, d: proj[i]?.depth ?? Infinity }))
-      .sort((a, b) => b.d - a.d);
+    // Painter's order, far to near, sorted in place over an index buffer.
+    const sorted = Array.prototype.sort.call(order, (a: number, b: number) => projD[b] - projD[a]);
+    void sorted;
 
-    for (const { i } of order) {
-      const P = proj[i];
+    for (let oi = 0; oi < order.length; oi++) {
+      const i = order[oi];
+      const P = proj(i);
       if (!P) continue;
       const n = nodes[i];
       const g = target(P.depth);
