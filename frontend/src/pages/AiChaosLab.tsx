@@ -61,8 +61,8 @@ export default function AiChaosLab() {
           <div className="mb-3 font-medium">Failure injectors (probability per LLM call)</div>
           <div className="space-y-3">
             {FAILURE_TYPES.map((t) => (
-              <div key={t} className="flex items-center gap-3">
-                <span className="w-48 text-sm">{t}</span>
+              <div key={t} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="w-full text-sm sm:w-48">{t}</span>
                 <input
                   type="range"
                   min={0}

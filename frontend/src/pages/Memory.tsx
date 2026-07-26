@@ -36,12 +36,12 @@ export default function Memory() {
         </p>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-slate-400">scope</span>
         <input
           value={scope}
           onChange={(e) => setScope(e.target.value)}
-          className="rounded-md border border-edge bg-ink px-3 py-1.5 text-sm font-mono"
+          className="min-w-0 flex-1 rounded-md border border-edge bg-ink px-3 py-1.5 text-sm font-mono sm:flex-none"
         />
         <button onClick={list} className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge">
           Load

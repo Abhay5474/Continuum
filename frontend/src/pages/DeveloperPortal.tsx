@@ -40,7 +40,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
 
   return (
     <div className="relative mx-auto mt-8 max-w-md animate-fade-up">
-      <div className="pointer-events-none absolute -inset-6 -z-10 rounded-3xl bg-aurora/10 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 -z-10 rounded-3xl bg-aurora/10 blur-3xl" />
       <div className="glass p-7">
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-lg font-bold text-ink shadow-glow-sm">
@@ -283,7 +283,8 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           Store your own LLM provider API keys. They are encrypted with AES-256-GCM and decrypted only
           in-memory at request execution. Secrets are write-only — never displayed after saving.
         </p>
-        <table className="mt-3 w-full text-sm">
+        <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[420px] text-sm">
           <thead className="text-xs text-slate-400">
             <tr className="text-left"><th className="py-2">Provider</th><th>API Key (write-only)</th><th>Status</th><th>Actions</th></tr>
           </thead>
@@ -319,6 +320,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
             })}
           </tbody>
         </table>
+        </div>
 
         <div className="mt-4 rounded-md border border-edge bg-ink p-3">
           <label className="flex items-start gap-2 text-sm">
@@ -476,14 +478,14 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
 function OnboardStep({ n, title, done, children }: { n: number; title: string; done: boolean; children: import("react").ReactNode }) {
   return (
-    <div className={`rounded-xl border p-3 transition-all ${done ? "border-emerald-400/40 bg-emerald-500/5" : "border-edge bg-ink/40"}`}>
+    <div className={`min-w-0 rounded-xl border p-3 transition-all ${done ? "border-emerald-400/40 bg-emerald-500/5" : "border-edge bg-ink/40"}`}>
       <div className="flex items-center gap-2">
         <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs font-bold ${done ? "bg-emerald-500/20 text-emerald-300" : "bg-gradient-to-br from-aurora to-neon text-ink"}`}>
           {done ? "✓" : n}
         </span>
         <span className="text-sm font-semibold">{title}</span>
       </div>
-      <div className="mt-2 text-xs text-slate-400">{children}</div>
+      <div className="mt-2 min-w-0 text-xs text-slate-400">{children}</div>
     </div>
   );
 }

@@ -155,7 +155,7 @@ export function CodeBlock({
   className?: string;
 }) {
   return (
-    <div className={`group relative overflow-hidden rounded-lg border border-edge bg-ink ${className}`}>
+    <div className={`group relative w-full min-w-0 overflow-hidden rounded-lg border border-edge bg-ink ${className}`}>
       <div className="flex items-center justify-between border-b border-edge/60 px-3 py-1.5">
         <span className="text-[10px] uppercase tracking-widest text-slate-500">{language ?? "code"}</span>
         <CopyButton text={code} />

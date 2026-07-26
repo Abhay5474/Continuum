@@ -80,6 +80,19 @@ export interface WorldOptions {
   pointer: () => { x: number; y: number };
   accent: string;
   dim: string;
+  /**
+   * Overall presence, 0..1. The console runs this well under 1.
+   *
+   * <p>The same field that carries a marketing page would be an obstruction
+   * behind a table of live numbers. Turning it down rather than turning it off
+   * keeps the two halves of the product recognisably the same thing while
+   * leaving the data unambiguously in front.
+   */
+  intensity?: number;
+  /** Population multiplier. Fewer nodes where the field is only a signature. */
+  density?: number;
+  /** Suppresses the cursor lamp where a moving highlight would distract. */
+  lamp?: boolean;
 }
 
 import { activeDemos, drainSurge } from "./activity";
@@ -109,6 +122,9 @@ export function createWorld(
   // backdrop they sit on. This is the difference between a lit volume and a
   // wallpaper, and it costs one extra canvas.
   const nctx = nearCanvas?.getContext("2d", { alpha: true }) ?? null;
+  const intensity = opts.intensity ?? 1;
+  const density = opts.density ?? 1;
+  const lampOn = opts.lamp ?? true;
   const reduced =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -164,7 +180,7 @@ export function createWorld(
   }
 
   function build() {
-    const n = populationFor(width);
+    const n = Math.max(24, Math.round(populationFor(width) * density));
     nodes = Array.from({ length: n }, (_, i) => ({
       x: (Math.random() - 0.5) * width * 1.6,
       y: (Math.random() - 0.5) * height * 1.6,
@@ -201,7 +217,7 @@ export function createWorld(
       nearCanvas.height = canvas.height;
       nctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    if (nodes.length === 0 || populationFor(width) !== nodes.length) {
+    if (nodes.length === 0 || Math.max(24, Math.round(populationFor(width) * density)) !== nodes.length) {
       build();
     }
   }
@@ -213,6 +229,7 @@ export function createWorld(
    */
   function formationAt(p: number) {
     const n = opts.formations.length;
+    if (n === 1) return { index: 0, next: 0, t: 0 };
     const scaled = clamp(p, 0, 0.9999) * (n - 1);
     const index = Math.floor(scaled);
     return { index, next: Math.min(n - 1, index + 1), t: scaled - index };
@@ -423,7 +440,7 @@ export function createWorld(
     // The lamp made visible. Very low alpha — this is the light in the medium,
     // not a glowing blob; without it the cursor brightens things for no visible
     // reason, which reads as a bug rather than as illumination.
-    {
+    if (lampOn) {
       const reachBg = Math.min(width, height) * 0.5;
       // Built at the origin once and translated into place, so the gradient is
       // not reconstructed and the fill covers only the lamp's own footprint.
@@ -460,6 +477,7 @@ export function createWorld(
 
     /** 0..1 — how strongly the lamp falls on a projected point. */
     const lit = (sx: number, sy: number) => {
+      if (!lampOn) return 0;
       const d = Math.hypot(sx - light.x, sy - light.y);
       const f = 1 - Math.min(1, d / reach);
       // Squared falloff reads as light rather than as a flat circular mask.
@@ -529,7 +547,7 @@ export function createWorld(
           g.lineWidth = hot ? 1.6 : 1;
           g.strokeStyle = withAlpha(
             hot ? opts.accent : opts.dim,
-            (level + 0.6) / (EDGE_LEVELS * 1.5)
+            ((level + 0.6) / (EDGE_LEVELS * 1.5)) * intensity
           );
           g.beginPath();
           for (let i = 0; i < pts.length; i += 4) {
@@ -554,7 +572,7 @@ export function createWorld(
       const depth = lerp(A.depth, B.depth, pk.t);
       const g = target(depth);
       const r = clamp(k * 2.1, 0.8, 3.4);
-      g.fillStyle = withAlpha(pk.hue, clamp(k * 0.95 * fog(depth), 0.2, 1) * nearDamp(depth));
+      g.fillStyle = withAlpha(pk.hue, clamp(k * 0.95 * fog(depth), 0.2, 1) * nearDamp(depth) * intensity);
       g.beginPath();
       g.arc(x, y, r, 0, Math.PI * 2);
       g.fill();
@@ -585,7 +603,8 @@ export function createWorld(
         clamp(P.k * (0.3 + n.energy * 0.55 + glow * 0.5 + surge * 0.3) * haze, 0.03, 0.95) *
         // Defocused matter is dimmer as it spreads, or the foreground shouts.
         (1 - nearness * 0.72) *
-        nearDamp(P.depth);
+        nearDamp(P.depth) *
+        intensity;
 
       g.fillStyle = withAlpha(n.energy > 0.55 || glow > 0.5 ? opts.accent : opts.dim, alpha);
       g.beginPath();

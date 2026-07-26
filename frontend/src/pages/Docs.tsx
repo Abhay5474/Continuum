@@ -102,7 +102,7 @@ export default function Docs() {
               let Continuum route by complexity.
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
+              <div className="min-w-0">
                 <div className="mb-1 text-xs font-semibold text-slate-300">JavaScript</div>
                 <CodeBlock
                   language="javascript"
@@ -124,7 +124,7 @@ const data = await res.json();
 console.log(data.response);`}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="mb-1 text-xs font-semibold text-slate-300">Python</div>
                 <CodeBlock
                   language="python"
@@ -328,7 +328,7 @@ function DocsHeader() {
           <span className="text-lg font-bold tracking-tight text-gradient">Continuum</span>
           <span className="hidden text-[10px] uppercase tracking-widest text-slate-500 sm:block">Docs</span>
         </Link>
-        <nav className="ml-auto flex items-center gap-2">
+        <nav className="ml-auto flex min-w-0 shrink items-center gap-1.5 sm:gap-2">
           <Link to="/dashboard" className="rounded-lg px-3 py-1.5 text-sm text-slate-300 hover:text-white">
             Dashboard
           </Link>
