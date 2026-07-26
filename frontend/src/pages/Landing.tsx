@@ -1,176 +1,249 @@
 import { Link } from "react-router-dom";
-import { Reveal, CodeBlock, ThemeToggle } from "../components/ui";
-import { Magnetic, ParallaxLayer } from "../system/motion";
+import { CodeBlock, ThemeToggle } from "../components/ui";
+import { Magnetic } from "../system/motion";
+import World from "../world/World";
+import { Facts, Scene } from "../world/Scene";
 
 /**
- * The front door. Standalone marketing page (no app chrome) — says what
- * Continuum is, who it's for, and the value props, JetBrains-product style:
- * animated gradients, scroll-reveal, tasteful motion.
+ * The front door.
+ *
+ * <p>Not a stack of sections. A single spatial system sits behind the whole page
+ * and reorganises as you scroll — scattered systems resolving into a fabric,
+ * the fabric becoming an execution graph, the graph becoming a memory
+ * hierarchy, and so on — while the copy names what you are looking at. Scenes
+ * do not each bring their own graphic; there is one world in seven states.
+ *
+ * <p>The claims here are the ones the system can actually back: durable
+ * execution, exactly-once effects, deterministic replay, failover. No capability
+ * is described that the console cannot show you.
  */
 export default function Landing() {
   return (
-    <div className="min-h-full">
+    <div className="relative">
+      <World />
       <LandingHeader />
 
-      {/* ---------- HERO ---------- */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 -z-10">
-          <ParallaxLayer
-            speed={0.18}
-            className="absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-aurora/20 blur-[120px] animate-glow-pulse"
-          />
-          <div className="absolute top-40 right-0 h-[360px] w-[360px] rounded-full bg-neon/10 blur-[100px]" />
-        </div>
-        <div className="mx-auto max-w-6xl px-6 pt-20 pb-16 text-center sm:pt-28">
-          <div className="inline-flex items-center gap-2 rounded-full border border-edge bg-panel/60 px-3 py-1 text-xs text-slate-400 animate-fade-up">
+      {/* ---------- ENTRY ---------- */}
+      <section className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center">
+        <div className="animate-fade-up">
+          <div className="inline-flex items-center gap-2 rounded-full border border-edge/80 bg-panel/40 px-3 py-1 text-[11px] tracking-wide text-slate-400 backdrop-blur-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-stream-dot" />
-            Durable execution for AI — event-sourced, self-healing, verifiable
+            Event-sourced · deterministic replay · exactly-once
           </div>
-          <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-bold leading-[1.1] tracking-tight sm:text-6xl animate-fade-up">
-            The reliability layer <br className="hidden sm:block" />
-            <span className="text-gradient">between your app and the AI.</span>
+
+          <h1 className="mx-auto mt-8 max-w-4xl text-[2.75rem] font-semibold leading-[1.05] tracking-tight text-slate-100 sm:text-7xl">
+            An operating layer
+            <br />
+            <span className="text-gradient">for AI systems.</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-slate-400 sm:text-lg animate-fade-up">
-            Continuum treats the LLM as just another unreliable dependency. Point your app at it and
-            get crash-proof workflows, exactly-once side effects, automatic provider failover,
-            verified answers and huge cost savings — without changing your code.
+
+          <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-slate-400">
+            AI systems fail in ways ordinary software does not: providers vanish mid-call, context
+            outgrows the window, answers change between runs. Continuum is the layer underneath that
+            makes them survivable — and inspectable.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3 animate-fade-up">
+
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Magnetic pull={7}>
               <Link
                 to="/signin"
-                className="inline-block rounded-xl bg-gradient-to-r from-aurora to-neon px-6 py-3 text-sm font-semibold text-ink shadow-glow"
+                className="inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-6 py-3 text-sm font-semibold text-ink shadow-glow"
               >
-                Get your API key →
+                Get an API key
               </Link>
             </Magnetic>
             <Link
               to="/docs"
-              className="rounded-xl border border-edge px-6 py-3 text-sm font-medium text-slate-200 transition-colors hover:border-neon/50 hover:text-neon"
+              className="rounded-lg border border-edge px-6 py-3 text-sm font-medium text-slate-200 transition-colors hover:border-neon/50 hover:text-neon"
             >
               Read the docs
             </Link>
-            <Link
-              to="/dashboard"
-              className="rounded-xl px-6 py-3 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
-            >
-              Live dashboard ↗
-            </Link>
           </div>
+        </div>
 
-          {/* hero code */}
-          <div className="mx-auto mt-14 max-w-2xl text-left animate-fade-up">
-            <CodeBlock
-              language="bash"
-              code={`curl https://your-continuum/api/gateway/chat \\
+        <div className="absolute bottom-10 flex flex-col items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-slate-600">
+          <span>Descend</span>
+          <span className="h-8 w-px animate-pulse bg-gradient-to-b from-slate-600 to-transparent" />
+        </div>
+      </section>
+
+      {/* ---------- THE NARRATIVE ---------- */}
+      <Scene
+        index="01"
+        label="The problem"
+        title={
+          <>
+            Every AI system becomes
+            <br />a distributed system.
+          </>
+        }
+        body={
+          <>
+            One model call becomes six. Six become an agent. Agents call tools, tools call services,
+            and each hop is a place to fail. The parts cannot see each other, so nothing can recover
+            anything else — and when something breaks at three in the morning, there is no record of
+            what the system was thinking.
+          </>
+        }
+      />
+
+      <Scene
+        index="02"
+        label="The layer"
+        side="right"
+        title={
+          <>
+            Continuum is the fabric
+            <br />
+            they run on.
+          </>
+        }
+        body={
+          <>
+            Every step is written to an event log before it happens and again when it completes.
+            That log is the source of truth: it is what lets a crashed run resume from its last
+            completed step instead of the beginning, and what makes a run reproducible months later.
+          </>
+        }
+      >
+        <Facts
+          items={[
+            ["Recovery", "last completed step"],
+            ["Side effects", "exactly once"],
+            ["History", "fully replayable"],
+          ]}
+        />
+      </Scene>
+
+      <Scene
+        index="03"
+        label="Durable execution"
+        title={<>Work that survives the process that started it.</>}
+        body={
+          <>
+            Publish a workflow as a graph of steps. Continuum runs it durably: independent steps go
+            in parallel, retries never repeat work that already succeeded, waits cost no worker, and
+            every call carries a stable idempotency key so your services can dedupe. Kill the engine
+            mid-run and it picks up where it stopped.
+          </>
+        }
+      >
+        <Facts
+          items={[
+            ["Steps", "parallel by dependency"],
+            ["Retries", "4xx settles, 5xx retries"],
+            ["Waits", "durable timers"],
+          ]}
+        />
+      </Scene>
+
+      <Scene
+        index="04"
+        label="Context virtualization"
+        side="right"
+        title={<>Most of what a model could see should not be resident.</>}
+        body={
+          <>
+            Context is paged like memory. A working set stays in the window; the rest lives in colder
+            tiers and faults back on reference. The model behaves as though it has the whole history,
+            while the tokens you pay for stay bounded.
+          </>
+        }
+      >
+        <Facts
+          items={[
+            ["Tiers", "L1 / L2 / L3 / durable"],
+            ["Resident", "working set only"],
+            ["Cold pages", "fault in on reference"],
+          ]}
+        />
+      </Scene>
+
+      <Scene
+        index="05"
+        label="Verification"
+        title={<>One answer is a guess. Several that agree is evidence.</>}
+        body={
+          <>
+            For decisions worth checking, a question is decomposed into solvers and verifiers that
+            work independently and are resolved by Bayesian aggregation. What comes back is not just
+            an answer but a confidence and the trace that produced it.
+          </>
+        }
+      />
+
+      <Scene
+        index="06"
+        label="Adaptive routing"
+        side="right"
+        title={<>Providers fail. Traffic should already be elsewhere.</>}
+        body={
+          <>
+            Requests are scored per call on capability, latency, cost and live provider health, and a
+            failing provider is routed around before your users notice. Fault drills run against your
+            own traffic — scoped to your account, safe to run in production.
+          </>
+        }
+      >
+        <Facts
+          items={[
+            ["Selection", "scored per request"],
+            ["Failover", "automatic"],
+            ["Drills", "scoped to your account"],
+          ]}
+        />
+      </Scene>
+
+      <Scene
+        index="07"
+        label="Continuum"
+        side="center"
+        title={<>One fabric. Every guarantee.</>}
+        body={
+          <>
+            Execution, context, verification and routing are not four products stitched together —
+            they are the same event log seen from four angles. That is why a run can be replayed, why
+            a side effect fires once, and why the console can show you exactly what happened.
+          </>
+        }
+      >
+        <div className="mx-auto max-w-2xl text-left">
+          <CodeBlock
+            language="bash"
+            code={`curl https://your-continuum/api/gateway/chat \\
   -H "Authorization: Bearer cnt_live_…" \\
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello!"}]}'`}
-            />
-            <p className="mt-2 text-center text-xs text-slate-500">
-              OpenAI-compatible. Same request shape you already use — Continuum handles the rest.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------- VALUE PROPS ---------- */}
-      <section className="mx-auto max-w-6xl px-6 py-16">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ["shield", "Never loses work", "Crash mid-task and it resumes exactly where it left off — no repeated work, no lost progress."],
-            ["check", "Exactly-once", "Emails and charges fire once, even through retries and crashes. No double receipts."],
-            ["switch", "Auto failover", "A provider goes down and Continuum switches instantly. Your users never notice."],
-            ["savings", "Big cost savings", "Right-sized routing, prompt compression and context paging cut token spend dramatically."],
-          ].map(([icon, title, body], i) => (
-            <Reveal key={title} delay={i * 80}>
-              <div className="glass h-full p-5 transition-all hover:-translate-y-1 hover:shadow-glow">
-                <Icon name={icon} />
-                <div className="mt-3 text-sm font-semibold">{title}</div>
-                <div className="mt-1 text-xs leading-relaxed text-slate-400">{body}</div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------- FEATURE SPOTLIGHT ---------- */}
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <Reveal>
-          <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
-            One gateway. <span className="text-gradient">Every reliability guarantee.</span>
-          </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-slate-400">
-            Each capability is opt-in and off by default — turn on exactly what you need.
+          />
+          <p className="mt-3 text-center text-xs text-slate-500">
+            OpenAI-compatible. The request shape you already send — Continuum handles what happens
+            after it.
           </p>
-        </Reveal>
-        <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[
-            ["Verified answers", "Break high-stakes questions into a parallel DAG of solvers and verifiers, resolved by Bayesian math — with a confidence score and full audit trail.", "/dag"],
-            ["Autonomous optimization", "A Thompson-sampling autopilot learns the best routing from real traffic and only changes what's proven better, with a digital-twin safety net.", "/autopilot"],
-            ["Context virtualization", "An OS-style paging MMU keeps only what matters in the model's window and pages the rest — infinite context without bigger token limits.", "/mmu"],
-            ["Long-term memory", "A four-tier memory that summarizes, distills and forgets like a brain — bounded, private, and per-tenant.", "/godmode"],
-            ["Prompt firewall", "PII redaction and prompt-injection blocking inbound; secret-leak scanning outbound. Compliance-grade by design.", "/portal"],
-            ["Self-healing deploys", "Ship changed workflow code over in-flight jobs — the engine reconciles the divergence automatically. No crashes.", "/dag"],
-          ].map(([title, body, to], i) => (
-            <Reveal key={title} delay={(i % 3) * 80}>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Magnetic pull={7}>
               <Link
-                to={to as string}
-                className="group flex h-full flex-col rounded-xl border border-edge bg-panel/60 p-5 transition-all hover:-translate-y-1 hover:border-aurora/40 hover:shadow-glow-sm"
+                to="/signin"
+                className="inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-6 py-3 text-sm font-semibold text-ink shadow-glow"
               >
-                <div className="text-sm font-semibold text-slate-100 group-hover:text-white">{title}</div>
-                <div className="mt-2 flex-1 text-xs leading-relaxed text-slate-400">{body}</div>
-                <div className="mt-3 text-xs font-medium text-neon opacity-0 transition-opacity group-hover:opacity-100">
-                  Explore →
-                </div>
+                Start building
               </Link>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------- HOW IT WORKS ---------- */}
-      <section className="mx-auto max-w-4xl px-6 py-16">
-        <Reveal>
-          <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">Live in three steps</h2>
-        </Reveal>
-        <div className="mt-10 space-y-4">
-          {[
-            ["1", "Get a key", "Sign up in the Developer Portal and issue a Continuum API key."],
-            ["2", "Point your app", "Swap your base URL — Continuum speaks the OpenAI chat format."],
-            ["3", "Flip on features", "Toggle verification, memory, compression or the firewall as you need them."],
-          ].map(([n, title, body], i) => (
-            <Reveal key={title} delay={i * 80}>
-              <div className="flex items-start gap-4 rounded-xl border border-edge bg-panel/50 p-5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-sm font-bold text-ink">
-                  {n}
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">{title}</div>
-                  <div className="mt-0.5 text-xs text-slate-400">{body}</div>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-        <Reveal>
-          <div className="mt-10 text-center">
+            </Magnetic>
             <Link
-              to="/portal"
-              className="inline-block rounded-xl bg-gradient-to-r from-aurora to-neon px-6 py-3 text-sm font-semibold text-ink shadow-glow transition-transform hover:-translate-y-0.5"
+              to="/dashboard"
+              className="rounded-lg border border-edge px-6 py-3 text-sm font-medium text-slate-300 transition-colors hover:border-neon/50 hover:text-neon"
             >
-              Start building — free →
+              Open the console
             </Link>
           </div>
-        </Reveal>
-      </section>
+        </div>
+      </Scene>
 
-      <footer className="border-t border-edge/60">
+      <footer className="relative border-t border-edge/60 bg-ink/60 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-8 text-xs text-slate-500">
-          <span className="text-gradient font-bold">⟳ Continuum</span>
-          <span>Durable execution engine for AI agents</span>
+          <span className="font-semibold text-slate-300">⟳ Continuum</span>
+          <span>Durable execution for AI systems</span>
           <div className="ml-auto flex gap-4">
             <Link to="/docs" className="hover:text-slate-300">Docs</Link>
-            <Link to="/dashboard" className="hover:text-slate-300">Dashboard</Link>
+            <Link to="/dashboard" className="hover:text-slate-300">Console</Link>
             <Link to="/portal" className="hover:text-slate-300">Portal</Link>
           </div>
         </div>
@@ -181,71 +254,33 @@ export default function Landing() {
 
 function LandingHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-edge/50 bg-ink/70 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-edge/40 bg-ink/50 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
         <Link to="/" className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-lg font-bold text-ink shadow-glow-sm">
             ⟳
           </span>
-          <span className="text-lg font-bold tracking-tight text-gradient">Continuum</span>
+          <span className="text-lg font-semibold tracking-tight text-slate-100">Continuum</span>
         </Link>
-        <nav className="ml-auto flex items-center gap-1 sm:gap-2">
-          <Link to="/docs" className="rounded-lg px-3 py-1.5 text-sm text-slate-300 transition-colors hover:text-white">
+        <nav className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+          <Link to="/docs" className="rounded-lg px-2.5 py-1.5 text-sm text-slate-300 transition-colors hover:text-white sm:px-3">
             Docs
           </Link>
-          <Link to="/dashboard" className="hidden rounded-lg px-3 py-1.5 text-sm text-slate-300 transition-colors hover:text-white sm:block">
-            Dashboard
+          <Link
+            to="/dashboard"
+            className="hidden rounded-lg px-3 py-1.5 text-sm text-slate-300 transition-colors hover:text-white sm:block"
+          >
+            Console
           </Link>
           <ThemeToggle />
           <Link
             to="/signin"
-            className="rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-1.5 text-sm font-semibold text-ink shadow-glow-sm transition-transform hover:-translate-y-0.5"
+            className="whitespace-nowrap rounded-lg bg-gradient-to-r from-aurora to-neon px-3 py-1.5 text-sm font-semibold text-ink shadow-glow-sm transition-transform hover:-translate-y-0.5 sm:px-4"
           >
             Sign in
           </Link>
         </nav>
       </div>
     </header>
-  );
-}
-
-/**
- * Small line icons for the value props. Inline SVG rather than emoji: emoji
- * render differently per platform and read as informal on a product page.
- */
-function Icon({ name }: { name: string }) {
-  const paths: Record<string, JSX.Element> = {
-    shield: <path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3z" />,
-    check: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M8.5 12.5l2.5 2.5 4.5-5" />
-      </>
-    ),
-    switch: (
-      <>
-        <path d="M4 8h10l-2.5-2.5M20 16H10l2.5 2.5" />
-      </>
-    ),
-    savings: (
-      <>
-        <path d="M4 17l5-5 3.5 3.5L20 8" />
-        <path d="M15 8h5v5" />
-      </>
-    ),
-  };
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-6 w-6 text-neon"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {paths[name]}
-    </svg>
   );
 }
