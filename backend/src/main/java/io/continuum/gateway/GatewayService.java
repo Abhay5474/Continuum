@@ -88,6 +88,8 @@ public class GatewayService {
     // Checks the finished answer against the request that asked for it.
     private final io.continuum.quality.QualityGate qualityGate;
     private final io.continuum.quality.QualityGateService quality;
+    // Trips a model out of rotation when its answers degrade, not when it errors.
+    private final io.continuum.drift.SemanticBreakerService breaker;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -111,7 +113,8 @@ public class GatewayService {
                           io.continuum.uncertainty.SemanticUncertaintyService uncertainty,
                           io.continuum.aichaos.AiChaosEngine aiChaos,
                           io.continuum.quality.QualityGate qualityGate,
-                          io.continuum.quality.QualityGateService quality) {
+                          io.continuum.quality.QualityGateService quality,
+                          io.continuum.drift.SemanticBreakerService breaker) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -139,6 +142,7 @@ public class GatewayService {
         this.aiChaos = aiChaos;
         this.qualityGate = qualityGate;
         this.quality = quality;
+        this.breaker = breaker;
     }
 
     /** Record a routing outcome into the contextual bandit; never affects the request. */
@@ -255,6 +259,21 @@ public class GatewayService {
         }
         List<ModelFallbackPolicy.ModelCandidate> chain =
                 fallbackPolicy.buildChain(options, complexity, canonical.model(), requireVision);
+
+        // Divert away from models whose quality has drifted. Filtered rather than
+        // excluded from scoring, so if EVERY model is tripped the request still
+        // goes somewhere: a degraded answer beats no answer.
+        if (breaker.enabledFor(developerId) && chain.size() > 1) {
+            List<ModelFallbackPolicy.ModelCandidate> permitted = new ArrayList<>();
+            for (ModelFallbackPolicy.ModelCandidate c : chain) {
+                if (breaker.allows(developerId, c.provider(), c.model())) {
+                    permitted.add(c);
+                }
+            }
+            if (!permitted.isEmpty()) {
+                chain = permitted;
+            }
+        }
 
         if (chain.isEmpty()) {
             logFailure(developerId, req, complexity, mode);
@@ -380,12 +399,25 @@ public class GatewayService {
             GatewayDtos.ChatResponse response, String developerId, LlmRequest canonical,
             String provider, String model, Map<String, String> devKeys, double complexity) {
 
-        if (!quality.activeFor(developerId)) {
+        boolean gateOn = quality.activeFor(developerId);
+        boolean breakerOn = breaker.enabledFor(developerId);
+        if (!gateOn && !breakerOn) {
             return response;
         }
         try {
             var cfg = quality.settingsFor(developerId);
             var verdict = qualityGate.check(canonical, response.response(), complexity, cfg.getThreshold());
+
+            // The breaker's input. Scoring is free — no model call — so it works
+            // whether or not the gate itself is enabled, and the breaker does not
+            // inherit the gate's mode.
+            breaker.observe(developerId, provider, model, verdict.score(),
+                    verdict.defects().isEmpty() ? null : verdict.summary());
+
+            if (!gateOn) {
+                // Breaker only: observe and get out of the way.
+                return response;
+            }
 
             boolean enforce = cfg.getMode() == io.continuum.persistence.entity.QualityGateSettingEntity.Mode.ENFORCE;
             // BLOCK is a refusal. Asking again is how you get the same refusal
@@ -504,6 +536,17 @@ public class GatewayService {
 
             var m = uncertainty.measure(developerId, answers);
             uncertainty.record(developerId, lastUserContent(canonical), model, m, extraCost, extraMs);
+
+            // Second drift channel. The quality gate checks whether an answer
+            // honours its contract, which is deliberately not a check on whether
+            // it is true — a fluent, well-formatted fabrication scores full
+            // marks. Self-agreement is the signal that moves when a model starts
+            // confabulating, so when it is being measured the breaker gets it
+            // too.
+            if (!Double.isNaN(m.confidence())) {
+                breaker.observe(developerId, provider, model, m.confidence(),
+                        m.clusters() > 1 ? m.clusters() + " conflicting answers across samples" : null);
+            }
 
             return new GatewayDtos.ChatResponse(response.response(), response.provider(), response.model(),
                     response.latency() + extraMs, response.tokens(), response.cost() + extraCost,

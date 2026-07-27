@@ -43,6 +43,7 @@ const GROUPS: Group[] = [
     label: "Reliability",
     items: [
       { to: "/quality", label: "Quality Gate", desc: "Check the answer against the request" },
+      { to: "/breaker", label: "Semantic Breaker", desc: "Trip a model when its answers degrade" },
       { to: "/confidence", label: "Answer Confidence", desc: "Does the model agree with itself" },
       { to: "/dag", label: "Verification", desc: "Consensus traces and evidence" },
       { to: "/replay", label: "Replay Audit", desc: "Deterministic replay and divergence healing" },

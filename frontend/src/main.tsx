@@ -30,6 +30,7 @@ import SemanticCache from "./pages/SemanticCache";
 import Cascade from "./pages/Cascade";
 import Uncertainty from "./pages/Uncertainty";
 import QualityGatePage from "./pages/QualityGate";
+import BreakerPage from "./pages/Breaker";
 import { ToastProvider } from "./components/ui";
 import { OperatorProvider } from "./system/OperatorAccess";
 
@@ -78,6 +79,7 @@ const router = createBrowserRouter([
           { path: "cascade", element: <Cascade /> },
           { path: "confidence", element: <Uncertainty /> },
           { path: "quality", element: <QualityGatePage /> },
+          { path: "breaker", element: <BreakerPage /> },
         ],
       },
     ],

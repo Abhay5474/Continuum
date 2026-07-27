@@ -327,6 +327,21 @@ export const portal = {
     clear: () => portalHttp<any>("/api/portal/developer/quality", "DELETE"),
   },
 
+  // --- Semantic circuit breaker ---
+  breaker: {
+    status: () => portalHttp<any>("/api/portal/developer/breaker/status", "GET"),
+    configure: (body: {
+      enabled?: boolean; warmup?: number; slack?: number; threshold?: number; cooldownSeconds?: number;
+    }) => portalHttp<any>("/api/portal/developer/breaker/settings", "PUT", body),
+    events: (limit = 30) => portalHttp<any[]>(`/api/portal/developer/breaker/events?limit=${limit}`, "GET"),
+    reset: (provider: string, model: string) =>
+      portalHttp<any>(
+        `/api/portal/developer/breaker/reset?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`,
+        "POST"
+      ),
+    clear: () => portalHttp<any>("/api/portal/developer/breaker", "DELETE"),
+  },
+
   // --- Customer-defined workflows ---
   defs: {
     list: () => portalHttp<any[]>("/api/portal/developer/workflows/definitions", "GET"),
