@@ -21,13 +21,13 @@ class HttpStepActivityTargetTest {
     void allowsAPublicTarget() {
         // An address literal, so the check is exercised without depending on DNS
         // being reachable from the test environment.
-        assertThatCode(() -> guarded.validateTarget("https://93.184.216.34/hook"))
+        assertThatCode(() -> guarded.resolveTarget("https://93.184.216.34/hook"))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void blocksLoopback() {
-        assertThatThrownBy(() -> guarded.validateTarget("http://127.0.0.1:8080/internal"))
+        assertThatThrownBy(() -> guarded.resolveTarget("http://127.0.0.1:8080/internal"))
                 .isInstanceOf(HttpStepActivity.NonRetryable.class)
                 .hasMessageContaining("private address");
     }
@@ -35,20 +35,20 @@ class HttpStepActivityTargetTest {
     @Test
     void blocksPrivateRanges() {
         for (String host : new String[] {"http://10.0.0.5/x", "http://192.168.1.10/x", "http://172.16.0.9/x"}) {
-            assertThatThrownBy(() -> guarded.validateTarget(host))
+            assertThatThrownBy(() -> guarded.resolveTarget(host))
                     .isInstanceOf(HttpStepActivity.NonRetryable.class);
         }
     }
 
     @Test
     void blocksCloudMetadataLinkLocal() {
-        assertThatThrownBy(() -> guarded.validateTarget("http://169.254.169.254/latest/meta-data/"))
+        assertThatThrownBy(() -> guarded.resolveTarget("http://169.254.169.254/latest/meta-data/"))
                 .isInstanceOf(HttpStepActivity.NonRetryable.class);
     }
 
     @Test
     void blocksNonHttpSchemes() {
-        assertThatThrownBy(() -> guarded.validateTarget("file:///etc/passwd"))
+        assertThatThrownBy(() -> guarded.resolveTarget("file:///etc/passwd"))
                 .isInstanceOf(HttpStepActivity.NonRetryable.class)
                 .hasMessageContaining("http or https");
     }
@@ -63,7 +63,7 @@ class HttpStepActivityTargetTest {
     @Test
     void selfHostedDeploymentsCanOptIntoPrivateTargets() {
         // Running the engine beside your own services is a legitimate setup.
-        assertThatCode(() -> permissive.validateTarget("http://10.0.0.5/internal"))
+        assertThatCode(() -> permissive.resolveTarget("http://10.0.0.5/internal"))
                 .doesNotThrowAnyException();
     }
 }

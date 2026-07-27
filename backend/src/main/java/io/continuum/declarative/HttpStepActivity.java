@@ -35,6 +35,13 @@ import java.util.Map;
 public class HttpStepActivity implements Activity {
 
     public static final String TYPE = "declarative.httpStep";
+
+    /**
+     * Hard ceiling on a response body. Generous enough for any legitimate JSON
+     * payload, small enough that a hostile target cannot exhaust the heap the
+     * whole engine shares.
+     */
+    static final int MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
     private static final Logger log = LoggerFactory.getLogger(HttpStepActivity.class);
 
     private final ObjectMapper mapper;
@@ -61,7 +68,8 @@ public class HttpStepActivity implements Activity {
     @Override
     public Object execute(String inputJson, ActivityContext ctx) throws Exception {
         Input in = mapper.readValue(inputJson, Input.class);
-        URI uri = validateTarget(in.url());
+        Target target = resolveTarget(in.url());
+        URI uri = target.uri();
 
         HttpRequest.Builder b = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(Math.max(1, Math.min(300, in.timeoutSeconds()))))
@@ -87,23 +95,83 @@ public class HttpStepActivity implements Activity {
             default -> b.POST(HttpRequest.BodyPublishers.ofString(body == null ? "{}" : body));
         }
 
-        HttpResponse<String> res = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+        // Pin the hostname to the address that passed the check, so the
+        // connection cannot resolve to somewhere else. Released in the finally:
+        // activities run on a pooled thread and a leaked pin would silently
+        // misdirect a later request.
+        boolean pinned = target.pin();
+        HttpResponse<java.io.InputStream> res;
+        String bodyText;
+        try {
+            res = client.send(b.build(), HttpResponse.BodyHandlers.ofInputStream());
+            bodyText = readBounded(res.body());
+        } finally {
+            if (pinned) {
+                target.release();
+            }
+        }
         int code = res.statusCode();
 
         // 4xx is the caller's fault and will not fix itself, so it fails the step
         // immediately instead of burning the retry budget. 5xx and timeouts throw,
         // which is what the engine retries.
         if (code >= 500) {
-            throw new IllegalStateException("Step target returned " + code + ": " + truncate(res.body()));
+            throw new IllegalStateException("Step target returned " + code + ": " + truncate(bodyText));
         }
         if (code >= 400) {
-            throw new NonRetryable("Step target returned " + code + ": " + truncate(res.body()));
+            throw new NonRetryable("Step target returned " + code + ": " + truncate(bodyText));
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("status", code);
-        out.put("body", parse(res.body()));
+        out.put("body", parse(bodyText));
         return out;
+    }
+
+    /**
+     * A vetted destination: the URI to call and the single address approved for
+     * it.
+     *
+     * <p>Carrying the address rather than re-deriving it is the point — see
+     * {@link #resolveTarget}.
+     */
+    record Target(URI uri, String host, java.net.InetAddress address) {
+
+        /** @return whether the pin is actually in force */
+        boolean pin() {
+            return address != null && io.continuum.net.PinnedDnsResolver.pin(host, address);
+        }
+
+        void release() {
+            io.continuum.net.PinnedDnsResolver.unpin(host);
+        }
+    }
+
+    /**
+     * Reads at most {@link #MAX_RESPONSE_BYTES}, then stops.
+     *
+     * <p>{@code BodyHandlers.ofString()} materialises the entire response before
+     * anything can truncate it, so a target returning a multi-gigabyte body
+     * exhausts the heap — and since every activity in the process shares that
+     * heap, one hostile endpoint takes the engine down rather than just its own
+     * step.
+     */
+    private static String readBounded(java.io.InputStream in) throws java.io.IOException {
+        try (in) {
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int total = 0;
+            int n;
+            while ((n = in.read(chunk)) > 0) {
+                int room = MAX_RESPONSE_BYTES - total;
+                if (room <= 0) {
+                    break;
+                }
+                buf.write(chunk, 0, Math.min(n, room));
+                total += n;
+            }
+            return buf.toString(java.nio.charset.StandardCharsets.UTF_8);
+        }
     }
 
     /** A failure the engine should not retry. */
@@ -119,7 +187,7 @@ public class HttpStepActivity implements Activity {
      * customers, so without this the engine would be a confused deputy able to
      * reach internal services and cloud metadata endpoints.
      */
-    URI validateTarget(String url) throws URISyntaxException, UnknownHostException {
+    Target resolveTarget(String url) throws URISyntaxException, UnknownHostException {
         URI uri = new URI(url);
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
         if (!scheme.equals("https") && !scheme.equals("http")) {
@@ -129,17 +197,26 @@ public class HttpStepActivity implements Activity {
             throw new NonRetryable("Step url has no host: " + url);
         }
         if (allowPrivateTargets) {
-            return uri;
+            return new Target(uri, uri.getHost(), null);
         }
-        for (InetAddress addr : InetAddress.getAllByName(uri.getHost())) {
-            if (addr.isLoopbackAddress() || addr.isAnyLocalAddress() || addr.isLinkLocalAddress()
-                    || addr.isSiteLocalAddress() || addr.isMulticastAddress()
-                    || isUniqueLocal(addr)) {
+        InetAddress[] resolved = InetAddress.getAllByName(uri.getHost());
+        for (InetAddress addr : resolved) {
+            if (isPrivate(addr)) {
                 throw new NonRetryable("Step url resolves to a private address, which is not allowed: "
                         + uri.getHost());
             }
         }
-        return uri;
+        // Every answer was public. Carry the first one forward and connect to
+        // exactly that: re-resolving at connect time is what lets a hostile
+        // nameserver answer differently the second time.
+        return new Target(uri, uri.getHost(), resolved.length > 0 ? resolved[0] : null);
+    }
+
+    /** Addresses inside the deployment's own network, in any of their guises. */
+    static boolean isPrivate(InetAddress addr) {
+        return addr.isLoopbackAddress() || addr.isAnyLocalAddress() || addr.isLinkLocalAddress()
+                || addr.isSiteLocalAddress() || addr.isMulticastAddress()
+                || isUniqueLocal(addr);
     }
 
     /** IPv6 unique-local (fc00::/7), which the JDK does not classify as site-local. */
