@@ -40,6 +40,7 @@ const SIGNATURE: [string, typeof workflow][] = [
   ["/memory", memory],
   ["/dag", consensus],
   ["/confidence", consensus],
+  ["/quality", consensus],
   ["/replay", consensus],
   ["/router", routing],
   ["/cascade", routing],

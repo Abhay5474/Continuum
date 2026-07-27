@@ -318,6 +318,15 @@ export const portal = {
     clear: () => portalHttp<any>("/api/portal/developer/uncertainty", "DELETE"),
   },
 
+  // --- Response quality gate ---
+  quality: {
+    status: () => portalHttp<any>("/api/portal/developer/quality/status", "GET"),
+    configure: (body: { mode?: string; threshold?: number; maxRepairs?: number; budgetMs?: number }) =>
+      portalHttp<any>("/api/portal/developer/quality/settings", "PUT", body),
+    checks: (limit = 30) => portalHttp<any[]>(`/api/portal/developer/quality/checks?limit=${limit}`, "GET"),
+    clear: () => portalHttp<any>("/api/portal/developer/quality", "DELETE"),
+  },
+
   // --- Customer-defined workflows ---
   defs: {
     list: () => portalHttp<any[]>("/api/portal/developer/workflows/definitions", "GET"),

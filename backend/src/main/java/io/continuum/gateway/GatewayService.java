@@ -6,6 +6,7 @@ import io.continuum.persistence.entity.ModelEntity;
 import io.continuum.persistence.repository.GatewayRequestLogRepository;
 import io.continuum.provider.ProviderRouter;
 import io.continuum.provider.model.LlmRequest;
+import io.continuum.provider.model.Message;
 import io.continuum.provider.model.LlmResponse;
 import io.continuum.registry.ModelRegistryService;
 import io.continuum.routing.ProviderSelectionEngine;
@@ -84,6 +85,9 @@ public class GatewayService {
     // — it previously only reached durable workflows, so a drill against the
     // gateway did nothing at all.
     private final io.continuum.aichaos.AiChaosEngine aiChaos;
+    // Checks the finished answer against the request that asked for it.
+    private final io.continuum.quality.QualityGate qualityGate;
+    private final io.continuum.quality.QualityGateService quality;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -105,7 +109,9 @@ public class GatewayService {
                           io.continuum.hedging.HedgingService hedging,
                           io.continuum.cascade.ResponseCascadeService cascade,
                           io.continuum.uncertainty.SemanticUncertaintyService uncertainty,
-                          io.continuum.aichaos.AiChaosEngine aiChaos) {
+                          io.continuum.aichaos.AiChaosEngine aiChaos,
+                          io.continuum.quality.QualityGate qualityGate,
+                          io.continuum.quality.QualityGateService quality) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -131,6 +137,8 @@ public class GatewayService {
         this.cascade = cascade;
         this.uncertainty = uncertainty;
         this.aiChaos = aiChaos;
+        this.qualityGate = qualityGate;
+        this.quality = quality;
     }
 
     /** Record a routing outcome into the contextual bandit; never affects the request. */
@@ -335,9 +343,13 @@ public class GatewayService {
                 semanticCache.store(developerId, cacheKey, req.model(), c.provider(),
                         safeContent, tokens, cost);
 
+                // Gate first, then measure: there is no point measuring the
+                // confidence of an answer that is about to be replaced.
                 return withUncertainty(
-                        new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
-                                totalMs, tokens, cost, failovers, reason),
+                        withQualityGate(
+                                new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
+                                        totalMs, tokens, cost, failovers, reason),
+                                developerId, canonical, c.provider(), c.model(), devKeys, complexity),
                         developerId, req, canonical, c.provider(), c.model(), devKeys, false);
             } catch (Exception e) {
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
@@ -355,6 +367,101 @@ public class GatewayService {
         labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
         throw new GatewayException("All eligible providers failed for this request"
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
+    }
+
+    /**
+     * Runs the quality gate over a finished answer, repairing it if enforcing.
+     *
+     * <p>Returns the response unchanged on anything unexpected, and on a repair
+     * that runs out of budget. The answer already exists; discarding it because
+     * a check failed to complete would be the wrong trade every time.
+     */
+    private GatewayDtos.ChatResponse withQualityGate(
+            GatewayDtos.ChatResponse response, String developerId, LlmRequest canonical,
+            String provider, String model, Map<String, String> devKeys, double complexity) {
+
+        if (!quality.activeFor(developerId)) {
+            return response;
+        }
+        try {
+            var cfg = quality.settingsFor(developerId);
+            var verdict = qualityGate.check(canonical, response.response(), complexity, cfg.getThreshold());
+
+            boolean enforce = cfg.getMode() == io.continuum.persistence.entity.QualityGateSettingEntity.Mode.ENFORCE;
+            // BLOCK is a refusal. Asking again is how you get the same refusal
+            // twice and pay for both, so it is never repaired.
+            boolean shouldRepair = enforce
+                    && verdict.action() == io.continuum.quality.QualityGate.Action.REPAIR
+                    && cfg.getMaxRepairs() > 0;
+
+            if (!shouldRepair) {
+                // MONITOR records the intent without acting on it; that gap is
+                // the evidence for whether enforcing would help.
+                quality.record(developerId, cfg, verdict, "NONE", model, response.response(),
+                        null, null, 0, 0);
+                return annotate(response, verdict, false);
+            }
+
+            long start = System.nanoTime();
+            List<Message> repairMessages = new ArrayList<>(canonical.messages());
+            repairMessages.add(Message.assistant(response.response()));
+            repairMessages.add(Message.user(verdict.repairInstruction()));
+
+            LlmResponse repaired = chaos(developerId, router.complete(
+                    new LlmRequest(model, repairMessages, canonical.maxTokens(), canonical.temperature()),
+                    List.of(provider), keyFor(devKeys, provider)));
+            long repairMs = (System.nanoTime() - start) / 1_000_000;
+
+            if (repairMs > cfg.getBudgetMs()) {
+                // Over budget: the repair may well be better, but latency is part
+                // of the contract too. Record the miss rather than hiding it.
+                quality.record(developerId, cfg, verdict, "BUDGET_EXCEEDED", model,
+                        response.response(), null, null, 0, repairMs);
+                return annotate(response, verdict, false);
+            }
+
+            double repairCost = router.estimateCost(provider, repaired.model(),
+                    repaired.promptTokens(), repaired.completionTokens());
+            String safe = firewall.guardOutbound(developerId, repaired.content());
+            var after = qualityGate.check(canonical, safe, complexity, cfg.getThreshold());
+
+            // Only keep the repair if it actually helped. A "correction" that
+            // scores worse is a regression the gate caused itself.
+            boolean better = after.score() > verdict.score();
+            quality.record(developerId, cfg, verdict, better ? "REPAIR" : "REPAIR_REJECTED", model,
+                    response.response(), safe, after, repairCost, repairMs);
+
+            if (!better) {
+                return annotate(response, verdict, false);
+            }
+            return annotate(new GatewayDtos.ChatResponse(safe, response.provider(), response.model(),
+                    response.latency() + repairMs, response.tokens(), response.cost() + repairCost,
+                    response.failovers(),
+                    response.routingReason() + String.format(" · repaired (%.2f → %.2f): %s",
+                            verdict.score(), after.score(), verdict.summary()),
+                    response.confidence(), response.lowConfidence(), response.agreementClusters()),
+                    after, true);
+        } catch (Exception e) {
+            log.warn("Quality gate failed for {}; returning the answer unchecked: {}",
+                    developerId, e.getMessage());
+            return response;
+        }
+    }
+
+    /** Appends the verdict to the routing reason without altering the answer. */
+    private static GatewayDtos.ChatResponse annotate(GatewayDtos.ChatResponse r,
+                                                     io.continuum.quality.QualityGate.Verdict v,
+                                                     boolean alreadyDescribed) {
+        if (alreadyDescribed) {
+            return r;
+        }
+        String note = v.passed()
+                ? String.format(" · quality %.2f", v.score())
+                : String.format(" · quality %.2f (%s): %s", v.score(),
+                        v.action().name().toLowerCase(), v.summary());
+        return new GatewayDtos.ChatResponse(r.response(), r.provider(), r.model(), r.latency(),
+                r.tokens(), r.cost(), r.failovers(), r.routingReason() + note,
+                r.confidence(), r.lowConfidence(), r.agreementClusters());
     }
 
     /**
@@ -513,11 +620,13 @@ public class GatewayService {
         // The judge's ambivalent band is exactly where a second opinion is worth
         // buying, which is what ADAPTIVE mode targets.
         boolean judgeUnsure = assessment.confidence() < Math.min(1.0, assessment.threshold() + 0.15);
+        String finalModel = served ? strong.model() : cheap.model();
         return withUncertainty(
-                new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
-                        totalMs, tokens, billed, 0, reason),
-                developerId, req, canonical, chosenProvider,
-                served ? strong.model() : cheap.model(), devKeys, judgeUnsure);
+                withQualityGate(
+                        new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
+                                totalMs, tokens, billed, 0, reason),
+                        developerId, canonical, chosenProvider, finalModel, devKeys, complexity),
+                developerId, req, canonical, chosenProvider, finalModel, devKeys, judgeUnsure);
     }
 
     /**

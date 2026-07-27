@@ -171,7 +171,7 @@ public class AnswerClusterer {
      * <p>Number words are folded to digits so "thirty days" and "30 days" are one
      * claim rather than two.
      */
-    Set<String> claims(String text) {
+    public Set<String> claims(String text) {
         Set<String> out = new LinkedHashSet<>();
         if (text == null) {
             return out;
