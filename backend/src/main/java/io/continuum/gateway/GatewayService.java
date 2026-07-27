@@ -69,6 +69,11 @@ public class GatewayService {
     // Semantic cache (opt-in, OFF by default): serves a previous answer when the
     // incoming prompt means the same thing. Never on the critical path when off.
     private final io.continuum.cache.SemanticCacheService semanticCache;
+    // Routing strategy + hedging. Both existed and neither was reachable from
+    // this path: the on/off switch was never read, the bandit was never asked,
+    // and hedging lived only in the workflow activity.
+    private final io.continuum.routing.RoutingStrategyService routingStrategy;
+    private final io.continuum.hedging.HedgingService hedging;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -85,7 +90,9 @@ public class GatewayService {
                           io.continuum.compression.PromptCompressionService compression,
                           io.continuum.firewall.PromptFirewallService firewall,
                           io.continuum.billing.BillingService billing,
-                          io.continuum.cache.SemanticCacheService semanticCache) {
+                          io.continuum.cache.SemanticCacheService semanticCache,
+                          io.continuum.routing.RoutingStrategyService routingStrategy,
+                          io.continuum.hedging.HedgingService hedging) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -106,6 +113,8 @@ public class GatewayService {
         this.firewall = firewall;
         this.billing = billing;
         this.semanticCache = semanticCache;
+        this.routingStrategy = routingStrategy;
+        this.hedging = hedging;
     }
 
     /** Record a routing outcome into the contextual bandit; never affects the request. */
@@ -196,7 +205,18 @@ public class GatewayService {
         // providers come first (their keys, their request); otherwise we route on
         // platform keys. Ordering otherwise uses the measured-stats scorer (reused).
         SelectionResult selection = selectionEngine.select(canonical, RoutingPolicy.of(mode));
-        Map<String, Integer> providerRank = buildProviderOrder(developerId, selection, useOwnKeys);
+
+        // Which strategy actually orders providers — static, the heuristic
+        // scorer, or the contextual bandit. Until now the gateway ran the
+        // scorer unconditionally and never consulted the bandit at all, so both
+        // the routing switch and every posterior the console drew were inert.
+        io.continuum.routing.RoutingStrategyService.Decision routingDecision =
+                routingStrategy.decide(selection.chosenChain(), router.availableChain(), complexity);
+
+        Map<String, Integer> providerRank = buildProviderOrder(developerId,
+                new SelectionResult(selection.mode(), selection.complexity(), selection.approxPromptTokens(),
+                        routingDecision.order(), selection.scores(), routingDecision.explanation()),
+                useOwnKeys);
         if (autopilot.isPresent()) {
             providerRank = applyAutopilotOrder(autopilot.get().policy().providerOrder(), providerRank);
         }
@@ -219,6 +239,21 @@ public class GatewayService {
 
         // Resolve developer-supplied provider keys (decrypted only here, never logged/returned).
         Map<String, String> devKeys = useOwnKeys ? resolveKeys(developerId, chain) : Map.of();
+
+        // Tail-latency hedging (engine-wide, opt-in, OFF by default). When a
+        // provider is slow past the governor's live p95, a second request goes
+        // to the next provider and the first answer back wins. This existed for
+        // durable workflows only; the gateway — the path an external
+        // application actually uses — never had it.
+        if (hedging.isEnabled() && chain.size() > 1) {
+            GatewayDtos.ChatResponse hedged = tryHedged(developerId, req, canonical, chain, devKeys,
+                    complexity, mode, started, routingDecision, autopilot, cacheKey);
+            if (hedged != null) {
+                return hedged;
+            }
+            // A failed race is not a failed request: fall through to the
+            // ordinary sequential chain, which is the behaviour without hedging.
+        }
 
         int failovers = 0;
         RuntimeException lastError = null;
@@ -254,6 +289,11 @@ public class GatewayService {
                         resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers));
                 labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
                 recordBandit(complexity, c.provider(), true, totalMs, cost);
+                // The counterfactual: what the heuristic would have chosen is
+                // stored beside what actually ran, so "learning helped" is a
+                // number rather than a claim.
+                routingStrategy.record(developerId, routingDecision, complexity,
+                        c.provider(), true, totalMs, cost);
                 // V8 Prompt Firewall (opt-in): scan the outbound response for leaked
                 // secrets. Pass-through when off.
                 String safeContent = firewall.guardOutbound(developerId, resp.content());
@@ -273,6 +313,8 @@ public class GatewayService {
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
                 health.recordFailure(c.provider(), c.model(), attemptMs, e.getMessage());
                 recordBandit(complexity, c.provider(), false, attemptMs, 0);
+                routingStrategy.record(developerId, routingDecision, complexity,
+                        c.provider(), false, attemptMs, 0);
                 failovers++;
                 lastError = new RuntimeException(e.getMessage(), e);
                 log.warn("Gateway: {} {} failed, falling over: {}", c.provider(), c.model(), e.getMessage());
@@ -283,6 +325,79 @@ public class GatewayService {
         labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
         throw new GatewayException("All eligible providers failed for this request"
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
+    }
+
+    /**
+     * Races the top providers in the chain and returns the first good answer.
+     *
+     * <p>Returns {@code null} rather than throwing when the race produces
+     * nothing usable, so the caller falls back to the ordinary sequential chain.
+     * Hedging is an optimisation; it must never be the reason a request fails.
+     */
+    private GatewayDtos.ChatResponse tryHedged(
+            String developerId, GatewayDtos.ChatRequest req, LlmRequest canonical,
+            List<ModelFallbackPolicy.ModelCandidate> chain, Map<String, String> devKeys,
+            double complexity, RoutingMode mode, long started,
+            io.continuum.routing.RoutingStrategyService.Decision routingDecision,
+            java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> autopilot,
+            String cacheKey) {
+
+        // One entry per distinct provider, keeping that provider's best model.
+        Map<String, ModelFallbackPolicy.ModelCandidate> byProvider = new java.util.LinkedHashMap<>();
+        for (ModelFallbackPolicy.ModelCandidate c : chain) {
+            byProvider.putIfAbsent(c.provider(), c);
+        }
+        if (byProvider.size() < 2) {
+            return null;
+        }
+        List<String> providers = new ArrayList<>(byProvider.keySet());
+
+        try {
+            io.continuum.hedging.HedgedResult result = hedging.execute(canonical, providers,
+                    (provider, request) -> {
+                        ModelFallbackPolicy.ModelCandidate cand = byProvider.get(provider);
+                        Map<String, String> keys = devKeys.containsKey(provider)
+                                ? Map.of(provider, devKeys.get(provider)) : null;
+                        return router.complete(new LlmRequest(cand.model(), request.messages(),
+                                request.maxTokens(), request.temperature()), List.of(provider), keys);
+                    });
+
+            LlmResponse resp = result.response();
+            if (resp == null) {
+                return null;
+            }
+            String winner = result.winningProvider();
+            ModelFallbackPolicy.ModelCandidate cand = byProvider.get(winner);
+            long totalMs = (System.nanoTime() - started) / 1_000_000;
+
+            health.recordSuccess(winner, cand == null ? resp.model() : cand.model(), result.elapsedMs());
+            int tokens = resp.promptTokens() + resp.completionTokens();
+            double cost = router.estimateCost(winner, resp.model(), resp.promptTokens(), resp.completionTokens());
+            // A hedge that fired paid for two calls; reporting one would make
+            // hedging look free, which is exactly the tradeoff being made.
+            double billedCost = cost * Math.max(1, result.requestsLaunched());
+
+            String reason = String.format("hedged across %s — %s answered first in %dms%s",
+                    result.attemptedProviders(), winner, result.elapsedMs(),
+                    result.hedged() ? " (hedge fired)" : " (no hedge needed)");
+
+            var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), winner,
+                    resp.model(), complexity, reason, totalMs, tokens, billedCost, true, 0));
+            labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, billedCost);
+            recordBandit(complexity, winner, true, totalMs, billedCost);
+            routingStrategy.record(developerId, routingDecision, complexity, winner, true, totalMs, billedCost);
+
+            String safeContent = firewall.guardOutbound(developerId, resp.content());
+            godMode.observeExchange(developerId, "gateway", lastUserContent(canonical), safeContent);
+            semanticCache.store(developerId, cacheKey, req.model(), winner, safeContent, tokens, billedCost);
+
+            return new GatewayDtos.ChatResponse(safeContent, winner, resp.model(),
+                    totalMs, tokens, billedCost, 0, reason);
+        } catch (Exception e) {
+            log.warn("Hedged execution failed for {}; falling back to the sequential chain: {}",
+                    developerId, e.getMessage());
+            return null;
+        }
     }
 
     private static String lastUserContent(LlmRequest canonical) {

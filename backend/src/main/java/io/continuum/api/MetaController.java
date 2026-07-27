@@ -23,20 +23,44 @@ public class MetaController {
     private final WorkflowInstanceRepository instances;
     private final DeliveryRecorder deliveries;
     private final WorkflowQueryService query;
+    // Optional: absent when this process runs with workers disabled.
+    private final java.util.Optional<io.continuum.core.engine.ActivityWorker> activityWorker;
 
     public MetaController(WorkflowRegistry workflows, ProviderRouter router,
                           WorkflowInstanceRepository instances, DeliveryRecorder deliveries,
-                          WorkflowQueryService query) {
+                          WorkflowQueryService query,
+                          java.util.Optional<io.continuum.core.engine.ActivityWorker> activityWorker) {
         this.workflows = workflows;
         this.router = router;
         this.instances = instances;
         this.deliveries = deliveries;
         this.query = query;
+        this.activityWorker = activityWorker;
     }
 
     @GetMapping("/meta")
     public MetaView meta() {
         return new MetaView(workflows.types().stream().sorted().toList(), router.availableChain());
+    }
+
+    /**
+     * Worker occupancy.
+     *
+     * <p>Activities used to execute inline on Spring's single scheduler thread,
+     * so the engine's real concurrency was one regardless of how many were
+     * queued. They now run on a bounded pool; this reports how much of it is
+     * busy, which is the difference made visible.
+     */
+    @GetMapping("/engine/capacity")
+    public java.util.Map<String, Object> capacity() {
+        return activityWorker
+                .map(w -> java.util.Map.<String, Object>of(
+                        "inFlight", w.inFlight(),
+                        "capacity", w.capacity(),
+                        "saturation", w.capacity() == 0 ? 0.0 : (double) w.inFlight() / w.capacity(),
+                        "workersEnabled", true))
+                .orElse(java.util.Map.of("inFlight", 0, "capacity", 0, "saturation", 0.0,
+                        "workersEnabled", false));
     }
 
     /** Workflow counters for the signed-in developer (engine-wide for an operator). */

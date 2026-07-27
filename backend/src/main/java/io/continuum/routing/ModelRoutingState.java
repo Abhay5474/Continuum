@@ -16,7 +16,26 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 public class ModelRoutingState {
 
+    /**
+     * How a provider order is decided.
+     *
+     * <p>This exists because "routing enabled" was not a meaningful statement:
+     * the gateway ignored the switch entirely and always ran the heuristic
+     * scorer, while the contextual bandit observed every outcome and was never
+     * consulted. Naming the three strategies makes the choice explicit, and
+     * makes {@code LEARNED} a thing you can actually turn on.
+     */
+    public enum Strategy {
+        /** Static availability order — the original V1 behaviour. */
+        STATIC,
+        /** Cost/latency/quality scorer over aggregate provider statistics. */
+        HEURISTIC,
+        /** Contextual bandit: Thompson sampling over per-context arm posteriors. */
+        LEARNED
+    }
+
     private final AtomicBoolean enabled = new AtomicBoolean(false);
+    private final AtomicReference<Strategy> strategy = new AtomicReference<>(Strategy.HEURISTIC);
     private final AtomicReference<RoutingMode> mode = new AtomicReference<>(RoutingMode.BALANCED);
     private final AtomicReference<RoutingPolicy> customPolicy = new AtomicReference<>(null);
 
@@ -26,6 +45,20 @@ public class ModelRoutingState {
 
     public void setEnabled(boolean value) {
         enabled.set(value);
+    }
+
+    /** The strategy in force, or {@link Strategy#STATIC} while routing is off. */
+    public Strategy getStrategy() {
+        return enabled.get() ? strategy.get() : Strategy.STATIC;
+    }
+
+    /** The configured strategy, regardless of whether routing is currently on. */
+    public Strategy getConfiguredStrategy() {
+        return strategy.get();
+    }
+
+    public void setStrategy(Strategy s) {
+        strategy.set(s == null ? Strategy.HEURISTIC : s);
     }
 
     public RoutingMode getMode() {

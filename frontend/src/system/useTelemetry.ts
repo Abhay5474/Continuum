@@ -66,7 +66,8 @@ export function useTelemetry(pollMs = 4000): Telemetry {
     let alive = true;
 
     const tick = async () => {
-      const [stats, gw, health, mmu, dag, routing, aichaos, chaos, wfs, fw, god, cache] = await Promise.all([
+      const [stats, gw, health, mmu, dag, routing, aichaos, chaos, wfs, fw, god, cache, capacity] =
+        await Promise.all([
         soft(api.get<any>("/api/stats")),
         soft(api.get<any>("/api/gateway/stats")),
         soft(api.get<any[]>("/api/gateway/health")),
@@ -79,6 +80,7 @@ export function useTelemetry(pollMs = 4000): Telemetry {
         soft(portal.get<any>("/api/portal/developer/v8/firewall/profile")),
         soft(portal.godmode.status()),
         soft(portal.cache.status()),
+        soft(api.get<any>("/api/engine/capacity")),
       ]);
       if (!alive) return;
 
@@ -143,7 +145,14 @@ export function useTelemetry(pollMs = 4000): Telemetry {
           metrics: [
             { label: "Running", value: String(running) },
             { label: "Completed", value: String(completed) },
-            { label: "Failed", value: String(failed) },
+            // Real worker occupancy. Activities used to run one at a time on the
+            // scheduler thread, so this was always 1 no matter how deep the queue.
+            {
+              label: "Workers",
+              value: capacity?.capacity
+                ? `${capacity.inFlight ?? 0}/${capacity.capacity}`
+                : String(failed),
+            },
           ],
           route: "/workflows",
         },

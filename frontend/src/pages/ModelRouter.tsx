@@ -22,6 +22,17 @@ import { Morph } from "../system/motion";
  */
 
 const MODES = ["LOW_COST", "LOW_LATENCY", "HIGH_QUALITY", "BALANCED"];
+
+/**
+ * How a provider order is decided. Naming these is the point: "routing enabled"
+ * previously implied a choice the gateway never actually made, and the bandit
+ * that appears further down this page was never consulted by anything.
+ */
+const STRATEGIES: [string, string][] = [
+  ["STATIC", "Static — availability order"],
+  ["HEURISTIC", "Heuristic — cost/latency/quality scorer"],
+  ["LEARNED", "Learned — contextual bandit"],
+];
 const CONTEXTS = ["SIMPLE", "MODERATE", "COMPLEX"];
 
 /** Providers are tints of one hue, so state colour stays reserved for health. */
@@ -46,6 +57,7 @@ export default function ModelRouter() {
   const [bandit, setBandit] = useState<any | null>(null);
   const [hedging, setHedging] = useState<any | null>(null);
   const [hedgeMetrics, setHedgeMetrics] = useState<any | null>(null);
+  const [comparison, setComparison] = useState<any | null>(null);
   const [prompt, setPrompt] = useState("Summarise this contract clause and flag any risk.");
   const [probe, setProbe] = useState<any | null>(null);
   const [probing, setProbing] = useState(false);
@@ -57,6 +69,7 @@ export default function ModelRouter() {
     api.get<any>("/api/routing/bandit").then(setBandit).catch(() => {});
     api.get<any>("/api/hedging").then(setHedging).catch(() => {});
     api.get<any>("/api/hedging/metrics").then(setHedgeMetrics).catch(() => {});
+    api.get<any>("/api/routing/comparison?limit=500").then(setComparison).catch(() => {});
   };
   useEffect(() => {
     refresh();
@@ -131,6 +144,20 @@ export default function ModelRouter() {
               <StateDot state={routing?.enabled ? "healthy" : "idle"} />
               {routing?.enabled ? "Enabled" : "Disabled"}
             </button>
+          </div>
+          <div>
+            <Micro>Strategy</Micro>
+            <select
+              value={routing?.configuredStrategy ?? "HEURISTIC"}
+              onChange={(e) => api.opPost(`/api/routing/strategy?strategy=${e.target.value}`).then(refresh)}
+              disabled={!operator}
+              title={operator ? undefined : "Engine-wide setting — unlock operator access to change it"}
+              className="mt-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-aurora/60 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {STRATEGIES.map(([v, label]) => (
+                <option key={v} value={v}>{label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <Micro>Objective</Micro>
@@ -254,6 +281,7 @@ export default function ModelRouter() {
 
         </>)}
         {tab === "learning" && (<>
+      <LearningLedger comparison={comparison} strategy={routing?.strategy} />
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ---- bandit beliefs ---- */}
         <section>
@@ -643,4 +671,114 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
 }
 function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <td className="readout py-2 text-right text-slate-300" style={style}>{children}</td>;
+}
+
+/**
+ * What learned routing actually did.
+ *
+ * <p>Every decision records the provider the active strategy chose alongside the
+ * provider the heuristic scorer would have chosen. Rows where they agree carry
+ * no information about whether learning helps, so they are reported separately —
+ * an aggregate success rate is dominated by them and would look reassuring
+ * whatever the bandit did.
+ *
+ * <p>The live tape underneath is the part worth watching: a request arrives,
+ * and you can see the bandit either follow the scorer or override it, and how
+ * that turned out.
+ */
+function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: string }) {
+  const diverged = comparison?.whenDiverged;
+  const agreed = comparison?.whenAgreed;
+  const recent: any[] = comparison?.recent ?? [];
+  const divergenceRate = comparison?.divergenceRate ?? 0;
+
+  const pct = (v: number | null | undefined) => (v == null ? "—" : `${(v * 100).toFixed(1)}%`);
+  const delta =
+    diverged?.successRate != null && agreed?.successRate != null
+      ? diverged.successRate - agreed.successRate
+      : null;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <Micro>Decision ledger · learned routing against its own baseline</Micro>
+        <span className="micro">
+          strategy in force: <span className="text-slate-300">{strategy ?? "—"}</span>
+        </span>
+      </div>
+
+      {(comparison?.decisions ?? 0) === 0 ? (
+        <Plane className="p-6 text-center text-sm text-slate-500">
+          No routing decisions recorded yet. Send traffic through the gateway and every choice —
+          and the choice it overrode — lands here.
+        </Plane>
+      ) : (
+        <>
+          <Plane className="grid gap-6 p-5 sm:grid-cols-2 lg:grid-cols-5">
+            <Readout label="Decisions" value={comparison.decisions} size="sm" />
+            <Readout
+              label="Overrode scorer"
+              value={comparison.diverged}
+              size="sm"
+              hint={`${(divergenceRate * 100).toFixed(0)}% of traffic`}
+              state={comparison.diverged > 0 ? "active" : "idle"}
+            />
+            <Readout label="Explored" value={comparison.explored} size="sm"
+              hint="Deliberately tried a thin arm" />
+            <Readout
+              label="Success when overriding"
+              value={pct(diverged?.successRate)}
+              size="sm"
+              state={delta == null ? "idle" : delta >= 0 ? "healthy" : "critical"}
+            />
+            <Readout label="Success when agreeing" value={pct(agreed?.successRate)} size="sm" />
+          </Plane>
+
+          {delta != null && (comparison.diverged ?? 0) > 0 && (
+            <p className={`text-xs ${delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+              On the {comparison.diverged} request{comparison.diverged === 1 ? "" : "s"} where learning
+              changed the answer, success was {Math.abs(delta * 100).toFixed(1)} points{" "}
+              {delta >= 0 ? "higher" : "lower"} than where it agreed
+              {diverged?.avgCost != null && agreed?.avgCost != null && agreed.avgCost > 0
+                ? `, at ${(((diverged.avgCost - agreed.avgCost) / agreed.avgCost) * 100).toFixed(0)}% the cost`
+                : ""}
+              .
+            </p>
+          )}
+
+          <Plane className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-xs">
+              <thead>
+                <tr className="border-b border-edge/60 text-left">
+                  {["Context", "Scorer wanted", "Actually ran", "Outcome", "Latency", "Cost"].map((h) => (
+                    <th key={h} className="px-3 py-2"><span className="micro">{h}</span></th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((r) => (
+                  <tr key={r.id} className="border-b border-edge/30 last:border-0">
+                    <td className="px-3 py-1.5 text-slate-500">{r.context}</td>
+                    <td className="px-3 py-1.5 text-slate-500">{r.baseline ?? "—"}</td>
+                    <td className="px-3 py-1.5">
+                      <span className={r.diverged ? "font-medium text-neon" : "text-slate-300"}>
+                        {r.chosen}
+                      </span>
+                      {r.diverged && <span className="ml-1.5 text-[10px] text-neon/70">override</span>}
+                      {r.explored && <span className="ml-1.5 text-[10px] text-amber-400/80">explore</span>}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <StateDot state={r.success ? "healthy" : "critical"} size={5} />
+                    </td>
+                    <td className="readout px-3 py-1.5 text-slate-400">{r.latencyMs}ms</td>
+                    <td className="readout px-3 py-1.5 text-slate-500">${(r.cost ?? 0).toFixed(5)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Plane>
+        </>
+      )}
+    </section>
+  );
 }

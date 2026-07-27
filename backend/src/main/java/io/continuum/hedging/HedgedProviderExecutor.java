@@ -54,6 +54,18 @@ public class HedgedProviderExecutor {
      */
     public HedgedResult execute(LlmRequest request, List<String> chain, HedgingPolicy policy,
                                 HedgeGovernor governor) {
+        return execute(request, chain, policy, governor, this.caller);
+    }
+
+    /**
+     * As above, but calling through a supplied {@link ProviderCaller}.
+     *
+     * <p>The gateway needs this: a developer's own provider credentials are
+     * resolved per request, so the caller cannot be a singleton built at startup
+     * the way the workflow path's is.
+     */
+    public HedgedResult execute(LlmRequest request, List<String> chain, HedgingPolicy policy,
+                                HedgeGovernor governor, ProviderCaller caller) {
         if (chain == null || chain.isEmpty()) {
             throw new IllegalStateException("No providers to hedge over");
         }
@@ -64,7 +76,7 @@ public class HedgedProviderExecutor {
         List<String> attempted = new ArrayList<>();
 
         int nextIdx = 0;
-        nextIdx = launch(ecs, inflight, attempted, chain, nextIdx, request);
+        nextIdx = launch(ecs, inflight, attempted, chain, nextIdx, request, caller);
         Exception lastError = null;
 
         try {
@@ -78,7 +90,7 @@ public class HedgedProviderExecutor {
                             && (governor == null || governor.allowHedge(policy))
                             && budgetCheck.canAfford(attempted, chain.get(nextIdx), request, policy.perRequestBudgetUsd());
                     if (canHedge) {
-                        nextIdx = launch(ecs, inflight, attempted, chain, nextIdx, request);
+                        nextIdx = launch(ecs, inflight, attempted, chain, nextIdx, request, caller);
                     }
                     continue;
                 }
@@ -97,7 +109,7 @@ public class HedgedProviderExecutor {
                 // Failure -> failover to the next provider immediately (not counted as a hedge).
                 lastError = attempt.error();
                 if (nextIdx < chain.size()) {
-                    nextIdx = launch(ecs, inflight, attempted, chain, nextIdx, request);
+                    nextIdx = launch(ecs, inflight, attempted, chain, nextIdx, request, caller);
                 }
             }
         } catch (InterruptedException e) {
@@ -112,7 +124,7 @@ public class HedgedProviderExecutor {
     }
 
     private int launch(CompletionService<Attempt> ecs, List<Future<Attempt>> inflight, List<String> attempted,
-                       List<String> chain, int idx, LlmRequest request) {
+                       List<String> chain, int idx, LlmRequest request, ProviderCaller caller) {
         String provider = chain.get(idx);
         attempted.add(provider);
         inflight.add(ecs.submit(() -> {

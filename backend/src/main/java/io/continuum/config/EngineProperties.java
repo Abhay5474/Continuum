@@ -21,6 +21,26 @@ public class EngineProperties {
     /** Whether the embedded worker pollers are enabled in this process. */
     private boolean workersEnabled = true;
 
+    /**
+     * How many activities this process may execute concurrently.
+     *
+     * <p>Activities used to run inline on the scheduler thread, one after
+     * another, which meant a single slow HTTP step blocked every workflow
+     * decision, the outbox dispatcher and the recovery sweeper behind it — and
+     * made {@code executeActivitiesParallel} parallel in name only. They now run
+     * on a bounded pool, and the poller claims no more work than the pool has
+     * room for, so the queue stays available to other workers.
+     */
+    private int activityConcurrency = 16;
+
+    public int getActivityConcurrency() {
+        return activityConcurrency;
+    }
+
+    public void setActivityConcurrency(int activityConcurrency) {
+        this.activityConcurrency = activityConcurrency;
+    }
+
     public long getPollIntervalMs() {
         return pollIntervalMs;
     }

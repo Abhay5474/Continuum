@@ -28,20 +28,24 @@ public class RoutingController {
     private final ProviderMetrics metrics;
     private final RoutingDecisionRepository decisions;
     private final io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit;
+    private final RoutingStrategyService routingStrategy;
 
     public RoutingController(ModelRoutingState state, ProviderSelectionEngine engine,
                              ProviderMetrics metrics, RoutingDecisionRepository decisions,
-                             io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit) {
+                             io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit,
+                             RoutingStrategyService routingStrategy) {
         this.state = state;
         this.engine = engine;
         this.metrics = metrics;
         this.decisions = decisions;
         this.contextualBandit = contextualBandit;
+        this.routingStrategy = routingStrategy;
     }
 
     /**
      * V8 — the learned contextual + non-stationary bandit's per-context posteriors,
-     * built from real gateway outcomes (record-only; does not change routing).
+     * built from real gateway outcomes. Under the LEARNED strategy these
+     * posteriors are what actually choose the provider.
      */
     @GetMapping("/bandit")
     public Map<String, Object> bandit() {
@@ -65,7 +69,15 @@ public class RoutingController {
 
     @GetMapping("/state")
     public Map<String, Object> getState() {
-        return Map.of("enabled", state.isEnabled(), "mode", state.getMode());
+        return Map.of(
+                "enabled", state.isEnabled(),
+                "mode", state.getMode(),
+                // The strategy in force right now, and the one configured — they
+                // differ while routing is switched off, and conflating them is
+                // how the console previously showed a setting that did nothing.
+                "strategy", state.getStrategy(),
+                "configuredStrategy", state.getConfiguredStrategy(),
+                "hedgingOnGateway", true);
     }
 
     /**
@@ -83,6 +95,33 @@ public class RoutingController {
             state.setMode(mode);
         }
         return getState();
+    }
+
+    /**
+     * Which strategy orders providers. Engine-wide, so operator-only.
+     *
+     * <p>{@code LEARNED} is the one that matters: it is what finally lets the
+     * contextual bandit act on what it has been observing all along.
+     */
+    @PostMapping("/strategy")
+    public Map<String, Object> setStrategy(@RequestParam ModelRoutingState.Strategy strategy,
+                                           HttpServletRequest req) {
+        requireOperator(req);
+        state.setStrategy(strategy);
+        return getState();
+    }
+
+    /**
+     * Learned routing against its own baseline.
+     *
+     * <p>Scoped to the caller, because one tenant's routing outcomes are not
+     * another's business; the operator sees the engine-wide picture.
+     */
+    @GetMapping("/comparison")
+    public Map<String, Object> comparison(@RequestParam(defaultValue = "500") int limit,
+                                          HttpServletRequest req) {
+        String dev = RequestScope.isOperator(req) ? null : RequestScope.requireDeveloper(req);
+        return routingStrategy.comparison(dev, Math.max(1, Math.min(2000, limit)));
     }
 
     @PostMapping("/mode")

@@ -55,6 +55,19 @@ public class HedgingService {
         return executor.execute(request, chain, policy.get(), governor);
     }
 
+    /**
+     * Hedged execution on behalf of a specific caller.
+     *
+     * <p>Hedging was reachable only from the durable-workflow path, so an
+     * external application calling the gateway got none of it — the switch, the
+     * governor and the latency percentiles on the Routing page all described
+     * traffic that no customer generated. The gateway needs this overload
+     * because a developer's own provider keys are resolved per request.
+     */
+    public HedgedResult execute(LlmRequest request, List<String> chain, ProviderCaller caller) {
+        return executor.execute(request, chain, policy.get(), governor, caller);
+    }
+
     /** Live adaptive-hedging telemetry for the before/after research metric. */
     public java.util.Map<String, Object> metrics() {
         HedgingPolicy p = policy.get();

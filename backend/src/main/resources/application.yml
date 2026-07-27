@@ -19,6 +19,15 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+  task:
+    scheduling:
+      # Spring's default scheduler is a single thread. Seven @Scheduled methods
+      # share it — both queue pollers, the outbox dispatcher, the recovery
+      # sweeper, autopilot, god mode and model discovery — so any one of them
+      # running long stalled all the others, including the sweeper whose job is
+      # to recover from exactly that.
+      pool:
+        size: ${SCHEDULER_POOL_SIZE:8}
 
 continuum:
   engine:
