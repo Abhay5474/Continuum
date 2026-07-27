@@ -368,6 +368,24 @@ export const portal = {
 
     trace: (traceId: string) =>
       portalHttp<any>(`/api/portal/developer/specialists/traces/${traceId}`, "GET"),
+    recentTraces: (limit = 20) =>
+      portalHttp<string[]>(`/api/portal/developer/specialists/traces?limit=${limit}`, "GET"),
+  },
+
+  // --- Pipelines: input -> specialist -> context -> model ---
+  pipelines: {
+    list: () => portalHttp<any[]>("/api/portal/developer/pipelines", "GET"),
+    add: (body: {
+      name: string; description?: string; inputKind?: string;
+      systemPrompt?: string; steps?: number[];
+    }) => portalHttp<any>("/api/portal/developer/pipelines", "POST", body),
+    update: (id: number, body: {
+      description?: string; systemPrompt?: string; steps?: number[]; enabled?: boolean;
+    }) => portalHttp<any>(`/api/portal/developer/pipelines/${id}`, "PUT", body),
+    remove: (id: number) => portalHttp<any>(`/api/portal/developer/pipelines/${id}`, "DELETE"),
+    /** Runs it exactly as an application would, so the chain can be seen before going live. */
+    run: (name: string, input: Record<string, unknown>, prompt?: string) =>
+      portalHttp<any>(`/api/portal/developer/pipelines/${name}/run`, "POST", { input, prompt }),
   },
 
   // --- Customer-defined workflows ---

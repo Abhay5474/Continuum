@@ -44,7 +44,10 @@ public class GatewaySecurityConfig {
         reg.setFilter(new ApiKeyAuthenticationFilter(developerService, mapper));
         // The developer chat endpoints authenticate with an API key; the console
         // read APIs authenticate with a session (see consoleAuthFilter below).
-        reg.addUrlPatterns("/api/gateway/chat", "/v1/chat/completions");
+        // Pipelines are the same kind of endpoint — called by a program, not a
+        // person — so they belong here rather than behind the console filter.
+        reg.addUrlPatterns("/api/gateway/chat", "/v1/chat/completions",
+                "/api/gateway/pipeline/*");
         reg.setOrder(1);
         return reg;
     }

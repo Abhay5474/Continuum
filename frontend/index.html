@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Declared inline rather than as a file in public/. With no icon at all the
+      browser falls back to /favicon.ico and logs a 404 on every page of the
+      console, which buries real errors in the very place you go to read them.
+    -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%236366f1' stroke-width='3'/%3E%3Cpath d='M11 16h10M16 11v10' stroke='%236366f1' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
     <title>Continuum — Durable AI Workflow Runtime</title>
   </head>
   <body>

@@ -32,6 +32,7 @@ import Uncertainty from "./pages/Uncertainty";
 import QualityGatePage from "./pages/QualityGate";
 import BreakerPage from "./pages/Breaker";
 import Specialists from "./pages/Specialists";
+import Pipelines from "./pages/Pipelines";
 import { ToastProvider } from "./components/ui";
 import { OperatorProvider } from "./system/OperatorAccess";
 
@@ -82,6 +83,7 @@ const router = createBrowserRouter([
           { path: "quality", element: <QualityGatePage /> },
           { path: "breaker", element: <BreakerPage /> },
           { path: "specialists", element: <Specialists /> },
+          { path: "pipelines", element: <Pipelines /> },
         ],
       },
     ],
