@@ -55,7 +55,8 @@ class HttpStepActivityResponseTest {
         // The target is loopback, which production rejects; the flag exists so a
         // self-hosted deployment can reach its own network, and it is what makes
         // this test possible.
-        activity = new HttpStepActivity(new ObjectMapper(), true);
+        activity = new HttpStepActivity(new ObjectMapper(),
+                new io.continuum.net.GuardedHttpSender(true));
     }
 
     @AfterEach

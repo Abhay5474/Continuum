@@ -33,6 +33,7 @@ const GROUPS: Group[] = [
     // beside the learning features, which put four unrelated things in one menu.
     label: "Prompt",
     items: [
+      { to: "/specialists", label: "Specialists", desc: "Call a smaller model before the big one" },
       { to: "/guard", label: "Prompt Guard", desc: "PII redaction, injection blocking, compression" },
       { to: "/cache", label: "Semantic Cache", desc: "Reuse answers to equivalent questions" },
       { to: "/mmu", label: "Context Optimizer", desc: "Context virtualization and paging" },

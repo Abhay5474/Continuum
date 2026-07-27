@@ -3,6 +3,8 @@ package io.continuum.api;
 import io.continuum.portal.PortalAuthFilter;
 import io.continuum.specialist.SpecialistConnectionService;
 import io.continuum.specialist.SpecialistProviders;
+import io.continuum.specialist.SpecialistService;
+import io.continuum.specialist.TraceRecorder;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,9 +22,14 @@ import java.util.Map;
 public class SpecialistConnectionController {
 
     private final SpecialistConnectionService connections;
+    private final SpecialistService specialists;
+    private final TraceRecorder traces;
 
-    public SpecialistConnectionController(SpecialistConnectionService connections) {
+    public SpecialistConnectionController(SpecialistConnectionService connections,
+                                          SpecialistService specialists, TraceRecorder traces) {
         this.connections = connections;
+        this.specialists = specialists;
+        this.traces = traces;
     }
 
     private String dev(HttpServletRequest req) {
@@ -58,8 +65,66 @@ public class SpecialistConnectionController {
         return Map.of("deleted", true);
     }
 
+    // --- specialists --------------------------------------------------------
+
+    @GetMapping
+    public List<Map<String, Object>> list(HttpServletRequest req, @RequestParam(required = false) String all) {
+        return specialists.list(dev(req));
+    }
+
+    @PostMapping
+    public Map<String, Object> create(HttpServletRequest req, @RequestBody NewSpecialist body) {
+        return specialists.create(dev(req), body.connectionId(), body.name(), body.modelPath(),
+                body.inputKind(), body.minConfidence(), body.timeoutSeconds());
+    }
+
+    @PutMapping("/{id}")
+    public Map<String, Object> configure(HttpServletRequest req, @PathVariable Long id,
+                                         @RequestBody SpecialistSettings body) {
+        return specialists.configure(dev(req), id, body.minConfidence(), body.timeoutSeconds());
+    }
+
+    /**
+     * Sends one real request and records the answer.
+     *
+     * <p>This is what turns a DRAFT specialist into a usable one, and what the
+     * console shows instead of describing the integration.
+     */
+    @PostMapping("/{id}/probe")
+    public Map<String, Object> probe(HttpServletRequest req, @PathVariable Long id,
+                                     @RequestBody(required = false) Map<String, Object> sample) {
+        return specialists.probe(dev(req), id, sample);
+    }
+
+    @DeleteMapping("/{id}")
+    public Map<String, Object> deleteSpecialist(HttpServletRequest req, @PathVariable Long id) {
+        specialists.delete(dev(req), id);
+        return Map.of("deleted", true);
+    }
+
+    // --- trace --------------------------------------------------------------
+
+    /** The visible chain behind one answer. */
+    @GetMapping("/traces/{traceId}")
+    public Map<String, Object> trace(HttpServletRequest req, @PathVariable String traceId) {
+        return traces.trace(dev(req), traceId);
+    }
+
+    @GetMapping("/traces")
+    public List<String> recentTraces(HttpServletRequest req,
+                                     @RequestParam(defaultValue = "20") int limit) {
+        return traces.recent(dev(req), limit);
+    }
+
     public record NewConnection(String name, String provider, String baseUrl, String authStyle,
                                 String authParam, String secret) {
+    }
+
+    public record NewSpecialist(Long connectionId, String name, String modelPath, String inputKind,
+                                Double minConfidence, Integer timeoutSeconds) {
+    }
+
+    public record SpecialistSettings(Double minConfidence, Integer timeoutSeconds) {
     }
 
     public record SecretUpdate(String secret) {

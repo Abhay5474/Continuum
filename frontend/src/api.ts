@@ -342,6 +342,34 @@ export const portal = {
     clear: () => portalHttp<any>("/api/portal/developer/breaker", "DELETE"),
   },
 
+  // --- Specialist models ---
+  specialists: {
+    providers: () => portalHttp<any[]>("/api/portal/developer/specialists/providers", "GET"),
+    connections: () => portalHttp<any[]>("/api/portal/developer/specialists/connections", "GET"),
+    addConnection: (body: {
+      name: string; provider: string; baseUrl?: string; authStyle?: string;
+      authParam?: string; secret?: string;
+    }) => portalHttp<any>("/api/portal/developer/specialists/connections", "POST", body),
+    rotateSecret: (id: number, secret: string) =>
+      portalHttp<any>(`/api/portal/developer/specialists/connections/${id}/secret`, "POST", { secret }),
+    deleteConnection: (id: number) =>
+      portalHttp<any>(`/api/portal/developer/specialists/connections/${id}`, "DELETE"),
+
+    list: () => portalHttp<any[]>("/api/portal/developer/specialists", "GET"),
+    add: (body: {
+      connectionId: number; name: string; modelPath: string; inputKind?: string;
+      minConfidence?: number; timeoutSeconds?: number;
+    }) => portalHttp<any>("/api/portal/developer/specialists", "POST", body),
+    configure: (id: number, body: { minConfidence?: number; timeoutSeconds?: number }) =>
+      portalHttp<any>(`/api/portal/developer/specialists/${id}`, "PUT", body),
+    probe: (id: number, sample?: unknown) =>
+      portalHttp<any>(`/api/portal/developer/specialists/${id}/probe`, "POST", sample ?? {}),
+    remove: (id: number) => portalHttp<any>(`/api/portal/developer/specialists/${id}`, "DELETE"),
+
+    trace: (traceId: string) =>
+      portalHttp<any>(`/api/portal/developer/specialists/traces/${traceId}`, "GET"),
+  },
+
   // --- Customer-defined workflows ---
   defs: {
     list: () => portalHttp<any[]>("/api/portal/developer/workflows/definitions", "GET"),

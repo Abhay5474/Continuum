@@ -34,6 +34,7 @@ import {
 /** Route prefix to the arrangement that means something for that page. */
 const SIGNATURE: [string, typeof workflow][] = [
   ["/workflows", workflow],
+  ["/specialists", routing],
   ["/mmu", memory],
   ["/cache", memory],
   ["/guard", fabric],
