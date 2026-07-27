@@ -28,6 +28,7 @@ import Settings from "./pages/Settings";
 import PromptGuard from "./pages/PromptGuard";
 import SemanticCache from "./pages/SemanticCache";
 import Cascade from "./pages/Cascade";
+import Uncertainty from "./pages/Uncertainty";
 import { ToastProvider } from "./components/ui";
 import { OperatorProvider } from "./system/OperatorAccess";
 
@@ -74,6 +75,7 @@ const router = createBrowserRouter([
           { path: "guard", element: <PromptGuard /> },
           { path: "cache", element: <SemanticCache /> },
           { path: "cascade", element: <Cascade /> },
+          { path: "confidence", element: <Uncertainty /> },
         ],
       },
     ],

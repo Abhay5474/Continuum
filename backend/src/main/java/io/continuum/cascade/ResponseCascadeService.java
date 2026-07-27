@@ -55,12 +55,6 @@ public class ResponseCascadeService {
 
     private static final Logger log = LoggerFactory.getLogger(ResponseCascadeService.class);
 
-    /**
-     * Answers at or above this cosine similarity are treated as the same answer.
-     * Deliberately generous: two phrasings of the same fact should count as
-     * agreement, or every escalation would look justified.
-     */
-    private static final double AGREEMENT_SIMILARITY = 0.70;
 
     private final CascadeSettingRepository settings;
     private final CascadeDecisionRepository decisions;
@@ -68,16 +62,27 @@ public class ResponseCascadeService {
     private final io.continuum.provider.ProviderRouter router;
     private final DeferralJudge judge;
     private final CalibrationStore calibration;
+    /**
+     * Agreement between the two tiers was originally raw cosine, which reported
+     * a terse answer and a verbose answer stating the same fact as
+     * <em>disagreement</em> — biasing the audit toward over-reporting missed
+     * escalations. The clusterer compares assertions first, so "30 days" and
+     * "The refund window is thirty days from renewal" agree, while "30 days" and
+     * "14 days" do not however similar the surrounding prose.
+     */
+    private final io.continuum.uncertainty.AnswerClusterer clusterer;
 
     public ResponseCascadeService(CascadeSettingRepository settings, CascadeDecisionRepository decisions,
                                   ModelRegistryService registry, io.continuum.provider.ProviderRouter router,
-                                  DeferralJudge judge, CalibrationStore calibration) {
+                                  DeferralJudge judge, CalibrationStore calibration,
+                                  io.continuum.uncertainty.AnswerClusterer clusterer) {
         this.settings = settings;
         this.decisions = decisions;
         this.registry = registry;
         this.router = router;
         this.judge = judge;
         this.calibration = calibration;
+        this.clusterer = clusterer;
     }
 
     /** A tier of the cascade: a concrete (provider, model) with its input price. */
@@ -181,9 +186,8 @@ public class ResponseCascadeService {
             Boolean agreed = null;
             Double similarity = null;
             if (cheapAnswer != null && strongAnswer != null) {
-                double sim = TextVectors.cosine(cheapAnswer, strongAnswer);
-                similarity = sim;
-                agreed = sim >= AGREEMENT_SIMILARITY;
+                similarity = TextVectors.cosine(cheapAnswer, strongAnswer);
+                agreed = clusterer.sameMeaning(cheapAnswer, strongAnswer);
                 // The free label: "the cheap answer was sufficient" is exactly
                 // "the strong model said the same thing".
                 calibration.observe(developerId, a.rawScore(), agreed);

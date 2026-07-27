@@ -308,6 +308,16 @@ export const portal = {
     reset: () => portalHttp<any>("/api/portal/developer/cascade", "DELETE"),
   },
 
+  // --- Semantic uncertainty ---
+  uncertainty: {
+    status: () => portalHttp<any>("/api/portal/developer/uncertainty/status", "GET"),
+    configure: (body: { mode?: string; samples?: number; temperature?: number; lowConfidence?: number }) =>
+      portalHttp<any>("/api/portal/developer/uncertainty/settings", "PUT", body),
+    measurements: (limit = 20) =>
+      portalHttp<any[]>(`/api/portal/developer/uncertainty/measurements?limit=${limit}`, "GET"),
+    clear: () => portalHttp<any>("/api/portal/developer/uncertainty", "DELETE"),
+  },
+
   // --- Customer-defined workflows ---
   defs: {
     list: () => portalHttp<any[]>("/api/portal/developer/workflows/definitions", "GET"),

@@ -77,6 +77,13 @@ public class GatewayService {
     // Verify-then-escalate. Answers on the cheap tier, judges the answer, and
     // pays for the strong tier only when the judge says the cheap one failed.
     private final io.continuum.cascade.ResponseCascadeService cascade;
+    // Semantic entropy over resampled answers — the only signal here that tells
+    // a caller whether to trust the answer it just received.
+    private final io.continuum.uncertainty.SemanticUncertaintyService uncertainty;
+    // AI-level fault injection. Armed per tenant, and — like hedging before this
+    // — it previously only reached durable workflows, so a drill against the
+    // gateway did nothing at all.
+    private final io.continuum.aichaos.AiChaosEngine aiChaos;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -96,7 +103,9 @@ public class GatewayService {
                           io.continuum.cache.SemanticCacheService semanticCache,
                           io.continuum.routing.RoutingStrategyService routingStrategy,
                           io.continuum.hedging.HedgingService hedging,
-                          io.continuum.cascade.ResponseCascadeService cascade) {
+                          io.continuum.cascade.ResponseCascadeService cascade,
+                          io.continuum.uncertainty.SemanticUncertaintyService uncertainty,
+                          io.continuum.aichaos.AiChaosEngine aiChaos) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -120,6 +129,8 @@ public class GatewayService {
         this.routingStrategy = routingStrategy;
         this.hedging = hedging;
         this.cascade = cascade;
+        this.uncertainty = uncertainty;
+        this.aiChaos = aiChaos;
     }
 
     /** Record a routing outcome into the contextual bandit; never affects the request. */
@@ -281,7 +292,7 @@ public class GatewayService {
                     ? Map.of(c.provider(), devKeys.get(c.provider())) : null;
             long attemptStart = System.nanoTime();
             try {
-                LlmResponse resp = router.complete(perModel, List.of(c.provider()), keys);
+                LlmResponse resp = chaos(developerId, router.complete(perModel, List.of(c.provider()), keys));
                 if (mmuSession != null) {
                     // V7 page-fault interception: if the model requested a paged
                     // segment, materialize it from L3 and re-dispatch (bounded).
@@ -324,8 +335,10 @@ public class GatewayService {
                 semanticCache.store(developerId, cacheKey, req.model(), c.provider(),
                         safeContent, tokens, cost);
 
-                return new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
-                        totalMs, tokens, cost, failovers, reason);
+                return withUncertainty(
+                        new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
+                                totalMs, tokens, cost, failovers, reason),
+                        developerId, req, canonical, c.provider(), c.model(), devKeys, false);
             } catch (Exception e) {
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
                 health.recordFailure(c.provider(), c.model(), attemptMs, e.getMessage());
@@ -342,6 +355,61 @@ public class GatewayService {
         labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
         throw new GatewayException("All eligible providers failed for this request"
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
+    }
+
+    /**
+     * Attaches a confidence measurement to a finished response.
+     *
+     * <p>Resamples the same question at a non-zero temperature and takes entropy
+     * over the <em>meanings</em> of the samples, so a model that says the same
+     * thing several ways reads as certain and one that says several different
+     * things does not.
+     *
+     * <p>Returns the response untouched on any failure. The answer is already
+     * good; losing it because a measurement failed would be absurd.
+     */
+    private GatewayDtos.ChatResponse withUncertainty(
+            GatewayDtos.ChatResponse response, String developerId, GatewayDtos.ChatRequest req,
+            LlmRequest canonical, String provider, String model, Map<String, String> devKeys,
+            boolean judgeUnsure) {
+
+        boolean requested = Boolean.TRUE.equals(req.measureUncertainty());
+        if (!uncertainty.shouldMeasure(developerId, requested, judgeUnsure)) {
+            return response;
+        }
+        try {
+            var cfg = uncertainty.settingsFor(developerId);
+            int extra = Math.max(1, cfg.getSamples() - 1);
+            long start = System.nanoTime();
+
+            List<String> answers = new ArrayList<>();
+            answers.add(response.response());
+            double extraCost = 0;
+            for (int i = 0; i < extra; i++) {
+                LlmResponse r = chaos(developerId, router.complete(
+                        new LlmRequest(model, canonical.messages(), canonical.maxTokens(),
+                                cfg.getTemperature()),
+                        List.of(provider), keyFor(devKeys, provider)));
+                answers.add(r.content());
+                extraCost += router.estimateCost(provider, r.model(), r.promptTokens(), r.completionTokens());
+            }
+            long extraMs = (System.nanoTime() - start) / 1_000_000;
+
+            var m = uncertainty.measure(developerId, answers);
+            uncertainty.record(developerId, lastUserContent(canonical), model, m, extraCost, extraMs);
+
+            return new GatewayDtos.ChatResponse(response.response(), response.provider(), response.model(),
+                    response.latency() + extraMs, response.tokens(), response.cost() + extraCost,
+                    response.failovers(),
+                    response.routingReason() + String.format(" · confidence %.2f over %d samples in %d meaning%s",
+                            m.confidence(), m.samples(), m.clusters(), m.clusters() == 1 ? "" : "s"),
+                    Double.isNaN(m.confidence()) ? null : m.confidence(),
+                    m.lowConfidence(), m.clusters());
+        } catch (Exception e) {
+            log.warn("Uncertainty measurement failed for {}; returning the answer unmeasured: {}",
+                    developerId, e.getMessage());
+            return response;
+        }
     }
 
     /**
@@ -370,10 +438,10 @@ public class GatewayService {
         long cheapStart = System.nanoTime();
         LlmResponse cheapResp;
         try {
-            cheapResp = router.complete(
+            cheapResp = chaos(developerId, router.complete(
                     new LlmRequest(cheap.model(), canonical.messages(), canonical.maxTokens(),
                             canonical.temperature()),
-                    List.of(cheap.provider()), keyFor(devKeys, cheap.provider()));
+                    List.of(cheap.provider()), keyFor(devKeys, cheap.provider())));
         } catch (Exception e) {
             // The cheap tier is not special; a failure here is an ordinary
             // provider failure and the normal chain handles it.
@@ -397,10 +465,10 @@ public class GatewayService {
         if (runStrong) {
             try {
                 long t = System.nanoTime();
-                strongResp = router.complete(
+                strongResp = chaos(developerId, router.complete(
                         new LlmRequest(strong.model(), canonical.messages(), canonical.maxTokens(),
                                 canonical.temperature()),
-                        List.of(strong.provider()), keyFor(devKeys, strong.provider()));
+                        List.of(strong.provider()), keyFor(devKeys, strong.provider())));
                 strongCost = router.estimateCost(strong.provider(), strongResp.model(),
                         strongResp.promptTokens(), strongResp.completionTokens());
                 health.recordSuccess(strong.provider(), strong.model(), (System.nanoTime() - t) / 1_000_000);
@@ -442,8 +510,34 @@ public class GatewayService {
         godMode.observeExchange(developerId, "gateway", lastUserContent(canonical), safeContent);
         semanticCache.store(developerId, cacheKey, req.model(), chosenProvider, safeContent, tokens, billed);
 
-        return new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
-                totalMs, tokens, billed, 0, reason);
+        // The judge's ambivalent band is exactly where a second opinion is worth
+        // buying, which is what ADAPTIVE mode targets.
+        boolean judgeUnsure = assessment.confidence() < Math.min(1.0, assessment.threshold() + 0.15);
+        return withUncertainty(
+                new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
+                        totalMs, tokens, billed, 0, reason),
+                developerId, req, canonical, chosenProvider,
+                served ? strong.model() : cheap.model(), devKeys, judgeUnsure);
+    }
+
+    /**
+     * Applies armed AI-level faults to a provider response.
+     *
+     * <p>Chaos is scoped to the tenant that armed it, so this is safe to run
+     * against production traffic — and it is what makes a hallucination drill
+     * visible on the path an external application actually uses.
+     */
+    private LlmResponse chaos(String developerId, LlmResponse response) {
+        if (developerId == null || !aiChaos.isActive(developerId)) {
+            return response;
+        }
+        try {
+            return aiChaos.applyToResponse(response, "gateway:" + developerId, null);
+        } catch (Exception e) {
+            log.warn("AI chaos injection failed for {}; returning the response untouched: {}",
+                    developerId, e.getMessage());
+            return response;
+        }
     }
 
     private static Map<String, String> keyFor(Map<String, String> devKeys, String provider) {

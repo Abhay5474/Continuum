@@ -42,6 +42,7 @@ const GROUPS: Group[] = [
   {
     label: "Reliability",
     items: [
+      { to: "/confidence", label: "Answer Confidence", desc: "Does the model agree with itself" },
       { to: "/dag", label: "Verification", desc: "Consensus traces and evidence" },
       { to: "/replay", label: "Replay Audit", desc: "Deterministic replay and divergence healing" },
       { to: "/chaos", label: "Fault Injection", desc: "Infrastructure failure drills" },
