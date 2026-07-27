@@ -29,9 +29,17 @@ public class MockProvider implements LlmProvider {
         return true;
     }
 
+    /**
+     * Priced per model so a keyless deployment still has a real cost gradient to
+     * route and cascade over. A single free model made every cost comparison
+     * degenerate.
+     */
     @Override
     public double estimateCost(String model, int promptTokens, int completionTokens) {
-        return 0.0;
+        boolean large = model != null && model.contains("large");
+        double in = large ? 0.0005 : 0.00002;
+        double out = large ? 0.0015 : 0.00004;
+        return (promptTokens / 1000.0) * in + (completionTokens / 1000.0) * out;
     }
 
     @Override
@@ -41,11 +49,32 @@ public class MockProvider implements LlmProvider {
                 .map(Message::content)
                 .reduce((a, b) -> b)
                 .orElse("");
-        String content = "[mock-llm] " + summarize(lastUser);
+        // The small model answers briefly and the large one at length — the
+        // difference small models actually exhibit, and enough for a cascade to
+        // have something real to judge.
+        String model = request.model() == null ? "mock-small" : request.model();
+        boolean large = model.contains("large");
+        String content = "[mock-llm] " + (large ? elaborate(lastUser) : summarize(lastUser));
         int promptTokens = request.messages().stream()
                 .mapToInt(m -> m.content() == null ? 0 : m.content().length() / 4).sum();
         int completionTokens = content.length() / 4;
-        return new LlmResponse(content, List.of(), promptTokens, completionTokens, name(), "mock-1", "stop");
+        return new LlmResponse(content, List.of(), promptTokens, completionTokens, name(), model, "stop");
+    }
+
+    /** The large model's answer: the same assessment, worked through. */
+    private String elaborate(String input) {
+        String trimmed = input == null ? "" : input.strip();
+        if (trimmed.isEmpty()) {
+            return "No input provided.";
+        }
+        String oneLine = trimmed.replaceAll("\\s+", " ");
+        String head = oneLine.length() > 160 ? oneLine.substring(0, 160) + "\u2026" : oneLine;
+        return "Analysis of: \"" + head + "\". Assessment: LOW RISK. Confidence: 0.82. "
+                + "Reasoning: the request was decomposed into its constituent claims and each was "
+                + "checked against the supplied context. No contradictions were found between the "
+                + "stated requirements and the available evidence, and no obligation appears to "
+                + "survive the stated term. Recommended next step: confirm the counterparty's "
+                + "position before relying on this assessment.";
     }
 
     private String summarize(String input) {

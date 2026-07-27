@@ -74,6 +74,9 @@ public class GatewayService {
     // and hedging lived only in the workflow activity.
     private final io.continuum.routing.RoutingStrategyService routingStrategy;
     private final io.continuum.hedging.HedgingService hedging;
+    // Verify-then-escalate. Answers on the cheap tier, judges the answer, and
+    // pays for the strong tier only when the judge says the cheap one failed.
+    private final io.continuum.cascade.ResponseCascadeService cascade;
 
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
@@ -92,7 +95,8 @@ public class GatewayService {
                           io.continuum.billing.BillingService billing,
                           io.continuum.cache.SemanticCacheService semanticCache,
                           io.continuum.routing.RoutingStrategyService routingStrategy,
-                          io.continuum.hedging.HedgingService hedging) {
+                          io.continuum.hedging.HedgingService hedging,
+                          io.continuum.cascade.ResponseCascadeService cascade) {
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -115,6 +119,7 @@ public class GatewayService {
         this.semanticCache = semanticCache;
         this.routingStrategy = routingStrategy;
         this.hedging = hedging;
+        this.cascade = cascade;
     }
 
     /** Record a routing outcome into the contextual bandit; never affects the request. */
@@ -240,6 +245,18 @@ public class GatewayService {
         // Resolve developer-supplied provider keys (decrypted only here, never logged/returned).
         Map<String, String> devKeys = useOwnKeys ? resolveKeys(developerId, chain) : Map.of();
 
+        // Verify-then-escalate cascade (per-tenant, opt-in, OFF by default).
+        // Runs ahead of hedging and the ordinary chain: when it produces an
+        // answer, nothing below needs to. Declines silently when the registry
+        // offers no meaningful price difference between models.
+        if (cascade.enabledFor(developerId)) {
+            GatewayDtos.ChatResponse cascaded = tryCascade(developerId, req, canonical, devKeys,
+                    complexity, started, routingDecision, autopilot, cacheKey);
+            if (cascaded != null) {
+                return cascaded;
+            }
+        }
+
         // Tail-latency hedging (engine-wide, opt-in, OFF by default). When a
         // provider is slow past the governor's live p95, a second request goes
         // to the next provider and the first answer back wins. This existed for
@@ -325,6 +342,112 @@ public class GatewayService {
         labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
         throw new GatewayException("All eligible providers failed for this request"
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
+    }
+
+    /**
+     * Answers on the cheap tier, judges it, and escalates only if needed.
+     *
+     * <p>Returns {@code null} when the cascade cannot apply — no meaningful
+     * price gap between models, or the cheap call failed — so the caller falls
+     * through to the ordinary chain. The cascade is an optimisation and must
+     * never be the reason a request fails.
+     */
+    private GatewayDtos.ChatResponse tryCascade(
+            String developerId, GatewayDtos.ChatRequest req, LlmRequest canonical,
+            Map<String, String> devKeys, double complexity, long started,
+            io.continuum.routing.RoutingStrategyService.Decision routingDecision,
+            java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> autopilot,
+            String cacheKey) {
+
+        List<io.continuum.cascade.ResponseCascadeService.Tier> pair = cascade.cheapAndStrong();
+        if (pair.size() < 2) {
+            return null;
+        }
+        var cheap = pair.get(0);
+        var strong = pair.get(1);
+
+        // --- tier 0 -------------------------------------------------------
+        long cheapStart = System.nanoTime();
+        LlmResponse cheapResp;
+        try {
+            cheapResp = router.complete(
+                    new LlmRequest(cheap.model(), canonical.messages(), canonical.maxTokens(),
+                            canonical.temperature()),
+                    List.of(cheap.provider()), keyFor(devKeys, cheap.provider()));
+        } catch (Exception e) {
+            // The cheap tier is not special; a failure here is an ordinary
+            // provider failure and the normal chain handles it.
+            log.warn("Cascade tier 0 ({}) failed; falling back to the standard chain: {}",
+                    cheap.model(), e.getMessage());
+            return null;
+        }
+        long cheapMs = (System.nanoTime() - cheapStart) / 1_000_000;
+        double cheapCost = router.estimateCost(cheap.provider(), cheapResp.model(),
+                cheapResp.promptTokens(), cheapResp.completionTokens());
+        health.recordSuccess(cheap.provider(), cheap.model(), cheapMs);
+
+        var assessment = cascade.assess(developerId, canonical, cheapResp.content(), complexity);
+        // A sampled slice runs both tiers whatever the verdict says, which is
+        // the only way to see the escalations the judge did NOT make.
+        boolean audit = !assessment.escalate() && cascade.shouldAudit(developerId);
+        boolean runStrong = assessment.escalate() || audit;
+
+        LlmResponse strongResp = null;
+        double strongCost = 0;
+        if (runStrong) {
+            try {
+                long t = System.nanoTime();
+                strongResp = router.complete(
+                        new LlmRequest(strong.model(), canonical.messages(), canonical.maxTokens(),
+                                canonical.temperature()),
+                        List.of(strong.provider()), keyFor(devKeys, strong.provider()));
+                strongCost = router.estimateCost(strong.provider(), strongResp.model(),
+                        strongResp.promptTokens(), strongResp.completionTokens());
+                health.recordSuccess(strong.provider(), strong.model(), (System.nanoTime() - t) / 1_000_000);
+            } catch (Exception e) {
+                // Escalation failing is survivable: the cheap answer exists and
+                // is returned, flagged as un-escalated.
+                log.warn("Cascade escalation to {} failed; returning the tier-0 answer: {}",
+                        strong.model(), e.getMessage());
+            }
+        }
+
+        // On an audit the cheap answer is what the caller was going to get, so
+        // it is what they get — measuring must not change the measurement.
+        boolean served = strongResp != null && assessment.escalate();
+        LlmResponse chosen = served ? strongResp : cheapResp;
+        String chosenProvider = served ? strong.provider() : cheap.provider();
+        double billed = cheapCost + strongCost;
+        long totalMs = (System.nanoTime() - started) / 1_000_000;
+
+        cascade.record(developerId, assessment, served, audit,
+                cheapResp.content(), strongResp == null ? null : strongResp.content(),
+                cheap.model(), strongResp == null ? null : strong.model(),
+                cheapCost, strongCost, cheapMs, totalMs, complexity);
+
+        int tokens = chosen.promptTokens() + chosen.completionTokens();
+        String reason = served
+                ? String.format("cascade: %s escalated to %s — %s", cheap.model(), strong.model(),
+                        assessment.reason())
+                : String.format("cascade: answered by %s — %s%s", cheap.model(), assessment.reason(),
+                        audit ? " (audit sample)" : "");
+
+        var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), chosenProvider,
+                chosen.model(), complexity, reason, totalMs, tokens, billed, true, 0));
+        labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, billed);
+        recordBandit(complexity, chosenProvider, true, totalMs, billed);
+        routingStrategy.record(developerId, routingDecision, complexity, chosenProvider, true, totalMs, billed);
+
+        String safeContent = firewall.guardOutbound(developerId, chosen.content());
+        godMode.observeExchange(developerId, "gateway", lastUserContent(canonical), safeContent);
+        semanticCache.store(developerId, cacheKey, req.model(), chosenProvider, safeContent, tokens, billed);
+
+        return new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
+                totalMs, tokens, billed, 0, reason);
+    }
+
+    private static Map<String, String> keyFor(Map<String, String> devKeys, String provider) {
+        return devKeys.containsKey(provider) ? Map.of(provider, devKeys.get(provider)) : null;
     }
 
     /**

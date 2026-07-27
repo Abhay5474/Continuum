@@ -295,6 +295,19 @@ export const portal = {
     clear: () => portalHttp<any>("/api/portal/developer/cache", "DELETE"),
   },
 
+  // --- Verify-then-escalate cascade ---
+  cascade: {
+    status: () => portalHttp<any>("/api/portal/developer/cascade/status", "GET"),
+    setEnabled: (on: boolean) =>
+      portalHttp<any>(`/api/portal/developer/cascade/${on ? "enable" : "disable"}`, "POST"),
+    configure: (body: { threshold?: number; auditRate?: number; escalationCap?: number }) =>
+      portalHttp<any>("/api/portal/developer/cascade/settings", "PUT", body),
+    tiers: () => portalHttp<any[]>("/api/portal/developer/cascade/tiers", "GET"),
+    decisions: (limit = 40) =>
+      portalHttp<any[]>(`/api/portal/developer/cascade/decisions?limit=${limit}`, "GET"),
+    reset: () => portalHttp<any>("/api/portal/developer/cascade", "DELETE"),
+  },
+
   // --- Customer-defined workflows ---
   defs: {
     list: () => portalHttp<any[]>("/api/portal/developer/workflows/definitions", "GET"),

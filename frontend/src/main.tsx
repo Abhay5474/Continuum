@@ -27,6 +27,7 @@ import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import PromptGuard from "./pages/PromptGuard";
 import SemanticCache from "./pages/SemanticCache";
+import Cascade from "./pages/Cascade";
 import { ToastProvider } from "./components/ui";
 import { OperatorProvider } from "./system/OperatorAccess";
 
@@ -72,6 +73,7 @@ const router = createBrowserRouter([
           { path: "mmu", element: <MmuProfiler /> },
           { path: "guard", element: <PromptGuard /> },
           { path: "cache", element: <SemanticCache /> },
+          { path: "cascade", element: <Cascade /> },
         ],
       },
     ],
