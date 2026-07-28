@@ -38,7 +38,20 @@ public final class GatewayDtos {
              * must not silently make that caller's traffic the first thing
              * dropped under load.
              */
-            String criticality) {
+            String criticality,
+            /**
+             * How long this result stays useful, in milliseconds from now.
+             *
+             * <p>Only consulted when scheduling is on. A request that cannot meet
+             * its deadline even with an immediate start is refused rather than
+             * run: starting it spends a slot on a result nobody can use and
+             * delays the requests that could still make theirs.
+             *
+             * <p>Null means no deadline, which is not the same as an urgent one —
+             * an unset deadline sorts last among equal priorities rather than
+             * first.
+             */
+            Long deadlineMs) {
     }
 
     public record ChatResponse(

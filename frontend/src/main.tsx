@@ -34,6 +34,9 @@ import BreakerPage from "./pages/Breaker";
 import Specialists from "./pages/Specialists";
 import Pipelines from "./pages/Pipelines";
 import Admission from "./pages/Admission";
+import LoopGuard from "./pages/LoopGuard";
+import Saga from "./pages/Saga";
+import Scheduling from "./pages/Scheduling";
 import Provenance from "./pages/Provenance";
 import { ToastProvider } from "./components/ui";
 import { OperatorProvider } from "./system/OperatorAccess";
@@ -87,6 +90,9 @@ const router = createBrowserRouter([
           { path: "specialists", element: <Specialists /> },
           { path: "pipelines", element: <Pipelines /> },
           { path: "admission", element: <Admission /> },
+          { path: "scheduling", element: <Scheduling /> },
+          { path: "loops", element: <LoopGuard /> },
+          { path: "saga", element: <Saga /> },
           { path: "provenance", element: <Provenance /> },
         ],
       },

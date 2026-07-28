@@ -24,6 +24,7 @@ const GROUPS: Group[] = [
       { to: "/gateway", label: "Gateway", desc: "Live requests, providers and failover" },
       { to: "/router", label: "Routing", desc: "Model selection and tail-latency hedging" },
       { to: "/admission", label: "Admission Control", desc: "Infer provider capacity, queue and shed deliberately" },
+      { to: "/scheduling", label: "Priority & Deadlines", desc: "Who gets the next free slot, and who is too late to use it" },
       { to: "/cascade", label: "Model Cascade", desc: "Cheap model first, escalate only when needed" },
     ],
   },
@@ -46,6 +47,8 @@ const GROUPS: Group[] = [
     label: "Reliability",
     items: [
       { to: "/quality", label: "Quality Gate", desc: "Check the answer against the request" },
+      { to: "/loops", label: "Loop Detection", desc: "Spot an agent going round in circles" },
+      { to: "/saga", label: "Compensation", desc: "Undo what completed when a workflow fails partway" },
       { to: "/breaker", label: "Semantic Breaker", desc: "Trip a model when its answers degrade" },
       { to: "/confidence", label: "Answer Confidence", desc: "Does the model agree with itself" },
       { to: "/dag", label: "Verification", desc: "Consensus traces and evidence" },

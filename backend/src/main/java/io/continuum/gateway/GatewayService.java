@@ -6,6 +6,8 @@ import io.continuum.persistence.entity.ModelEntity;
 import io.continuum.persistence.repository.GatewayRequestLogRepository;
 import io.continuum.admission.AdmissionService;
 import io.continuum.admission.Criticality;
+import io.continuum.scheduling.DeadlineScheduler;
+import io.continuum.scheduling.SchedulerService;
 import io.continuum.provider.ProviderRouter;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.Message;
@@ -52,6 +54,7 @@ public class GatewayService {
     private final CredentialVaultService vault;
     private final ProviderRouter router;
     private final AdmissionService admission;
+    private final SchedulerService scheduler;
     private final io.continuum.quality.AnswerRepairService repairEngine;
     private final io.continuum.provenance.ProvenanceService provenance;
     private final io.continuum.degradation.DegradationService degradation;
@@ -102,6 +105,7 @@ public class GatewayService {
                           ModelFallbackPolicy fallbackPolicy, ProviderHealthTracker health,
                           CredentialVaultService vault, ProviderRouter router,
                           AdmissionService admission,
+                          SchedulerService scheduler,
                           io.continuum.quality.AnswerRepairService repairEngine,
                           io.continuum.provenance.ProvenanceService provenance,
                           io.continuum.degradation.DegradationService degradation,
@@ -125,6 +129,7 @@ public class GatewayService {
                           io.continuum.quality.QualityGate qualityGate,
                           io.continuum.quality.QualityGateService quality,
                           io.continuum.drift.SemanticBreakerService breaker) {
+        this.scheduler = scheduler;
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -1051,8 +1056,38 @@ public class GatewayService {
         if (!admission.enabled(developerId)) {
             return null;
         }
-        return admission.acquire(developerId, provider, Criticality.of(req.criticality()));
+        Criticality criticality = Criticality.of(req.criticality());
+        if (!scheduler.enabled(developerId)) {
+            return admission.acquire(developerId, provider, criticality);
+        }
+        // Ordering only applies while something is actually waiting, so the
+        // ticket lives exactly as long as the wait does.
+        SchedulerService.Ticket ticket = scheduler.enqueue(developerId, provider,
+                priorityOf(criticality), req.deadlineMs(),
+                Math.round(admission.observedLatencyMs(developerId, provider)),
+                java.time.Instant.now());
+        try {
+            return admission.acquire(developerId, provider, criticality, ticket);
+        } finally {
+            ticket.close();
+        }
     }
+
+    /**
+     * Importance and scheduling priority are the same judgement seen twice: one
+     * decides who is refused when there is no room, the other who goes first
+     * when there is nearly none. Deriving the second from the first keeps a
+     * caller from having to state it twice and disagree with itself.
+     */
+    private static DeadlineScheduler.Priority priorityOf(Criticality c) {
+        return switch (c) {
+            case BACKGROUND -> DeadlineScheduler.Priority.BATCH;
+            case CRITICAL -> DeadlineScheduler.Priority.INTERACTIVE;
+            default -> DeadlineScheduler.Priority.NORMAL;
+        };
+    }
+
+
 
     private String routingReason(double complexity, RoutingMode mode, ModelFallbackPolicy.ModelCandidate c, int failovers) {
         String basis = complexity >= 0.5 ? "high complexity → stronger model" : "low complexity → cheaper model";

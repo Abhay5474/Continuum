@@ -79,7 +79,21 @@ async function http<T>(path: string, init?: RequestInit, asOperator = false): Pr
   }
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
+    const err = new Error(`${res.status}: ${text}`) as Error & {
+      status?: number;
+      body?: unknown;
+    };
+    err.status = res.status;
+    // Some endpoints answer a question with a non-2xx status — a detected loop
+    // is a 409 carrying its verdict, a missed deadline a 422 carrying why. The
+    // parsed body is attached so a page can show the answer instead of a
+    // stringified status line.
+    try {
+      err.body = JSON.parse(text);
+    } catch {
+      /* not JSON; the message already carries the text */
+    }
+    throw err;
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
@@ -362,6 +376,44 @@ export const portal = {
       portalHttp<any>("/api/portal/developer/admission/settings", "PUT", body),
     /** Forgets learned limits, so a changed provider quota is re-inferred. */
     reset: () => portalHttp<any>("/api/portal/developer/admission", "DELETE"),
+  },
+
+  loops: {
+    status: () => portalHttp<any>("/api/portal/developer/loops/status", "GET"),
+    configure: (body: { enabled?: boolean; mode?: string }) =>
+      portalHttp<any>("/api/portal/developer/loops/settings", "PUT", body),
+    /**
+     * Runs the detector over a sequence of steps without an agent behind it.
+     * Returns 409 in HALT mode when a loop is found, which is the answer rather
+     * than an error — the caller asked whether to continue and it said no.
+     */
+    inspect: (body: { workflowId?: string; steps: string[]; progress?: boolean[] }) =>
+      portalHttp<any>("/api/portal/developer/loops/inspect", "POST", body),
+    clear: () => portalHttp<any>("/api/portal/developer/loops", "DELETE"),
+  },
+
+  saga: {
+    status: () => portalHttp<any>("/api/portal/developer/saga/status", "GET"),
+    configure: (body: { enabled?: boolean }) =>
+      portalHttp<any>("/api/portal/developer/saga/settings", "PUT", body),
+    clear: () => portalHttp<any>("/api/portal/developer/saga", "DELETE"),
+  },
+
+  scheduling: {
+    status: () => portalHttp<any>("/api/portal/developer/scheduling/status", "GET"),
+    configure: (body: { enabled?: boolean }) =>
+      portalHttp<any>("/api/portal/developer/scheduling/settings", "PUT", body),
+    /** Orders a hypothetical queue without running anything. */
+    order: (body: {
+      tasks: {
+        id: string;
+        priority?: string;
+        waitedSeconds?: number;
+        deadlineSeconds?: number;
+        estimateSeconds?: number;
+      }[];
+    }) => portalHttp<any>("/api/portal/developer/scheduling/order", "POST", body),
+    reset: () => portalHttp<any>("/api/portal/developer/scheduling/reset", "POST"),
   },
 
   breaker: {

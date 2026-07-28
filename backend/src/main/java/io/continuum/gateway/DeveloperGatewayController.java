@@ -35,6 +35,12 @@ public class DeveloperGatewayController {
         }
         try {
             return ResponseEntity.ok(gateway.chat(developer.getId(), request));
+        } catch (io.continuum.scheduling.SchedulerService.DeadlineUnreachableException e) {
+            // Not overload — the caller's own deadline. 422: the request was
+            // understood and cannot be satisfied as stated, and retrying it
+            // unchanged will fail the same way.
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(Map.of("error", "deadline_unreachable", "message", e.getMessage()));
         } catch (io.continuum.admission.AdmissionService.SheddedException e) {
             // Deliberately refused, not broken. 429 with Retry-After so a client
             // backs off instead of retrying immediately and deepening the

@@ -146,6 +146,20 @@ public class AdmissionService {
      * @throws SheddedException when there is no room for traffic of this importance
      */
     public Slot acquire(String developerId, String provider, Criticality criticality) {
+        return acquire(developerId, provider, criticality, null);
+    }
+
+    /**
+     * Acquires a slot, waiting briefly if the provider is busy.
+     *
+     * @param ticket a place in the ordered queue, or null when scheduling is off.
+     *               With one, a free slot is only taken by the waiter the
+     *               scheduler ranks first — otherwise the slot goes to whoever
+     *               happened to poll at the right moment.
+     * @throws SheddedException when there is no room for traffic of this importance
+     */
+    public Slot acquire(String developerId, String provider, Criticality criticality,
+                        io.continuum.scheduling.SchedulerService.Ticket ticket) {
         String key = key(developerId, provider);
         ConcurrencyLimiter l = limiter(key);
         AtomicInteger n = counted(key);
@@ -161,7 +175,13 @@ public class AdmissionService {
             // refused while there is still room for an interactive request.
             double ceiling = limit * criticality.sheddingPoint();
 
-            if (current < ceiling) {
+            // A free slot is not automatically this request's slot. When
+            // scheduling is on, it belongs to whichever waiter ranks first —
+            // which is recomputed here, because aging moves the order while
+            // requests are queued.
+            boolean myTurn = ticket == null || ticket.isNext(java.time.Instant.now());
+
+            if (current < ceiling && myTurn) {
                 int taken = n.incrementAndGet();
                 // Re-check: another thread may have taken the slot between the
                 // read and the increment. Losing the race means giving it back.
@@ -199,6 +219,19 @@ public class AdmissionService {
                         criticality, l.limit(), n.get());
             }
         }
+    }
+
+    /**
+     * The most recent round trip observed for this provider, in milliseconds, or
+     * 0 when nothing has been measured yet.
+     *
+     * <p>Zero means "no evidence", and the caller must treat it as such: refusing
+     * a request for missing a deadline on the strength of a guess would be worse
+     * than letting it try.
+     */
+    public double observedLatencyMs(String developerId, String provider) {
+        ConcurrencyLimiter l = limiters.get(key(developerId, provider));
+        return l == null ? 0 : l.lastRttMs();
     }
 
     // --- state ---------------------------------------------------------------

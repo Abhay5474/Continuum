@@ -5,6 +5,7 @@ import io.continuum.common.Json;
 import io.continuum.core.engine.WorkflowEngine;
 import io.continuum.persistence.entity.WorkflowDefinitionEntity;
 import io.continuum.persistence.repository.WorkflowDefinitionRepository;
+import io.continuum.saga.SagaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,13 +27,15 @@ public class DefinitionService {
     private final WorkflowEngine engine;
     private final ObjectMapper mapper;
     private final Json json;
+    private final SagaService saga;
 
     public DefinitionService(WorkflowDefinitionRepository repo, WorkflowEngine engine,
-                             ObjectMapper mapper, Json json) {
+                             ObjectMapper mapper, Json json, SagaService saga) {
         this.repo = repo;
         this.engine = engine;
         this.mapper = mapper;
         this.json = json;
+        this.saga = saga;
     }
 
     /** Validates and stores a new version of {@code name}. */
@@ -78,8 +81,11 @@ public class DefinitionService {
     public Map<String, Object> run(String developerId, String name, Integer version,
                                    Map<String, Object> input, String requestedId) {
         WorkflowDefinitionEntity d = resolve(developerId, name, version);
+        // Pinned at start. A run must replay the way it began, so toggling the
+        // setting mid-flight cannot change whether a rollback happens.
         DeclarativeWorkflow.Run run = new DeclarativeWorkflow.Run(
-                d.getName(), d.getVersion(), json.read(d.getSpecJson(), Object.class), input);
+                d.getName(), d.getVersion(), json.read(d.getSpecJson(), Object.class), input,
+                saga.enabled(developerId), developerId);
 
         String workflowId = engine.startWorkflow(DeclarativeWorkflow.TYPE, json.write(run), requestedId, developerId);
 

@@ -1,9 +1,12 @@
 package io.continuum.declarative;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.continuum.core.workflow.ActivityFailedException;
 import io.continuum.core.workflow.ActivityOptions;
 import io.continuum.core.workflow.Workflow;
 import io.continuum.core.workflow.WorkflowContext;
+import io.continuum.saga.SagaPlan;
+import io.continuum.saga.SagaRecordActivity;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -86,7 +89,16 @@ public class DeclarativeWorkflow implements Workflow {
                                         .timeoutSeconds(s.getTimeoutSeconds())));
             }
 
-            List<Map> results = ctx.executeActivitiesParallel(calls, Map.class);
+            List<Map> results;
+            try {
+                results = ctx.executeActivitiesParallel(calls, Map.class);
+            } catch (ActivityFailedException failure) {
+                // The forward path is over. Everything already in stepResults ran
+                // against a system that has never heard of this transaction, so
+                // undoing it is the workflow's job, not the engine's.
+                compensate(ctx, run, spec, scope, stepResults, live, failure);
+                throw failure;
+            }
             for (int i = 0; i < live.size(); i++) {
                 Map<String, Object> r = (Map<String, Object>) results.get(i);
                 // A step's body is what later steps reference, so ${steps.x.field}
@@ -119,6 +131,84 @@ public class DeclarativeWorkflow implements Workflow {
             out.put("callbackStatus", delivery == null ? null : delivery.get("status"));
         }
         return out;
+    }
+
+    /**
+     * Undoes what completed, newest first, then writes down what it could not.
+     *
+     * <p>Runs entirely through {@link #executeActivity}, so each compensation is
+     * durable, retried and replayed exactly like a forward step: a crash halfway
+     * through a rollback resumes the rollback rather than restarting it.
+     *
+     * <p>A compensation that itself fails does not stop the others. The remaining
+     * ones still need to run, and the failed one is reported as stranded — which
+     * is the whole point of the report.
+     */
+    private void compensate(WorkflowContext ctx, Run run, WorkflowSpec spec,
+                            Map<String, Object> scope, Map<String, Object> stepResults,
+                            List<WorkflowSpec.Step> failedLayer, ActivityFailedException failure) {
+        if (!run.compensate()) {
+            return;
+        }
+        // Insertion order into stepResults is completion order. Guard-skipped
+        // steps never ran, so there is nothing of them to undo.
+        List<String> completed = new ArrayList<>();
+        for (Map.Entry<String, Object> e : stepResults.entrySet()) {
+            Object v = e.getValue();
+            boolean skipped = v instanceof Map<?, ?> m && Boolean.TRUE.equals(m.get("skipped"));
+            if (!skipped) {
+                completed.add(e.getKey());
+            }
+        }
+        String failedAt = failedLayer.stream().map(WorkflowSpec.Step::getId)
+                .collect(java.util.stream.Collectors.joining(", "));
+
+        SagaPlan.Plan plan = SagaPlan.forFailure(spec, completed, failedAt);
+        if (plan.compensations().isEmpty() && plan.uncompensated().isEmpty()) {
+            return;
+        }
+
+        List<String> undone = new ArrayList<>();
+        List<String> stranded = new ArrayList<>(plan.uncompensated());
+        for (SagaPlan.Compensation c : plan.compensations()) {
+            WorkflowSpec.Call call = c.call();
+            Map<String, String> headers = new LinkedHashMap<>();
+            call.getHeaders().forEach((k, v) ->
+                    headers.put(k, String.valueOf(Templates.resolve(v, scope))));
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("compensating", c.stepId());
+            body.put("workflowId", ctx.workflowId());
+            body.put("reason", failure.getMessage());
+            Object authored = Templates.resolve(call.getBody(), scope);
+            if (authored instanceof Map<?, ?> m) {
+                m.forEach((k, v) -> body.put(String.valueOf(k), v));
+            }
+            try {
+                ctx.executeActivity(HttpStepActivity.TYPE,
+                        new HttpStepActivity.Input(
+                                String.valueOf(Templates.resolve(call.getUrl(), scope)),
+                                call.getMethod(), headers, body, 30,
+                                ctx.workflowId() + ":compensate:" + c.stepId()),
+                        ActivityOptions.defaults().maxAttempts(3).timeoutSeconds(30),
+                        Map.class);
+                undone.add(c.stepId());
+            } catch (ActivityFailedException e) {
+                // Its effect is still out there and now nothing else will remove
+                // it. That belongs in the stranded list, not in a log line.
+                stranded.add(c.stepId() + " (compensation failed)");
+            }
+        }
+
+        boolean complete = stranded.isEmpty();
+        String summary = complete
+                ? undone.size() + " step" + (undone.size() == 1 ? "" : "s") + " rolled back."
+                : undone.size() + " rolled back; " + stranded.size()
+                        + " could not be and their effects remain.";
+        ctx.executeActivity(SagaRecordActivity.TYPE,
+                new SagaRecordActivity.Input(run.developerId(), ctx.workflowId(), run.definition(),
+                        failedAt, undone, stranded, complete, summary),
+                ActivityOptions.defaults().maxAttempts(3).timeoutSeconds(20),
+                Map.class);
     }
 
     /**
@@ -158,6 +248,13 @@ public class DeclarativeWorkflow implements Workflow {
      * What a run is started with. The spec is embedded rather than referenced so
      * the execution is immune to later edits of the definition.
      */
-    public record Run(String definition, int version, Object spec, Map<String, Object> input) {
+    /**
+     * @param compensate whether saga rollback is on, pinned at start so toggling
+     *                   the setting cannot change how an in-flight run replays.
+     *                   Runs started before this field existed deserialize it as
+     *                   {@code false}, which is what they actually ran with.
+     */
+    public record Run(String definition, int version, Object spec, Map<String, Object> input,
+                      boolean compensate, String developerId) {
     }
 }

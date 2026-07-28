@@ -64,6 +64,7 @@ public class WorkflowSpec {
         private List<String> dependsOn = new ArrayList<>();
         private int retries = 3;
         private int timeoutSeconds = 30;
+        private Call compensate;
 
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
@@ -82,6 +83,23 @@ public class WorkflowSpec {
         public void setRetries(int retries) { this.retries = retries; }
         public int getTimeoutSeconds() { return timeoutSeconds; }
         public void setTimeoutSeconds(int t) { this.timeoutSeconds = t; }
+
+        /**
+         * How to undo this step if a later one fails.
+         *
+         * <p>A durable engine guarantees each step runs exactly once; it cannot
+         * guarantee the <em>set</em> of them is all-or-nothing, because the
+         * calls go to systems that have never heard of this transaction. You
+         * cannot roll back a charge at a payment provider — you can only issue a
+         * refund. That is a saga (Garcia-Molina &amp; Salem, 1987): forward
+         * steps paired with compensating ones, run in reverse on failure.
+         *
+         * <p>Optional per step. A step with nothing to undo — a read, a
+         * notification already delivered — simply has none, and the plan says so
+         * rather than pretending the rollback was complete.
+         */
+        public Call getCompensate() { return compensate; }
+        public void setCompensate(Call c) { this.compensate = c; }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
