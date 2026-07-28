@@ -174,4 +174,68 @@ class SpecialistProviderTest {
             assertThat(m.get("requiresBaseUrl")).isEqualTo(true);
         });
     }
+
+    // --- confidence range, found by driving a live pipeline ------------------
+
+    @Test
+    @DisplayName("An empty results list means nothing found, not 'scrape the envelope'")
+    void emptyResultsListIsTheAnswer() {
+        // The bug: a detector reporting no predictions fell through to the
+        // score-map fallback, which read the envelope's own bookkeeping fields
+        // as findings. "bytes_received: 128" reached the confidence policy as
+        // strong evidence and produced confident advice about nothing.
+        List<SpecialistProvider.Finding> findings = http.parse(Map.of(
+                "predictions", List.of(),
+                "bytes_received", 128,
+                "credential_seen", true));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A percentage-scaled score is brought onto 0-1")
+    void percentageScaleIsNormalised() {
+        // An endpoint scoring out of 100 would otherwise clear the reporting
+        // threshold, the prose bands and the policy in one go.
+        List<SpecialistProvider.Finding> out = SpecialistProvider.normalise(List.of(
+                new SpecialistProvider.Finding("wound", 85, null)));
+
+        assertThat(out).singleElement()
+                .satisfies(f -> assertThat(f.confidence()).isEqualTo(0.85));
+    }
+
+    @Test
+    @DisplayName("A confidence outside any recognisable scale is dropped, not clamped")
+    void impossibleConfidenceIsDropped() {
+        // Clamping 128 to 1.0 would turn garbage into maximum confidence, which
+        // is the failure this check exists to stop.
+        assertThat(SpecialistProvider.normalise(List.of(
+                new SpecialistProvider.Finding("bytes_received", 128, null),
+                new SpecialistProvider.Finding("negative", -0.5, null),
+                new SpecialistProvider.Finding("nan", Double.NaN, null))))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("Normal 0-1 confidences pass through untouched, strongest first")
+    void normalConfidencesAreUnchanged() {
+        List<SpecialistProvider.Finding> out = SpecialistProvider.normalise(List.of(
+                new SpecialistProvider.Finding("bruise", 0.42, null),
+                new SpecialistProvider.Finding("wound", 0.91, null)));
+
+        assertThat(out).extracting(SpecialistProvider.Finding::label)
+                .containsExactly("wound", "bruise");
+        assertThat(out.get(0).confidence()).isEqualTo(0.91);
+    }
+
+    @Test
+    @DisplayName("Exactly 1.0 stays full confidence rather than becoming 1%")
+    void oneIsFullConfidence() {
+        // The one genuinely ambiguous value. A bare list of labels already uses
+        // 1.0 to mean "unscored", so reading it as 1% would silently filter
+        // every unscored finding out.
+        assertThat(SpecialistProvider.normalise(List.of(
+                new SpecialistProvider.Finding("wound", 1.0, null))).get(0).confidence())
+                .isEqualTo(1.0);
+    }
 }

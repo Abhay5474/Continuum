@@ -22,7 +22,9 @@ import java.time.Instant;
 public class TraceStepEntity {
 
     public enum Kind {
-        INPUT, SPECIALIST, ENRICHMENT, MODEL, VERIFY, OUTPUT
+        /** POLICY sits between enrichment and the model: it reads how strong the
+         *  evidence is and decides what the model is allowed to do with it. */
+        INPUT, SPECIALIST, ENRICHMENT, POLICY, MODEL, VERIFY, OUTPUT
     }
 
     @Id

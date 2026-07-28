@@ -74,4 +74,46 @@ public interface SpecialistProvider {
      */
     record Finding(String label, double confidence, Map<String, Object> region) {
     }
+
+    /**
+     * Forces every adapter's confidences onto the 0–1 scale the rest of the
+     * system assumes.
+     *
+     * <p>Applied centrally rather than trusted to each adapter. Nothing else in
+     * Continuum re-checks the range: the reporting threshold, the context
+     * builder's bands and the confidence policy all compare against numbers
+     * between 0 and 1, and a single value outside it sails past all three. An
+     * endpoint scoring out of 100 would be read as maximally confident by every
+     * one of them.
+     *
+     * <p>Found by driving a pipeline whose detector returned an empty result and
+     * an envelope field of {@code 128}, which arrived at the policy as
+     * "12800% confident" and selected STRONG.
+     *
+     * <p>The rules:
+     * <ul>
+     *   <li>0–1 is taken as given.</li>
+     *   <li>Above 1 and up to 100 is treated as a percentage and divided. A
+     *       score that was never a percentage — a logit, a vote count — becomes
+     *       a small number and is filtered out. That is the safe direction to be
+     *       wrong in; the other one produces confident advice from noise.</li>
+     *   <li>Above 100, or negative, or not a number, is not a confidence on any
+     *       scale worth guessing at, and the finding is dropped.</li>
+     * </ul>
+     */
+    static List<Finding> normalise(List<Finding> raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        List<Finding> out = new java.util.ArrayList<>(raw.size());
+        for (Finding f : raw) {
+            double c = f.confidence();
+            if (Double.isNaN(c) || Double.isInfinite(c) || c < 0 || c > 100) {
+                continue;
+            }
+            out.add(c <= 1 ? f : new Finding(f.label(), c / 100.0, f.region()));
+        }
+        out.sort((a, b) -> Double.compare(b.confidence(), a.confidence()));
+        return out;
+    }
 }

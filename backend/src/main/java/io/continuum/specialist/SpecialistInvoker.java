@@ -177,6 +177,12 @@ public class SpecialistInvoker {
             all = List.of();
         }
 
+        // Every adapter's output passes through here, so the range check lives
+        // here too. An adapter that returned 85 meaning 85% would otherwise
+        // defeat the reporting threshold, the prose bands and the confidence
+        // policy in one go.
+        all = SpecialistProvider.normalise(all);
+
         List<SpecialistProvider.Finding> kept = new ArrayList<>();
         for (SpecialistProvider.Finding f : all) {
             if (f.confidence() >= specialist.getMinConfidence()) {

@@ -24,7 +24,30 @@ type Pipeline = {
   systemPrompt: string | null;
   steps: number[];
   enabled: boolean;
+  policyEnabled: boolean;
+  strongThreshold: number;
+  weakThreshold: number;
+  declineOnNoEvidence: boolean;
   runs: number;
+};
+
+type Band = "STRONG" | "MEDIUM" | "WEAK" | "NONE" | "UNAVAILABLE";
+
+type Policy = {
+  band: Band;
+  action: "PASS" | "HEDGE" | "ASK_FOR_BETTER_INPUT" | "DECLINE";
+  evidence: number;
+  declined: boolean;
+  reason: string;
+};
+
+type Compliance = {
+  action: string;
+  checked: boolean;
+  complied: boolean;
+  markers: string[];
+  flatAssertions: string[];
+  method: string;
 };
 
 type Specialist = {
@@ -56,7 +79,37 @@ type Run = {
   model: string;
   cost: number;
   latencyMs: number;
+  policy: Policy | null;
+  compliance: Compliance | null;
   trace: Step[];
+};
+
+const BAND_COPY: Record<Band, { title: string; note: string; tone: string }> = {
+  STRONG: {
+    title: "Strong evidence",
+    note: "Answered directly. Nothing was added to the prompt — a strong finding needs no instruction, and adding one would make every answer read as unsure.",
+    tone: "text-emerald-400 border-emerald-500/40 bg-emerald-500/5",
+  },
+  MEDIUM: {
+    title: "Moderate evidence",
+    note: "The model was told to state its uncertainty out loud rather than leave it implied.",
+    tone: "text-amber-400 border-amber-500/40 bg-amber-500/5",
+  },
+  WEAK: {
+    title: "Too weak to advise on",
+    note: "The model was forbidden from naming a condition and told to ask for better input instead. This is what stops a 0.31 detection becoming confident advice.",
+    tone: "text-orange-400 border-orange-500/40 bg-orange-500/5",
+  },
+  NONE: {
+    title: "Nothing found",
+    note: "The analysis ran and found nothing above the reporting threshold. That is a real result — the model may still answer parts of the question that need no findings.",
+    tone: "text-slate-400 border-edge bg-ink/40",
+  },
+  UNAVAILABLE: {
+    title: "No analysis available",
+    note: "No specialist answered, so nothing was examined. Not the same as finding nothing, and the model was explicitly forbidden from presenting it as an all-clear.",
+    tone: "text-rose-400 border-rose-500/40 bg-rose-500/5",
+  },
 };
 
 /** A 1×1 PNG. Enough to exercise the whole chain without asking for a file. */
@@ -104,6 +157,7 @@ export default function Pipelines() {
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   const live = (pipelines ?? []).filter((p) => p.enabled).length;
+  const guarded = (pipelines ?? []).filter((p) => p.policyEnabled).length;
   const totalRuns = (pipelines ?? []).reduce((n, p) => n + p.runs, 0);
 
   return (
@@ -122,7 +176,13 @@ export default function Pipelines() {
           state={live > 0 ? "active" : "idle"}
           hint="A pipeline is off until you turn it on. Nothing runs by default."
         />
-        <Readout label="Specialists ready" value={ready.length} size="sm" />
+        <Readout
+          label="Policy on"
+          value={guarded}
+          size="sm"
+          state={guarded > 0 ? "active" : "idle"}
+          hint="Pipelines where the strength of the evidence decides what the model may do with it."
+        />
         <Readout label="Runs" value={totalRuns} size="sm" />
       </Plane>
 
@@ -172,6 +232,7 @@ export default function Pipelines() {
               }
               onDelete={() => act(() => portal.pipelines.remove(p.id), "Pipeline removed.")}
               onRan={load}
+              onPolicy={(body) => act(() => portal.pipelines.update(p.id, body))}
             />
           ))}
         </div>
@@ -335,6 +396,7 @@ function PipelineCard({
   onEnable,
   onDelete,
   onRan,
+  onPolicy,
 }: {
   p: Pipeline;
   specialists: Specialist[];
@@ -344,6 +406,10 @@ function PipelineCard({
   onEnable: (next: boolean) => void;
   onDelete: () => void;
   onRan: () => void;
+  onPolicy: (body: {
+    policyEnabled?: boolean; strongThreshold?: number; weakThreshold?: number;
+    declineOnNoEvidence?: boolean;
+  }) => void;
 }) {
   const named = p.steps
     .map((id) => specialists.find((s) => s.id === id)?.name ?? `#${id}`)
@@ -359,6 +425,11 @@ function PipelineCard({
             {p.description || named} · {p.runs} {p.runs === 1 ? "run" : "runs"}
           </div>
         </button>
+        {p.policyEnabled && (
+          <span className="micro shrink-0 text-amber-400" title="Confidence policy is on">
+            policy
+          </span>
+        )}
         <span className="micro shrink-0">{p.enabled ? "live" : "off"}</span>
         <button
           disabled={busy}
@@ -394,10 +465,138 @@ function PipelineCard({
             </p>
           </div>
 
+          <PolicyControls p={p} busy={busy} onChange={onPolicy} />
+
           <TryIt pipeline={p} onRan={onRan} />
         </div>
       )}
     </Plane>
+  );
+}
+
+// --- confidence policy ------------------------------------------------------
+
+function PolicyControls({
+  p,
+  busy,
+  onChange,
+}: {
+  p: Pipeline;
+  busy: boolean;
+  onChange: (b: {
+    policyEnabled?: boolean; strongThreshold?: number; weakThreshold?: number;
+    declineOnNoEvidence?: boolean;
+  }) => void;
+}) {
+  const [strong, setStrong] = useState(p.strongThreshold);
+  const [weak, setWeak] = useState(p.weakThreshold);
+
+  // The server refuses weak > strong; mirroring that here means the slider
+  // cannot be dragged into a state the save will reject.
+  const invalid = weak > strong;
+
+  return (
+    <div className="rounded-md border border-edge/60 p-3">
+      <Switch
+        checked={p.policyEnabled}
+        busy={busy}
+        onChange={(next) => onChange({ policyEnabled: next })}
+        label="Confidence policy"
+        hint="Off by default. When on, the strength of the evidence decides what the model is allowed to do with it — answer plainly, hedge, or ask for something better."
+      />
+
+      {p.policyEnabled && (
+        <div className="mt-4 space-y-4">
+          {/* The bands as a single bar, because they are only meaningful
+              relative to each other and to the numbers on either side. */}
+          <div>
+            <div className="flex h-6 w-full overflow-hidden rounded-md border border-edge/60">
+              <div
+                className="flex items-center justify-center bg-orange-500/25 text-[10px] text-orange-300"
+                style={{ width: `${weak * 100}%` }}
+                title="Too weak to advise on"
+              >
+                {weak >= 0.18 && "ask for better"}
+              </div>
+              <div
+                className="flex items-center justify-center bg-amber-500/25 text-[10px] text-amber-300"
+                style={{ width: `${(strong - weak) * 100}%` }}
+                title="Moderate — model told to hedge"
+              >
+                {strong - weak >= 0.14 && "hedge"}
+              </div>
+              <div
+                className="flex items-center justify-center bg-emerald-500/25 text-[10px] text-emerald-300"
+                style={{ width: `${(1 - strong) * 100}%` }}
+                title="Strong — answered directly"
+              >
+                {1 - strong >= 0.14 && "answer"}
+              </div>
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="readout text-[10px] text-slate-600">0.00</span>
+              <span className="readout text-[10px] text-slate-600">1.00</span>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <div className="flex items-baseline justify-between">
+                <Micro>Weak below</Micro>
+                <span className="readout text-xs text-slate-400">{weak.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={weak}
+                disabled={busy}
+                onChange={(e) => setWeak(Number(e.target.value))}
+                onMouseUp={() => !invalid && onChange({ weakThreshold: weak })}
+                onTouchEnd={() => !invalid && onChange({ weakThreshold: weak })}
+                className="mt-1 w-full accent-amber-500"
+                aria-label="Weak threshold"
+              />
+            </label>
+            <label className="block">
+              <div className="flex items-baseline justify-between">
+                <Micro>Strong at or above</Micro>
+                <span className="readout text-xs text-slate-400">{strong.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={strong}
+                disabled={busy}
+                onChange={(e) => setStrong(Number(e.target.value))}
+                onMouseUp={() => !invalid && onChange({ strongThreshold: strong })}
+                onTouchEnd={() => !invalid && onChange({ strongThreshold: strong })}
+                className="mt-1 w-full accent-emerald-500"
+                aria-label="Strong threshold"
+              />
+            </label>
+          </div>
+
+          {invalid && (
+            <p className="text-xs text-rose-400">
+              The weak threshold cannot sit above the strong one — there would be no middle band
+              left to hedge in, which looks like a working policy and silently isn't.
+            </p>
+          )}
+
+          <Switch
+            checked={p.declineOnNoEvidence}
+            busy={busy}
+            onChange={(next) => onChange({ declineOnNoEvidence: next })}
+            label="Refuse outright when there is no evidence at all"
+            hint="Skips the model entirely and returns a fixed message. Cheaper and strictly safer; leaving it off keeps the model able to answer the parts of a question that need no findings."
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -485,6 +684,8 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
 
           {shown >= run.trace.length && (
             <>
+              {run.policy && <PolicyVerdict policy={run.policy} compliance={run.compliance} />}
+
               <Plane inset className="grid grid-cols-2 gap-4 p-3 sm:grid-cols-4">
                 <Readout label="Findings used" value={run.findings} size="sm" />
                 <Readout
@@ -534,10 +735,72 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
   );
 }
 
+/**
+ * The band the evidence landed in, and — separately — whether the model
+ * actually did what it was asked.
+ *
+ * <p>Those two are kept visually apart on purpose. The policy can only ever
+ * request; showing "hedged" because a hedge was requested would report intent as
+ * observation, which is the failure this whole feature exists to avoid.
+ */
+function PolicyVerdict({ policy, compliance }: { policy: Policy; compliance: Compliance | null }) {
+  const copy = BAND_COPY[policy.band];
+  return (
+    <div className={`rounded-md border px-3 py-2.5 ${copy.tone}`}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-sm font-medium">{copy.title}</span>
+        {policy.evidence > 0 && (
+          <span className="readout text-xs opacity-80">
+            strongest finding {policy.evidence.toFixed(2)}
+          </span>
+        )}
+        {policy.declined && <span className="micro">no model was called</span>}
+      </div>
+      <p className="mt-1 text-xs text-slate-400">{copy.note}</p>
+
+      {compliance?.checked && (
+        <div className="mt-2.5 border-t border-current/20 pt-2">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span
+              className={`text-xs font-medium ${
+                compliance.complied ? "text-emerald-400" : "text-rose-400"
+              }`}
+            >
+              {compliance.complied
+                ? "The model did what the policy asked."
+                : "The model ignored the policy."}
+            </span>
+            <span className="micro opacity-70">measured, {compliance.method}</span>
+          </div>
+          {compliance.markers.length > 0 && (
+            <p className="mt-1 text-xs text-slate-500">
+              Found in the answer: {compliance.markers.map((m) => `"${m}"`).join(", ")}
+            </p>
+          )}
+          {compliance.flatAssertions.length > 0 && (
+            <p className="mt-1 text-xs text-amber-400/90">
+              Flat assertions despite the instruction:{" "}
+              {compliance.flatAssertions.map((m) => `"${m}"`).join(", ")}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-slate-600">
+            Checked on the answer that came back, not assumed from the instruction — the policy can
+            only ask, and a page that reported success because it asked would be reporting its own
+            intent. The check is lexical: it reliably catches an instruction that produced flat,
+            unqualified prose, and cannot tell a real hedge from a decorative one.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const KIND_NOTE: Record<string, string> = {
   INPUT: "What your application sent. It is never forwarded to the language model.",
   SPECIALIST: "A purpose-trained model looked at the raw input and reported what it saw.",
   ENRICHMENT: "The findings became words a language model can reason about, with the confidence stated rather than implied.",
+  POLICY: "How strong the evidence is, and what the model is therefore allowed to do with it.",
+  VERIFY: "Whether the model actually did what the policy asked — measured on the answer, not assumed from the instruction.",
   MODEL: "The language model reasoned over the findings — not over the image, which it never saw.",
   OUTPUT: "The answer went back to your application.",
 };
@@ -556,7 +819,7 @@ function Chain({
   onDetail: (n: number | null) => void;
 }) {
   const skeleton = useMemo(
-    () => ["INPUT", "SPECIALIST", "ENRICHMENT", "MODEL", "OUTPUT"], []);
+    () => ["INPUT", "SPECIALIST", "ENRICHMENT", "POLICY", "MODEL", "OUTPUT"], []);
 
   if (pending) {
     return (
@@ -579,7 +842,12 @@ function Chain({
     <div className="space-y-1.5">
       {steps.map((s, i) => {
         const visible = i < shown;
-        const bad = s.status !== "OK";
+        // CONSTRAINED and DECLINED are the policy working, not something
+        // breaking. Painting them the same red as a dead specialist would teach
+        // people to ignore the colour.
+        const bad = s.status === "FAILED" || s.status === "IGNORED";
+        const acted = s.status === "CONSTRAINED" || s.status === "DECLINED"
+          || s.status === "DEGRADED";
         return (
           <div
             key={s.ordinal}
@@ -588,12 +856,22 @@ function Chain({
             <button
               onClick={() => onDetail(detail === s.ordinal ? null : s.ordinal)}
               className={`flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left ${
-                bad ? "border-rose-500/40 bg-rose-500/5" : "border-edge/60 hover:border-aurora/40"
+                bad
+                  ? "border-rose-500/40 bg-rose-500/5"
+                  : acted
+                    ? "border-amber-500/40 bg-amber-500/5"
+                    : "border-edge/60 hover:border-aurora/40"
               }`}
             >
               <span
                 className={`h-2 w-2 shrink-0 rounded-full ${
-                  bad ? "bg-rose-400" : s.kind === "MODEL" ? "bg-indigo-400" : "bg-emerald-400"
+                  bad
+                    ? "bg-rose-400"
+                    : acted
+                      ? "bg-amber-400"
+                      : s.kind === "MODEL"
+                        ? "bg-indigo-400"
+                        : "bg-emerald-400"
                 }`}
               />
               <span className="micro w-24 shrink-0">{s.kind}</span>
@@ -606,7 +884,11 @@ function Chain({
               {s.latencyMs > 0 && (
                 <span className="readout shrink-0 text-xs text-slate-500">{s.latencyMs}ms</span>
               )}
-              {bad && <span className="micro shrink-0 text-rose-400">{s.status}</span>}
+              {(bad || acted) && (
+                <span className={`micro shrink-0 ${bad ? "text-rose-400" : "text-amber-400"}`}>
+                  {s.status}
+                </span>
+              )}
             </button>
 
             {detail === s.ordinal && (

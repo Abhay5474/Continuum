@@ -47,7 +47,8 @@ public class PipelineController {
     public Map<String, Object> update(HttpServletRequest req, @PathVariable Long id,
                                       @RequestBody PipelineSettings body) {
         return pipelines.update(dev(req), id, body.description(), body.systemPrompt(),
-                body.steps(), body.enabled());
+                body.steps(), body.enabled(), body.policyEnabled(), body.strongThreshold(),
+                body.weakThreshold(), body.declineOnNoEvidence());
     }
 
     @DeleteMapping("/{id}")
@@ -85,6 +86,11 @@ public class PipelineController {
         m.put("model", r.model() == null ? "" : r.model());
         m.put("cost", r.cost());
         m.put("latencyMs", r.latencyMs());
+        // Null when the policy is off, rather than a hollow "action: NONE" —
+        // an application can then tell "not configured" from "configured and it
+        // chose to pass", which are different facts about the answer.
+        m.put("policy", r.policy());
+        m.put("compliance", r.compliance());
         m.put("trace", r.chain() == null ? List.of() : r.chain());
         return m;
     }
@@ -94,7 +100,8 @@ public class PipelineController {
     }
 
     public record PipelineSettings(String description, String systemPrompt, List<Long> steps,
-                                   Boolean enabled) {
+                                   Boolean enabled, Boolean policyEnabled, Double strongThreshold,
+                                   Double weakThreshold, Boolean declineOnNoEvidence) {
     }
 
     public record RunRequest(Map<String, Object> input, String prompt) {

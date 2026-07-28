@@ -27,10 +27,17 @@ import java.util.Map;
  */
 public final class ContextBuilder {
 
-    /** Above this a finding is presented as observed. */
-    private static final double STRONG = 0.70;
+    /**
+     * Above this a finding is presented as observed.
+     *
+     * <p>Public because {@link ConfidencePolicy} defaults to the same boundary.
+     * Two private copies of 0.70 in two classes is a drift waiting to happen:
+     * the prompt would say "Observed" while the policy said MEDIUM, and the
+     * model's instruction would contradict the evidence right above it.
+     */
+    public static final double STRONG = 0.70;
     /** Between {@link #STRONG} and this it is presented as possible. */
-    private static final double POSSIBLE = 0.40;
+    public static final double POSSIBLE = 0.40;
 
     private ContextBuilder() {
     }

@@ -82,10 +82,13 @@ public class GenericHttpProvider implements SpecialistProvider {
         for (String key : LIST_KEYS) {
             Object v = body.get(key);
             if (v instanceof List<?> list) {
+                // A recognised results key IS the answer, even when it is empty.
+                // Falling through on an empty list sent the score-map scrape
+                // over the envelope's own bookkeeping fields — a detector
+                // reporting nothing came back with "bytes_received" as a finding
+                // at 128, which the policy then read as strong evidence.
                 collect(list, out);
-                if (!out.isEmpty()) {
-                    return sorted(out);
-                }
+                return sorted(out);
             }
         }
         // A single result at the top level: {"label": "wound", "score": 0.87}

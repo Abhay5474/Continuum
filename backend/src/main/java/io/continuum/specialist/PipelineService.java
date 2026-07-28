@@ -59,10 +59,17 @@ public class PipelineService {
         this.mapper = mapper;
     }
 
-    /** What the calling application gets back. */
+    /**
+     * What the calling application gets back.
+     *
+     * @param policy     the confidence decision, or null when the policy is off
+     * @param compliance whether the model actually did what the policy asked,
+     *                   or null when nothing was asked of it
+     */
     public record Run(String response, String traceId, int findings, double topConfidence,
                       boolean anythingFound, boolean analysisRan, String model, double cost,
-                      long latencyMs, List<Map<String, Object>> chain) {
+                      long latencyMs, List<Map<String, Object>> chain,
+                      Map<String, Object> policy, Map<String, Object> compliance) {
     }
 
     @Transactional
@@ -112,12 +119,51 @@ public class PipelineService {
                 ctx.analysisRan() ? "OK" : "DEGRADED",
                 ctx.anythingFound() ? ctx.topConfidence() : null, 0, 0);
 
+        // --- policy ---------------------------------------------------------
+        // Between the evidence and the model: how strong is what we have, and
+        // what is the model allowed to do with it. Off unless the developer
+        // turned it on for this pipeline.
+        ConfidencePolicy.Decision decision = p.isPolicyEnabled()
+                ? ConfidencePolicy.decide(ctx, p.getStrongThreshold(), p.getWeakThreshold(),
+                        p.isDeclineOnNoEvidence())
+                : null;
+        if (decision != null) {
+            traces.step(traceId, developerId, TraceStepEntity.Kind.POLICY,
+                    policyLabel(decision), decision.describe(),
+                    decision.declined() ? "DECLINED"
+                            : decision.action() == ConfidencePolicy.Action.PASS ? "OK" : "CONSTRAINED",
+                    decision.evidence() > 0 ? decision.evidence() : null, 0, 0);
+        }
+
+        // A decline never reaches a model. Spending a call to be told to say
+        // "I cannot assess this" is money for a sentence already known, and it
+        // leaves room for the model to answer anyway.
+        if (decision != null && decision.declined()) {
+            String canned = ConfidencePolicy.declineMessage(decision.band());
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            traces.step(traceId, developerId, TraceStepEntity.Kind.OUTPUT,
+                    "Declined without calling a model",
+                    Map.of("characters", canned.length()), "DECLINED", null, 0, 0);
+            p.recordRun();
+            repo.save(p);
+            Map<String, Object> declinedChain = traces.trace(developerId, traceId);
+            traces.finish(traceId);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> declinedSteps =
+                    (List<Map<String, Object>>) declinedChain.get("steps");
+            return new Run(canned, traceId, ctx.totalFindings(), ctx.topConfidence(),
+                    ctx.anythingFound(), ctx.analysisRan(), null, 0, ms, declinedSteps,
+                    decision.describe(), null);
+        }
+
         // --- model ----------------------------------------------------------
         List<GatewayDtos.Message> messages = new ArrayList<>();
         if (p.getSystemPrompt() != null && !p.getSystemPrompt().isBlank()) {
             messages.add(new GatewayDtos.Message("system", p.getSystemPrompt()));
         }
-        messages.add(new GatewayDtos.Message("user", ctx.prompt()));
+        String userMessage = ctx.prompt()
+                + (decision == null ? "" : decision.instruction());
+        messages.add(new GatewayDtos.Message("user", userMessage));
 
         long modelStart = System.nanoTime();
         GatewayDtos.ChatResponse answer = gateway.chat(developerId,
@@ -129,6 +175,19 @@ public class PipelineService {
                 Map.of("provider", String.valueOf(answer.provider()),
                         "reason", String.valueOf(answer.routingReason())),
                 "OK", answer.confidence(), answer.cost(), modelMs);
+
+        // --- did it comply? --------------------------------------------------
+        // The policy asked; nothing made it binding. Measured rather than
+        // assumed, because a page reporting "hedged" on the strength of having
+        // requested one is reporting its own intent as an observation.
+        HedgeDetector.Compliance compliance = decision == null ? null
+                : HedgeDetector.check(decision.action(), answer.response());
+        if (compliance != null && compliance.checked()) {
+            traces.step(traceId, developerId, TraceStepEntity.Kind.VERIFY,
+                    compliance.complied() ? "Model followed the policy"
+                            : "Model did NOT follow the policy",
+                    compliance.describe(), compliance.complied() ? "OK" : "IGNORED", null, 0, 0);
+        }
 
         long totalMs = (System.nanoTime() - start) / 1_000_000;
         traces.step(traceId, developerId, TraceStepEntity.Kind.OUTPUT, "Answer returned",
@@ -143,7 +202,9 @@ public class PipelineService {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> steps = (List<Map<String, Object>>) chain.get("steps");
         return new Run(answer.response(), traceId, ctx.totalFindings(), ctx.topConfidence(),
-                ctx.anythingFound(), ctx.analysisRan(), answer.model(), answer.cost(), totalMs, steps);
+                ctx.anythingFound(), ctx.analysisRan(), answer.model(), answer.cost(), totalMs, steps,
+                decision == null ? null : decision.describe(),
+                compliance == null || !compliance.checked() ? null : compliance.describe());
     }
 
     // --- configuration -------------------------------------------------------
@@ -166,8 +227,23 @@ public class PipelineService {
 
     @Transactional
     public Map<String, Object> update(String developerId, Long id, String description,
-                                      String systemPrompt, List<Long> steps, Boolean enabled) {
+                                      String systemPrompt, List<Long> steps, Boolean enabled,
+                                      Boolean policyEnabled, Double strongThreshold,
+                                      Double weakThreshold, Boolean declineOnNoEvidence) {
         PipelineEntity p = require(developerId, id);
+        if (strongThreshold != null || weakThreshold != null) {
+            // Set together: the entity refuses weak > strong, which would leave
+            // no middle band and silently turn hedging off.
+            p.setThresholds(
+                    strongThreshold == null ? p.getStrongThreshold() : strongThreshold,
+                    weakThreshold == null ? p.getWeakThreshold() : weakThreshold);
+        }
+        if (policyEnabled != null) {
+            p.setPolicyEnabled(policyEnabled);
+        }
+        if (declineOnNoEvidence != null) {
+            p.setDeclineOnNoEvidence(declineOnNoEvidence);
+        }
         if (description != null) {
             p.setDescription(description);
         }
@@ -224,6 +300,10 @@ public class PipelineService {
         m.put("systemPrompt", p.getSystemPrompt());
         m.put("steps", stepIds(p));
         m.put("enabled", p.isEnabled());
+        m.put("policyEnabled", p.isPolicyEnabled());
+        m.put("strongThreshold", p.getStrongThreshold());
+        m.put("weakThreshold", p.getWeakThreshold());
+        m.put("declineOnNoEvidence", p.isDeclineOnNoEvidence());
         m.put("runs", p.getRuns());
         m.put("createdAt", p.getCreatedAt());
         return m;
@@ -244,6 +324,18 @@ public class PipelineService {
         } catch (Exception e) {
             return "[]";
         }
+    }
+
+    /** Written for a person reading the chain, not for a machine parsing it. */
+    private static String policyLabel(ConfidencePolicy.Decision d) {
+        return switch (d.action()) {
+            case PASS -> "Evidence is strong — answering directly";
+            case HEDGE -> "Evidence is moderate — model told to state its uncertainty";
+            case ASK_FOR_BETTER_INPUT -> d.band() == ConfidencePolicy.Band.UNAVAILABLE
+                    ? "No analysis available — model told not to present an all-clear"
+                    : "Evidence too weak to advise on — model told to ask for better input";
+            case DECLINE -> "Declined — not enough evidence to involve a model";
+        };
     }
 
     private static String describeInput(String kind) {

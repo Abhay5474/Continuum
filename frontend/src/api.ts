@@ -381,6 +381,8 @@ export const portal = {
     }) => portalHttp<any>("/api/portal/developer/pipelines", "POST", body),
     update: (id: number, body: {
       description?: string; systemPrompt?: string; steps?: number[]; enabled?: boolean;
+      policyEnabled?: boolean; strongThreshold?: number; weakThreshold?: number;
+      declineOnNoEvidence?: boolean;
     }) => portalHttp<any>(`/api/portal/developer/pipelines/${id}`, "PUT", body),
     remove: (id: number) => portalHttp<any>(`/api/portal/developer/pipelines/${id}`, "DELETE"),
     /** Runs it exactly as an application would, so the chain can be seen before going live. */

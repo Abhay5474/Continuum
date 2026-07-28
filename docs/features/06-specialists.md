@@ -209,7 +209,7 @@ Full suite: **316 passing.**
 | Phase | What |
 |---|---|
 | ~~3~~ | ~~**Pipelines**~~ — **shipped**, see [07-pipelines.md](07-pipelines.md) |
-| 4 | **Confidence policy** — high passes through, medium makes the model hedge, low asks for better input or declines |
+| ~~4~~ | ~~**Confidence policy**~~ — **shipped**, see [08-confidence-policy.md](08-confidence-policy.md) |
 | 2 | The Hub — search provider catalogues, one-click add |
 | 5 | Specialist routing — which specialist, decided by type, rule, or the model itself |
 | 6 | Output verification — does the advice match the findings |

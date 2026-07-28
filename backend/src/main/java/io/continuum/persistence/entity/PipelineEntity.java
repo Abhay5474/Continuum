@@ -1,5 +1,6 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.specialist.ConfidencePolicy;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -51,6 +52,23 @@ public class PipelineEntity {
     @Column(name = "runs", nullable = false)
     private long runs;
 
+    /**
+     * The confidence policy is off until a developer turns it on, per pipeline.
+     * It changes what a live endpoint says to real users, so it cannot arrive
+     * with an upgrade.
+     */
+    @Column(name = "policy_enabled", nullable = false)
+    private boolean policyEnabled;
+
+    @Column(name = "strong_threshold", nullable = false)
+    private double strongThreshold = ConfidencePolicy.DEFAULT_STRONG;
+
+    @Column(name = "weak_threshold", nullable = false)
+    private double weakThreshold = ConfidencePolicy.DEFAULT_WEAK;
+
+    @Column(name = "decline_on_no_evidence", nullable = false)
+    private boolean declineOnNoEvidence;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -79,6 +97,10 @@ public class PipelineEntity {
     public String getSteps() { return steps; }
     public boolean isEnabled() { return enabled; }
     public long getRuns() { return runs; }
+    public boolean isPolicyEnabled() { return policyEnabled; }
+    public double getStrongThreshold() { return strongThreshold; }
+    public double getWeakThreshold() { return weakThreshold; }
+    public boolean isDeclineOnNoEvidence() { return declineOnNoEvidence; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 
@@ -86,6 +108,31 @@ public class PipelineEntity {
     public void setSystemPrompt(String v) { this.systemPrompt = v; touch(); }
     public void setSteps(String v) { this.steps = v == null ? "[]" : v; touch(); }
     public void setEnabled(boolean v) { this.enabled = v; touch(); }
+    public void setPolicyEnabled(boolean v) { this.policyEnabled = v; touch(); }
+    public void setDeclineOnNoEvidence(boolean v) { this.declineOnNoEvidence = v; touch(); }
+
+    /**
+     * Both thresholds at once, because they are only meaningful relative to each
+     * other. Setting them independently allows weak &gt; strong, which makes the
+     * MEDIUM band empty and silently turns hedging off — a misconfiguration that
+     * looks like a working policy.
+     */
+    public void setThresholds(double strong, double weak) {
+        double s = clamp(strong);
+        double w = clamp(weak);
+        if (w > s) {
+            throw new IllegalArgumentException(
+                    "The weak threshold must not be above the strong threshold — "
+                            + "there would be no middle band left to hedge in.");
+        }
+        this.strongThreshold = s;
+        this.weakThreshold = w;
+        touch();
+    }
+
+    private static double clamp(double v) {
+        return Math.max(0, Math.min(1, v));
+    }
 
     public void recordRun() {
         this.runs++;
