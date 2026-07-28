@@ -321,10 +321,18 @@ export const portal = {
   // --- Response quality gate ---
   quality: {
     status: () => portalHttp<any>("/api/portal/developer/quality/status", "GET"),
-    configure: (body: { mode?: string; threshold?: number; maxRepairs?: number; budgetMs?: number }) =>
-      portalHttp<any>("/api/portal/developer/quality/settings", "PUT", body),
+    configure: (body: {
+      mode?: string; threshold?: number; maxRepairs?: number; budgetMs?: number;
+      repairEngineEnabled?: boolean;
+    }) => portalHttp<any>("/api/portal/developer/quality/settings", "PUT", body),
     checks: (limit = 30) => portalHttp<any[]>(`/api/portal/developer/quality/checks?limit=${limit}`, "GET"),
     clear: () => portalHttp<any>("/api/portal/developer/quality", "DELETE"),
+
+    /** Attempt-by-attempt repair ledger, including the attempts that were discarded. */
+    repairs: (limit = 30) =>
+      portalHttp<any[]>(`/api/portal/developer/quality/repairs?limit=${limit}`, "GET"),
+    repairSummary: () => portalHttp<any>("/api/portal/developer/quality/repairs/summary", "GET"),
+    clearRepairs: () => portalHttp<any>("/api/portal/developer/quality/repairs", "DELETE"),
   },
 
   // --- Semantic circuit breaker ---

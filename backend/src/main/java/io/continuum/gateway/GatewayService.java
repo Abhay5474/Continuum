@@ -52,6 +52,7 @@ public class GatewayService {
     private final CredentialVaultService vault;
     private final ProviderRouter router;
     private final AdmissionService admission;
+    private final io.continuum.quality.AnswerRepairService repairEngine;
     private final GatewayRequestLogRepository logRepo;
     private final io.continuum.persistence.repository.DeveloperAuthRepository devAuth;
     // Autopilot integration (additive; empty resolution ⇒ exact pre-Autopilot behaviour).
@@ -99,6 +100,7 @@ public class GatewayService {
                           ModelFallbackPolicy fallbackPolicy, ProviderHealthTracker health,
                           CredentialVaultService vault, ProviderRouter router,
                           AdmissionService admission,
+                          io.continuum.quality.AnswerRepairService repairEngine,
                           GatewayRequestLogRepository logRepo,
                           io.continuum.persistence.repository.DeveloperAuthRepository devAuth,
                           io.continuum.autopilot.PolicyResolver policyResolver,
@@ -128,6 +130,7 @@ public class GatewayService {
         this.vault = vault;
         this.router = router;
         this.admission = admission;
+        this.repairEngine = repairEngine;
         this.logRepo = logRepo;
         this.devAuth = devAuth;
         this.policyResolver = policyResolver;
@@ -458,6 +461,14 @@ public class GatewayService {
                 return annotate(response, verdict, false);
             }
 
+            // The targeted repair engine, when the developer has turned it on:
+            // one defect kind per attempt, re-checked after each, and any
+            // attempt that scores lower than what it replaced is discarded.
+            if (cfg.isRepairEngineEnabled()) {
+                return withRepairEngine(response, developerId, canonical, provider, model,
+                        devKeys, complexity, cfg, verdict);
+            }
+
             long start = System.nanoTime();
             List<Message> repairMessages = new ArrayList<>(canonical.messages());
             repairMessages.add(Message.assistant(response.response()));
@@ -502,6 +513,53 @@ public class GatewayService {
                     developerId, e.getMessage());
             return response;
         }
+    }
+
+
+    /**
+     * The Answer Repair Engine path.
+     *
+     * <p>Differs from the single-shot repair in the guard that makes it safe:
+     * every attempt is re-scored by the same external gate and discarded if it
+     * did not help. Huang et al. (ICLR 2024) showed a model asked to reconsider
+     * will degrade correct work; the point here is that nothing relies on the
+     * model's own judgement of its answer.
+     */
+    private GatewayDtos.ChatResponse withRepairEngine(
+            GatewayDtos.ChatResponse response, String developerId, LlmRequest canonical,
+            String provider, String model, Map<String, String> devKeys, double complexity,
+            io.continuum.persistence.entity.QualityGateSettingEntity cfg,
+            io.continuum.quality.QualityGate.Verdict verdict) {
+
+        var result = repairEngine.repair(developerId, model, canonical, response.response(),
+                verdict, complexity, cfg.getThreshold(), cfg.getMaxRepairs(), cfg.getBudgetMs(),
+                messages -> {
+                    LlmResponse r = chaos(developerId, router.complete(
+                            new LlmRequest(model, messages, canonical.maxTokens(),
+                                    canonical.temperature()),
+                            List.of(provider), keyFor(devKeys, provider)));
+                    String safe = firewall.guardOutbound(developerId, r.content());
+                    double c = router.estimateCost(provider, r.model(),
+                            r.promptTokens(), r.completionTokens());
+                    return new io.continuum.quality.AnswerRepairService.Regenerate.Attempt(safe, c);
+                });
+
+        quality.record(developerId, cfg, verdict, result.improved() ? "REPAIR" : "REPAIR_REJECTED",
+                model, response.response(), result.improved() ? result.answer() : null, null,
+                result.totalCost(), result.totalMs());
+
+        if (!result.improved()) {
+            // Every attempt was discarded, so the original stands. Reported, not
+            // hidden: an engine that never improves anything is one to turn off.
+            return annotate(response, verdict, false);
+        }
+        return new GatewayDtos.ChatResponse(result.answer(), response.provider(), response.model(),
+                response.latency() + result.totalMs(), response.tokens(),
+                response.cost() + result.totalCost(), response.failovers(),
+                response.routingReason() + String.format(" · repaired (%.2f → %.2f) over %d attempt%s",
+                        result.originalScore(), result.finalScore(), result.attempts().size(),
+                        result.attempts().size() == 1 ? "" : "s"),
+                response.confidence(), response.lowConfidence(), response.agreementClusters());
     }
 
     /** Appends the verdict to the routing reason without altering the answer. */

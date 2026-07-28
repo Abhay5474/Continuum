@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout } from "../system/primitives";
+import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 
@@ -58,15 +58,24 @@ export default function QualityGatePage() {
   const toast = useToast();
   const [status, setStatus] = useState<Status | null>(null);
   const [rows, setRows] = useState<any[] | null>(null);
+  const [repairs, setRepairs] = useState<any[]>([]);
+  const [repairStats, setRepairStats] = useState<any | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [s, c] = await Promise.all([portal.quality.status(), portal.quality.checks(30)]);
+      const [s, c, r, rs] = await Promise.all([
+        portal.quality.status(),
+        portal.quality.checks(30),
+        portal.quality.repairs(30),
+        portal.quality.repairSummary(),
+      ]);
       setStatus(s);
       setRows(c);
+      setRepairs(r);
+      setRepairStats(rs);
       setError(null);
     } catch (e: any) {
       setError(e?.message ?? "Could not load the quality gate.");
@@ -102,6 +111,19 @@ export default function QualityGatePage() {
       <PageHeader
         title="Quality Gate"
         subtitle="Checks a finished answer against the request that asked for it. Off by default; the gate can rewrite an answer, so it has to earn that first."
+      />
+
+      <RepairEngine
+        enabled={!!(status as any)?.repairEngineEnabled}
+        busy={busy}
+        stats={repairStats}
+        attempts={repairs}
+        onToggle={(next) =>
+          run(
+            () => portal.quality.configure({ repairEngineEnabled: next }),
+            next ? "Repair engine on." : "Repair engine off."
+          )
+        }
       />
 
       {/* ---- mode ---- */}
@@ -385,5 +407,108 @@ function Check({ row, open, onToggle }: { row: any; open: boolean; onToggle: () 
         </div>
       )}
     </Plane>
+  );
+}
+
+// --- Answer Repair Engine ---------------------------------------------------
+
+/**
+ * The attempt ledger, discards included.
+ *
+ * <p>The discarded attempts are the point. They are the evidence that the guard
+ * against making an answer worse is doing something — an engine that never
+ * discards anything is not being checked, and one that never keeps anything is
+ * money going out with nothing coming back.
+ */
+function RepairEngine({
+  enabled,
+  busy,
+  stats,
+  attempts,
+  onToggle,
+}: {
+  enabled: boolean;
+  busy: boolean;
+  stats: any | null;
+  attempts: any[];
+  onToggle: (next: boolean) => void;
+}) {
+  const kept = stats?.kept ?? 0;
+  const discarded = stats?.discarded ?? 0;
+  const total = kept + discarded;
+
+  return (
+    <section className="space-y-3">
+      <Micro>Answer Repair Engine</Micro>
+
+      <Plane className="space-y-3 p-4">
+        <Switch
+          checked={enabled}
+          busy={busy}
+          onChange={onToggle}
+          label="Targeted repair"
+          hint="Off by default. With it off the gate does one generic repair pass. With it on, each defect kind gets its own instruction, the answer is re-scored after every attempt, and an attempt that scored lower than what it replaced is thrown away."
+        />
+        <p className="text-xs text-slate-600">
+          A model asked to reconsider will find fault with correct work and degrade it — that is
+          the finding in Huang et al., <em>Large Language Models Cannot Self-Correct Reasoning
+          Yet</em> (ICLR 2024). Nothing here relies on the model's opinion of its own answer: every
+          attempt is scored by the same external gate, so a repair that did not help is discarded
+          rather than shipped.
+        </p>
+      </Plane>
+
+      {total > 0 && (
+        <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+          <Readout label="Attempts" value={total} size="sm" />
+          <Readout label="Kept" value={kept} size="sm" state={kept > 0 ? "healthy" : "idle"} />
+          <Readout
+            label="Discarded"
+            value={discarded}
+            size="sm"
+            state={discarded > 0 ? "degraded" : "idle"}
+            hint="Scored no better than the answer they replaced, so the original was kept."
+          />
+          <Readout
+            label="Score gained"
+            value={(stats?.totalScoreGained ?? 0).toFixed(2)}
+            size="sm"
+            hint="Summed improvement across every kept attempt."
+          />
+        </Plane>
+      )}
+
+      {attempts.length === 0 ? (
+        <Plane className="p-6 text-center text-sm text-slate-500">
+          No repair attempts yet. They appear here as the gate finds defects worth fixing —
+          including the attempts that were thrown away.
+        </Plane>
+      ) : (
+        <div className="space-y-1.5">
+          {attempts.map((a) => (
+            <Plane key={a.id} className="px-4 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${
+                    a.kept ? "bg-emerald-400" : "bg-slate-600"
+                  }`}
+                />
+                <span className="micro w-28 shrink-0">{a.strategy}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-300">{a.note}</span>
+                <span className="readout shrink-0 text-xs text-slate-400">
+                  {a.scoreBefore?.toFixed(2)} → {a.scoreAfter?.toFixed(2)}
+                </span>
+                <span className={`micro shrink-0 ${a.kept ? "text-emerald-400" : "text-slate-500"}`}>
+                  {a.kept ? "kept" : "discarded"}
+                </span>
+              </div>
+              {a.defects && (
+                <p className="mt-1 truncate text-xs text-slate-600">{a.defects}</p>
+              )}
+            </Plane>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

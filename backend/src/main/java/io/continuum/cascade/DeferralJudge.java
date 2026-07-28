@@ -196,8 +196,29 @@ public class DeferralJudge {
      */
     private static boolean endsCleanly(String s) {
         char last = s.charAt(s.length() - 1);
-        return ".!?\"')]}`…:".indexOf(last) >= 0 || Character.isDigit(last);
+        if (".!?\"')]}`…:".indexOf(last) >= 0 || Character.isDigit(last)) {
+            return true;
+        }
+        // A list item is not a truncated sentence. Bulleted and numbered lines
+        // routinely end without punctuation, and treating that as truncation
+        // marked well-formed answers incomplete — which the repair engine then
+        // discarded, so a correct three-bullet answer could never beat the prose
+        // it was replacing. Found by a failing test on exactly that case.
+        return endsWithListItem(s);
     }
+
+    /** Whether the last non-empty line is a bullet or numbered item. */
+    private static boolean endsWithListItem(String s) {
+        int nl = s.lastIndexOf('\n');
+        String lastLine = (nl < 0 ? s : s.substring(nl + 1)).strip();
+        if (lastLine.isEmpty()) {
+            return false;
+        }
+        return LIST_ITEM.matcher(lastLine).find();
+    }
+
+    private static final Pattern LIST_ITEM =
+            Pattern.compile("^\\s*(?:[-*•–]|\\d+[.)])\\s+\\S");
 
     private static boolean looksLikeJson(String s) {
         String t = s.strip();

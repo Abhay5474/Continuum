@@ -14,9 +14,12 @@ import java.util.Map;
 public class QualityGateController {
 
     private final QualityGateService quality;
+    private final io.continuum.quality.AnswerRepairService repairs;
 
-    public QualityGateController(QualityGateService quality) {
+    public QualityGateController(QualityGateService quality,
+                                 io.continuum.quality.AnswerRepairService repairs) {
         this.quality = quality;
+        this.repairs = repairs;
     }
 
     private String dev(HttpServletRequest req) {
@@ -31,7 +34,7 @@ public class QualityGateController {
     @PutMapping("/settings")
     public Map<String, Object> settings(HttpServletRequest req, @RequestBody Settings body) {
         return quality.configure(dev(req), body.mode(), body.threshold(),
-                body.maxRepairs(), body.budgetMs());
+                body.maxRepairs(), body.budgetMs(), body.repairEngineEnabled());
     }
 
     @GetMapping("/checks")
@@ -45,6 +48,25 @@ public class QualityGateController {
         return quality.clear(dev(req));
     }
 
-    public record Settings(String mode, Double threshold, Integer maxRepairs, Integer budgetMs) {
+    /** Attempt-by-attempt record, including the attempts that were discarded. */
+    @GetMapping("/repairs")
+    public List<Map<String, Object>> repairs(HttpServletRequest req,
+                                             @RequestParam(defaultValue = "30") int limit) {
+        return repairs.recent(dev(req), limit);
+    }
+
+    @GetMapping("/repairs/summary")
+    public Map<String, Object> repairSummary(HttpServletRequest req) {
+        return repairs.summary(dev(req));
+    }
+
+    @DeleteMapping("/repairs")
+    public Map<String, Object> clearRepairs(HttpServletRequest req) {
+        repairs.clear(dev(req));
+        return Map.of("cleared", true);
+    }
+
+    public record Settings(String mode, Double threshold, Integer maxRepairs, Integer budgetMs,
+                           Boolean repairEngineEnabled) {
     }
 }

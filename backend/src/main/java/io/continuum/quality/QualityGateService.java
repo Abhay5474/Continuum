@@ -99,8 +99,12 @@ public class QualityGateService {
 
     @Transactional
     public Map<String, Object> configure(String developerId, String mode, Double threshold,
-                                         Integer maxRepairs, Integer budgetMs) {
+                                         Integer maxRepairs, Integer budgetMs,
+                                         Boolean repairEngineEnabled) {
         QualityGateSettingEntity cfg = settingsFor(developerId);
+        if (repairEngineEnabled != null) {
+            cfg.setRepairEngineEnabled(repairEngineEnabled);
+        }
         if (mode != null) {
             try {
                 cfg.setMode(QualityGateSettingEntity.Mode.valueOf(mode.toUpperCase()));
@@ -185,6 +189,7 @@ public class QualityGateService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("mode", cfg.getMode().name());
         out.put("threshold", cfg.getThreshold());
+        out.put("repairEngineEnabled", cfg.isRepairEngineEnabled());
         out.put("maxRepairs", cfg.getMaxRepairs());
         out.put("budgetMs", cfg.getBudgetMs());
         out.put("checked", total);
