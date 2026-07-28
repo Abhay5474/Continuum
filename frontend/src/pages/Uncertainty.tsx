@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout } from "../system/primitives";
+import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 
@@ -22,6 +22,8 @@ type Status = {
   samples: number;
   temperature: number;
   lowConfidence: number;
+  adaptiveEnabled: boolean;
+  overturnThreshold: number;
   measured: number;
   lowConfidenceCount: number;
   lowConfidenceRate: number;
@@ -162,6 +164,59 @@ export default function Uncertainty() {
           </Plane>
         </section>
       )}
+
+      {/* ---- adaptive stopping ---- */}
+      <section className="space-y-3">
+        <Micro>Adaptive consensus</Micro>
+        <Plane className="space-y-3 p-5">
+          <Switch
+            checked={!!status?.adaptiveEnabled}
+            busy={busy}
+            onChange={(next) =>
+              run(
+                () => portal.uncertainty.configure({ adaptiveEnabled: next }),
+                next ? "Adaptive consensus on." : "Adaptive consensus off."
+              )
+            }
+            label="Stop sampling once the answer is decided"
+            hint="Off by default — every measurement draws the full sample count. With it on, sampling stops as soon as further samples could not reasonably change the answer, so an easy question costs two samples and a contested one still costs the budget."
+          />
+
+          <label className="block max-w-sm">
+            <span className="micro">Stop when the chance of being overturned is below</span>
+            <select
+              value={status?.overturnThreshold ?? 0.05}
+              disabled={busy || !status?.adaptiveEnabled}
+              onChange={(e) =>
+                run(
+                  () => portal.uncertainty.configure({ overturnThreshold: Number(e.target.value) }),
+                  "Threshold updated"
+                )
+              }
+              className="mt-1 block w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200 disabled:opacity-40"
+            >
+              {[0.01, 0.02, 0.05, 0.1, 0.2].map((n) => (
+                <option key={n} value={n}>
+                  {(n * 100).toFixed(0)}% — {n <= 0.02 ? "cautious, more samples" : n >= 0.1 ? "eager, fewer samples" : "balanced"}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p className="text-xs text-slate-600">
+            A Beta posterior over the leading answer's share, stopped when P(the leader is not the
+            true majority) falls below the threshold — Adaptive-Consistency (Aggarwal et al., EMNLP
+            2023), which is Wald's sequential test applied to sampling. Three identical answers
+            gives 6.3%, still above a 5% bar; four gives 3.1% and stops. It never stops below two
+            samples and never exceeds the configured budget, so this can only ever cost less.
+          </p>
+          <p className="text-xs text-slate-600">
+            It cannot shorten a genuinely contested question, and should not — disagreement is
+            exactly what the extra samples are for. The saving comes from the easy majority of
+            traffic.
+          </p>
+        </Plane>
+      </section>
 
       {/* ---- settings ---- */}
       <section className="space-y-3">

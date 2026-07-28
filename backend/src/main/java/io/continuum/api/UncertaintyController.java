@@ -34,6 +34,7 @@ public class UncertaintyController {
     @PutMapping("/settings")
     public Map<String, Object> settings(HttpServletRequest req, @RequestBody Settings body) {
         return uncertainty.configure(dev(req), body.mode(), body.samples(),
+                body.adaptiveEnabled(), body.overturnThreshold(),
                 body.temperature(), body.lowConfidence());
     }
 
@@ -48,6 +49,6 @@ public class UncertaintyController {
         return uncertainty.clear(dev(req));
     }
 
-    public record Settings(String mode, Integer samples, Double temperature, Double lowConfidence) {
+    public record Settings(String mode, Integer samples, Double temperature, Double lowConfidence, Boolean adaptiveEnabled, Double overturnThreshold) {
     }
 }

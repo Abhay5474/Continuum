@@ -94,6 +94,22 @@ public class SemanticUncertaintyService {
     }
 
     /**
+     * How many answers fell into each meaning-cluster.
+     *
+     * <p>Exposed so the adaptive stopping rule can ask "is this decided yet?"
+     * after each sample, using exactly the clustering the final measurement will
+     * use. Deciding to stop on a different notion of agreement than the one that
+     * produces the answer would be measuring one thing and acting on another.
+     */
+    public List<Integer> clusterSizes(List<String> answers) {
+        if (answers == null || answers.size() < 2) {
+            return List.of();
+        }
+        return clusterer.cluster(answers).stream().map(AnswerClusterer.Cluster::size).toList();
+    }
+
+
+    /**
      * Computes semantic entropy over a set of sampled answers.
      *
      * <p>Pure: the sampling itself happens at the gateway, which owns the
@@ -144,7 +160,18 @@ public class SemanticUncertaintyService {
     // --- configuration -------------------------------------------------------
 
     @Transactional
+    /**
+     * The pre-adaptive signature, kept so existing callers and tests are not
+     * churned by a feature they do not use. Delegates with the adaptive fields
+     * left alone.
+     */
     public Map<String, Object> configure(String developerId, String mode, Integer samples,
+                                         Double temperature, Double lowConfidence) {
+        return configure(developerId, mode, samples, null, null, temperature, lowConfidence);
+    }
+
+    public Map<String, Object> configure(String developerId, String mode, Integer samples,
+                                         Boolean adaptiveEnabled, Double overturnThreshold,
                                          Double temperature, Double lowConfidence) {
         UncertaintySettingEntity cfg = settingsFor(developerId);
         if (mode != null) {
@@ -153,6 +180,12 @@ public class SemanticUncertaintyService {
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Unknown mode: " + mode);
             }
+        }
+        if (adaptiveEnabled != null) {
+            cfg.setAdaptiveEnabled(adaptiveEnabled);
+        }
+        if (overturnThreshold != null) {
+            cfg.setOverturnThreshold(overturnThreshold);
         }
         if (samples != null) {
             cfg.setSamples(samples);
@@ -194,6 +227,8 @@ public class SemanticUncertaintyService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("mode", cfg.getMode().name());
         out.put("samples", cfg.getSamples());
+        out.put("adaptiveEnabled", cfg.isAdaptiveEnabled());
+        out.put("overturnThreshold", cfg.getOverturnThreshold());
         out.put("temperature", cfg.getTemperature());
         out.put("lowConfidence", cfg.getLowConfidence());
         out.put("measured", rows.size());

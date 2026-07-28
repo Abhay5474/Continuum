@@ -606,6 +606,7 @@ public class GatewayService {
             List<String> answers = new ArrayList<>();
             answers.add(response.response());
             double extraCost = 0;
+            io.continuum.uncertainty.AdaptiveStopping.Decision stopped = null;
             for (int i = 0; i < extra; i++) {
                 LlmResponse r = chaos(developerId, router.complete(
                         new LlmRequest(model, canonical.messages(), canonical.maxTokens(),
@@ -613,6 +614,18 @@ public class GatewayService {
                         List.of(provider), keyFor(devKeys, provider)));
                 answers.add(r.content());
                 extraCost += router.estimateCost(provider, r.model(), r.promptTokens(), r.completionTokens());
+
+                // Adaptive consensus: stop as soon as the answer is decided
+                // rather than always drawing the configured k. Off by default,
+                // in which case this loop behaves exactly as it always has.
+                if (cfg.isAdaptiveEnabled()) {
+                    stopped = io.continuum.uncertainty.AdaptiveStopping.decide(
+                            uncertainty.clusterSizes(answers), answers.size(), cfg.getSamples(),
+                            cfg.getOverturnThreshold());
+                    if (stopped.stop()) {
+                        break;
+                    }
+                }
             }
             long extraMs = (System.nanoTime() - start) / 1_000_000;
 
@@ -634,7 +647,10 @@ public class GatewayService {
                     response.latency() + extraMs, response.tokens(), response.cost() + extraCost,
                     response.failovers(),
                     response.routingReason() + String.format(" · confidence %.2f over %d samples in %d meaning%s",
-                            m.confidence(), m.samples(), m.clusters(), m.clusters() == 1 ? "" : "s"),
+                            m.confidence(), m.samples(), m.clusters(), m.clusters() == 1 ? "" : "s")
+                            + (stopped != null && stopped.stop() && m.samples() < cfg.getSamples()
+                                    ? String.format(" · stopped early, %d of %d drawn",
+                                            m.samples(), cfg.getSamples()) : ""),
                     Double.isNaN(m.confidence()) ? null : m.confidence(),
                     m.lowConfidence(), m.clusters());
         } catch (Exception e) {

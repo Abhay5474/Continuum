@@ -311,7 +311,7 @@ export const portal = {
   // --- Semantic uncertainty ---
   uncertainty: {
     status: () => portalHttp<any>("/api/portal/developer/uncertainty/status", "GET"),
-    configure: (body: { mode?: string; samples?: number; temperature?: number; lowConfidence?: number }) =>
+    configure: (body: { mode?: string; samples?: number; temperature?: number; lowConfidence?: number; adaptiveEnabled?: boolean; overturnThreshold?: number }) =>
       portalHttp<any>("/api/portal/developer/uncertainty/settings", "PUT", body),
     measurements: (limit = 20) =>
       portalHttp<any[]>(`/api/portal/developer/uncertainty/measurements?limit=${limit}`, "GET"),

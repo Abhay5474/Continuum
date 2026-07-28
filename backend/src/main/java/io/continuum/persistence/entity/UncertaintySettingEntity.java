@@ -38,6 +38,18 @@ public class UncertaintySettingEntity {
     @Column(name = "low_confidence", nullable = false)
     private double lowConfidence = 0.5;
 
+    /** Stop early once the answer is decided. OFF by default. */
+    @Column(name = "adaptive_enabled", nullable = false)
+    private boolean adaptiveEnabled;
+
+    /**
+     * Stop when the probability of further sampling overturning the leading
+     * answer falls below this. 5% by default — the same order as the confidence
+     * level anyone would accept for a decision made on a handful of samples.
+     */
+    @Column(name = "overturn_threshold", nullable = false)
+    private double overturnThreshold = 0.05;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
@@ -53,6 +65,19 @@ public class UncertaintySettingEntity {
     public int getSamples() { return samples; }
     public double getTemperature() { return temperature; }
     public double getLowConfidence() { return lowConfidence; }
+    public boolean isAdaptiveEnabled() { return adaptiveEnabled; }
+    public double getOverturnThreshold() { return overturnThreshold; }
+
+    public void setAdaptiveEnabled(boolean v) {
+        this.adaptiveEnabled = v;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Clamped: a threshold of 0 never stops early, and one near 1 stops instantly. */
+    public void setOverturnThreshold(double v) {
+        this.overturnThreshold = Math.max(0.001, Math.min(0.5, v));
+        this.updatedAt = Instant.now();
+    }
     public Instant getUpdatedAt() { return updatedAt; }
 
     public void setMode(Mode m) {
