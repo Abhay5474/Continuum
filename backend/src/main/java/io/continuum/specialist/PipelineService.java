@@ -91,18 +91,47 @@ public class PipelineService {
 
         // --- specialists ----------------------------------------------------
         List<ContextBuilder.StepResult> results = new ArrayList<>();
-        for (Long specialistId : stepIds(p)) {
+        int findingsSoFar = 0;
+        int ranSoFar = 0;
+        int skipped = 0;
+        for (PipelineStep step : steps(p)) {
             SpecialistEntity s;
             try {
-                s = specialists.require(developerId, specialistId);
+                s = specialists.require(developerId, step.specialistId());
             } catch (RuntimeException e) {
                 // A deleted specialist should not break a pipeline that still
                 // has others; note it and carry on.
-                log.warn("Pipeline {} references missing specialist {}", p.getName(), specialistId);
+                log.warn("Pipeline {} references missing specialist {}", p.getName(),
+                        step.specialistId());
                 continue;
             }
+
+            // With routing off every step runs, whatever its condition — the
+            // behaviour every pipeline had before routing existed.
+            StepRouter.Decision route = p.isRoutingEnabled()
+                    ? StepRouter.decide(step, findingsSoFar, ranSoFar, userPrompt, p.getInputKind())
+                    : new StepRouter.Decision(true, "Routing is off, so every step runs.");
+
+            if (!route.run()) {
+                // Recorded, not silent. A step that did not run and a step that
+                // ran and found nothing look identical in an answer and need
+                // completely different fixes.
+                skipped++;
+                traces.step(traceId, developerId, TraceStepEntity.Kind.SPECIALIST,
+                        s.getName() + " — skipped",
+                        Map.of("condition", step.when().name(),
+                                "pattern", String.valueOf(step.pattern()),
+                                "reason", route.reason()),
+                        "SKIPPED", null, 0, 0);
+                continue;
+            }
+
             SpecialistInvoker.Result r = invoker.invoke(s, input, traceId);
             results.add(new ContextBuilder.StepResult(s.getName(), r.findings(), r.dropped(), r.error()));
+            ranSoFar++;
+            if (r.error() == null) {
+                findingsSoFar += r.findings().size();
+            }
         }
 
         // --- context --------------------------------------------------------
@@ -211,7 +240,8 @@ public class PipelineService {
 
     @Transactional
     public Map<String, Object> create(String developerId, String name, String description,
-                                      String inputKind, String systemPrompt, List<Long> steps) {
+                                      String inputKind, String systemPrompt,
+                                      List<PipelineStep> steps) {
         if (name == null || !name.matches("[a-zA-Z0-9_-]{1,120}")) {
             throw new SpecialistConnectionService.InvalidConnectionException(
                     "A pipeline name may contain letters, digits, underscore and hyphen — "
@@ -227,9 +257,10 @@ public class PipelineService {
 
     @Transactional
     public Map<String, Object> update(String developerId, Long id, String description,
-                                      String systemPrompt, List<Long> steps, Boolean enabled,
+                                      String systemPrompt, List<PipelineStep> steps, Boolean enabled,
                                       Boolean policyEnabled, Double strongThreshold,
-                                      Double weakThreshold, Boolean declineOnNoEvidence) {
+                                      Double weakThreshold, Boolean declineOnNoEvidence,
+                                      Boolean routingEnabled) {
         PipelineEntity p = require(developerId, id);
         if (strongThreshold != null || weakThreshold != null) {
             // Set together: the entity refuses weak > strong, which would leave
@@ -250,17 +281,11 @@ public class PipelineService {
         if (systemPrompt != null) {
             p.setSystemPrompt(systemPrompt);
         }
+        if (routingEnabled != null) {
+            p.setRoutingEnabled(routingEnabled);
+        }
         if (steps != null) {
-            // Every step must be this developer's, and must have been probed.
-            // Enabling a pipeline whose specialist has never answered moves the
-            // failure to a customer's request.
-            for (Long sid : steps) {
-                SpecialistEntity s = specialists.require(developerId, sid);
-                if (s.getStatus() == SpecialistEntity.Status.DRAFT) {
-                    throw new SpecialistConnectionService.InvalidConnectionException(
-                            "Specialist '" + s.getName() + "' has not been probed yet.");
-                }
-            }
+            validateSteps(developerId, steps);
             p.setSteps(writeSteps(steps));
         }
         if (enabled != null) {
@@ -272,6 +297,41 @@ public class PipelineService {
         }
         repo.save(p);
         return describe(p);
+    }
+
+    /**
+     * Every step must be this developer's, must have been probed, and must carry
+     * a condition that can actually be evaluated where it sits.
+     */
+    private void validateSteps(String developerId, List<PipelineStep> steps) {
+        for (int i = 0; i < steps.size(); i++) {
+            PipelineStep step = steps.get(i);
+            SpecialistEntity s = specialists.require(developerId, step.specialistId());
+            if (s.getStatus() == SpecialistEntity.Status.DRAFT) {
+                throw new SpecialistConnectionService.InvalidConnectionException(
+                        "Specialist '" + s.getName() + "' has not been probed yet.");
+            }
+            // Caught here rather than at request time. "Only if the previous
+            // step found something" in first position is not a condition that
+            // can be false — it is a condition with nothing to refer to, and
+            // discovering that on a customer's request is too late.
+            if (i == 0 && step.when().needsPredecessor()) {
+                throw new SpecialistConnectionService.InvalidConnectionException(
+                        "'" + s.getName() + "' is first, so there is no previous step for its "
+                                + "condition to look at. Move it down, or set it to run always.");
+            }
+            if (step.when() == PipelineStep.Condition.IF_PROMPT_MATCHES
+                    && !StepRouter.validPattern(step.pattern())) {
+                throw new SpecialistConnectionService.InvalidConnectionException(
+                        "'" + s.getName() + "' matches on a pattern, but /" + step.pattern()
+                                + "/ is not a valid regular expression.");
+            }
+            if (step.when() == PipelineStep.Condition.IF_INPUT_IS
+                    && (step.pattern() == null || step.pattern().isBlank())) {
+                throw new SpecialistConnectionService.InvalidConnectionException(
+                        "'" + s.getName() + "' runs for one input kind, but none was given.");
+            }
+        }
     }
 
     @Transactional(readOnly = true)
@@ -298,7 +358,12 @@ public class PipelineService {
         m.put("description", p.getDescription());
         m.put("inputKind", p.getInputKind());
         m.put("systemPrompt", p.getSystemPrompt());
+        // Both shapes: `steps` stays a bare id array so anything reading it
+        // before routing existed keeps working, and `routing` carries the
+        // conditions alongside it.
         m.put("steps", stepIds(p));
+        m.put("routing", steps(p).stream().map(PipelineStep::describe).toList());
+        m.put("routingEnabled", p.isRoutingEnabled());
         m.put("enabled", p.isEnabled());
         m.put("policyEnabled", p.isPolicyEnabled());
         m.put("strongThreshold", p.getStrongThreshold());
@@ -309,18 +374,53 @@ public class PipelineService {
         return m;
     }
 
-    private List<Long> stepIds(PipelineEntity p) {
+    /**
+     * Reads either shape.
+     *
+     * <p>Before routing, steps were a bare array of ids: {@code [3, 7]}. They are
+     * now objects carrying a condition. Both are accepted, so no stored pipeline
+     * needed rewriting and a rollback does not strand rows the previous build
+     * cannot parse. A bare id means {@code ALWAYS}, which is what it always did.
+     */
+    List<PipelineStep> steps(PipelineEntity p) {
+        List<PipelineStep> out = new ArrayList<>();
         try {
-            return mapper.readValue(p.getSteps(), mapper.getTypeFactory()
-                    .constructCollectionType(List.class, Long.class));
+            for (Object o : mapper.readValue(p.getSteps(), List.class)) {
+                if (o instanceof Number n) {
+                    out.add(PipelineStep.always(n.longValue()));
+                } else if (o instanceof Map<?, ?> m) {
+                    Object id = m.get("specialistId");
+                    if (!(id instanceof Number n)) {
+                        continue;
+                    }
+                    PipelineStep.Condition when;
+                    try {
+                        when = m.get("when") == null ? PipelineStep.Condition.ALWAYS
+                                : PipelineStep.Condition.valueOf(String.valueOf(m.get("when")));
+                    } catch (IllegalArgumentException e) {
+                        // An unknown condition from a newer build must not make a
+                        // step vanish. Running is the pre-routing behaviour.
+                        when = PipelineStep.Condition.ALWAYS;
+                    }
+                    Object pattern = m.get("pattern");
+                    out.add(new PipelineStep(n.longValue(), when,
+                            pattern == null ? null : String.valueOf(pattern)));
+                }
+            }
         } catch (Exception e) {
             return List.of();
         }
+        return out;
     }
 
-    private String writeSteps(List<Long> steps) {
+    private List<Long> stepIds(PipelineEntity p) {
+        return steps(p).stream().map(PipelineStep::specialistId).toList();
+    }
+
+    private String writeSteps(List<PipelineStep> steps) {
         try {
-            return mapper.writeValueAsString(steps == null ? List.of() : steps);
+            return mapper.writeValueAsString(
+                    steps == null ? List.of() : steps.stream().map(PipelineStep::describe).toList());
         } catch (Exception e) {
             return "[]";
         }

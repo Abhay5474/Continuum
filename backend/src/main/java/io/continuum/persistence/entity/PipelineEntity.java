@@ -69,6 +69,15 @@ public class PipelineEntity {
     @Column(name = "decline_on_no_evidence", nullable = false)
     private boolean declineOnNoEvidence;
 
+    /**
+     * With routing off every step runs regardless of its condition, which is
+     * exactly what pipelines did before routing existed. Conditions can be
+     * configured while it is off, so a developer can set one up and see it take
+     * effect the moment they flip this.
+     */
+    @Column(name = "routing_enabled", nullable = false)
+    private boolean routingEnabled;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -101,6 +110,7 @@ public class PipelineEntity {
     public double getStrongThreshold() { return strongThreshold; }
     public double getWeakThreshold() { return weakThreshold; }
     public boolean isDeclineOnNoEvidence() { return declineOnNoEvidence; }
+    public boolean isRoutingEnabled() { return routingEnabled; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 
@@ -110,6 +120,7 @@ public class PipelineEntity {
     public void setEnabled(boolean v) { this.enabled = v; touch(); }
     public void setPolicyEnabled(boolean v) { this.policyEnabled = v; touch(); }
     public void setDeclineOnNoEvidence(boolean v) { this.declineOnNoEvidence = v; touch(); }
+    public void setRoutingEnabled(boolean v) { this.routingEnabled = v; touch(); }
 
     /**
      * Both thresholds at once, because they are only meaningful relative to each

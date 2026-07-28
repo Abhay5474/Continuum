@@ -23,6 +23,8 @@ type Pipeline = {
   inputKind: string;
   systemPrompt: string | null;
   steps: number[];
+  routing: RoutingStep[];
+  routingEnabled: boolean;
   enabled: boolean;
   policyEnabled: boolean;
   strongThreshold: number;
@@ -30,6 +32,42 @@ type Pipeline = {
   declineOnNoEvidence: boolean;
   runs: number;
 };
+
+type Condition =
+  | "ALWAYS"
+  | "IF_PREVIOUS_FOUND"
+  | "IF_PREVIOUS_EMPTY"
+  | "IF_PROMPT_MATCHES"
+  | "IF_INPUT_IS";
+
+type RoutingStep = { specialistId: number; when: Condition; pattern: string | null };
+
+/** Written for the person choosing, not for the person who wrote the enum. */
+const CONDITIONS: { value: Condition; label: string; hint: string; needsPattern?: string }[] = [
+  { value: "ALWAYS", label: "Always", hint: "Runs on every request." },
+  {
+    value: "IF_PREVIOUS_EMPTY",
+    label: "Only if nothing was found yet",
+    hint: "Escalation — screen with something cheap, and only reach for the expensive model when the cheap one saw nothing.",
+  },
+  {
+    value: "IF_PREVIOUS_FOUND",
+    label: "Only if something was found",
+    hint: "Drill-down — a general detector first, then a specific classifier once there is something to classify.",
+  },
+  {
+    value: "IF_PROMPT_MATCHES",
+    label: "Only if the question matches",
+    hint: "Runs when the user's own question matches a pattern.",
+    needsPattern: "bleed|wound|hurt",
+  },
+  {
+    value: "IF_INPUT_IS",
+    label: "Only for one kind of input",
+    hint: "For a pipeline that accepts more than one kind.",
+    needsPattern: "audio",
+  },
+];
 
 type Band = "STRONG" | "MEDIUM" | "WEAK" | "NONE" | "UNAVAILABLE";
 
@@ -408,7 +446,7 @@ function PipelineCard({
   onRan: () => void;
   onPolicy: (body: {
     policyEnabled?: boolean; strongThreshold?: number; weakThreshold?: number;
-    declineOnNoEvidence?: boolean;
+    declineOnNoEvidence?: boolean; routingEnabled?: boolean; routing?: RoutingStep[];
   }) => void;
 }) {
   const named = p.steps
@@ -465,12 +503,144 @@ function PipelineCard({
             </p>
           </div>
 
+          <RoutingControls
+            p={p}
+            specialists={specialists}
+            busy={busy}
+            onChange={onPolicy}
+          />
+
           <PolicyControls p={p} busy={busy} onChange={onPolicy} />
 
           <TryIt pipeline={p} onRan={onRan} />
         </div>
       )}
     </Plane>
+  );
+}
+
+// --- specialist routing -----------------------------------------------------
+
+/**
+ * Which specialists run, rather than all of them, always.
+ *
+ * <p>Conditions can be edited while routing is off, so a developer can set one
+ * up and watch it take effect the moment they flip the switch — rather than
+ * having to turn on a behaviour change before they can configure it.
+ */
+function RoutingControls({
+  p,
+  specialists,
+  busy,
+  onChange,
+}: {
+  p: Pipeline;
+  specialists: Specialist[];
+  busy: boolean;
+  onChange: (b: { routingEnabled?: boolean; routing?: RoutingStep[] }) => void;
+}) {
+  const steps: RoutingStep[] =
+    p.routing?.length > 0
+      ? p.routing
+      : p.steps.map((id) => ({ specialistId: id, when: "ALWAYS" as Condition, pattern: null }));
+
+  const name = (id: number) => specialists.find((s) => s.id === id)?.name ?? `#${id}`;
+
+  const setStep = (i: number, patch: Partial<RoutingStep>) => {
+    const next = steps.map((s, j) => (j === i ? { ...s, ...patch } : s));
+    onChange({ routing: next });
+  };
+
+  return (
+    <div className="rounded-md border border-edge/60 p-3">
+      <Switch
+        checked={p.routingEnabled}
+        busy={busy}
+        onChange={(next) => onChange({ routingEnabled: next })}
+        label="Specialist routing"
+        hint="Off by default — every step runs, which is what this pipeline did before. When on, each step's condition decides whether it runs at all."
+      />
+
+      <div className="mt-4 space-y-2">
+        {steps.map((s, i) => {
+          const meta = CONDITIONS.find((c) => c.value === s.when) ?? CONDITIONS[0];
+          const first = i === 0;
+          const impossible = first && (s.when === "IF_PREVIOUS_FOUND" || s.when === "IF_PREVIOUS_EMPTY");
+          return (
+            <div key={`${s.specialistId}-${i}`} className="rounded-md border border-edge/50 p-2.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="readout flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-edge/50 text-[10px] text-slate-400">
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-300">
+                  {name(s.specialistId)}
+                </span>
+              </div>
+
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <label className="block">
+                  <Micro>Runs when</Micro>
+                  <select
+                    value={s.when}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setStep(i, {
+                        when: e.target.value as Condition,
+                        pattern:
+                          CONDITIONS.find((c) => c.value === e.target.value)?.needsPattern ?? null,
+                      })
+                    }
+                    className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-aurora/60"
+                  >
+                    {CONDITIONS.map((c) => (
+                      <option
+                        key={c.value}
+                        value={c.value}
+                        // Offered but not selectable in first position: it is a
+                        // condition with nothing to refer to.
+                        disabled={first && (c.value === "IF_PREVIOUS_FOUND" || c.value === "IF_PREVIOUS_EMPTY")}
+                      >
+                        {c.label}
+                        {first && (c.value === "IF_PREVIOUS_FOUND" || c.value === "IF_PREVIOUS_EMPTY")
+                          ? " — needs a step before it"
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {meta.needsPattern && (
+                  <label className="block">
+                    <Micro>{s.when === "IF_INPUT_IS" ? "Input kind" : "Pattern"}</Micro>
+                    <input
+                      value={s.pattern ?? ""}
+                      disabled={busy}
+                      placeholder={meta.needsPattern}
+                      onChange={(e) => setStep(i, { pattern: e.target.value })}
+                      className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 font-mono text-sm text-slate-200 outline-none focus:border-aurora/60"
+                    />
+                  </label>
+                )}
+              </div>
+
+              <p className="mt-1.5 text-xs text-slate-600">{meta.hint}</p>
+              {impossible && (
+                <p className="mt-1 text-xs text-rose-400">
+                  Nothing runs before this one, so there is no previous step for the condition to
+                  look at.
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {!p.routingEnabled && steps.some((s) => s.when !== "ALWAYS") && (
+        <p className="mt-3 text-xs text-amber-400/90">
+          These conditions are saved but not in force — routing is off, so every step still runs.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -848,6 +1018,9 @@ function Chain({
         const bad = s.status === "FAILED" || s.status === "IGNORED";
         const acted = s.status === "CONSTRAINED" || s.status === "DECLINED"
           || s.status === "DEGRADED";
+        // A skipped step is neither a failure nor an intervention — it is work
+        // that was correctly not done, and it reads as absence.
+        const skippedStep = s.status === "SKIPPED";
         return (
           <div
             key={s.ordinal}
@@ -860,7 +1033,9 @@ function Chain({
                   ? "border-rose-500/40 bg-rose-500/5"
                   : acted
                     ? "border-amber-500/40 bg-amber-500/5"
-                    : "border-edge/60 hover:border-aurora/40"
+                    : skippedStep
+                      ? "border-dashed border-edge/50"
+                      : "border-edge/60 hover:border-aurora/40"
               }`}
             >
               <span
@@ -869,13 +1044,21 @@ function Chain({
                     ? "bg-rose-400"
                     : acted
                       ? "bg-amber-400"
-                      : s.kind === "MODEL"
-                        ? "bg-indigo-400"
-                        : "bg-emerald-400"
+                      : skippedStep
+                        ? "bg-slate-600"
+                        : s.kind === "MODEL"
+                          ? "bg-indigo-400"
+                          : "bg-emerald-400"
                 }`}
               />
               <span className="micro w-24 shrink-0">{s.kind}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-300">{s.label}</span>
+              <span
+                className={`min-w-0 flex-1 truncate text-sm ${
+                  skippedStep ? "text-slate-500" : "text-slate-300"
+                }`}
+              >
+                {s.label}
+              </span>
               {s.confidence != null && (
                 <span className="readout shrink-0 text-xs text-slate-400">
                   {s.confidence.toFixed(2)}
@@ -884,8 +1067,12 @@ function Chain({
               {s.latencyMs > 0 && (
                 <span className="readout shrink-0 text-xs text-slate-500">{s.latencyMs}ms</span>
               )}
-              {(bad || acted) && (
-                <span className={`micro shrink-0 ${bad ? "text-rose-400" : "text-amber-400"}`}>
+              {(bad || acted || skippedStep) && (
+                <span
+                  className={`micro shrink-0 ${
+                    bad ? "text-rose-400" : acted ? "text-amber-400" : "text-slate-500"
+                  }`}
+                >
                   {s.status}
                 </span>
               )}
@@ -910,6 +1097,20 @@ function Chain({
  * page. Everything else is shown as its raw record.
  */
 function StepDetail({ step }: { step: Step }) {
+  // A skipped step's reason is the whole story, so it is shown as a sentence
+  // rather than buried in a JSON blob.
+  if (step.status === "SKIPPED") {
+    return (
+      <div className="mt-2">
+        <p className="text-sm text-slate-300">{step.detail?.reason ?? "Condition not met."}</p>
+        <p className="mt-1 text-xs text-slate-600">
+          Recorded rather than left out. A step that did not run and a step that ran and found
+          nothing look identical in the answer, and they need different fixes.
+        </p>
+      </div>
+    );
+  }
+
   const structured = step.kind === "ENRICHMENT" ? step.detail?.structured : null;
 
   if (structured) {

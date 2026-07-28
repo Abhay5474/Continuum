@@ -211,7 +211,7 @@ Full suite: **316 passing.**
 | ~~3~~ | ~~**Pipelines**~~ — **shipped**, see [07-pipelines.md](07-pipelines.md) |
 | ~~4~~ | ~~**Confidence policy**~~ — **shipped**, see [08-confidence-policy.md](08-confidence-policy.md) |
 | ~~2~~ | ~~**The Hub**~~ — **shipped**, see [09-hub.md](09-hub.md) |
-| 5 | Specialist routing — which specialist, decided by type, rule, or the model itself |
+| ~~5~~ | ~~**Specialist routing**~~ — **shipped**, see [10-specialist-routing.md](10-specialist-routing.md) |
 | 6 | Output verification — does the advice match the findings |
 
 Phase 3 is where an external app sends an image and gets advice without knowing

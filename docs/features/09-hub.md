@@ -189,6 +189,6 @@ plaintext key does not appear anywhere in the response.
 
 | Phase | What |
 |---|---|
-| 5 | Specialist routing — which specialist, decided by type, rule, or the model |
+| ~~5~~ | ~~**Specialist routing**~~ — **shipped**, see [10-specialist-routing.md](10-specialist-routing.md) |
 | 6 | Output verification — does the advice match the findings |
 | — | A live `CatalogueSource` against a provider directory, wherever it can be run against the real API |

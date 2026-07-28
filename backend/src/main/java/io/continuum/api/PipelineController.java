@@ -2,6 +2,7 @@ package io.continuum.api;
 
 import io.continuum.portal.PortalAuthFilter;
 import io.continuum.specialist.PipelineService;
+import io.continuum.specialist.PipelineStep;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,15 +41,40 @@ public class PipelineController {
     @PostMapping
     public Map<String, Object> create(HttpServletRequest req, @RequestBody NewPipeline body) {
         return pipelines.create(dev(req), body.name(), body.description(), body.inputKind(),
-                body.systemPrompt(), body.steps());
+                body.systemPrompt(), toSteps(body.steps(), body.routing()));
     }
 
     @PutMapping("/{id}")
     public Map<String, Object> update(HttpServletRequest req, @PathVariable Long id,
                                       @RequestBody PipelineSettings body) {
         return pipelines.update(dev(req), id, body.description(), body.systemPrompt(),
-                body.steps(), body.enabled(), body.policyEnabled(), body.strongThreshold(),
-                body.weakThreshold(), body.declineOnNoEvidence());
+                toSteps(body.steps(), body.routing()), body.enabled(), body.policyEnabled(),
+                body.strongThreshold(), body.weakThreshold(), body.declineOnNoEvidence(),
+                body.routingEnabled());
+    }
+
+    /**
+     * Accepts either {@code steps: [3, 7]} or {@code routing: [{specialistId, when,
+     * pattern}]}.
+     *
+     * <p>The bare form is what every existing caller sends, and it keeps working
+     * — it means "run always", which is what it has always meant. When both are
+     * present the richer one wins, because it is the only one that can express a
+     * condition.
+     */
+    private static List<PipelineStep> toSteps(List<Long> steps, List<StepSpec> routing) {
+        if (routing != null) {
+            return routing.stream()
+                    .map(r -> new PipelineStep(r.specialistId(),
+                            r.when() == null ? PipelineStep.Condition.ALWAYS
+                                    : PipelineStep.Condition.valueOf(r.when()),
+                            r.pattern()))
+                    .toList();
+        }
+        if (steps != null) {
+            return steps.stream().map(PipelineStep::always).toList();
+        }
+        return null;
     }
 
     @DeleteMapping("/{id}")
@@ -96,12 +122,17 @@ public class PipelineController {
     }
 
     public record NewPipeline(String name, String description, String inputKind,
-                              String systemPrompt, List<Long> steps) {
+                              String systemPrompt, List<Long> steps, List<StepSpec> routing) {
     }
 
     public record PipelineSettings(String description, String systemPrompt, List<Long> steps,
-                                   Boolean enabled, Boolean policyEnabled, Double strongThreshold,
-                                   Double weakThreshold, Boolean declineOnNoEvidence) {
+                                   List<StepSpec> routing, Boolean enabled, Boolean policyEnabled,
+                                   Double strongThreshold, Double weakThreshold,
+                                   Boolean declineOnNoEvidence, Boolean routingEnabled) {
+    }
+
+    /** One step with its condition. */
+    public record StepSpec(Long specialistId, String when, String pattern) {
     }
 
     public record RunRequest(Map<String, Object> input, String prompt) {
