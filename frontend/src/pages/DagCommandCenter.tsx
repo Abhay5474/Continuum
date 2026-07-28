@@ -126,7 +126,7 @@ Turn it on above, then send a gateway request.
                   <span className="min-w-0 flex-1 truncate text-sm text-slate-300">
                     {r.prompt || <span className="text-slate-600">no prompt recorded</span>}
                   </span>
-                  <span className="readout text-sm font-semibold" style={{ color: STATE[s].color }}>
+                  <span className="readout text-sm font-semibold" style={{ color: STATE[s].ink }}>
                     {r.finalConfidence != null ? `${(conf * 100).toFixed(1)}%` : "—"}
                   </span>
                   <span className="micro w-20 text-right">{r.uncertainty ?? "—"}</span>

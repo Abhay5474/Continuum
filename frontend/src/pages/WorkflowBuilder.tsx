@@ -448,7 +448,7 @@ export default function WorkflowBuilder() {
                         {f?.definition ?? "—"}
                         {f?.version != null && <span className="ml-1 text-slate-600">v{f.version}</span>}
                       </span>
-                      <span className="w-20 shrink-0 font-medium" style={{ color: STATE[st].color }}>
+                      <span className="w-20 shrink-0 font-medium" style={{ color: STATE[st].ink }}>
                         {r.status}
                       </span>
                       <span className="readout w-14 shrink-0 text-right text-slate-500">

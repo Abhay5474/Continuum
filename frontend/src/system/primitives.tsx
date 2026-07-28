@@ -90,7 +90,7 @@ export function Readout({
       <div className="mt-1 flex items-baseline gap-1">
         <span
           className={`readout font-semibold ${sizes[size]}`}
-          style={{ color: state === "idle" ? undefined : STATE[state].color }}
+          style={{ color: state === "idle" ? undefined : STATE[state].ink }}
         >
           {body}
         </span>

@@ -265,7 +265,7 @@ export default function ModelRouter() {
                       <td className="py-2 text-right">
                         <span className="inline-flex items-center gap-1.5" title={h?.lastError ?? undefined}>
                           <StateDot state={st} size={6} />
-                          <span className="readout" style={{ color: STATE[st].color }}>
+                          <span className="readout" style={{ color: STATE[st].ink }}>
                             {h ? `${(h.score * 100).toFixed(0)}%` : "—"}
                           </span>
                         </span>

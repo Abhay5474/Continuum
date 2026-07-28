@@ -214,7 +214,7 @@ export default function GodMode() {
             <div className="mt-2 flex flex-wrap items-end gap-6">
               <div className="min-w-[240px] flex-1">
                 <div className="flex items-baseline justify-between">
-                  <span className="readout text-2xl font-semibold" style={{ color: STATE[fillState].color }}>
+                  <span className="readout text-2xl font-semibold" style={{ color: STATE[fillState].ink }}>
                     {(fill * 100).toFixed(0)}%
                   </span>
                   <span className="readout text-[11px] text-slate-500">
@@ -315,7 +315,7 @@ export default function GodMode() {
                       <span className="font-medium text-slate-300">{a.action}</span>
                       {a.tier && <span className="text-slate-600">{a.tier}</span>}
                       {r != null && (
-                        <span className="readout ml-auto" style={{ color: STATE[st].color }}>
+                        <span className="readout ml-auto" style={{ color: STATE[st].ink }}>
                           {r > 0 ? "+" : ""}
                           {r.toFixed(2)}
                         </span>
@@ -595,7 +595,7 @@ function Cascade({ mem, quotas, last }: { mem: any; quotas: any; last: any | nul
               <Plane className="h-full p-3">
                 <div className="flex items-baseline justify-between">
                   <span className="text-[11px] font-medium text-slate-300">{t.label}</span>
-                  <span className="readout text-lg font-semibold" style={{ color: STATE[st].color }}>
+                  <span className="readout text-lg font-semibold" style={{ color: STATE[st].ink }}>
                     {n}
                   </span>
                 </div>
@@ -731,7 +731,7 @@ function SimulationRow({ sim }: { sim: any }) {
     <Plane className="p-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <StateDot state={st} />
-        <span className="text-sm font-semibold" style={{ color: STATE[st].color }}>
+        <span className="text-sm font-semibold" style={{ color: STATE[st].ink }}>
           {sim.verdict}
         </span>
         <span className="micro">{String(sim.scenario).replace(/_/g, " ").toLowerCase()}</span>

@@ -156,7 +156,7 @@ function Row({ label, value }: { label: string; value: unknown }) {
           className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
           style={{
             background: value ? `${STATE.healthy.color}22` : "rgb(var(--edge))",
-            color: value ? STATE.healthy.color : "#8593AB",
+            color: value ? STATE.healthy.ink : "#8593AB",
           }}
         >
           {value ? "yes" : "no"}

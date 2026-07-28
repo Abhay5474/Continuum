@@ -138,7 +138,7 @@ export default function ReplayVerify() {
             <div className="flex items-start gap-3">
               <StateDot state={verdict.state} />
               <div>
-                <div className="text-sm font-semibold" style={{ color: STATE[verdict.state].color }}>
+                <div className="text-sm font-semibold" style={{ color: STATE[verdict.state].ink }}>
                   {verdict.label}
                 </div>
                 <p className="mt-0.5 max-w-xl text-xs text-slate-500">{verdict.blurb}</p>

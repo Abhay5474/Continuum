@@ -57,7 +57,7 @@ export default function FeatureToggle({
       className="flex shrink-0 items-center gap-2 rounded border px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
       style={{
         borderColor: on ? `${STATE.healthy.color}55` : "rgb(var(--edge))",
-        color: on ? STATE.healthy.color : undefined,
+        color: on ? STATE.healthy.ink : undefined,
       }}
     >
       <StateDot state={on ? "healthy" : "idle"} size={7} />

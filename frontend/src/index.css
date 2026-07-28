@@ -17,6 +17,17 @@
   --topo-label-off: 74 82 101;
   --aurora-glow: 0.05;
   --neon-glow: 0.035;
+
+  /* State colours as *text*. The fills glow on instrument black; as text on
+     paper they are pastel and unreadable, so the ink variant flips with the
+     theme while the fill hex stays put (several call sites append alpha to it). */
+  --state-idle-ink: #7C879C;
+  --state-healthy-ink: #34D399;
+  --state-active-ink: #6BA1F7;
+  --state-warning-ink: #F5B544;
+  --state-degraded-ink: #F97C4A;
+  --state-critical-ink: #F4566E;
+  --state-offline-ink: #6A7386;
   color-scheme: dark;
 }
 
@@ -32,6 +43,13 @@
   --topo-label-off: 148 163 184;
   --aurora-glow: 0.045;
   --neon-glow: 0.03;
+  --state-idle-ink: #4B5563;
+  --state-healthy-ink: #047857;
+  --state-active-ink: #1D4ED8;
+  --state-warning-ink: #B45309;
+  --state-degraded-ink: #C2410C;
+  --state-critical-ink: #BE123C;
+  --state-offline-ink: #6B7280;
   color-scheme: light;
 }
 
@@ -71,19 +89,66 @@ body {
 :root[data-theme="light"] .text-slate-400 { color: rgb(51 65 85); }
 :root[data-theme="light"] .text-slate-500 { color: rgb(71 85 105); }
 :root[data-theme="light"] .text-slate-600 { color: rgb(100 116 139); }
+/* Status colours. The -300 shades are chosen to glow on instrument black; on
+   paper they are pastel-on-white and unreadable — the same failure as the slate
+   remaps above, one layer over, and the audit found 25 of them. The -700 shades
+   carry the same meaning at the same hue with the contrast the light surface
+   needs. */
+:root[data-theme="light"] .text-emerald-300 { color: rgb(4 120 87); }
+:root[data-theme="light"] .text-rose-300 { color: rgb(190 18 60); }
+:root[data-theme="light"] .text-amber-300 { color: rgb(180 83 9); }
+:root[data-theme="light"] .text-indigo-300 { color: rgb(67 56 202); }
+:root[data-theme="light"] .text-sky-300 { color: rgb(3 105 161); }
+:root[data-theme="light"] .text-orange-300 { color: rgb(194 65 12); }
+/* The -400 shades sit on the same surfaces and fail for the same reason. */
+:root[data-theme="light"] .text-emerald-400 { color: rgb(4 120 87); }
+:root[data-theme="light"] .text-rose-400 { color: rgb(190 18 60); }
+:root[data-theme="light"] .text-amber-400 { color: rgb(180 83 9); }
+:root[data-theme="light"] .text-indigo-400 { color: rgb(67 56 202); }
+
+/* Secondary and tertiary text on the dark theme, lifted to meet WCAG AA.
+   Measured across all 26 console routes: Tailwind's slate-500 lands at 4.21:1
+   against the instrument-black background and slate-600 at 2.49:1, where 4.5:1
+   is the bar for body-size text. Both are used everywhere — every page
+   subtitle, every table header, every caption — so this was 79 contrast
+   failures from three utility classes.
+
+   Lifted the minimum that clears the bar rather than jumping to slate-400: the
+   muted hierarchy is doing real work on these pages, and flattening it to fix
+   contrast would trade one legibility problem for another. Scoped with :not so
+   the light remap above still wins on its own theme. */
+:root:not([data-theme="light"]) .text-slate-500 { color: rgb(112 128 151); }
+:root:not([data-theme="light"]) .text-slate-600 { color: rgb(114 128 149); }
+/* slate-700 is used for separators and glyphs between values; on black it
+   measured 1.94:1, which is decoration pretending to be text. */
+:root:not([data-theme="light"]) .text-slate-700 { color: rgb(108 122 143); }
+/* .micro composes text-slate-500, so it is carried by the rule above. */
 /* Hover states that brighten toward white must darken instead. */
 :root[data-theme="light"] .hover\:text-white:hover { color: rgb(2 6 23); }
 :root[data-theme="light"] .hover\:text-slate-100:hover { color: rgb(2 6 23); }
 :root[data-theme="light"] .hover\:text-slate-200:hover { color: rgb(15 23 42); }
 
 /* Text on a filled accent button stays white — it sits on indigo, not on paper.
-   Restated after the remaps above so specificity lands the right way round. */
-:root[data-theme="light"] [class*="bg-indigo-"] .text-white,
-:root[data-theme="light"] [class*="bg-rose-"] .text-white,
-:root[data-theme="light"] button[class*="bg-indigo-"],
-:root[data-theme="light"] button[class*="bg-rose-"],
-:root[data-theme="light"] button[class*="bg-emerald-"],
-:root[data-theme="light"] a[class*="bg-indigo-"] {
+   Restated after the remaps above so specificity lands the right way round.
+
+   Matched on " bg-accent-" (leading space) or a class attribute that starts with
+   it, rather than a bare substring. A bare *= also matched "hover:bg-rose-500/10"
+   — so a button that is transparent until hovered was given white text on white
+   paper and disappeared. The Revoke control on the API-keys page measured 1:1,
+   which is invisible, not merely low contrast. A plain utility is always
+   preceded by a space or starts the attribute; a variant is preceded by a colon. */
+:root[data-theme="light"] [class*=" bg-indigo-"] .text-white,
+:root[data-theme="light"] [class^="bg-indigo-"] .text-white,
+:root[data-theme="light"] [class*=" bg-rose-"] .text-white,
+:root[data-theme="light"] [class^="bg-rose-"] .text-white,
+:root[data-theme="light"] button[class*=" bg-indigo-"],
+:root[data-theme="light"] button[class^="bg-indigo-"],
+:root[data-theme="light"] button[class*=" bg-rose-"],
+:root[data-theme="light"] button[class^="bg-rose-"],
+:root[data-theme="light"] button[class*=" bg-emerald-"],
+:root[data-theme="light"] button[class^="bg-emerald-"],
+:root[data-theme="light"] a[class*=" bg-indigo-"],
+:root[data-theme="light"] a[class^="bg-indigo-"] {
   color: rgb(255 255 255);
 }
 

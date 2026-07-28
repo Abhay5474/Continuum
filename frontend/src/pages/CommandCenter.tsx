@@ -46,7 +46,7 @@ export default function CommandCenter() {
               <StateDot state={t.coreState} size={10} />
               <span
                 className="text-xl font-semibold tracking-tight"
-                style={{ color: STATE[t.coreState].color }}
+                style={{ color: STATE[t.coreState].ink }}
               >
                 {STATE[t.coreState].label}
               </span>
@@ -120,7 +120,7 @@ export default function CommandCenter() {
                           {s.name}
                         </span>
                         <span className="ml-auto readout text-[10px]"
-                          style={{ color: STATE[s.installed ? s.state : "offline"].color }}>
+                          style={{ color: STATE[s.installed ? s.state : "offline"].ink }}>
                           {s.installed ? STATE[s.state].label : "absent"}
                         </span>
                       </button>

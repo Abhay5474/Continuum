@@ -8,13 +8,13 @@
 
 /** System states. Order is severity-ascending; `rank` drives the worst-state roll-up. */
 export const STATE = {
-  idle: { label: "Idle", color: "#5A6478", glow: "rgba(90,100,120,0.35)", rank: 0 },
-  healthy: { label: "Healthy", color: "#34D399", glow: "rgba(52,211,153,0.45)", rank: 1 },
-  active: { label: "Active", color: "#4C8BF5", glow: "rgba(76,139,245,0.55)", rank: 2 },
-  warning: { label: "Warning", color: "#F5B544", glow: "rgba(245,181,68,0.5)", rank: 3 },
-  degraded: { label: "Degraded", color: "#F97C4A", glow: "rgba(249,124,74,0.5)", rank: 4 },
-  critical: { label: "Critical", color: "#F4566E", glow: "rgba(244,86,110,0.55)", rank: 5 },
-  offline: { label: "Not installed", color: "#333A49", glow: "rgba(51,58,73,0.25)", rank: -1 },
+  idle: { label: "Idle", color: "#5A6478", ink: "var(--state-idle-ink)", glow: "rgba(90,100,120,0.35)", rank: 0 },
+  healthy: { label: "Healthy", color: "#34D399", ink: "var(--state-healthy-ink)", glow: "rgba(52,211,153,0.45)", rank: 1 },
+  active: { label: "Active", color: "#4C8BF5", ink: "var(--state-active-ink)", glow: "rgba(76,139,245,0.55)", rank: 2 },
+  warning: { label: "Warning", color: "#F5B544", ink: "var(--state-warning-ink)", glow: "rgba(245,181,68,0.5)", rank: 3 },
+  degraded: { label: "Degraded", color: "#F97C4A", ink: "var(--state-degraded-ink)", glow: "rgba(249,124,74,0.5)", rank: 4 },
+  critical: { label: "Critical", color: "#F4566E", ink: "var(--state-critical-ink)", glow: "rgba(244,86,110,0.55)", rank: 5 },
+  offline: { label: "Not installed", color: "#333A49", ink: "var(--state-offline-ink)", glow: "rgba(51,58,73,0.25)", rank: -1 },
 } as const;
 
 export type StateKey = keyof typeof STATE;
