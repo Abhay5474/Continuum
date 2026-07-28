@@ -5,6 +5,8 @@ import io.continuum.persistence.entity.MmuStubEntity;
 import io.continuum.portal.RequestScope;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,5 +39,14 @@ public class MmuController {
         String developerId = RequestScope.developerId(req);
         // Stubs are per-developer; an operator has no single tenant to scope to.
         return developerId == null ? List.of() : mmu.recentStubs(developerId);
+    }
+
+    /** Working-set context assembly. OFF by default. */
+    @PutMapping("/settings")
+    public Map<String, Object> settings(HttpServletRequest req, @RequestBody Settings body) {
+        return mmu.configure(RequestScope.developerId(req), body.workingSet());
+    }
+
+    public record Settings(Boolean workingSet) {
     }
 }

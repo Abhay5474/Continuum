@@ -40,7 +40,12 @@ class ContextMmuTest {
     private final MmuStubRepository stubs = mock(MmuStubRepository.class);
     private final MmuStubEventRepository stubEvents = mock(MmuStubEventRepository.class);
     private final MmuRequestMetricRepository metrics = mock(MmuRequestMetricRepository.class);
-    private final ContextMMU mmu = new ContextMMU(devAuth, stubs, stubEvents, metrics, BUDGET);
+    // Working set is off unless a tenant turns it on, so an empty settings
+    // repository is the default the existing assertions were written against.
+    private final io.continuum.persistence.repository.MmuSettingRepository mmuSettings =
+            mock(io.continuum.persistence.repository.MmuSettingRepository.class);
+    private final ContextMMU mmu =
+            new ContextMMU(devAuth, stubs, stubEvents, metrics, BUDGET, mmuSettings);
 
     private final Map<String, MmuStubEntity> stubStore = new HashMap<>();
     private final Map<String, List<MmuStubEventEntity>> eventStore = new HashMap<>();

@@ -76,6 +76,9 @@ public class ContextMMU {
     private static final Pattern MEMORY_REF = Pattern.compile("\\[MEMORY_REF:\\s*id=\"([^\"]+)\"");
     private static final int RECENT_KEEP = 4;      // newest messages never evicted
     private static final int SEGMENT_TOKENS = 800; // eviction granularity
+    /** A [MEMORY_REF] stub with its summary. Measured, not guessed at. */
+    private static final int STUB_TOKENS = 70;
+    private static final int PAGING_INSTRUCTION_TOKENS = 45;
     private static final int MAX_FAULT_ROUNDS = 2;
     private static final double PREFETCH_RELEVANCE = 0.30;
 
@@ -84,18 +87,21 @@ public class ContextMMU {
     private final MmuStubEventRepository stubEvents;
     private final MmuRequestMetricRepository metrics;
     private final int l1BudgetTokens;
+    private final io.continuum.persistence.repository.MmuSettingRepository settings;
 
     /** Write-behind dirty set: stubId → superseding note. Flushed at the next checkpoint. */
     private final Map<String, String> pendingDirty = new ConcurrentHashMap<>();
 
     public ContextMMU(DeveloperAuthRepository devAuth, MmuStubRepository stubs,
                       MmuStubEventRepository stubEvents, MmuRequestMetricRepository metrics,
-                      @Value("${continuum.mmu.l1-budget-tokens:6000}") int l1BudgetTokens) {
+                      @Value("${continuum.mmu.l1-budget-tokens:6000}") int l1BudgetTokens,
+                      io.continuum.persistence.repository.MmuSettingRepository settings) {
         this.devAuth = devAuth;
         this.stubs = stubs;
         this.stubEvents = stubEvents;
         this.metrics = metrics;
         this.l1BudgetTokens = l1BudgetTokens;
+        this.settings = settings;
     }
 
     public boolean enabledFor(String developerId) {
@@ -117,6 +123,17 @@ public class ContextMMU {
      * The single entry point. Returns {@code null} when the developer has not
      * opted in — the caller then runs its exact pre-V7 path.
      */
+    /** Turns working-set assembly on or off for one tenant. */
+    public java.util.Map<String, Object> configure(String developerId, Boolean workingSet) {
+        io.continuum.persistence.entity.MmuSettingEntity cfg = settings.findById(developerId)
+                .orElseGet(() -> new io.continuum.persistence.entity.MmuSettingEntity(developerId));
+        if (workingSet != null) {
+            cfg.setWorkingSet(workingSet);
+        }
+        settings.save(cfg);
+        return java.util.Map.of("workingSet", cfg.isWorkingSet());
+    }
+
     public MmuSession open(String developerId, LlmRequest request) {
         if (!enabledFor(developerId)) {
             return null;
@@ -143,13 +160,15 @@ public class ContextMMU {
         private long faultLatencyMs;
         private long materializationMs;
         private int dirtyFlushed;
+        private java.util.List<java.util.Map<String, Object>> workingSetTrace = java.util.List.of();
+        private int keptByRelevance;
 
         private MmuSession(String developerId, LlmRequest original) {
             this.developerId = developerId;
             this.tokensWithoutMmu = tokensOf(original.messages());
             this.dirtyFlushed = lastFlushCount.getOrDefault(developerId, 0);
             lastFlushCount.remove(developerId);
-            List<Message> evicted = evict(original.messages());
+            List<Message> evicted = evict(original.messages(), currentTask(original.messages()));
             List<Message> prefetched = prefetch(evicted, original.messages());
             this.virtualized = new LlmRequest(original.model(), prefetched,
                     original.maxTokens(), original.temperature());
@@ -206,7 +225,7 @@ public class ContextMMU {
 
         // ---- L1 → L2 eviction ----
 
-        private List<Message> evict(List<Message> messages) {
+        private List<Message> evict(List<Message> messages, String task) {
             if (tokensOf(messages) <= l1BudgetTokens) {
                 return messages;
             }
@@ -221,6 +240,43 @@ public class ContextMMU {
                     evictable.add(msg);
                 }
             }
+            // Working set: score what is left against the request being answered
+            // now, and hold the best of it resident. Off by default, in which
+            // case every evictable message is paged out exactly as before.
+            if (workingSetEnabled()) {
+                // Room left after the pinned pages — minus what the stubs will
+                // themselves cost. Without this reserve the resident set spends
+                // the whole budget and the stubs are added on top, so L1 comes
+                // in over budget: measured at 8275 tokens against a 6000 ceiling
+                // on a 37k-token conversation. The bound is the entire point of
+                // having one.
+                int worstCaseStubs = (int) Math.ceil(
+                        (double) tokensOf(evictable) / Math.max(200, Math.min(SEGMENT_TOKENS,
+                                l1BudgetTokens / 4)));
+                int stubReserve = worstCaseStubs * STUB_TOKENS + PAGING_INSTRUCTION_TOKENS;
+                int room = Math.max(0, l1BudgetTokens - tokensOf(out) - stubReserve);
+                List<WorkingSet.Scored> scored = WorkingSet.select(
+                        evictable, task, room, m -> tokensOf(List.of(m)));
+                List<Message> stillEvictable = new ArrayList<>();
+                List<Message> resident = new ArrayList<>();
+                List<java.util.Map<String, Object>> trace = new ArrayList<>();
+                for (WorkingSet.Scored sc : scored) {
+                    trace.add(sc.describe());
+                    if (sc.resident()) {
+                        resident.add(sc.message());
+                    } else {
+                        stillEvictable.add(sc.message());
+                    }
+                }
+                this.workingSetTrace = List.copyOf(trace);
+                this.keptByRelevance = resident.size();
+                evictable = stillEvictable;
+                // Between the system prompt and the pinned recent window, in
+                // its original order. Inserting at 0 would put conversation
+                // history ahead of the system prompt.
+                out.addAll(Math.max(0, out.size() - Math.min(RECENT_KEEP, out.size())), resident);
+            }
+
             // Fold evictable history into deterministic segments, oldest first.
             // Granularity adapts to the budget so a promoted page always fits
             // back into L1 (an OS swaps pages; it never refuses to page in).
@@ -253,6 +309,38 @@ public class ContextMMU {
                 rebuilt.add(out.get(i));
             }
             return rebuilt;
+        }
+
+
+        /** The request being answered now — what relevance is measured against. */
+        private static String currentTask(List<Message> messages) {
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if (messages.get(i).role() == Role.USER) {
+                    return messages.get(i).content();
+                }
+            }
+            return "";
+        }
+
+        private boolean workingSetEnabled() {
+            try {
+                return settings.findById(developerId)
+                        .map(io.continuum.persistence.entity.MmuSettingEntity::isWorkingSet)
+                        .orElse(false);
+            } catch (RuntimeException e) {
+                // A settings lookup that fails must not take the request down;
+                // the previous behaviour is the safe answer.
+                return false;
+            }
+        }
+
+        /** What the working set decided, for the console. */
+        public List<java.util.Map<String, Object>> workingSetTrace() {
+            return workingSetTrace;
+        }
+
+        public int keptByRelevance() {
+            return keptByRelevance;
         }
 
         private Message pageOut(List<Message> segment) {
@@ -420,6 +508,10 @@ public class ContextMMU {
                 .map(MmuRequestMetricEntity::getFaultLatencyMs).sorted().toList();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("requests", rows.size());
+        out.put("workingSet", developerId == null ? false
+                : settings.findById(developerId)
+                        .map(io.continuum.persistence.entity.MmuSettingEntity::isWorkingSet)
+                        .orElse(false));
         out.put("tokensWithoutMmu", without);
         out.put("tokensSent", sent);
         out.put("tokenReduction", without == 0 ? 0 : 1.0 - (double) sent / without);

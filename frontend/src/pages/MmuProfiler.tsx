@@ -20,6 +20,7 @@ import { timeOf, toMillis } from "../system/time";
  */
 export default function MmuProfiler() {
   const [profile, setProfile] = useState<any | null>(null);
+  const [busyWs, setBusyWs] = useState(false);
   const [stubs, setStubs] = useState<any[]>([]);
   const [sel, setSel] = useState<string | null>(null);
 
@@ -66,6 +67,54 @@ export default function MmuProfiler() {
         </div>
         <FeatureToggle status={portal.v7.status} enable={portal.v7.enable} disable={portal.v7.disable} />
       </header>
+
+      {/* Working-set assembly: what is kept is decided by the current request,
+          not by what happens to be newest. */}
+      <Plane className="space-y-3 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-slate-200">Working-set assembly</div>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Off by default — eviction is positional, oldest paged out first. With it on, what
+              stays resident is scored against the request being answered now, so an order number
+              stated in message three survives a question asked in message forty.
+            </p>
+          </div>
+          <button
+            disabled={busyWs}
+            onClick={async () => {
+              setBusyWs(true);
+              try {
+                await api.get<any>("/api/mmu/profile");
+                await fetch("/api/mmu/settings", {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("continuum.portal.session") ?? ""}`,
+                  },
+                  body: JSON.stringify({ workingSet: !p.workingSet }),
+                });
+                api.get<any>("/api/mmu/profile").then(setProfile).catch(() => {});
+              } finally {
+                setBusyWs(false);
+              }
+            }}
+            className={`shrink-0 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-40 ${
+              p.workingSet
+                ? "border-aurora/60 bg-aurora/10 text-slate-200"
+                : "border-edge text-slate-400 hover:border-aurora/40"
+            }`}
+          >
+            {p.workingSet ? "On" : "Off"}
+          </button>
+        </div>
+        <p className="text-xs text-slate-600">
+          Scored 0.7 × relevance to the current request + 0.3 × recency. Relevance outweighs
+          recency because recency is only a proxy for it, and when a direct measurement is
+          available the proxy should not outvote it. The measure is lexical, so it will miss a
+          paraphrase sharing no vocabulary — better than position, worse than understanding.
+        </p>
+      </Plane>
 
       {!active ? (
         <Plane className="p-8 text-center">
