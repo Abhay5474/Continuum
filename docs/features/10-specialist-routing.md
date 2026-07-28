@@ -127,4 +127,4 @@ pre-routing pipeline             → parsed, ran, unchanged
 
 | Phase | What |
 |---|---|
-| 6 | Output verification — does the advice match the findings |
+| ~~6~~ | ~~**Output verification**~~ — **shipped**, see [11-output-verification.md](11-output-verification.md) |

@@ -190,5 +190,5 @@ plaintext key does not appear anywhere in the response.
 | Phase | What |
 |---|---|
 | ~~5~~ | ~~**Specialist routing**~~ — **shipped**, see [10-specialist-routing.md](10-specialist-routing.md) |
-| 6 | Output verification — does the advice match the findings |
+| ~~6~~ | ~~**Output verification**~~ — **shipped**, see [11-output-verification.md](11-output-verification.md) |
 | — | A live `CatalogueSource` against a provider directory, wherever it can be run against the real API |

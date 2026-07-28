@@ -111,6 +111,20 @@ class HedgeDetectorTest {
     }
 
     @Test
+    @DisplayName("A negated form is not counted as the marker it contains")
+    void negatedFormsDoNotCountAsAssertions() {
+        // "unconfirmed" contains "confirmed"; "inconclusive" contains
+        // "conclusive". A substring match reads both as the opposite of what
+        // they say.
+        HedgeDetector.Compliance c = HedgeDetector.check(ConfidencePolicy.Action.HEDGE,
+                "The findings are unconfirmed and the picture is inconclusive.");
+
+        assertThat(c.assertions()).doesNotContain("confirmed");
+        assertThat(c.complied()).isTrue();
+        assertThat(c.markers()).contains("inconclusive");
+    }
+
+    @Test
     @DisplayName("Detection is case-insensitive")
     void caseDoesNotMatter() {
         assertThat(HedgeDetector.check(ConfidencePolicy.Action.HEDGE,

@@ -87,7 +87,10 @@ public final class HedgeDetector {
 
         List<String> found = new ArrayList<>();
         for (String h : action == ConfidencePolicy.Action.HEDGE ? HEDGES : REFUSALS) {
-            if (text.contains(h)) {
+            // Word boundaries: a substring match reads "unconfirmed" as
+            // "confirmed" and "inconclusive" as "conclusive" — negated forms
+            // that mean the opposite of the marker they contain.
+            if (Phrases.contains(text, h)) {
                 found.add(h.strip());
             }
         }
@@ -95,7 +98,7 @@ public final class HedgeDetector {
         // developer sees the whole picture.
         if (action == ConfidencePolicy.Action.ASK_FOR_BETTER_INPUT) {
             for (String h : HEDGES) {
-                if (text.contains(h) && !found.contains(h.strip())) {
+                if (Phrases.contains(text, h) && !found.contains(h.strip())) {
                     found.add(h.strip());
                 }
             }
@@ -103,7 +106,7 @@ public final class HedgeDetector {
 
         List<String> flat = new ArrayList<>();
         for (String a : ASSERTIONS) {
-            if (text.contains(a)) {
+            if (Phrases.contains(text, a)) {
                 flat.add(a);
             }
         }

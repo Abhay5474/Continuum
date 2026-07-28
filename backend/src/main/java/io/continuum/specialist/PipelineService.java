@@ -69,7 +69,8 @@ public class PipelineService {
     public record Run(String response, String traceId, int findings, double topConfidence,
                       boolean anythingFound, boolean analysisRan, String model, double cost,
                       long latencyMs, List<Map<String, Object>> chain,
-                      Map<String, Object> policy, Map<String, Object> compliance) {
+                      Map<String, Object> policy, Map<String, Object> compliance,
+                      Map<String, Object> verification) {
     }
 
     @Transactional
@@ -182,7 +183,7 @@ public class PipelineService {
                     (List<Map<String, Object>>) declinedChain.get("steps");
             return new Run(canned, traceId, ctx.totalFindings(), ctx.topConfidence(),
                     ctx.anythingFound(), ctx.analysisRan(), null, 0, ms, declinedSteps,
-                    decision.describe(), null);
+                    decision.describe(), null, null);
         }
 
         // --- model ----------------------------------------------------------
@@ -218,9 +219,36 @@ public class PipelineService {
                     compliance.describe(), compliance.complied() ? "OK" : "IGNORED", null, 0, 0);
         }
 
+        // --- does the advice match the findings? ------------------------------
+        // The policy and the compliance check are both about the instruction.
+        // Neither asks whether the advice is anchored to what was actually
+        // found — an answer can hedge beautifully and still describe an injury
+        // nobody detected.
+        String finalAnswer = answer.response();
+        Map<String, Object> verification = null;
+        if (p.getVerificationMode() != AnswerVerifier.Mode.OFF) {
+            AnswerVerifier.Result v = AnswerVerifier.check(finalAnswer, ctx, userPrompt,
+                    p.getWeakThreshold());
+            boolean replace = p.getVerificationMode() == AnswerVerifier.Mode.ENFORCE
+                    && v.verdict() == AnswerVerifier.Verdict.FAIL;
+            if (replace) {
+                finalAnswer = AnswerVerifier.replacement(ctx);
+                v = new AnswerVerifier.Result(v.verdict(), v.issues(), v.covered(), v.uncovered(),
+                        true, v.method());
+            }
+            verification = v.describe();
+            traces.step(traceId, developerId, TraceStepEntity.Kind.VERIFY,
+                    verifyLabel(v.verdict(), replace), verification,
+                    switch (v.verdict()) {
+                        case OK -> "OK";
+                        case WARN -> "WARNED";
+                        case FAIL -> replace ? "REPLACED" : "FAILED";
+                    }, null, 0, 0);
+        }
+
         long totalMs = (System.nanoTime() - start) / 1_000_000;
         traces.step(traceId, developerId, TraceStepEntity.Kind.OUTPUT, "Answer returned",
-                Map.of("characters", answer.response() == null ? 0 : answer.response().length()),
+                Map.of("characters", finalAnswer == null ? 0 : finalAnswer.length()),
                 "OK", null, 0, 0);
 
         p.recordRun();
@@ -230,10 +258,11 @@ public class PipelineService {
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> steps = (List<Map<String, Object>>) chain.get("steps");
-        return new Run(answer.response(), traceId, ctx.totalFindings(), ctx.topConfidence(),
+        return new Run(finalAnswer, traceId, ctx.totalFindings(), ctx.topConfidence(),
                 ctx.anythingFound(), ctx.analysisRan(), answer.model(), answer.cost(), totalMs, steps,
                 decision == null ? null : decision.describe(),
-                compliance == null || !compliance.checked() ? null : compliance.describe());
+                compliance == null || !compliance.checked() ? null : compliance.describe(),
+                verification);
     }
 
     // --- configuration -------------------------------------------------------
@@ -260,7 +289,7 @@ public class PipelineService {
                                       String systemPrompt, List<PipelineStep> steps, Boolean enabled,
                                       Boolean policyEnabled, Double strongThreshold,
                                       Double weakThreshold, Boolean declineOnNoEvidence,
-                                      Boolean routingEnabled) {
+                                      Boolean routingEnabled, String verificationMode) {
         PipelineEntity p = require(developerId, id);
         if (strongThreshold != null || weakThreshold != null) {
             // Set together: the entity refuses weak > strong, which would leave
@@ -283,6 +312,14 @@ public class PipelineService {
         }
         if (routingEnabled != null) {
             p.setRoutingEnabled(routingEnabled);
+        }
+        if (verificationMode != null) {
+            try {
+                p.setVerificationMode(AnswerVerifier.Mode.valueOf(verificationMode));
+            } catch (IllegalArgumentException e) {
+                throw new SpecialistConnectionService.InvalidConnectionException(
+                        "Verification is OFF, MONITOR or ENFORCE.");
+            }
         }
         if (steps != null) {
             validateSteps(developerId, steps);
@@ -364,6 +401,7 @@ public class PipelineService {
         m.put("steps", stepIds(p));
         m.put("routing", steps(p).stream().map(PipelineStep::describe).toList());
         m.put("routingEnabled", p.isRoutingEnabled());
+        m.put("verificationMode", p.getVerificationMode().name());
         m.put("enabled", p.isEnabled());
         m.put("policyEnabled", p.isPolicyEnabled());
         m.put("strongThreshold", p.getStrongThreshold());
@@ -424,6 +462,17 @@ public class PipelineService {
         } catch (Exception e) {
             return "[]";
         }
+    }
+
+    private static String verifyLabel(AnswerVerifier.Verdict verdict, boolean replaced) {
+        if (replaced) {
+            return "Answer did not match the findings — replaced";
+        }
+        return switch (verdict) {
+            case OK -> "Answer matches the findings";
+            case WARN -> "Answer matches, with something worth noting";
+            case FAIL -> "Answer does NOT match the findings";
+        };
     }
 
     /** Written for a person reading the chain, not for a machine parsing it. */

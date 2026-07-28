@@ -1,5 +1,6 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.specialist.AnswerVerifier;
 import io.continuum.specialist.ConfidencePolicy;
 import jakarta.persistence.*;
 
@@ -78,6 +79,14 @@ public class PipelineEntity {
     @Column(name = "routing_enabled", nullable = false)
     private boolean routingEnabled;
 
+    /**
+     * OFF, MONITOR or ENFORCE. Stored as text rather than an ordinal so
+     * reordering the enum cannot silently reinterpret every stored row.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_mode", nullable = false, length = 16)
+    private AnswerVerifier.Mode verificationMode = AnswerVerifier.Mode.OFF;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -111,6 +120,7 @@ public class PipelineEntity {
     public double getWeakThreshold() { return weakThreshold; }
     public boolean isDeclineOnNoEvidence() { return declineOnNoEvidence; }
     public boolean isRoutingEnabled() { return routingEnabled; }
+    public AnswerVerifier.Mode getVerificationMode() { return verificationMode; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 
@@ -121,6 +131,10 @@ public class PipelineEntity {
     public void setPolicyEnabled(boolean v) { this.policyEnabled = v; touch(); }
     public void setDeclineOnNoEvidence(boolean v) { this.declineOnNoEvidence = v; touch(); }
     public void setRoutingEnabled(boolean v) { this.routingEnabled = v; touch(); }
+    public void setVerificationMode(AnswerVerifier.Mode v) {
+        this.verificationMode = v == null ? AnswerVerifier.Mode.OFF : v;
+        touch();
+    }
 
     /**
      * Both thresholds at once, because they are only meaningful relative to each

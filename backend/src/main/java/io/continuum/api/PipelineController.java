@@ -50,7 +50,7 @@ public class PipelineController {
         return pipelines.update(dev(req), id, body.description(), body.systemPrompt(),
                 toSteps(body.steps(), body.routing()), body.enabled(), body.policyEnabled(),
                 body.strongThreshold(), body.weakThreshold(), body.declineOnNoEvidence(),
-                body.routingEnabled());
+                body.routingEnabled(), body.verificationMode());
     }
 
     /**
@@ -117,6 +117,7 @@ public class PipelineController {
         // chose to pass", which are different facts about the answer.
         m.put("policy", r.policy());
         m.put("compliance", r.compliance());
+        m.put("verification", r.verification());
         m.put("trace", r.chain() == null ? List.of() : r.chain());
         return m;
     }
@@ -128,7 +129,8 @@ public class PipelineController {
     public record PipelineSettings(String description, String systemPrompt, List<Long> steps,
                                    List<StepSpec> routing, Boolean enabled, Boolean policyEnabled,
                                    Double strongThreshold, Double weakThreshold,
-                                   Boolean declineOnNoEvidence, Boolean routingEnabled) {
+                                   Boolean declineOnNoEvidence, Boolean routingEnabled,
+                                   String verificationMode) {
     }
 
     /** One step with its condition. */

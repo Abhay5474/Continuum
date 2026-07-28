@@ -404,7 +404,7 @@ export const portal = {
     update: (id: number, body: {
       description?: string; systemPrompt?: string; steps?: number[]; enabled?: boolean;
       policyEnabled?: boolean; strongThreshold?: number; weakThreshold?: number;
-      declineOnNoEvidence?: boolean; routingEnabled?: boolean;
+      declineOnNoEvidence?: boolean; routingEnabled?: boolean; verificationMode?: string;
       routing?: { specialistId: number; when: string; pattern: string | null }[];
     }) => portalHttp<any>(`/api/portal/developer/pipelines/${id}`, "PUT", body),
     remove: (id: number) => portalHttp<any>(`/api/portal/developer/pipelines/${id}`, "DELETE"),

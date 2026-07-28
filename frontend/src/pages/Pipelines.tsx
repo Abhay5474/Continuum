@@ -25,6 +25,7 @@ type Pipeline = {
   steps: number[];
   routing: RoutingStep[];
   routingEnabled: boolean;
+  verificationMode: "OFF" | "MONITOR" | "ENFORCE";
   enabled: boolean;
   policyEnabled: boolean;
   strongThreshold: number;
@@ -119,7 +120,17 @@ type Run = {
   latencyMs: number;
   policy: Policy | null;
   compliance: Compliance | null;
+  verification: Verification | null;
   trace: Step[];
+};
+
+type Verification = {
+  verdict: "OK" | "WARN" | "FAIL";
+  issues: { kind: string; detail: string; severe: boolean }[];
+  covered: string[];
+  uncovered: string[];
+  replaced: boolean;
+  method: string;
 };
 
 const BAND_COPY: Record<Band, { title: string; note: string; tone: string }> = {
@@ -447,6 +458,7 @@ function PipelineCard({
   onPolicy: (body: {
     policyEnabled?: boolean; strongThreshold?: number; weakThreshold?: number;
     declineOnNoEvidence?: boolean; routingEnabled?: boolean; routing?: RoutingStep[];
+    verificationMode?: string;
   }) => void;
 }) {
   const named = p.steps
@@ -511,6 +523,8 @@ function PipelineCard({
           />
 
           <PolicyControls p={p} busy={busy} onChange={onPolicy} />
+
+          <VerificationControls p={p} busy={busy} onChange={onPolicy} />
 
           <TryIt pipeline={p} onRan={onRan} />
         </div>
@@ -770,6 +784,124 @@ function PolicyControls({
   );
 }
 
+// --- output verification ----------------------------------------------------
+
+const MODES: { value: string; label: string; hint: string }[] = [
+  { value: "OFF", label: "Off", hint: "No checking." },
+  {
+    value: "MONITOR",
+    label: "Monitor",
+    hint: "Check and record the verdict. The answer goes out unchanged — start here, so you find out how often your pipeline would have been stopped before you let it stop anything.",
+  },
+  {
+    value: "ENFORCE",
+    label: "Enforce",
+    hint: "Replace an answer that fails with one that states the findings plainly. This changes what a real user reads.",
+  },
+];
+
+function VerificationControls({
+  p,
+  busy,
+  onChange,
+}: {
+  p: Pipeline;
+  busy: boolean;
+  onChange: (b: { verificationMode?: string }) => void;
+}) {
+  const mode = MODES.find((m) => m.value === p.verificationMode) ?? MODES[0];
+  return (
+    <div className="rounded-md border border-edge/60 p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <Micro>Output verification</Micro>
+        <span className="micro text-slate-500">{p.verificationMode}</span>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">
+        Does the advice match the findings? The confidence policy asks the model to behave and
+        checks whether it did — both are about the instruction. This asks whether the answer is
+        anchored to what the specialists actually found.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {MODES.map((m) => (
+          <button
+            key={m.value}
+            disabled={busy}
+            onClick={() => onChange({ verificationMode: m.value })}
+            className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
+              p.verificationMode === m.value
+                ? "border-aurora/60 bg-aurora/10 text-slate-200"
+                : "border-edge text-slate-400 hover:border-slate-600"
+            } disabled:opacity-40`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-slate-600">{mode.hint}</p>
+
+      <p className="mt-2 text-xs text-slate-600">
+        Three checks: certainty beyond the evidence, invented confidence figures, and which
+        findings the advice actually addresses. Only the first two can fail an answer — coverage
+        matching is lexical, so a model writing "laceration" for a finding labelled "open wound"
+        reads as uncovered while having covered it perfectly, and failing that would punish good
+        writing.
+      </p>
+    </div>
+  );
+}
+
+const VERDICT_TONE: Record<string, string> = {
+  OK: "text-emerald-400 border-emerald-500/40 bg-emerald-500/5",
+  WARN: "text-amber-400 border-amber-500/40 bg-amber-500/5",
+  FAIL: "text-rose-400 border-rose-500/40 bg-rose-500/5",
+};
+
+function VerificationVerdict({ v }: { v: Verification }) {
+  return (
+    <div className={`rounded-md border px-3 py-2.5 ${VERDICT_TONE[v.verdict]}`}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-sm font-medium">
+          {v.verdict === "OK"
+            ? "The answer matches the findings."
+            : v.verdict === "WARN"
+              ? "The answer matches, with something worth noting."
+              : "The answer does NOT match the findings."}
+        </span>
+        {v.replaced && <span className="micro">answer replaced</span>}
+        <span className="micro opacity-70">measured, {v.method}</span>
+      </div>
+
+      {v.issues.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {v.issues.map((i, n) => (
+            <li key={n} className="text-xs text-slate-400">
+              <span className={i.severe ? "text-rose-400" : "text-amber-400"}>
+                {i.severe ? "✕" : "!"}
+              </span>{" "}
+              {i.detail}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {(v.covered.length > 0 || v.uncovered.length > 0) && (
+        <p className="mt-2 text-xs text-slate-500">
+          {v.covered.length > 0 && <>Addressed: {v.covered.join(", ")}. </>}
+          {v.uncovered.length > 0 && <>Not mentioned: {v.uncovered.join(", ")}.</>}
+        </p>
+      )}
+
+      {v.replaced && (
+        <p className="mt-2 text-xs text-slate-500">
+          The model's answer was discarded and replaced with one that states the findings plainly.
+          Your application received the replacement, not the original.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // --- the chain --------------------------------------------------------------
 
 function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
@@ -855,6 +987,8 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
           {shown >= run.trace.length && (
             <>
               {run.policy && <PolicyVerdict policy={run.policy} compliance={run.compliance} />}
+
+              {run.verification && <VerificationVerdict v={run.verification} />}
 
               <Plane inset className="grid grid-cols-2 gap-4 p-3 sm:grid-cols-4">
                 <Readout label="Findings used" value={run.findings} size="sm" />
@@ -1017,7 +1151,7 @@ function Chain({
         // people to ignore the colour.
         const bad = s.status === "FAILED" || s.status === "IGNORED";
         const acted = s.status === "CONSTRAINED" || s.status === "DECLINED"
-          || s.status === "DEGRADED";
+          || s.status === "DEGRADED" || s.status === "WARNED" || s.status === "REPLACED";
         // A skipped step is neither a failure nor an intervention — it is work
         // that was correctly not done, and it reads as absence.
         const skippedStep = s.status === "SKIPPED";

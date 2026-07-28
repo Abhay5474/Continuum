@@ -228,7 +228,7 @@ the feature working.
 |---|---|
 | ~~2~~ | ~~**The Hub**~~ — **shipped**, see [09-hub.md](09-hub.md) |
 | 5 | Specialist routing — which specialist, decided by type, rule, or the model |
-| 6 | Output verification — does the advice match the findings |
+| ~~6~~ | ~~**Output verification**~~ — **shipped**, see [11-output-verification.md](11-output-verification.md) |
 
 Phase 6 is where the lexical check gets replaced by something that reads the
 advice against the findings rather than against a word list.

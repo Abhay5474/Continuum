@@ -212,7 +212,7 @@ Full suite: **316 passing.**
 | ~~4~~ | ~~**Confidence policy**~~ — **shipped**, see [08-confidence-policy.md](08-confidence-policy.md) |
 | ~~2~~ | ~~**The Hub**~~ — **shipped**, see [09-hub.md](09-hub.md) |
 | ~~5~~ | ~~**Specialist routing**~~ — **shipped**, see [10-specialist-routing.md](10-specialist-routing.md) |
-| 6 | Output verification — does the advice match the findings |
+| ~~6~~ | ~~**Output verification**~~ — **shipped**, see [11-output-verification.md](11-output-verification.md) |
 
 Phase 3 is where an external app sends an image and gets advice without knowing
 Roboflow exists. Phase 4 is what stops a 0.31 detection becoming confident

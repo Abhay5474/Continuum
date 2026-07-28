@@ -229,7 +229,7 @@ detector down → 200  analysisRan: false, answer still returned,
 | ~~4~~ | ~~**Confidence policy**~~ — **shipped**, see [08-confidence-policy.md](08-confidence-policy.md) |
 | ~~2~~ | ~~**The Hub**~~ — **shipped**, see [09-hub.md](09-hub.md) |
 | 5 | Specialist routing — which specialist, decided by type, rule, or the model |
-| 6 | Output verification — does the advice match the findings |
+| ~~6~~ | ~~**Output verification**~~ — **shipped**, see [11-output-verification.md](11-output-verification.md) |
 
 Phase 4 is what stops a 0.31 detection becoming confident first-aid advice.
 `analysisRan` was added here because Phase 4 cannot be correct without it.
