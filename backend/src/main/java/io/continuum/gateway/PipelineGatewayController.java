@@ -54,6 +54,15 @@ public class PipelineGatewayController {
             // can fix. The message is theirs, written for them.
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "invalid_pipeline", "message", e.getMessage()));
+        } catch (io.continuum.admission.AdmissionService.SheddedException e) {
+            // Deliberately refused, not broken. 429 with Retry-After so a client
+            // backs off instead of retrying immediately and deepening the
+            // overload it just hit.
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header("Retry-After", "1")
+                    .body(Map.of("error", "capacity", "message", e.getMessage(),
+                            "criticality", e.criticality().name(),
+                            "inferredLimit", e.limit()));
         } catch (io.continuum.billing.BillingService.QuotaExceededException e) {
             return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
                     .body(Map.of("error", "quota_exceeded", "message", e.getMessage()));

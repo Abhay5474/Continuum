@@ -4,6 +4,8 @@ import io.continuum.gateway.health.ProviderHealthTracker;
 import io.continuum.persistence.entity.GatewayRequestLogEntity;
 import io.continuum.persistence.entity.ModelEntity;
 import io.continuum.persistence.repository.GatewayRequestLogRepository;
+import io.continuum.admission.AdmissionService;
+import io.continuum.admission.Criticality;
 import io.continuum.provider.ProviderRouter;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.Message;
@@ -49,6 +51,7 @@ public class GatewayService {
     private final ProviderHealthTracker health;
     private final CredentialVaultService vault;
     private final ProviderRouter router;
+    private final AdmissionService admission;
     private final GatewayRequestLogRepository logRepo;
     private final io.continuum.persistence.repository.DeveloperAuthRepository devAuth;
     // Autopilot integration (additive; empty resolution ⇒ exact pre-Autopilot behaviour).
@@ -95,6 +98,7 @@ public class GatewayService {
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
                           ModelFallbackPolicy fallbackPolicy, ProviderHealthTracker health,
                           CredentialVaultService vault, ProviderRouter router,
+                          AdmissionService admission,
                           GatewayRequestLogRepository logRepo,
                           io.continuum.persistence.repository.DeveloperAuthRepository devAuth,
                           io.continuum.autopilot.PolicyResolver policyResolver,
@@ -123,6 +127,7 @@ public class GatewayService {
         this.health = health;
         this.vault = vault;
         this.router = router;
+        this.admission = admission;
         this.logRepo = logRepo;
         this.devAuth = devAuth;
         this.policyResolver = policyResolver;
@@ -318,8 +323,15 @@ public class GatewayService {
             Map<String, String> keys = devKeys.containsKey(c.provider())
                     ? Map.of(c.provider(), devKeys.get(c.provider())) : null;
             long attemptStart = System.nanoTime();
+            // Congestion-controlled admission. The slot is held for exactly the
+            // provider call: holding it across the quality gate or the cascade
+            // would count time the provider is not busy against its capacity.
+            AdmissionService.Slot slot = admissionSlot(developerId, c.provider(), req);
             try {
                 LlmResponse resp = chaos(developerId, router.complete(perModel, List.of(c.provider()), keys));
+                if (slot != null) {
+                    slot.success();
+                }
                 if (mmuSession != null) {
                     // V7 page-fault interception: if the model requested a paged
                     // segment, materialize it from L3 and re-dispatch (bounded).
@@ -372,6 +384,12 @@ public class GatewayService {
                         developerId, req, canonical, c.provider(), c.model(), devKeys, false);
             } catch (Exception e) {
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
+                // A provider failure is the signal the gradient cannot see in
+                // time — back the limit off rather than waiting for latency to
+                // drift.
+                if (slot != null) {
+                    slot.dropped();
+                }
                 health.recordFailure(c.provider(), c.model(), attemptMs, e.getMessage());
                 recordBandit(complexity, c.provider(), false, attemptMs, 0);
                 routingStrategy.record(developerId, routingDecision, complexity,
@@ -379,6 +397,12 @@ public class GatewayService {
                 failovers++;
                 lastError = new RuntimeException(e.getMessage(), e);
                 log.warn("Gateway: {} {} failed, falling over: {}", c.provider(), c.model(), e.getMessage());
+            } finally {
+                // Idempotent: success()/dropped() already closed it. This only
+                // catches paths that returned or threw without either.
+                if (slot != null) {
+                    slot.close();
+                }
             }
         }
         long totalMs = (System.nanoTime() - started) / 1_000_000;
@@ -863,6 +887,22 @@ public class GatewayService {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+
+    /**
+     * A slot at the provider, or null when admission control is off.
+     *
+     * <p>A shed request is not a failover. Falling over to the next provider
+     * because this one is busy is how a local overload becomes a global one, so
+     * the refusal propagates to the caller immediately and says why.
+     */
+    private AdmissionService.Slot admissionSlot(String developerId, String provider,
+                                                GatewayDtos.ChatRequest req) {
+        if (!admission.enabled(developerId)) {
+            return null;
+        }
+        return admission.acquire(developerId, provider, Criticality.of(req.criticality()));
     }
 
     private String routingReason(double complexity, RoutingMode mode, ModelFallbackPolicy.ModelCandidate c, int failovers) {

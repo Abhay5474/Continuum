@@ -328,6 +328,14 @@ export const portal = {
   },
 
   // --- Semantic circuit breaker ---
+  admission: {
+    status: () => portalHttp<any>("/api/portal/developer/admission/status", "GET"),
+    configure: (body: { enabled?: boolean }) =>
+      portalHttp<any>("/api/portal/developer/admission/settings", "PUT", body),
+    /** Forgets learned limits, so a changed provider quota is re-inferred. */
+    reset: () => portalHttp<any>("/api/portal/developer/admission", "DELETE"),
+  },
+
   breaker: {
     status: () => portalHttp<any>("/api/portal/developer/breaker/status", "GET"),
     configure: (body: {

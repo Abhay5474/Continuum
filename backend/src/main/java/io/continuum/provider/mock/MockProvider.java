@@ -19,6 +19,63 @@ import java.util.List;
 @Component
 public class MockProvider implements LlmProvider {
 
+    /**
+     * Artificial service time, in milliseconds.
+     *
+     * <p>Zero by default, so nothing changes for tests or ordinary use. It
+     * exists because the mock answers in about three milliseconds, and at that
+     * timescale every latency-based control in Continuum — admission control's
+     * congestion gradient especially — is measuring thread scheduling rather
+     * than a provider. A hosted model sits between 200ms and several seconds,
+     * and this is the only way to exercise those controls against something
+     * that behaves like one.
+     *
+     * <p>Set with {@code CONTINUUM_MOCK_LATENCY_MS}.
+     */
+    private final long serviceTimeMs = Long.parseLong(
+            System.getenv().getOrDefault("CONTINUUM_MOCK_LATENCY_MS", "0"));
+
+    /**
+     * How many calls this provider will genuinely serve at once.
+     *
+     * <p>Unbounded by default. A sleep-based mock has no capacity ceiling — a
+     * hundred concurrent 250ms sleeps finish in 250ms — which makes it useless
+     * for exercising anything that defends against a saturated provider. Real
+     * providers have a concurrency quota, and past it requests queue and latency
+     * climbs. This reproduces that, so admission control has a real bottleneck
+     * to protect against rather than an imaginary one.
+     *
+     * <p>Set with {@code CONTINUUM_MOCK_CONCURRENCY}.
+     */
+    private final int capacity = Integer.parseInt(
+            System.getenv().getOrDefault("CONTINUUM_MOCK_CONCURRENCY", "0"));
+
+    private final java.util.concurrent.Semaphore permits =
+            new java.util.concurrent.Semaphore(capacity > 0 ? capacity : Integer.MAX_VALUE, true);
+
+    /** Simulated service time, applied per call. Interruption is not swallowed. */
+    private void serve() {
+        if (serviceTimeMs <= 0 && capacity <= 0) {
+            return;
+        }
+        boolean held = false;
+        try {
+            if (capacity > 0) {
+                permits.acquire();
+                held = true;
+            }
+            if (serviceTimeMs > 0) {
+                Thread.sleep(serviceTimeMs);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            if (held) {
+                permits.release();
+            }
+        }
+    }
+
     @Override
     public String name() {
         return "mock";
@@ -52,6 +109,7 @@ public class MockProvider implements LlmProvider {
         // The small model answers briefly and the large one at length — the
         // difference small models actually exhibit, and enough for a cascade to
         // have something real to judge.
+        serve();
         String model = request.model() == null ? "mock-small" : request.model();
         boolean large = model.contains("large");
         String content = "[mock-llm] " + (large ? elaborate(lastUser) : summarize(lastUser));

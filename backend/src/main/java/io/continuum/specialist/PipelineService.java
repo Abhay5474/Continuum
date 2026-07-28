@@ -197,7 +197,7 @@ public class PipelineService {
 
         long modelStart = System.nanoTime();
         GatewayDtos.ChatResponse answer = gateway.chat(developerId,
-                new GatewayDtos.ChatRequest("auto", messages, 800, 0.3, null, false, null));
+                new GatewayDtos.ChatRequest("auto", messages, 800, 0.3, null, false, null, null));
         long modelMs = (System.nanoTime() - modelStart) / 1_000_000;
 
         traces.step(traceId, developerId, TraceStepEntity.Kind.MODEL,

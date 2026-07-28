@@ -28,7 +28,17 @@ public final class GatewayDtos {
              * ON_DEMAND and ADAPTIVE modes; costs k times the tokens, so it is
              * opt-in per request rather than assumed.
              */
-            Boolean measureUncertainty) {
+            Boolean measureUncertainty,
+            /**
+             * How much this request deserves the last free slot when a provider
+             * is at capacity: BACKGROUND, NORMAL (the default) or CRITICAL.
+             *
+             * <p>Only consulted when admission control is on. An unrecognised
+             * value reads as NORMAL rather than BACKGROUND — a typo in a client
+             * must not silently make that caller's traffic the first thing
+             * dropped under load.
+             */
+            String criticality) {
     }
 
     public record ChatResponse(
