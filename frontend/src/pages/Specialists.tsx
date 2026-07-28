@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Micro, PageHeader, Plane, Readout } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import Hub from "./Hub";
 import { dateTimeOf } from "../system/time";
 
 /**
@@ -116,6 +117,10 @@ export default function Specialists() {
         <Readout label="Specialists" value={specialists?.length ?? 0} />
         <Readout label="Ready" value={ready} state={ready > 0 ? "healthy" : "idle"} />
       </Plane>
+
+      {/* The Hub sits above the manual forms on purpose: adding by hand means
+          knowing six things, and most people should not have to. */}
+      <Hub onInstalled={load} />
 
       <ConnectionsSection
         providers={providers}

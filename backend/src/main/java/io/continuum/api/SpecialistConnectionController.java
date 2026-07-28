@@ -1,6 +1,7 @@
 package io.continuum.api;
 
 import io.continuum.portal.PortalAuthFilter;
+import io.continuum.specialist.SpecialistCatalogue;
 import io.continuum.specialist.SpecialistConnectionService;
 import io.continuum.specialist.SpecialistProviders;
 import io.continuum.specialist.SpecialistService;
@@ -24,12 +25,15 @@ public class SpecialistConnectionController {
     private final SpecialistConnectionService connections;
     private final SpecialistService specialists;
     private final TraceRecorder traces;
+    private final SpecialistCatalogue hub;
 
     public SpecialistConnectionController(SpecialistConnectionService connections,
-                                          SpecialistService specialists, TraceRecorder traces) {
+                                          SpecialistService specialists, TraceRecorder traces,
+                                          SpecialistCatalogue hub) {
         this.connections = connections;
         this.specialists = specialists;
         this.traces = traces;
+        this.hub = hub;
     }
 
     private String dev(HttpServletRequest req) {
@@ -40,6 +44,35 @@ public class SpecialistConnectionController {
     @GetMapping("/providers")
     public List<Map<String, Object>> providers() {
         return SpecialistProviders.catalogue();
+    }
+
+    // --- the Hub -------------------------------------------------------------
+
+    /**
+     * Search for something to plug in.
+     *
+     * <p>Returns the state of every source alongside the results: an empty list
+     * means nothing without knowing whether the directory that would have known
+     * was reachable.
+     */
+    @GetMapping("/catalogue")
+    public Map<String, Object> catalogue(@RequestParam(required = false) String q,
+                                         @RequestParam(defaultValue = "25") int limit) {
+        return hub.search(q, limit);
+    }
+
+    /** Which existing connections a given entry could reuse. */
+    @GetMapping("/catalogue/{entryId}/connections")
+    public List<Map<String, Object>> reusable(HttpServletRequest req, @PathVariable String entryId) {
+        return hub.reusable(dev(req), entryId);
+    }
+
+    /** Create the connection and the specialist from a template, and probe it. */
+    @PostMapping("/catalogue/{entryId}/install")
+    public Map<String, Object> install(HttpServletRequest req, @PathVariable String entryId,
+                                       @RequestBody Install body) {
+        return hub.install(dev(req), entryId, body.name(), body.baseUrl(), body.modelPath(),
+                body.minConfidence(), body.connectionId(), body.secret());
     }
 
     @GetMapping("/connections")
@@ -128,5 +161,9 @@ public class SpecialistConnectionController {
     }
 
     public record SecretUpdate(String secret) {
+    }
+
+    public record Install(String name, String baseUrl, String modelPath, Double minConfidence,
+                          Long connectionId, String secret) {
     }
 }

@@ -355,6 +355,28 @@ export const portal = {
     deleteConnection: (id: number) =>
       portalHttp<any>(`/api/portal/developer/specialists/connections/${id}`, "DELETE"),
 
+    /** The Hub: search for something to plug in. */
+    catalogue: (q?: string, limit = 25) =>
+      portalHttp<any>(
+        `/api/portal/developer/specialists/catalogue?limit=${limit}` +
+          (q ? `&q=${encodeURIComponent(q)}` : ""),
+        "GET"
+      ),
+    reusableConnections: (entryId: string) =>
+      portalHttp<any[]>(
+        `/api/portal/developer/specialists/catalogue/${entryId}/connections`,
+        "GET"
+      ),
+    install: (entryId: string, body: {
+      name: string; baseUrl?: string; modelPath?: string; minConfidence?: number;
+      connectionId?: number; secret?: string;
+    }) =>
+      portalHttp<any>(
+        `/api/portal/developer/specialists/catalogue/${entryId}/install`,
+        "POST",
+        body
+      ),
+
     list: () => portalHttp<any[]>("/api/portal/developer/specialists", "GET"),
     add: (body: {
       connectionId: number; name: string; modelPath: string; inputKind?: string;

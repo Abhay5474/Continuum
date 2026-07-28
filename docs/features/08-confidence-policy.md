@@ -226,7 +226,7 @@ the feature working.
 
 | Phase | What |
 |---|---|
-| 2 | The Hub — search provider catalogues, one-click add |
+| ~~2~~ | ~~**The Hub**~~ — **shipped**, see [09-hub.md](09-hub.md) |
 | 5 | Specialist routing — which specialist, decided by type, rule, or the model |
 | 6 | Output verification — does the advice match the findings |
 

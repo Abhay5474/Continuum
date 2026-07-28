@@ -227,7 +227,7 @@ detector down → 200  analysisRan: false, answer still returned,
 | Phase | What |
 |---|---|
 | ~~4~~ | ~~**Confidence policy**~~ — **shipped**, see [08-confidence-policy.md](08-confidence-policy.md) |
-| 2 | The Hub — search provider catalogues, one-click add |
+| ~~2~~ | ~~**The Hub**~~ — **shipped**, see [09-hub.md](09-hub.md) |
 | 5 | Specialist routing — which specialist, decided by type, rule, or the model |
 | 6 | Output verification — does the advice match the findings |
 
