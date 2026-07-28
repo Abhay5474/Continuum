@@ -81,9 +81,21 @@ public class MockProvider implements LlmProvider {
         return "mock";
     }
 
+    /**
+     * Whether the safety-net provider is up.
+     *
+     * <p>Always, unless {@code CONTINUUM_MOCK_UNAVAILABLE} says otherwise. The
+     * mock is the last entry in every fallback chain, which means the chain can
+     * never actually be exhausted while it answers — so nothing that handles
+     * total provider failure can be exercised end to end without a way to take
+     * it down.
+     */
+    private final boolean unavailable = Boolean.parseBoolean(
+            System.getenv().getOrDefault("CONTINUUM_MOCK_UNAVAILABLE", "false"));
+
     @Override
     public boolean isAvailable() {
-        return true;
+        return !unavailable;
     }
 
     /**
@@ -101,6 +113,9 @@ public class MockProvider implements LlmProvider {
 
     @Override
     public LlmResponse complete(LlmRequest request) {
+        if (unavailable) {
+            throw new IllegalStateException("mock provider is marked unavailable");
+        }
         String lastUser = request.messages().stream()
                 .filter(m -> m.role() == Role.USER)
                 .map(Message::content)

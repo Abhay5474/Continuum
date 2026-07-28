@@ -34,6 +34,7 @@ import BreakerPage from "./pages/Breaker";
 import Specialists from "./pages/Specialists";
 import Pipelines from "./pages/Pipelines";
 import Admission from "./pages/Admission";
+import Provenance from "./pages/Provenance";
 import { ToastProvider } from "./components/ui";
 import { OperatorProvider } from "./system/OperatorAccess";
 
@@ -86,6 +87,7 @@ const router = createBrowserRouter([
           { path: "specialists", element: <Specialists /> },
           { path: "pipelines", element: <Pipelines /> },
           { path: "admission", element: <Admission /> },
+          { path: "provenance", element: <Provenance /> },
         ],
       },
     ],

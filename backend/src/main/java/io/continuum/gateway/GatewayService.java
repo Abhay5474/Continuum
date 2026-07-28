@@ -53,6 +53,8 @@ public class GatewayService {
     private final ProviderRouter router;
     private final AdmissionService admission;
     private final io.continuum.quality.AnswerRepairService repairEngine;
+    private final io.continuum.provenance.ProvenanceService provenance;
+    private final io.continuum.degradation.DegradationService degradation;
     private final GatewayRequestLogRepository logRepo;
     private final io.continuum.persistence.repository.DeveloperAuthRepository devAuth;
     // Autopilot integration (additive; empty resolution ⇒ exact pre-Autopilot behaviour).
@@ -101,6 +103,8 @@ public class GatewayService {
                           CredentialVaultService vault, ProviderRouter router,
                           AdmissionService admission,
                           io.continuum.quality.AnswerRepairService repairEngine,
+                          io.continuum.provenance.ProvenanceService provenance,
+                          io.continuum.degradation.DegradationService degradation,
                           GatewayRequestLogRepository logRepo,
                           io.continuum.persistence.repository.DeveloperAuthRepository devAuth,
                           io.continuum.autopilot.PolicyResolver policyResolver,
@@ -131,6 +135,8 @@ public class GatewayService {
         this.router = router;
         this.admission = admission;
         this.repairEngine = repairEngine;
+        this.provenance = provenance;
+        this.degradation = degradation;
         this.logRepo = logRepo;
         this.devAuth = devAuth;
         this.policyResolver = policyResolver;
@@ -318,6 +324,22 @@ public class GatewayService {
             // ordinary sequential chain, which is the behaviour without hedging.
         }
 
+        // Provenance: the same facts the routing reason concatenates, as data.
+        // Null unless the tenant turned it on.
+        io.continuum.provenance.ProvenanceService.Recording prov = provenance.start(developerId);
+        if (prov != null) {
+            prov.add(io.continuum.provenance.Decision.Stage.COMPLEXITY,
+                    String.format("%.2f", complexity),
+                    "estimated from the request before any model was chosen");
+            prov.add(new io.continuum.provenance.Decision(
+                    io.continuum.provenance.Decision.Stage.ROUTE,
+                    chain.isEmpty() ? "none" : chain.get(0).model(),
+                    "mode=" + mode + ", " + chain.size() + " candidate"
+                            + (chain.size() == 1 ? "" : "s") + " in the fallback chain",
+                    chain.stream().skip(1).map(ModelFallbackPolicy.ModelCandidate::model).toList(),
+                    0, 0));
+        }
+
         int failovers = 0;
         RuntimeException lastError = null;
         for (ModelFallbackPolicy.ModelCandidate c : chain) {
@@ -348,6 +370,15 @@ public class GatewayService {
                 }
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
                 health.recordSuccess(c.provider(), c.model(), attemptMs);
+                if (prov != null) {
+                    prov.add(new io.continuum.provenance.Decision(
+                            io.continuum.provenance.Decision.Stage.PROVIDER,
+                            c.provider() + "/" + c.model(),
+                            failovers == 0 ? "first choice answered"
+                                    : "answered after " + failovers + " failover"
+                                            + (failovers == 1 ? "" : "s"),
+                            List.of(), 0, attemptMs));
+                }
 
                 int tokens = resp.promptTokens() + resp.completionTokens();
                 double cost = router.estimateCost(c.provider(), resp.model(),
@@ -355,6 +386,13 @@ public class GatewayService {
                 long totalMs = (System.nanoTime() - started) / 1_000_000;
                 String reason = routingReason(complexity, mode, c, failovers);
 
+                if (prov != null) {
+                    prov.add(new io.continuum.provenance.Decision(
+                            io.continuum.provenance.Decision.Stage.OUTPUT,
+                            String.valueOf(tokens) + " tokens",
+                            reason, List.of(), cost, totalMs));
+                    prov.commit();
+                }
                 var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
                         resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers));
                 labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
@@ -398,6 +436,11 @@ public class GatewayService {
                 routingStrategy.record(developerId, routingDecision, complexity,
                         c.provider(), false, attemptMs, 0);
                 failovers++;
+                if (prov != null) {
+                    prov.add(io.continuum.provenance.Decision.Stage.PROVIDER,
+                            c.provider() + "/" + c.model() + " (failed)",
+                            "failing over: " + e.getMessage());
+                }
                 lastError = new RuntimeException(e.getMessage(), e);
                 log.warn("Gateway: {} {} failed, falling over: {}", c.provider(), c.model(), e.getMessage());
             } finally {
@@ -411,6 +454,38 @@ public class GatewayService {
         long totalMs = (System.nanoTime() - started) / 1_000_000;
         var failLog = logFailure(developerId, req, complexity, mode);
         labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
+
+        // Graceful degradation. Every provider failed; with the ladder on, step
+        // down to something rather than returning nothing. The response always
+        // says which rung it came from — a degraded answer presented as a normal
+        // one is worse than an error, because the caller cannot tell it should
+        // retry or warn its user.
+        if (degradation.enabled(developerId)) {
+            String cached = null;
+            try {
+                var stale = semanticCache.lookup(developerId, cacheKey, req.model());
+                cached = stale.map(io.continuum.cache.SemanticCacheService.Hit::response).orElse(null);
+            } catch (RuntimeException e) {
+                log.debug("Degradation cache lookup failed: {}", e.getMessage());
+            }
+            var outcome = io.continuum.degradation.DegradationLadder.descend(
+                    cached, lastError == null ? null : lastError.getMessage());
+            degradation.record(developerId, outcome);
+            if (prov != null) {
+                prov.add(io.continuum.provenance.Decision.Stage.OUTPUT,
+                        "degraded:" + outcome.rung().name(), outcome.reason());
+                prov.commit();
+            }
+            return new GatewayDtos.ChatResponse(outcome.answer(), "continuum",
+                    "degraded/" + outcome.rung().name().toLowerCase(), totalMs, 0, 0, failovers,
+                    "DEGRADED (" + outcome.rung().name() + "): " + outcome.reason());
+        }
+
+        if (prov != null) {
+            prov.add(io.continuum.provenance.Decision.Stage.OUTPUT, "failed",
+                    "every provider in the chain failed");
+            prov.commit();
+        }
         throw new GatewayException("All eligible providers failed for this request"
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
     }

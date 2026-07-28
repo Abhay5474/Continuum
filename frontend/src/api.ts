@@ -336,6 +336,26 @@ export const portal = {
   },
 
   // --- Semantic circuit breaker ---
+  degradation: {
+    status: () => portalHttp<any>("/api/portal/developer/degradation/status", "GET"),
+    configure: (body: { enabled?: boolean }) =>
+      portalHttp<any>("/api/portal/developer/degradation/settings", "PUT", body),
+    clear: () => portalHttp<any>("/api/portal/developer/degradation", "DELETE"),
+  },
+
+  provenance: {
+    status: () => portalHttp<any>("/api/portal/developer/provenance/status", "GET"),
+    configure: (body: { enabled?: boolean }) =>
+      portalHttp<any>("/api/portal/developer/provenance/settings", "PUT", body),
+    requests: (limit = 30) =>
+      portalHttp<string[]>(`/api/portal/developer/provenance/requests?limit=${limit}`, "GET"),
+    graph: (id: string) =>
+      portalHttp<any>(`/api/portal/developer/provenance/requests/${id}`, "GET"),
+    otel: (id: string) =>
+      portalHttp<any>(`/api/portal/developer/provenance/requests/${id}/otel`, "GET"),
+    clear: () => portalHttp<any>("/api/portal/developer/provenance", "DELETE"),
+  },
+
   admission: {
     status: () => portalHttp<any>("/api/portal/developer/admission/status", "GET"),
     configure: (body: { enabled?: boolean }) =>

@@ -49,6 +49,7 @@ const GROUPS: Group[] = [
       { to: "/breaker", label: "Semantic Breaker", desc: "Trip a model when its answers degrade" },
       { to: "/confidence", label: "Answer Confidence", desc: "Does the model agree with itself" },
       { to: "/dag", label: "Verification", desc: "Consensus traces and evidence" },
+      { to: "/provenance", label: "Decision Provenance", desc: "Why each answer happened, as data" },
       { to: "/replay", label: "Replay Audit", desc: "Deterministic replay and divergence healing" },
       { to: "/chaos", label: "Fault Injection", desc: "Infrastructure failure drills" },
       { to: "/ai-chaos", label: "Model Failures", desc: "Hallucination and degradation drills" },
