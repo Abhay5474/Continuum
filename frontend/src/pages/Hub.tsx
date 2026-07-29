@@ -12,10 +12,15 @@ import { useToast } from "../components/ui";
  * already knows filled in, and the probe run for you — so what comes back is
  * either a working integration or the exact reason it isn't.
  *
- * <p>Entries are templates by task shape rather than a directory of specific
- * third-party models. That is a real limitation and it is stated on screen: a
- * catalogue that hard-coded model ids nobody had probed would give you a
- * one-click add that 404s.
+ * <p>Results come from two kinds of source, and the difference is shown rather
+ * than blurred. A <b>template</b> ships with Continuum: always there, but it
+ * describes a shape you still have to point at something. A <b>live</b> result
+ * comes from a provider's own directory and names a model that exists right now.
+ * Mixing them without saying which is which would leave you unable to tell a
+ * one-click install from a form you have to finish.
+ *
+ * <p>A source that cannot answer says why, on screen. "No results" and "your
+ * Roboflow key is not connected" send you to completely different places.
  */
 
 type Entry = {
@@ -37,7 +42,16 @@ type Entry = {
   source: string;
 };
 
-type SourceState = { name: string; available: boolean };
+type SourceState = {
+  name: string;
+  available: boolean;
+  /** LIVE queries a provider's real directory; TEMPLATE is a shipped shape. */
+  type?: "LIVE" | "TEMPLATE";
+  live?: boolean;
+  results?: number;
+  /** Why it could not answer. Null when it did. */
+  reason?: string | null;
+};
 
 export default function Hub({ onInstalled }: { onInstalled: () => void }) {
   const toast = useToast();
@@ -46,12 +60,16 @@ export default function Hub({ onInstalled }: { onInstalled: () => void }) {
   const [sources, setSources] = useState<SourceState[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const apply = (r: any) => {
+    setEntries(r.entries ?? []);
+    setSources(r.sources ?? []);
+  };
 
   const load = useCallback(async (q: string) => {
     try {
-      const r = await portal.specialists.catalogue(q);
-      setEntries(r.entries);
-      setSources(r.sources ?? []);
+      apply(await portal.specialists.catalogue(q));
     } catch {
       setEntries([]);
     }
@@ -62,15 +80,40 @@ export default function Hub({ onInstalled }: { onInstalled: () => void }) {
     return () => clearTimeout(t);
   }, [query, load]);
 
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      apply(await portal.specialists.refreshCatalogue(query));
+      toast("Live directories re-queried.", "success");
+    } catch {
+      toast("Could not refresh the directories.", "error");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const down = sources.filter((s) => !s.available);
+  const anyLive = sources.some((s) => s.live);
 
   return (
     <Plane className="space-y-3 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <Micro>Hub</Micro>
-        <span className="text-xs text-slate-600">
-          {sources.map((s) => s.name).join(", ") || "no sources"}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {sources.map((s) => (
+            <SourceChip key={s.name} s={s} />
+          ))}
+          {anyLive && (
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              title="Live directories are cached for ten minutes. Use this after publishing a new model."
+              className="rounded border border-edge px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-400 hover:border-aurora/60 hover:text-slate-200 disabled:opacity-50"
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+          )}
+        </div>
       </div>
 
       <input
@@ -82,20 +125,29 @@ export default function Hub({ onInstalled }: { onInstalled: () => void }) {
       />
 
       {down.length > 0 && (
-        // Said out loud, because an empty result set means nothing without it.
-        <p className="text-xs text-amber-400/90">
-          {down.map((s) => s.name).join(", ")} could not be reached, so these results are
-          incomplete — this is not the same as finding nothing.
-        </p>
+        // Said out loud with the reason, because an empty result set means
+        // nothing without it — and "no key connected" and "unreachable" need
+        // completely different things done about them.
+        <div className="space-y-1 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+          {down.map((s) => (
+            <p key={s.name} className="text-xs text-amber-400/90">
+              <span className="font-medium">{s.name} is not answering.</span>{" "}
+              {s.reason ?? "No reason was given."}
+            </p>
+          ))}
+          <p className="text-xs text-slate-500">
+            These results are incomplete, which is not the same as finding nothing.
+          </p>
+        </div>
       )}
 
       {entries === null ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : entries.length === 0 ? (
         <p className="text-sm text-slate-500">
-          Nothing matches "{query}". The Hub covers integration shapes — detection,
-          classification, OCR, transcription, extraction, moderation — rather than a directory of
-          specific models.
+          Nothing matches "{query}". Templates cover integration shapes — detection,
+          classification, OCR, transcription, extraction, moderation. Live directories only
+          search when you type something, so an empty box shows the shelf rather than the world.
         </p>
       ) : (
         <div className="space-y-2">
@@ -131,11 +183,37 @@ export default function Hub({ onInstalled }: { onInstalled: () => void }) {
       )}
 
       <p className="text-xs text-slate-600">
-        Entries are templates by task, not a directory of specific models — nothing here claims a
-        particular third-party model exists, because a one-click add that 404s is worse than
-        pasting an id you already have.
+        Template entries describe a task shape, not a specific third-party model — nothing marked
+        Template claims a particular model exists, because a one-click add that 404s is worse than
+        pasting an id you already have. Entries marked Live came from a provider's own directory
+        and name a model that exists now.
       </p>
     </Plane>
+  );
+}
+
+/** One source and its state, so an empty result set can be read correctly. */
+function SourceChip({ s }: { s: SourceState }) {
+  const live = !!s.live;
+  const tone = !s.available
+    ? "border-amber-500/40 text-amber-400/90"
+    : live
+      ? "border-aurora/50 text-aurora"
+      : "border-edge text-slate-500";
+  return (
+    <span
+      title={
+        s.reason ??
+        (live
+          ? "Searches this provider's real directory. Results name models that exist right now."
+          : "Ships with Continuum. Entries are task shapes you point at your own endpoint.")
+      }
+      className={`rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${tone}`}
+    >
+      {s.name} · {live ? "live" : "template"}
+      {s.available && typeof s.results === "number" && s.results > 0 ? ` · ${s.results}` : ""}
+      {!s.available ? " · off" : ""}
+    </span>
   );
 }
 
@@ -180,6 +258,21 @@ function EntryCard({
       <button onClick={onToggle} aria-expanded={open} className="w-full px-3 py-2.5 text-left">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-sm font-medium text-slate-200">{e.title}</span>
+          {e.tags?.includes("live") ? (
+            <span
+              className="rounded border border-aurora/50 px-1 py-0.5 text-[10px] uppercase tracking-wide text-aurora"
+              title={`Found in ${e.source}'s directory. This model exists right now.`}
+            >
+              live · {e.source}
+            </span>
+          ) : (
+            <span
+              className="rounded border border-edge px-1 py-0.5 text-[10px] uppercase tracking-wide text-slate-500"
+              title="A shape that ships with Continuum. You point it at your own endpoint."
+            >
+              template
+            </span>
+          )}
           <span className="micro">{e.inputKind} in</span>
           <span className="micro text-aurora">{e.toolKindLabel}</span>
           {e.scored ? (

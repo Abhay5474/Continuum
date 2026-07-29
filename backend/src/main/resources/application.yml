@@ -19,6 +19,13 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+  servlet:
+    multipart:
+      # Uploads are refused by the container before a byte reaches the
+      # application. UploadedInput enforces its own, lower limit as well —
+      # this one exists so an oversized post is not read into memory first.
+      max-file-size: ${MAX_UPLOAD_SIZE:25MB}
+      max-request-size: ${MAX_UPLOAD_SIZE:25MB}
   task:
     scheduling:
       # Spring's default scheduler is a single thread. Seven @Scheduled methods

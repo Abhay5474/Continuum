@@ -58,6 +58,18 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            Real PDF text extraction. Continuum could previously only accept a
+            PDF by having the caller base64 it into JSON and route it to an OCR
+            endpoint the developer had to run themselves; a born-digital PDF
+            already contains its text, and needed no OCR at all.
+        -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>

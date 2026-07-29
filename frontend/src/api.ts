@@ -156,6 +156,33 @@ async function portalHttp<T>(path: string, method: string, body?: unknown): Prom
 }
 
 /**
+ * A multipart POST.
+ *
+ * <p>Separate from {@link portalHttp} because the Content-Type must be left
+ * unset: the browser has to add its own boundary, and setting the header by
+ * hand produces a body the server cannot parse.
+ */
+async function portalUpload<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: form,
+  });
+  if (!res.ok) {
+    let message = `${res.status}`;
+    try {
+      const body = await res.json();
+      message = body.message ?? body.error ?? message;
+    } catch {
+      /* a non-JSON body leaves the status code as the best available message */
+    }
+    if (res.status === 401) throw new UnauthorizedError(message);
+    throw new Error(message);
+  }
+  return (await res.json()) as T;
+}
+
+/**
  * The signed-in role, read from the session token's own payload.
  *
  * <p>Purely to decide what to render: engine-wide settings are the operator's,
@@ -475,6 +502,13 @@ export const portal = {
           (q ? `&q=${encodeURIComponent(q)}` : ""),
         "GET"
       ),
+    /** Drops every live directory's cache for this tenant, then searches again. */
+    refreshCatalogue: (q?: string, limit = 25) =>
+      portalHttp<any>(
+        `/api/portal/developer/specialists/catalogue/refresh?limit=${limit}` +
+          (q ? `&q=${encodeURIComponent(q)}` : ""),
+        "POST"
+      ),
     reusableConnections: (entryId: string) =>
       portalHttp<any[]>(
         `/api/portal/developer/specialists/catalogue/${entryId}/connections`,
@@ -524,6 +558,19 @@ export const portal = {
     /** Runs it exactly as an application would, so the chain can be seen before going live. */
     run: (name: string, input: Record<string, unknown>, prompt?: string) =>
       portalHttp<any>(`/api/portal/developer/pipelines/${name}/run`, "POST", { input, prompt }),
+
+    /**
+     * The same run, with a file instead of base64 JSON.
+     *
+     * <p>The server picks the input key from the file's bytes, so a PDF becomes
+     * a document and a JPEG an image without anything being declared here.
+     */
+    runFile: (name: string, file: File, prompt?: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (prompt) form.append("prompt", prompt);
+      return portalUpload<any>(`/api/portal/developer/pipelines/${name}/run/upload`, form);
+    },
   },
 
   // --- Customer-defined workflows ---

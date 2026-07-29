@@ -61,6 +61,19 @@ public class SpecialistConnectionController {
         return hub.search(q, limit);
     }
 
+    /**
+     * Clears every live directory's cache for this tenant, then searches again.
+     *
+     * <p>A POST because it has an effect. Without it a developer who has just
+     * published a model is told for ten minutes that it does not exist.
+     */
+    @PostMapping("/catalogue/refresh")
+    public Map<String, Object> refreshCatalogue(HttpServletRequest req,
+                                                @RequestParam(required = false) String q,
+                                                @RequestParam(defaultValue = "25") int limit) {
+        return hub.refresh(dev(req), q, limit);
+    }
+
     /** Which existing connections a given entry could reuse. */
     @GetMapping("/catalogue/{entryId}/connections")
     public List<Map<String, Object>> reusable(HttpServletRequest req, @PathVariable String entryId) {

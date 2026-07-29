@@ -11,19 +11,64 @@ import java.util.List;
  * tail, and is the obvious next thing. Keeping the seam here means adding one
  * later is a new class rather than a rewrite of the Hub.
  *
- * <p><b>Why there is no Roboflow Universe source yet.</b> It could not be
- * verified. Every model host — {@code universe.roboflow.com},
- * {@code api.roboflow.com}, {@code huggingface.co} — is refused at CONNECT by
- * this deployment's network policy, so the search API could not be called even
- * once. Writing a client against a response shape nobody had seen would have
- * produced a feature that looked finished and 404'd on first contact with the
- * real service. The seam is here; the implementation waits for somewhere it can
- * be run against the actual API.
+ * <p>There are now two kinds. {@link CuratedCatalogue} is a shelf of templates
+ * that ship with Continuum: always available, never wrong about itself, but
+ * limited to the shapes that recur. A <em>live</em> source searches a provider's
+ * real directory, which covers the long tail at the cost of needing a
+ * credential and a network. {@link #live()} tells the console which it is
+ * looking at, because a developer should never be left to guess whether an entry
+ * describes a model that exists today or a shape they will have to fill in.
  */
 public interface CatalogueSource {
 
     /** Shown in the console so a developer knows where an entry came from. */
     String name();
+
+    /**
+     * Whether this source queries a provider's real directory.
+     *
+     * <p>False for the shipped templates. The distinction is worth surfacing:
+     * a live result names a model that exists right now, a template describes a
+     * shape the developer still has to point at something.
+     */
+    default boolean live() {
+        return false;
+    }
+
+    /**
+     * Why the source cannot answer, when {@link #available()} is false.
+     *
+     * <p>"Unavailable" on its own sends a developer to check their spelling.
+     * "No Roboflow API key is connected" sends them to the one screen that fixes
+     * it, so a source that knows the difference should say.
+     */
+    default String unavailableReason() {
+        return null;
+    }
+
+    /**
+     * An entry this source previously returned, by id, or null.
+     *
+     * <p>Needed because installing happens on a later request than searching.
+     * The curated shelf can look one up any time; a live source can only offer
+     * what it has recently seen, and returning null is the honest answer when
+     * the result has aged out — the developer searches again rather than
+     * installing something reconstructed from an id.
+     */
+    default CatalogueEntry byId(String id) {
+        return null;
+    }
+
+    /**
+     * Forgets anything cached for a tenant.
+     *
+     * <p>A live directory is cached to keep the Hub from calling a provider on
+     * every keystroke, which means a developer who has just published a model
+     * would not see it. This is the console's Refresh: a no-op for a source that
+     * holds nothing.
+     */
+    default void invalidate(String developerId) {
+    }
 
     /**
      * Whether this source can answer right now.

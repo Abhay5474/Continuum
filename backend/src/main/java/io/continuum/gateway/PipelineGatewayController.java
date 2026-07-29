@@ -1,14 +1,17 @@
 package io.continuum.gateway;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.continuum.api.PipelineController;
 import io.continuum.developer.ApiKeyAuthenticationFilter;
 import io.continuum.persistence.entity.DeveloperEntity;
 import io.continuum.specialist.PipelineService;
 import io.continuum.specialist.SpecialistConnectionService;
+import io.continuum.tool.UploadedInput;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -30,15 +33,47 @@ import java.util.Map;
 public class PipelineGatewayController {
 
     private final PipelineService pipelines;
+    private final ObjectMapper mapper;
 
-    public PipelineGatewayController(PipelineService pipelines) {
+    public PipelineGatewayController(PipelineService pipelines, ObjectMapper mapper) {
         this.pipelines = pipelines;
+        this.mapper = mapper;
     }
 
     @PostMapping("/api/gateway/pipeline/{name}")
     public ResponseEntity<?> run(@PathVariable String name,
                                  @RequestBody PipelineController.RunRequest body,
                                  HttpServletRequest http) {
+        return execute(name, body == null ? null : body.input(),
+                body == null ? null : body.prompt(), http);
+    }
+
+    /**
+     * The same pipeline, called with a file.
+     *
+     * <p>An application that already holds a PDF or a photo can post it
+     * directly instead of base64-encoding it into JSON first. It is the same
+     * run, the same trace and the same response shape — only the way the bytes
+     * arrive differs.
+     */
+    @PostMapping(value = "/api/gateway/pipeline/{name}/upload", consumes = "multipart/form-data")
+    public ResponseEntity<?> runUpload(@PathVariable String name,
+                                       @RequestPart("file") MultipartFile file,
+                                       @RequestParam(required = false) String prompt,
+                                       @RequestParam(required = false) String input,
+                                       HttpServletRequest http) {
+        Map<String, Object> built;
+        try {
+            built = UploadedInput.from(file, input, mapper);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "invalid_upload", "message", e.getMessage()));
+        }
+        return execute(name, built, prompt, http);
+    }
+
+    private ResponseEntity<?> execute(String name, Map<String, Object> input, String prompt,
+                                      HttpServletRequest http) {
         DeveloperEntity developer =
                 (DeveloperEntity) http.getAttribute(ApiKeyAuthenticationFilter.DEVELOPER_ATTRIBUTE);
         if (developer == null) {
@@ -46,8 +81,7 @@ public class PipelineGatewayController {
                     .body(Map.of("error", "invalid_api_key", "message", "Authentication required."));
         }
         try {
-            PipelineService.Run r = pipelines.run(developer.getId(), name,
-                    body == null ? null : body.input(), body == null ? null : body.prompt());
+            PipelineService.Run r = pipelines.run(developer.getId(), name, input, prompt);
             return ResponseEntity.ok(PipelineController.describe(r));
         } catch (SpecialistConnectionService.InvalidConnectionException e) {
             // Unknown or disabled pipeline, or a misconfiguration the developer

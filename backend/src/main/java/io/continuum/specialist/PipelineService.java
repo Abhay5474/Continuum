@@ -7,6 +7,7 @@ import io.continuum.persistence.entity.PipelineEntity;
 import io.continuum.persistence.entity.SpecialistEntity;
 import io.continuum.persistence.entity.TraceStepEntity;
 import io.continuum.persistence.repository.PipelineRepository;
+import io.continuum.tool.InputIngestor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -47,16 +48,19 @@ public class PipelineService {
     private final GatewayService gateway;
     private final TraceRecorder traces;
     private final ObjectMapper mapper;
+    private final InputIngestor ingestor;
 
     public PipelineService(PipelineRepository repo, SpecialistService specialists,
                            SpecialistInvoker invoker, GatewayService gateway,
-                           TraceRecorder traces, ObjectMapper mapper) {
+                           TraceRecorder traces, ObjectMapper mapper,
+                           InputIngestor ingestor) {
         this.repo = repo;
         this.specialists = specialists;
         this.invoker = invoker;
         this.gateway = gateway;
         this.traces = traces;
         this.mapper = mapper;
+        this.ingestor = ingestor;
     }
 
     /**
@@ -90,8 +94,30 @@ public class PipelineService {
                 describeInput(p.getInputKind()),
                 Map.of("kind", p.getInputKind(), "pipeline", p.getName()), "OK", null, 0, 0);
 
+        // --- ingestion ------------------------------------------------------
+        // Before any tool runs, look at what actually arrived. A born-digital
+        // PDF carries its own text, and reading it here means the pipeline does
+        // not need an OCR endpoint to answer a question about an invoice.
+        // Ingestion only ever adds to the input; the original payload survives
+        // untouched, because a downstream OCR tool needs the file itself.
+        InputIngestor.Ingested ingested = ingestor.ingest(input);
+        Map<String, Object> effectiveInput = ingested.input();
+        List<ContextBuilder.StepResult> ingestResults = new ArrayList<>();
+        if (ingested.didSomething()) {
+            traces.step(traceId, developerId, TraceStepEntity.Kind.INPUT,
+                    "Input read before the tools ran",
+                    ingested.describe(),
+                    ingested.evidence().isEmpty() ? "DEGRADED" : "OK", null, 0, 0);
+            if (!ingested.evidence().isEmpty()) {
+                // Carried as a step result so the recovered text reaches the
+                // context builder exactly like a tool's evidence would.
+                ingestResults.add(new ContextBuilder.StepResult(
+                        "Document text", ingested.evidence(), 0, null));
+            }
+        }
+
         // --- specialists ----------------------------------------------------
-        List<ContextBuilder.StepResult> results = new ArrayList<>();
+        List<ContextBuilder.StepResult> results = new ArrayList<>(ingestResults);
         int findingsSoFar = 0;
         int ranSoFar = 0;
         int skipped = 0;
@@ -127,7 +153,7 @@ public class PipelineService {
                 continue;
             }
 
-            SpecialistInvoker.Result r = invoker.invoke(s, input, traceId);
+            SpecialistInvoker.Result r = invoker.invoke(s, effectiveInput, traceId);
             results.add(new ContextBuilder.StepResult(s.getName(), r.evidence(), r.dropped(), r.error()));
             ranSoFar++;
             if (r.error() == null) {

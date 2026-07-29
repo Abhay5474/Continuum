@@ -143,6 +143,34 @@ public class SpecialistConnectionService {
         return vault.decrypt(c.getDeveloperId(), c.getCredentialRef());
     }
 
+    /**
+     * The tenant's stored key for a provider, for provider <em>discovery</em>.
+     *
+     * <p>Exists so discovery reuses the credential the tenant already has rather
+     * than asking for a second one and storing it somewhere new. It resolves
+     * through the same vault and the same {@code credentialRef} convention as
+     * {@link #secretFor}; there is deliberately no second key store.
+     *
+     * <p>The returned value is a live secret. It may be handed to the provider
+     * it belongs to and nowhere else — never to a response body, a log line, a
+     * trace, an error message or a model prompt.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> discoveryKeyFor(String developerId, String provider) {
+        if (developerId == null || provider == null) {
+            return Optional.empty();
+        }
+        for (SpecialistConnectionEntity c : repo.findByDeveloperIdOrderByNameAsc(developerId)) {
+            if (provider.equalsIgnoreCase(c.getProvider())) {
+                Optional<String> secret = secretFor(c);
+                if (secret.isPresent() && !secret.get().isBlank()) {
+                    return secret;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     @Transactional
     public void recordSuccess(SpecialistConnectionEntity c) {
         c.markVerified();

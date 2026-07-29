@@ -1,10 +1,13 @@
 package io.continuum.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.continuum.portal.PortalAuthFilter;
 import io.continuum.specialist.PipelineService;
 import io.continuum.specialist.PipelineStep;
+import io.continuum.tool.UploadedInput;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,9 +27,11 @@ import java.util.Map;
 public class PipelineController {
 
     private final PipelineService pipelines;
+    private final ObjectMapper mapper;
 
-    public PipelineController(PipelineService pipelines) {
+    public PipelineController(PipelineService pipelines, ObjectMapper mapper) {
         this.pipelines = pipelines;
+        this.mapper = mapper;
     }
 
     private String dev(HttpServletRequest req) {
@@ -95,6 +100,26 @@ public class PipelineController {
                                    @RequestBody RunRequest body) {
         PipelineService.Run r = pipelines.run(dev(req), name, body.input(), body.prompt());
         return describe(r);
+    }
+
+    /**
+     * Runs a pipeline against an uploaded file.
+     *
+     * <p>The same run, reached with a file instead of base64 JSON. It exists
+     * because a developer testing a document pipeline has a PDF on their desk,
+     * and requiring them to base64 it first is a chore that tells them nothing
+     * about whether their pipeline works.
+     *
+     * <p>The file's key is chosen from its bytes, so a PDF becomes a document
+     * and a JPEG becomes an image without the caller declaring anything.
+     */
+    @PostMapping(value = "/{name}/run/upload", consumes = "multipart/form-data")
+    public Map<String, Object> runUpload(HttpServletRequest req, @PathVariable String name,
+                                         @RequestPart("file") MultipartFile file,
+                                         @RequestParam(required = false) String prompt,
+                                         @RequestParam(required = false) String input) {
+        Map<String, Object> built = UploadedInput.from(file, input, mapper);
+        return describe(pipelines.run(dev(req), name, built, prompt));
     }
 
     /** One response shape, shared with the gateway route. */

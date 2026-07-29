@@ -12,9 +12,11 @@ import java.util.Map;
 /**
  * The Hub: search for something to plug in, and add it in one step.
  *
- * <p>Fans out over every {@link CatalogueSource}. Today that is one local
- * source; the fan-out exists so a remote directory can be added without the
- * console, the search or the install flow changing.
+ * <p>Fans out over every {@link CatalogueSource}: the shipped templates, plus
+ * any live provider directory that can answer for this tenant. A source that is
+ * unavailable does not fail the search — it comes back in the source list with
+ * the reason, so an empty result set can be told apart from a directory that is
+ * simply not reachable.
  *
  * <p>The install is the part that earns the feature. Adding a specialist by hand
  * means knowing the provider, the base URL, the auth style, the model path, a
@@ -55,20 +57,34 @@ public class SpecialistCatalogue {
 
         for (CatalogueSource s : sources) {
             boolean up = false;
+            String reason = null;
+            int found = 0;
             try {
                 up = s.available();
                 if (up) {
                     for (CatalogueEntry e : s.search(query, limit)) {
                         entries.add(e.describe());
+                        found++;
                     }
+                } else {
+                    reason = s.unavailableReason();
                 }
             } catch (RuntimeException e) {
                 // A source that misbehaves must not take the Hub down with it.
                 up = false;
+                reason = "This source failed while answering the search.";
             }
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", s.name());
             m.put("available", up);
+            // LIVE means "these models exist right now"; TEMPLATE means "this is
+            // a shape you still have to point at something". Showing a developer
+            // one badge is the difference between trusting a result and having
+            // to work out where it came from.
+            m.put("type", s.live() ? "LIVE" : "TEMPLATE");
+            m.put("live", s.live());
+            m.put("results", found);
+            m.put("reason", reason);
             state.add(m);
         }
 
@@ -78,6 +94,25 @@ public class SpecialistCatalogue {
         out.put("sources", state);
         out.put("allSourcesAvailable", state.stream().allMatch(m -> Boolean.TRUE.equals(m.get("available"))));
         return out;
+    }
+
+    /**
+     * Drops every live source's cache for this tenant and searches again.
+     *
+     * <p>Exists because a cache a developer cannot clear is a bug report: they
+     * publish a model, search for it, and are told it does not exist for the
+     * next ten minutes.
+     */
+    public Map<String, Object> refresh(String developerId, String query, int limit) {
+        for (CatalogueSource s : sources) {
+            try {
+                s.invalidate(developerId);
+            } catch (RuntimeException ignored) {
+                // Refresh is best-effort; one uncooperative source must not stop
+                // the others being cleared.
+            }
+        }
+        return search(query, limit);
     }
 
     /** Everything, for the empty-query case where the console shows the shelf. */
@@ -97,10 +132,12 @@ public class SpecialistCatalogue {
     public Map<String, Object> install(String developerId, String entryId, String name,
                                        String baseUrl, String modelPath, Double minConfidence,
                                        Long connectionId, String secret) {
-        CatalogueEntry entry = curated.byId(entryId);
+        CatalogueEntry entry = resolve(entryId);
         if (entry == null) {
             throw new SpecialistConnectionService.InvalidConnectionException(
-                    "No catalogue entry called '" + entryId + "'.");
+                    "No catalogue entry called '" + entryId + "'. If it came from a live "
+                            + "directory the result may have aged out — search again and install "
+                            + "from the fresh result.");
         }
 
         String path = blankToNull(modelPath) == null ? entry.modelPath() : modelPath.strip();
@@ -163,9 +200,36 @@ public class SpecialistCatalogue {
         return out;
     }
 
+    /**
+     * An entry by id, from whichever source has it.
+     *
+     * <p>The curated shelf is asked first: it is local, it always answers, and
+     * its ids are stable. Live sources are asked afterwards and may legitimately
+     * have forgotten — a discovered result is only installable while it is still
+     * in hand, which is why this returns null rather than rebuilding one.
+     */
+    public CatalogueEntry resolve(String entryId) {
+        CatalogueEntry entry = curated.byId(entryId);
+        if (entry != null) {
+            return entry;
+        }
+        for (CatalogueSource s : sources) {
+            try {
+                CatalogueEntry e = s.byId(entryId);
+                if (e != null) {
+                    return e;
+                }
+            } catch (RuntimeException ignored) {
+                // A source that cannot answer is not one that gets to fail the
+                // lookup for the sources after it.
+            }
+        }
+        return null;
+    }
+
     /** Which of a developer's connections a given entry could reuse. */
     public List<Map<String, Object>> reusable(String developerId, String entryId) {
-        CatalogueEntry entry = curated.byId(entryId);
+        CatalogueEntry entry = resolve(entryId);
         if (entry == null) {
             return List.of();
         }

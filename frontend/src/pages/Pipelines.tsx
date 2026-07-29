@@ -910,6 +910,8 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
   const [payload, setPayload] = useState(SAMPLE_IMAGE);
   const [run, setRun] = useState<Run | null>(null);
   const [running, setRunning] = useState(false);
+  /** A chosen file wins over the pasted payload; null means use the textarea. */
+  const [file, setFile] = useState<File | null>(null);
   // How many steps of the returned chain are revealed. The run is synchronous,
   // so this replays it at reading speed rather than dropping five finished rows
   // at once — the point of the page is to see the layer do something.
@@ -930,7 +932,11 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
     setShown(0);
     setDetail(null);
     try {
-      const r = (await portal.pipelines.run(pipeline.name, { [inputField]: payload }, prompt)) as Run;
+      // A file, when one was chosen, goes up as a file. Base64-ing it in the
+      // browser first would only mean the server decoding it again.
+      const r = (file
+        ? await portal.pipelines.runFile(pipeline.name, file, prompt)
+        : await portal.pipelines.run(pipeline.name, { [inputField]: payload }, prompt)) as Run;
       setRun(r);
       onRan();
     } catch (e: any) {
@@ -950,14 +956,50 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
 
       <div className="mt-2 grid gap-3 sm:grid-cols-[1fr_auto]">
         <div className="min-w-0 space-y-2">
-          <label className="block">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="cursor-pointer rounded-md border border-edge px-2.5 py-1 text-xs text-slate-300 hover:border-aurora/60">
+              Upload a file
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            {file ? (
+              <span className="flex items-center gap-2 text-xs text-slate-400">
+                <span className="font-mono">{file.name}</span>
+                <span className="text-slate-600">
+                  {(file.size / 1024).toFixed(0)} KB
+                </span>
+                <button
+                  onClick={() => setFile(null)}
+                  className="text-slate-500 underline hover:text-slate-300"
+                >
+                  remove
+                </button>
+              </span>
+            ) : (
+              <span className="text-xs text-slate-600">
+                A PDF, image or audio file. Continuum reads what it is from the bytes — a
+                born-digital PDF is read in place, with no OCR call and no recognition errors.
+              </span>
+            )}
+          </div>
+
+          <label className={`block ${file ? "opacity-40" : ""}`}>
             <Micro>{pipeline.inputKind === "image" ? "Image (base64)" : "Input"}</Micro>
             <textarea
               value={payload}
               onChange={(e) => setPayload(e.target.value)}
+              disabled={!!file}
               rows={2}
               className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 font-mono text-[11px] text-slate-300 outline-none focus:border-aurora/60"
             />
+            {file && (
+              <p className="mt-1 text-xs text-slate-600">
+                Ignored while a file is attached.
+              </p>
+            )}
           </label>
           <label className="block">
             <Micro>What your user asked</Micro>
