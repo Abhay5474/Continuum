@@ -6,7 +6,8 @@ said it could *not* do, and what we did about that.
 
 Written in plain language. No prior knowledge assumed.
 
-**Last updated:** 28 July 2026 · **Migrations:** V1–V37 · **Tests:** 489 passing across 74 test classes
+**Last updated:** 29 July 2026 · **Migrations:** V1–V40 · **Tests:** 520 passing across 78 test classes
+**All eighteen ranked features are implemented.**
 
 ---
 
@@ -96,10 +97,14 @@ specific published paper, and the code cites it. This section lists every one.
 | 22 | [Taming Non-stationary Bandits: A Bayesian Approach](https://arxiv.org/abs/1707.09727) — Raj & Kalyani | 2017 | Discounted (forgetting) bandit |
 | 23 | [OWASP Top 10 for LLM Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/) | 2023– | Prompt Firewall |
 | 24 | [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) | 2024– | Decision Provenance export format |
-| 25 | UCCI ([arXiv 2605.18796](https://arxiv.org/abs/2605.18796)) and Semantic Agreement ([arXiv 2509.21837](https://arxiv.org/pdf/2509.21837)) | 2025–26 | Additional cascade signals (as cited in `docs/features/02`) |
+| 25 | [Analysis and Simulation of a Fair Queueing Algorithm](https://doi.org/10.1145/75247.75248) — Demers, Keshav & Shenker, *SIGCOMM* | 1989 | Cost-Aware Admission |
+| 26 | [Dominant Resource Fairness](https://www.usenix.org/conference/nsdi11/dominant-resource-fairness-fair-allocation-multiple-resource-types) — Ghodsi et al., *NSDI* | 2011 | Two-resource limiting |
+| 27 | [Doubly Robust Policy Evaluation and Learning](https://arxiv.org/abs/1103.4601) — Dudík, Langford & Li, *ICML* | 2011 | Counterfactual Replay |
+| 28 | [Fast Inference from Transformers via Speculative Decoding](https://arxiv.org/abs/2211.17192) — Leviathan, Kalman & Matias, *ICML* | 2023 | Speculative Cascade advisor |
+| 29 | UCCI ([arXiv 2605.18796](https://arxiv.org/abs/2605.18796)) and Semantic Agreement ([arXiv 2509.21837](https://arxiv.org/pdf/2509.21837)) | 2025–26 | Additional cascade signals (as cited in `docs/features/02`) |
 
-> **A note on honesty:** entries 1–24 I can describe from the literature. Entry
-> 25 is cited in the project's own cascade documentation; I'm listing it as the
+> **A note on honesty:** entries 1–28 I can describe from the literature. Entry
+> 29 is cited in the project's own cascade documentation; I'm listing it as the
 > repo records it rather than re-deriving it.
 
 ---
@@ -945,6 +950,7 @@ All features are organised in the console by what they do.
 | **Routing** | Model selection + tail-latency hedging | on |
 | **Admission Control** | Infer provider capacity, queue and shed deliberately | **OFF** |
 | **Priority & Deadlines** | Who gets the next free slot; who is too late to use it | **OFF** |
+| **Cost-Aware Limits** | Rate-limit by tokens consumed, not requests counted | **OFF** |
 | **Model Cascade** | Cheap model first, escalate only when needed | **OFF** |
 
 ## 5.2 Prompt
@@ -955,6 +961,7 @@ All features are organised in the console by what they do.
 | **Specialists** | Call a smaller specialist model before the big one | **OFF** |
 | **Prompt Guard** | PII redaction, injection blocking, compression | **OFF** |
 | **Semantic Cache** | Reuse answers to equivalent questions | **OFF** |
+| **Compression Budget** | Compress each part of a prompt by what it can spare | **OFF** |
 | **Context Optimizer** | Context virtualization and paging (the MMU) | **OFF** |
 | **Memory** | Long-context memory tiers | on |
 
@@ -969,6 +976,7 @@ All features are organised in the console by what they do.
 | **Answer Confidence** | Does the model agree with itself | **OFF** |
 | **Verification** | Consensus traces across providers, with evidence | **OFF** |
 | **Decision Provenance** | Why each answer happened, as data | **OFF** |
+| **Counterfactual Replay** | What a different routing policy would have cost | **OFF** |
 | **Replay Audit** | Deterministic replay and divergence healing | on |
 | **Fault Injection** | Infrastructure failure drills | **OFF** |
 | **Model Failures** | Hallucination and degradation drills | **OFF** |
@@ -1084,6 +1092,10 @@ Collected here so they're not scattered:
 | Admission Control | Costs more than it saves against a provider that never degrades | Real providers do degrade; documented so nobody enables it blindly |
 | Scheduling | In-memory, per-instance; no global order across servers | A shared queue costs more in round trips than it saves at a 250ms wait |
 | Saga | A failed compensation is reported, not retried past 3 attempts | Nothing else will clean it up — which is exactly why the list exists |
+| Compression Budget | An aggressive budget is a target, not a guarantee — protected spans stop it being reached | Protection is the guarantee and wins; the page shows target against achieved |
+| Cost-Aware Limits | In memory, per instance, like the existing rate limiter | Same limitation, same honest statement on the page |
+| Counterfactual Replay | Deterministic routing means no propensity correction exists for diverging traffic | Measured and modelled shares are reported separately rather than blended |
+| Speculative Cascade | Ships as an advisor, not a switch | The research said not to build it until the escalation rate could be measured — so the measurement is the feature |
 
 ---
 
