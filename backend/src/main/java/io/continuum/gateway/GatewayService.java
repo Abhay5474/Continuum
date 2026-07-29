@@ -5,6 +5,8 @@ import io.continuum.persistence.entity.GatewayRequestLogEntity;
 import io.continuum.persistence.entity.ModelEntity;
 import io.continuum.persistence.repository.GatewayRequestLogRepository;
 import io.continuum.admission.AdmissionService;
+import io.continuum.admission.CostAdmissionService;
+import io.continuum.admission.CostAwareLimiter;
 import io.continuum.admission.Criticality;
 import io.continuum.scheduling.DeadlineScheduler;
 import io.continuum.scheduling.SchedulerService;
@@ -55,6 +57,7 @@ public class GatewayService {
     private final ProviderRouter router;
     private final AdmissionService admission;
     private final SchedulerService scheduler;
+    private final CostAdmissionService costAdmission;
     private final io.continuum.quality.AnswerRepairService repairEngine;
     private final io.continuum.provenance.ProvenanceService provenance;
     private final io.continuum.degradation.DegradationService degradation;
@@ -106,6 +109,7 @@ public class GatewayService {
                           CredentialVaultService vault, ProviderRouter router,
                           AdmissionService admission,
                           SchedulerService scheduler,
+                          CostAdmissionService costAdmission,
                           io.continuum.quality.AnswerRepairService repairEngine,
                           io.continuum.provenance.ProvenanceService provenance,
                           io.continuum.degradation.DegradationService degradation,
@@ -130,6 +134,7 @@ public class GatewayService {
                           io.continuum.quality.QualityGateService quality,
                           io.continuum.drift.SemanticBreakerService breaker) {
         this.scheduler = scheduler;
+        this.costAdmission = costAdmission;
         this.normalizer = normalizer;
         this.complexityEstimator = complexityEstimator;
         this.selectionEngine = selectionEngine;
@@ -173,7 +178,47 @@ public class GatewayService {
         }
     }
 
+    /**
+     * Cost-aware admission wraps the request, when the tenant has enabled it.
+     *
+     * <p>The reservation is taken on the prompt as <em>submitted</em>, because
+     * that is the only size known before any work happens, and settled on the
+     * provider's reported usage — which reflects compression, paging and cache
+     * hits. The reserve is a conservative gate; settlement is what makes the
+     * accounting true.
+     *
+     * <p>The finally block is not optional: a reservation that is never returned
+     * holds allowance nobody is using until it times out.
+     */
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
+        CostAwareLimiter.Ticket ticket = costAdmission.reserve(
+                developerId, promptTokensOf(req), req == null ? null : req.maxTokens());
+        if (ticket == null) {
+            return chatInner(developerId, req);
+        }
+        try {
+            GatewayDtos.ChatResponse response = chatInner(developerId, req);
+            ticket.settle(response == null ? 0 : response.tokens());
+            return response;
+        } finally {
+            // No-op after a settle; returns the whole reservation otherwise.
+            ticket.close();
+        }
+    }
+
+    /** Tokens the caller sent us, before Continuum shrinks anything. */
+    private static int promptTokensOf(GatewayDtos.ChatRequest req) {
+        if (req == null || req.messages() == null) {
+            return 0;
+        }
+        int n = 0;
+        for (GatewayDtos.Message m : req.messages()) {
+            n += io.continuum.compression.PromptCompressor.estimateTokens(m.content());
+        }
+        return n;
+    }
+
+    private GatewayDtos.ChatResponse chatInner(String developerId, GatewayDtos.ChatRequest req) {
         // Billing: reject requests once the monthly token quota is exhausted
         // (throws QuotaExceededException → mapped to 402 upstream). The default
         // FREE plan quota is generous, so this is transparent for normal use.

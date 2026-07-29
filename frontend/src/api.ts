@@ -378,6 +378,20 @@ export const portal = {
     reset: () => portalHttp<any>("/api/portal/developer/admission", "DELETE"),
   },
 
+  compressionPolicy: {
+    status: () => portalHttp<any>("/api/portal/developer/compression-policy/status", "GET"),
+    configure: (body: { enabled?: boolean }) =>
+      portalHttp<any>("/api/portal/developer/compression-policy/settings", "PUT", body),
+    reset: () => portalHttp<any>("/api/portal/developer/compression-policy/reset", "POST"),
+  },
+
+  costAdmission: {
+    status: () => portalHttp<any>("/api/portal/developer/cost-admission/status", "GET"),
+    configure: (body: { enabled?: boolean; requestsPerMin?: number; tokensPerMin?: number }) =>
+      portalHttp<any>("/api/portal/developer/cost-admission/settings", "PUT", body),
+    reset: () => portalHttp<any>("/api/portal/developer/cost-admission/reset", "POST"),
+  },
+
   loops: {
     status: () => portalHttp<any>("/api/portal/developer/loops/status", "GET"),
     configure: (body: { enabled?: boolean; mode?: string }) =>

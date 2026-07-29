@@ -34,6 +34,8 @@ import BreakerPage from "./pages/Breaker";
 import Specialists from "./pages/Specialists";
 import Pipelines from "./pages/Pipelines";
 import Admission from "./pages/Admission";
+import CompressionPolicy from "./pages/CompressionPolicy";
+import CostAdmission from "./pages/CostAdmission";
 import LoopGuard from "./pages/LoopGuard";
 import Saga from "./pages/Saga";
 import Scheduling from "./pages/Scheduling";
@@ -91,6 +93,8 @@ const router = createBrowserRouter([
           { path: "pipelines", element: <Pipelines /> },
           { path: "admission", element: <Admission /> },
           { path: "scheduling", element: <Scheduling /> },
+          { path: "cost-limits", element: <CostAdmission /> },
+          { path: "compression", element: <CompressionPolicy /> },
           { path: "loops", element: <LoopGuard /> },
           { path: "saga", element: <Saga /> },
           { path: "provenance", element: <Provenance /> },

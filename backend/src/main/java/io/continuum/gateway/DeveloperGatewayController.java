@@ -35,6 +35,15 @@ public class DeveloperGatewayController {
         }
         try {
             return ResponseEntity.ok(gateway.chat(developer.getId(), request));
+        } catch (io.continuum.admission.CostAdmissionService.CostLimitedException e) {
+            // Same 429 as any rate limit, but the body says which resource ran
+            // out — a caller told only "too many requests" when they are in fact
+            // over their token allowance will retry with the same huge prompt.
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header("Retry-After", String.valueOf(e.decision().retryAfterSeconds()))
+                    .body(Map.of("error", "cost_limited", "message", e.getMessage(),
+                            "boundBy", e.decision().boundBy().name(),
+                            "retryAfterSeconds", e.decision().retryAfterSeconds()));
         } catch (io.continuum.scheduling.SchedulerService.DeadlineUnreachableException e) {
             // Not overload — the caller's own deadline. 422: the request was
             // understood and cannot be satisfied as stated, and retrying it

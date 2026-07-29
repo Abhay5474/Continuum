@@ -1,0 +1,276 @@
+import { useCallback, useEffect, useState } from "react";
+import { portal } from "../api";
+import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+
+/**
+ * Cost-aware admission.
+ *
+ * <p>The two bars per caller are the point of the page. A caller whose token bar
+ * is full while their request bar is nearly empty is exactly the case a
+ * request-counting limiter cannot see, and seeing it is what justifies the
+ * feature.
+ */
+
+type Caller = {
+  caller: string;
+  admitted: number;
+  refused: number;
+  refusedByTokens: number;
+  tokensCharged: number;
+  outstanding: number;
+  requestShare: number;
+  tokenShare: number;
+  peakTokenSharePct: number;
+};
+
+type Status = {
+  enabled: boolean;
+  requestsPerMin: number;
+  tokensPerMin: number;
+  assumedCompletionTokens: number;
+  reservationTtlSeconds: number;
+  callers: Caller[];
+};
+
+export default function CostAdmission() {
+  const toast = useToast();
+  const [status, setStatus] = useState<Status | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [reqs, setReqs] = useState<number | null>(null);
+  const [toks, setToks] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const s: Status = await portal.costAdmission.status();
+      setStatus(s);
+      setReqs((v) => (v === null ? s.requestsPerMin : v));
+      setToks((v) => (v === null ? s.tokensPerMin : v));
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message ?? "Could not load cost-aware admission.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+    // Buckets refill continuously, so the shares move while you watch.
+    const t = setInterval(() => void load(), 1500);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const act = async (fn: () => Promise<unknown>, ok?: string) => {
+    setBusy(true);
+    try {
+      await fn();
+      if (ok) toast(ok);
+      await load();
+    } catch (e: any) {
+      toast(e?.message ?? "That did not work.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (error) return <ErrorState message={error} onRetry={load} />;
+
+  const callers = status?.callers ?? [];
+  const admitted = callers.reduce((n, c) => n + c.admitted, 0);
+  const refused = callers.reduce((n, c) => n + c.refused, 0);
+  const byTokens = callers.reduce((n, c) => n + c.refusedByTokens, 0);
+  const charged = callers.reduce((n, c) => n + c.tokensCharged, 0);
+  const outstanding = callers.reduce((n, c) => n + c.outstanding, 0);
+
+  return (
+    <section className="space-y-5">
+      <PageHeader
+        title="Cost-Aware Limits"
+        subtitle="A fifty-step agent carrying twenty thousand tokens is not one request in the way that “hello” is one request."
+      />
+
+      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-5">
+        <Readout label="Admitted" value={admitted} size="sm" />
+        <Readout
+          label="Refused"
+          value={refused}
+          size="sm"
+          state={refused > 0 ? "degraded" : "idle"}
+        />
+        <Readout
+          label="Refused on tokens"
+          value={byTokens}
+          size="sm"
+          state={byTokens > 0 ? "critical" : "idle"}
+          hint="Would have passed a request-count limit."
+        />
+        <Readout
+          label="Tokens charged"
+          value={charged}
+          size="sm"
+          hint="Settled against what the provider actually reported."
+        />
+        <Readout
+          label="In flight"
+          value={outstanding}
+          size="sm"
+          state={outstanding > 0 ? "active" : "idle"}
+          hint="Reservations held right now. If this climbs and never falls, they are leaking."
+        />
+      </Plane>
+
+      <Plane className="space-y-3 p-4">
+        <Switch
+          checked={!!status?.enabled}
+          busy={busy}
+          onChange={(next) =>
+            act(
+              () => portal.costAdmission.configure({ enabled: next }),
+              next ? "Cost-aware limits are on." : "Cost-aware limits are off."
+            )
+          }
+          label="Limit by consumption, not request count"
+          hint="Off by default. Turning it on can refuse traffic a request-count limit would have admitted."
+        />
+
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="text-xs text-slate-500">
+            <span className="micro block">requests / minute</span>
+            <input
+              type="number"
+              min={1}
+              value={reqs ?? ""}
+              onChange={(e) => setReqs(Number(e.target.value))}
+              className="mt-1 w-28 rounded border border-edge bg-ink/60 px-2 py-1 text-sm text-slate-200 outline-none focus:border-aurora/50"
+            />
+          </label>
+          <label className="text-xs text-slate-500">
+            <span className="micro block">tokens / minute</span>
+            <input
+              type="number"
+              min={1}
+              step={1000}
+              value={toks ?? ""}
+              onChange={(e) => setToks(Number(e.target.value))}
+              className="mt-1 w-32 rounded border border-edge bg-ink/60 px-2 py-1 text-sm text-slate-200 outline-none focus:border-aurora/50"
+            />
+          </label>
+          <button
+            disabled={busy}
+            onClick={() =>
+              act(
+                () =>
+                  portal.costAdmission.configure({
+                    requestsPerMin: reqs ?? undefined,
+                    tokensPerMin: toks ?? undefined,
+                  }),
+                "Allowances saved."
+              )
+            }
+            className="rounded-md border border-aurora/50 bg-aurora/10 px-3 py-1.5 text-sm text-slate-100 hover:bg-aurora/20 disabled:opacity-40"
+          >
+            Save allowances
+          </button>
+        </div>
+
+        <p className="text-xs text-slate-600">
+          Both allowances refill continuously, so nobody can save up a minute's worth and spend it
+          in one burst. A request is admitted only when both have room — whichever a caller is
+          nearest to exhausting is the one that limits them, so someone making many tiny calls is
+          bounded by request count and someone making one enormous call is bounded by tokens.
+          Neither can starve the other by choosing a shape.
+        </p>
+      </Plane>
+
+      {status === null ? (
+        <SkeletonRows rows={2} />
+      ) : callers.length === 0 ? (
+        <Plane className="p-6 text-center text-sm text-slate-500">
+          No traffic yet. Once requests arrive, each caller's consumption of both allowances appears
+          here.
+        </Plane>
+      ) : (
+        <div className="space-y-2">
+          {callers.map((c) => {
+            const tokenBound = c.tokenShare >= c.requestShare;
+            return (
+              <Plane key={c.caller} className="space-y-3 p-4">
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  <span className="break-all font-mono text-xs text-slate-300">{c.caller}</span>
+                  <span className="flex-1" />
+                  <span className="micro">{c.admitted} admitted</span>
+                  {c.refused > 0 && (
+                    <span className="micro text-amber-400">{c.refused} refused</span>
+                  )}
+                  {c.outstanding > 0 && (
+                    <span className="micro">{c.outstanding} in flight</span>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Meter
+                    value={Math.max(0, Math.min(1, c.requestShare))}
+                    state={!tokenBound ? "degraded" : "active"}
+                    label={`Request allowance (${status.requestsPerMin}/min)`}
+                    height={6}
+                  />
+                  <Meter
+                    value={Math.max(0, Math.min(1, c.tokenShare))}
+                    state={tokenBound ? "degraded" : "active"}
+                    label={`Token allowance (${status.tokensPerMin.toLocaleString()}/min)`}
+                    height={6}
+                  />
+                </div>
+
+                <p className="text-xs text-slate-600">
+                  {tokenBound
+                    ? `Bounded by tokens — this caller is using ${Math.round(
+                        c.tokenShare * 100
+                      )}% of the token allowance against ${Math.round(
+                        c.requestShare * 100
+                      )}% of the request allowance. A request-count limit would not see this.`
+                    : `Bounded by request count — many small calls rather than a few large ones.`}
+                  {c.tokensCharged > 0 &&
+                    ` ${c.tokensCharged.toLocaleString()} tokens charged so far, peak token use ${c.peakTokenSharePct}%.`}
+                </p>
+              </Plane>
+            );
+          })}
+        </div>
+      )}
+
+      <Plane className="p-4">
+        <Micro>Reserve, then settle</Micro>
+        <p className="mt-1.5 text-xs text-slate-600">
+          A request's real token cost is not known until the response comes back, so admission
+          reserves an estimate — the prompt plus the caller's completion cap, or{" "}
+          <span className="readout">{status?.assumedCompletionTokens ?? 800}</span> tokens when they
+          did not set one — and the true figure is settled afterwards. The estimate is deliberately
+          generous: under-reserving lets a caller through and discovers the cost too late, while
+          over-reserving only makes them wait a moment longer and the excess is returned in full.
+        </p>
+        <p className="mt-2 text-xs text-slate-600">
+          A reservation whose request died before settling would hold allowance nobody is using, so
+          every one is returned in a finally block and any that is somehow missed expires after{" "}
+          <span className="readout">{status?.reservationTtlSeconds ?? 300}s</span>. The{" "}
+          <span className="readout">in flight</span> count above is how many are currently held —
+          if it climbs and never falls, reservations are leaking.
+        </p>
+        <p className="mt-2 text-xs text-slate-600">
+          Held in memory, per instance, like the existing rate limiter — three instances behind a
+          load balancer allow three times the traffic. Stated rather than implied.
+        </p>
+      </Plane>
+
+      {callers.length > 0 && (
+        <button
+          disabled={busy}
+          onClick={() => act(() => portal.costAdmission.reset(), "Counters cleared.")}
+          className="rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 hover:border-aurora/50 disabled:opacity-40"
+        >
+          Clear counters
+        </button>
+      )}
+    </section>
+  );
+}
