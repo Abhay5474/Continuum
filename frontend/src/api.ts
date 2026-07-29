@@ -392,6 +392,17 @@ export const portal = {
     reset: () => portalHttp<any>("/api/portal/developer/cost-admission/reset", "POST"),
   },
 
+  counterfactual: {
+    status: () => portalHttp<any>("/api/portal/developer/counterfactual/status", "GET"),
+    arms: () => portalHttp<string[]>("/api/portal/developer/counterfactual/arms", "GET"),
+    configure: (body: { enabled?: boolean }) =>
+      portalHttp<any>("/api/portal/developer/counterfactual/settings", "PUT", body),
+    /** Replays logged traffic against a candidate policy. Reads only; runs nothing. */
+    evaluate: (body: {
+      alwaysArm?: string; at?: number; below?: string; above?: string; limit?: number;
+    }) => portalHttp<any>("/api/portal/developer/counterfactual/evaluate", "POST", body),
+  },
+
   loops: {
     status: () => portalHttp<any>("/api/portal/developer/loops/status", "GET"),
     configure: (body: { enabled?: boolean; mode?: string }) =>

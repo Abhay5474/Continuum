@@ -55,6 +55,7 @@ const GROUPS: Group[] = [
       { to: "/confidence", label: "Answer Confidence", desc: "Does the model agree with itself" },
       { to: "/dag", label: "Verification", desc: "Consensus traces and evidence" },
       { to: "/provenance", label: "Decision Provenance", desc: "Why each answer happened, as data" },
+      { to: "/counterfactual", label: "Counterfactual Replay", desc: "What a different routing policy would have cost" },
       { to: "/replay", label: "Replay Audit", desc: "Deterministic replay and divergence healing" },
       { to: "/chaos", label: "Fault Injection", desc: "Infrastructure failure drills" },
       { to: "/ai-chaos", label: "Model Failures", desc: "Hallucination and degradation drills" },

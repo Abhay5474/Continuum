@@ -294,6 +294,27 @@ public class ResponseCascadeService {
         out.put("missedEscalations", missed);
         out.put("missRate", auditRows.isEmpty() ? null : (double) missed / auditRows.size());
         out.put("calibration", calibration.profile(developerId));
+
+        // Whether running the strong model speculatively — in parallel rather
+        // than after — would be worth it, computed from the escalation rate just
+        // measured above rather than from intuition.
+        double strongCost = 0;
+        double strongLatency = 0;
+        int strongRuns = 0;
+        for (CascadeDecisionEntity r : rows) {
+            if (r.getStrongCost() > 0) {
+                strongCost += r.getStrongCost();
+                // The strong call's own latency is what the total cost beyond
+                // the cheap one — which is precisely the wait speculation
+                // removes, since under speculation it was already running.
+                strongLatency += Math.max(0, r.getTotalLatencyMs() - r.getCheapLatencyMs());
+                strongRuns++;
+            }
+        }
+        out.put("speculation", SpeculationEconomics.advise(total, escalated,
+                strongRuns == 0 ? 0 : strongCost / strongRuns,
+                strongRuns == 0 ? 0 : strongLatency / strongRuns,
+                spent).describe());
         return out;
     }
 

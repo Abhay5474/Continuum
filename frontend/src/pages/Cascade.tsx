@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
 /**
@@ -39,6 +39,15 @@ type Status = {
   missedEscalations: number;
   missRate: number | null;
   calibration: { observations: number; calibrated: boolean; curve: any[] };
+  speculation: {
+    escalationRate: number;
+    breakEven: number;
+    extraSpendUsd: number;
+    extraSpendPct: number | null;
+    latencySavedMs: number;
+    worthwhile: boolean;
+    summary: string;
+  };
 };
 
 /**
@@ -262,6 +271,59 @@ export default function Cascade() {
           </div>
         </Plane>
       </section>
+
+      {/* ---- should this cascade run speculatively? ---- */}
+      {status?.speculation && (
+        <Plane className="space-y-3 p-4">
+          <Micro>Should the strong model run in parallel instead of afterwards?</Micro>
+          <p className="text-xs text-slate-600">
+            Speculative execution fires both tiers at once and returns whichever the judge accepts,
+            turning the cascade&rsquo;s latency penalty into a cost penalty. Whether that is a good
+            trade depends entirely on how often this account actually escalates — so the answer is
+            computed from the rate measured above, not from intuition.
+          </p>
+
+          <Meter
+            value={Math.min(1, status.speculation.escalationRate)}
+            state={status.speculation.worthwhile ? "healthy" : "degraded"}
+            label={`Escalation rate against the ${Math.round(
+              status.speculation.breakEven * 100
+            )}% break-even`}
+            height={8}
+          />
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Readout
+              label="Extra spend"
+              value={`$${status.speculation.extraSpendUsd.toFixed(5)}`}
+              size="sm"
+              state="degraded"
+              hint="Paying for the strong model on requests that never needed it."
+            />
+            <Readout
+              label="Latency saved"
+              value={Math.round(status.speculation.latencySavedMs)}
+              unit="ms"
+              size="sm"
+              state="healthy"
+              hint="On escalating requests, the strong call was already running."
+            />
+            <Readout
+              label="Verdict"
+              value={status.speculation.worthwhile ? "worth it" : "not yet"}
+              size="sm"
+              state={status.speculation.worthwhile ? "healthy" : "idle"}
+            />
+          </div>
+
+          <p className="text-xs text-slate-500">{status.speculation.summary}</p>
+          <p className="text-xs text-slate-600">
+            Whether a millisecond is worth a cent is a product decision, not an arithmetic one. Both
+            numbers are shown rather than collapsed into a single score, because there is no
+            universal exchange rate between latency and money.
+          </p>
+        </Plane>
+      )}
 
       {/* ---- calibration curve ---- */}
       {(status?.calibration?.observations ?? 0) > 0 && (
