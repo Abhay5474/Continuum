@@ -5,6 +5,7 @@ import io.continuum.net.GuardedHttpSender;
 import io.continuum.persistence.entity.SpecialistConnectionEntity;
 import io.continuum.persistence.entity.SpecialistEntity;
 import io.continuum.persistence.entity.TraceStepEntity;
+import io.continuum.tool.Evidence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -57,22 +58,53 @@ public class SpecialistInvoker {
     /**
      * The outcome of one invocation.
      *
-     * @param findings   normalised, already filtered by confidence, strongest first
+     * @param evidence   normalised, already filtered by confidence, strongest first
      * @param dropped    how many fell below the threshold — worth knowing, since
      *                   "nothing found" and "nothing confident enough" are
      *                   different situations
      * @param rawBody    what the provider actually returned, for the probe view
      * @param error      null on success
      */
-    public record Result(boolean ok, List<SpecialistProvider.Finding> findings, int dropped,
+    public record Result(boolean ok, List<Evidence> evidence, int dropped,
                          String rawBody, Integer httpStatus, long latencyMs, String error) {
 
-        public SpecialistProvider.Finding top() {
-            return findings.isEmpty() ? null : findings.get(0);
+        /**
+         * The scored, labelled subset, as legacy findings.
+         *
+         * <p>Kept so every caller written against the Specialist layer keeps
+         * compiling and behaving. Text, fields and rows are deliberately absent:
+         * they cannot become a {@code Finding} without inventing a confidence.
+         */
+        public List<SpecialistProvider.Finding> findings() {
+            List<SpecialistProvider.Finding> out = new ArrayList<>();
+            for (Evidence e : evidence) {
+                if (e.isFindingShaped()) {
+                    out.add(new SpecialistProvider.Finding(
+                            e.label(), e.confidence(), e.attributes().isEmpty() ? null : e.attributes()));
+                }
+            }
+            return out;
         }
 
+        public SpecialistProvider.Finding top() {
+            List<SpecialistProvider.Finding> f = findings();
+            return f.isEmpty() ? null : f.get(0);
+        }
+
+        /** Highest confidence among scored evidence; 0 when nothing is scored. */
         public double topConfidence() {
-            return findings.isEmpty() ? 0 : findings.get(0).confidence();
+            double top = 0;
+            for (Evidence e : evidence) {
+                if (e.scored()) {
+                    top = Math.max(top, e.confidence());
+                }
+            }
+            return top;
+        }
+
+        /** Evidence that carries no confidence — text, fields, rows. */
+        public long unscored() {
+            return evidence.stream().filter(e -> !e.scored()).count();
         }
     }
 
@@ -167,9 +199,9 @@ public class SpecialistInvoker {
             parsedBody = res.body();
         }
 
-        List<SpecialistProvider.Finding> all;
+        List<Evidence> all;
         try {
-            all = adapter.parse(parsedBody);
+            all = adapter.parseEvidence(parsedBody);
         } catch (RuntimeException e) {
             // An adapter is not allowed to throw, but a defect in one must not
             // become a failed customer request.
@@ -181,17 +213,24 @@ public class SpecialistInvoker {
         // here too. An adapter that returned 85 meaning 85% would otherwise
         // defeat the reporting threshold, the prose bands and the confidence
         // policy in one go.
-        all = SpecialistProvider.normalise(all);
+        all = Evidence.normalise(all);
 
-        List<SpecialistProvider.Finding> kept = new ArrayList<>();
-        for (SpecialistProvider.Finding f : all) {
-            if (f.confidence() >= specialist.getMinConfidence()) {
-                kept.add(f);
+        List<Evidence> kept = new ArrayList<>();
+        int dropped = 0;
+        for (Evidence e : all) {
+            // A confidence threshold is a statement about scores. Applying one
+            // to unscored evidence would discard every OCR line and every
+            // transcript, because none of them has a number to compare — the
+            // filter would silently delete the output of whole classes of tool.
+            if (!e.scored() || e.confidence() >= specialist.getMinConfidence()) {
+                kept.add(e);
+            } else {
+                dropped++;
             }
         }
         connections.recordSuccess(connection);
         return trace(specialist, traceId,
-                new Result(true, kept, all.size() - kept.size(), res.body(), res.status(), ms, null));
+                new Result(true, kept, dropped, res.body(), res.status(), ms, null));
     }
 
     private Result failed(SpecialistEntity s, String traceId, long start, String error) {
@@ -215,12 +254,16 @@ public class SpecialistInvoker {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("specialist", s.getName());
         detail.put("model", s.getModelPath());
+        // The full evidence, whatever shape it took. A trace that showed only
+        // findings would show nothing at all for an OCR or transcription step.
+        detail.put("evidence", r.evidence().stream().map(Evidence::describe).toList());
         detail.put("findings", r.findings().stream().map(f -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("label", f.label());
             m.put("confidence", f.confidence());
             return m;
         }).toList());
+        detail.put("unscored", r.unscored());
         detail.put("belowThreshold", r.dropped());
         detail.put("minConfidence", s.getMinConfidence());
         if (r.error() != null) {

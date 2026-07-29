@@ -36,7 +36,19 @@ import java.util.Map;
  */
 public final class ConfidencePolicy {
 
-    public enum Band { STRONG, MEDIUM, WEAK, NONE, UNAVAILABLE }
+    public enum Band {
+        STRONG, MEDIUM, WEAK, NONE, UNAVAILABLE,
+        /**
+         * Evidence was produced and none of it carries a confidence — recovered
+         * text, extracted fields, transformed records.
+         *
+         * <p>Not a strength. A sixth band exists because grading unscored
+         * evidence on a scale it was never measured against gives the wrong
+         * answer in both directions: called STRONG it invents certainty, called
+         * WEAK it makes the model refuse to read a document it was handed.
+         */
+        UNSCORED
+    }
 
     /** What the band asks the model to do. */
     public enum Action {
@@ -102,6 +114,12 @@ public final class ConfidencePolicy {
                     "The analysis ran and found nothing above the reporting threshold.");
         }
 
+        if (ctx.unscoredOnly()) {
+            return new Decision(Band.UNSCORED, Action.PASS, UNSCORED_INSTRUCTION, 0, false,
+                    "Evidence was recovered but none of it carries a confidence figure, so no "
+                            + "threshold applies to it.");
+        }
+
         double e = ctx.topConfidence();
         if (e >= strongAt) {
             return new Decision(Band.STRONG, Action.PASS, "", e, false,
@@ -134,6 +152,14 @@ public final class ConfidencePolicy {
             rather than leaving it implied: name what is uncertain, and say what would \
             make the picture clearer. Do not state anything as established fact that \
             rests only on the moderate findings above.""";
+
+    private static final String UNSCORED_INSTRUCTION = """
+            The evidence you have been given carries no confidence score. It is content \
+            recovered from the input — text, fields or records — not a probabilistic \
+            detection. Do not state or imply a percentage of your own, and do not describe \
+            the evidence as confirmed or uncertain; say what it contains, and say plainly \
+            when it does not contain what the question asks about.
+            """;
 
     private static final String WEAK_INSTRUCTION = """
 

@@ -138,7 +138,7 @@ public class SpecialistCatalogue {
 
         Long cid = ((Number) connection.get("id")).longValue();
         Map<String, Object> specialist = specialists.create(developerId, cid, name, path,
-                entry.inputKind(),
+                entry.inputKind(), entry.toolKind(),
                 minConfidence == null ? entry.suggestedConfidence() : minConfidence,
                 null);
 

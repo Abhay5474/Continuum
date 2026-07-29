@@ -51,6 +51,21 @@ public class SpecialistService {
     @Transactional
     public Map<String, Object> create(String developerId, Long connectionId, String name, String modelPath,
                                       String inputKind, Double minConfidence, Integer timeoutSeconds) {
+        return create(developerId, connectionId, name, modelPath, inputKind, null,
+                minConfidence, timeoutSeconds);
+    }
+
+    /**
+     * Creates a tool.
+     *
+     * @param toolKind what shape of work it does; null keeps the pre-existing
+     *                 behaviour of assuming a detector, so callers written
+     *                 before tool kinds existed are unaffected
+     */
+    @Transactional
+    public Map<String, Object> create(String developerId, Long connectionId, String name, String modelPath,
+                                      String inputKind, io.continuum.tool.ToolKind toolKind,
+                                      Double minConfidence, Integer timeoutSeconds) {
         if (name == null || name.isBlank()) {
             throw new SpecialistConnectionService.InvalidConnectionException("A specialist needs a name.");
         }
@@ -65,11 +80,14 @@ public class SpecialistService {
         // Fails here if the connection is not this developer's.
         connections.require(developerId, connectionId);
 
-        SpecialistEntity s = repo.save(new SpecialistEntity(developerId, connectionId, name.strip(),
+        SpecialistEntity draft = new SpecialistEntity(developerId, connectionId, name.strip(),
                 modelPath.strip(), inputKind,
                 minConfidence == null ? 0.30 : minConfidence,
-                timeoutSeconds == null ? 20 : timeoutSeconds));
-        return describe(s);
+                timeoutSeconds == null ? 20 : timeoutSeconds);
+        if (toolKind != null) {
+            draft.setToolKind(toolKind);
+        }
+        return describe(repo.save(draft));
     }
 
     @Transactional
@@ -100,30 +118,44 @@ public class SpecialistService {
                 ? defaultSampleFor(s.getInputKind())
                 : sample;
 
+        if (input == null) {
+            // Recorded as a failed probe rather than thrown, so the specialist
+            // stays DRAFT and the console can display the reason next to it —
+            // the same treatment any other unsuccessful probe receives.
+            String msg = sampleRequiredMessage(s.getInputKind());
+            s.recordSampleRequired(msg);
+            repo.save(s);
+            Map<String, Object> needsSample = describe(s);
+            needsSample.put("probeParsed", List.of());
+            needsSample.put("probeDropped", 0);
+            needsSample.put("sampleRequired", true);
+            return needsSample;
+        }
+
         SpecialistInvoker.Result r = invoker.invoke(s, input, null);
 
         String findingsJson;
         try {
-            findingsJson = mapper.writeValueAsString(r.findings());
+            findingsJson = mapper.writeValueAsString(
+                    r.evidence().stream().map(io.continuum.tool.Evidence::describe).toList());
         } catch (Exception e) {
             findingsJson = "[]";
         }
         s.recordProbe(r.httpStatus() == null ? 0 : r.httpStatus(), r.latencyMs(),
-                r.rawBody(), findingsJson, r.findings().size() + r.dropped(), r.error());
+                r.rawBody(), findingsJson, r.evidence().size() + r.dropped(), r.error());
         repo.save(s);
 
         Map<String, Object> out = describe(s);
         // The parsed findings are returned alongside the raw body so the console
         // can show both: "here is what your model said, and here is what
         // Continuum understood from it".
-        out.put("probeParsed", r.findings().stream().map(f -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("label", f.label());
-            m.put("confidence", f.confidence());
-            m.put("region", f.region());
-            return m;
-        }).toList());
+        // The full evidence, whatever shape it is. Showing only findings meant
+        // an OCR probe displayed an empty result beside a perfectly good body.
+        out.put("probeParsed", r.evidence().stream()
+                .map(io.continuum.tool.Evidence::describe).toList());
         out.put("probeDropped", r.dropped());
+        out.put("probeUnscored", r.unscored());
+        out.put("sampleRequired", false);
         return out;
     }
 
@@ -145,13 +177,37 @@ public class SpecialistService {
     }
 
     /** A minimal payload of the right kind, for probing without a supplied sample. */
-    private static Map<String, Object> defaultSampleFor(String inputKind) {
+    /**
+     * A sample good enough to learn a response shape from, or null when there
+     * isn't one.
+     *
+     * <p>Null is a real answer for audio and documents. Continuum has no blank
+     * WAV or blank PDF that any real provider would accept, and the previous
+     * behaviour — sending {@code {"audioBase64": ""}} for audio, and a 1x1 PNG
+     * for anything it did not recognise, documents included — probed those tools
+     * with content they could not possibly process. A probe that proves nothing
+     * is worse than no probe, because the tool is then marked READY.
+     */
+    static Map<String, Object> defaultSampleFor(String inputKind) {
         return switch (inputKind == null ? "image" : inputKind) {
             case "text" -> Map.of("text", "The quick brown fox jumps over the lazy dog.");
             case "json" -> Map.of("sample", true);
-            case "audio" -> Map.of("audioBase64", "");
+            case "image" -> Map.of("imageBase64", SAMPLE_IMAGE_BASE64);
+            // No universal sample exists. The developer supplies one.
+            case "audio", "document" -> null;
             default -> Map.of("imageBase64", SAMPLE_IMAGE_BASE64);
         };
+    }
+
+    /** What to tell a developer who must supply their own probe sample. */
+    static String sampleRequiredMessage(String inputKind) {
+        return "audio".equals(inputKind)
+                ? "This tool takes audio, and Continuum has no sample recording that a real "
+                        + "transcription service would accept. Supply a short clip — base64 under "
+                        + "\"audioBase64\" — so the probe exercises the real path."
+                : "This tool takes a document, and Continuum has no sample document that a real "
+                        + "extraction service would accept. Supply one — base64 under "
+                        + "\"documentBase64\" — so the probe exercises the real path.";
     }
 
     public Map<String, Object> describe(SpecialistEntity s) {
@@ -164,6 +220,9 @@ public class SpecialistService {
         m.put("minConfidence", s.getMinConfidence());
         m.put("timeoutSeconds", s.getTimeoutSeconds());
         m.put("status", s.getStatus().name());
+        m.put("toolKind", s.getToolKind().name());
+        m.put("toolKindLabel", s.getToolKind().label());
+        m.put("scored", s.getToolKind().isScored());
         m.put("probeStatus", s.getProbeStatus());
         m.put("probeMs", s.getProbeMs());
         m.put("probeError", s.getProbeError());

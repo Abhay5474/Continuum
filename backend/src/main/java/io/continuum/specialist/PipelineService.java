@@ -128,7 +128,7 @@ public class PipelineService {
             }
 
             SpecialistInvoker.Result r = invoker.invoke(s, input, traceId);
-            results.add(new ContextBuilder.StepResult(s.getName(), r.findings(), r.dropped(), r.error()));
+            results.add(new ContextBuilder.StepResult(s.getName(), r.evidence(), r.dropped(), r.error()));
             ranSoFar++;
             if (r.error() == null) {
                 findingsSoFar += r.findings().size();

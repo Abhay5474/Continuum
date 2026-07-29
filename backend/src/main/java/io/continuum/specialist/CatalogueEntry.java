@@ -24,7 +24,11 @@ import java.util.Map;
  * @param provider            {@code roboflow}, {@code http}, …
  * @param baseUrl             pre-filled when the provider has a fixed home
  * @param modelPath           pre-filled when the shape is fixed; empty when yours
- * @param inputKind           image | text | json | audio
+ * @param inputKind           image | text | json | audio | document
+ * @param toolKind            what shape of work it does, and therefore what
+ *                            shape of evidence it returns. Distinct from
+ *                            inputKind: OCR and document extraction both take a
+ *                            document and return entirely different things.
  * @param suggestedConfidence a starting threshold appropriate to the task
  * @param tags                what it is searched by
  * @param needs               fields the developer must provide
@@ -33,6 +37,7 @@ import java.util.Map;
  */
 public record CatalogueEntry(String id, String title, String description, String provider,
                              String baseUrl, String modelPath, String inputKind,
+                             io.continuum.tool.ToolKind toolKind,
                              double suggestedConfidence, List<String> tags, List<String> needs,
                              String note, String source) {
 
@@ -45,6 +50,9 @@ public record CatalogueEntry(String id, String title, String description, String
         m.put("baseUrl", baseUrl);
         m.put("modelPath", modelPath);
         m.put("inputKind", inputKind);
+        m.put("toolKind", toolKind.name());
+        m.put("toolKindLabel", toolKind.label());
+        m.put("scored", toolKind.isScored());
         m.put("suggestedConfidence", suggestedConfidence);
         m.put("tags", tags);
         m.put("needs", needs);
@@ -76,6 +84,14 @@ public record CatalogueEntry(String id, String title, String description, String
             score += 2;
         }
         if (provider.equalsIgnoreCase(q)) {
+            score += 4;
+        }
+        // Someone typing "ocr" or "transcription" is naming a kind of work, and
+        // that is the strongest possible signal about what they want.
+        if (toolKind.name().equalsIgnoreCase(q)) {
+            score += 8;
+        }
+        if (inputKind.equalsIgnoreCase(q)) {
             score += 4;
         }
         return score;

@@ -1,5 +1,6 @@
 package io.continuum.specialist;
 
+import io.continuum.tool.ToolKind;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
@@ -35,7 +36,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "Object or defect detection (Roboflow)",
                     "A model you trained in Roboflow, returning labelled boxes with confidences. "
                             + "The common case: damage, defects, wear, presence or absence of a part.",
-                    "roboflow", "https://detect.roboflow.com", "", "image",
+                    "roboflow", "https://detect.roboflow.com", "", "image", ToolKind.DETECTION,
                     0.40,
                     List.of("roboflow", "detection", "object", "defect", "damage", "boxes", "vision"),
                     List.of("modelPath", "secret"),
@@ -49,7 +50,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "Image classification (Roboflow)",
                     "A Roboflow classifier returning one or more labels for the whole image "
                             + "rather than regions within it.",
-                    "roboflow", "https://classify.roboflow.com", "", "image",
+                    "roboflow", "https://classify.roboflow.com", "", "image", ToolKind.CLASSIFICATION,
                     0.50,
                     List.of("roboflow", "classification", "classify", "label", "category", "vision"),
                     List.of("modelPath", "secret"),
@@ -63,7 +64,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "Object detection (your own endpoint)",
                     "Your own model behind HTTP — FastAPI, SageMaker, TorchServe, an internal "
                             + "service. Returns predictions with labels and scores.",
-                    "http", "", "/predict", "image",
+                    "http", "", "/predict", "image", ToolKind.DETECTION,
                     0.40,
                     List.of("custom", "http", "detection", "self-hosted", "fastapi", "sagemaker",
                             "torchserve", "vision"),
@@ -78,7 +79,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "Text classification (your own endpoint)",
                     "Sentiment, intent, topic or routing labels for a piece of text, before the "
                             + "language model sees it.",
-                    "http", "", "/classify", "text",
+                    "http", "", "/classify", "text", ToolKind.CLASSIFICATION,
                     0.50,
                     List.of("custom", "http", "text", "classification", "sentiment", "intent",
                             "topic", "routing", "nlp"),
@@ -92,7 +93,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "OCR / text extraction (your own endpoint)",
                     "Pull text out of an image or scan so the language model reasons over words "
                             + "instead of pixels it cannot see.",
-                    "http", "", "/ocr", "image",
+                    "http", "", "/ocr", "image", ToolKind.OCR,
                     0.60,
                     List.of("ocr", "text", "extraction", "document", "scan", "receipt", "invoice",
                             "http", "custom"),
@@ -107,7 +108,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "Audio transcription (your own endpoint)",
                     "Turn speech into text before summarising, routing or answering — a call "
                             + "recording, a voice note, a meeting.",
-                    "http", "", "/transcribe", "audio",
+                    "http", "", "/transcribe", "audio", ToolKind.TRANSCRIPTION,
                     0.50,
                     List.of("audio", "speech", "transcription", "whisper", "voice", "meeting",
                             "http", "custom"),
@@ -122,7 +123,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "Structured extraction from documents (your own endpoint)",
                     "Pull named fields out of a document or payload — totals, dates, parties, "
                             + "reference numbers — and hand them over as facts.",
-                    "http", "", "/extract", "json",
+                    "http", "", "/extract", "json", ToolKind.EXTRACTION,
                     0.55,
                     List.of("extraction", "document", "fields", "invoice", "form", "structured",
                             "json", "http", "custom"),
@@ -136,7 +137,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "http-moderation",
                     "Content safety / moderation (your own endpoint)",
                     "Flag unsafe or unwanted content before it reaches the model or the user.",
-                    "http", "", "/moderate", "text",
+                    "http", "", "/moderate", "text", ToolKind.MODERATION,
                     0.25,
                     List.of("moderation", "safety", "abuse", "nsfw", "toxicity", "filter",
                             "http", "custom"),
@@ -150,7 +151,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "http-generic",
                     "Anything else over HTTP",
                     "A blank template for a JSON endpoint that does not match the shapes above.",
-                    "http", "", "/", "json",
+                    "http", "", "/", "json", ToolKind.CUSTOM,
                     0.40,
                     List.of("custom", "http", "generic", "blank", "other", "json"),
                     List.of("baseUrl", "modelPath", "secret"),

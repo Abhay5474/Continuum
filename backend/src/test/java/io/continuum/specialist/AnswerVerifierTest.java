@@ -17,7 +17,7 @@ class AnswerVerifierTest {
 
     private static ContextBuilder.Context ctx(SpecialistProvider.Finding... findings) {
         return ContextBuilder.build("triage", "what now?",
-                List.of(new ContextBuilder.StepResult("detector", List.of(findings), 0, null)));
+                List.of(ContextBuilder.StepResult.ofFindings("detector", List.of(findings), 0, null)));
     }
 
     private static ContextBuilder.Context nothingFound() {

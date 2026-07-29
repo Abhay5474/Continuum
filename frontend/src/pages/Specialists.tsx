@@ -51,7 +51,24 @@ type Specialist = {
   probeError: string | null;
   probedAt: string | null;
   probeResponse: string | null;
-  probeFindings: { label: string; confidence: number }[];
+  toolKind: string;
+  toolKindLabel: string;
+  scored: boolean;
+  probeFindings: EvidenceItem[];
+};
+
+/**
+ * One thing a tool observed. Confidence is nullable on purpose: an OCR engine
+ * has no opinion about how sure it is, and rendering 0.00 there would read as
+ * "certainly not".
+ */
+type EvidenceItem = {
+  kind: "DETECTION" | "CLASSIFICATION" | "TEXT" | "FIELD" | "ROW" | "NOTE";
+  label?: string;
+  confidence: number | null;
+  scored: boolean;
+  text?: string;
+  attributes?: Record<string, unknown>;
 };
 
 export default function Specialists() {
@@ -467,7 +484,10 @@ function SpecialistCard({
         <button onClick={onToggle} aria-expanded={open} className="min-w-0 flex-1 text-left">
           <div className="text-sm font-medium text-slate-200">{s.name}</div>
           <div className="truncate text-xs text-slate-500">
-            {s.modelPath} · {s.inputKind} · ignores below {s.minConfidence.toFixed(2)}
+            {s.modelPath} · {s.inputKind} in · {s.toolKindLabel}
+            {s.scored
+              ? ` · ignores below ${s.minConfidence.toFixed(2)}`
+              : " · returns content, so no confidence threshold applies"}
             {s.probedAt ? ` · probed ${dateTimeOf(s.probedAt)}` : ""}
           </div>
         </button>
@@ -515,27 +535,8 @@ function SpecialistCard({
                     </div>
                   ) : (
                     <div className="well space-y-1.5 p-3">
-                      {s.probeFindings.map((f, i) => (
-                        <div key={i} className="flex min-w-0 items-center gap-3">
-                          <span className="min-w-0 flex-1 truncate text-xs text-slate-300">
-                            {f.label}
-                          </span>
-                          <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-edge/60">
-                            <div
-                              className={`h-full rounded-full ${
-                                f.confidence >= 0.7
-                                  ? "bg-emerald-500/70"
-                                  : f.confidence >= 0.4
-                                    ? "bg-amber-500/70"
-                                    : "bg-rose-500/70"
-                              }`}
-                              style={{ width: `${Math.max(3, f.confidence * 100)}%` }}
-                            />
-                          </div>
-                          <span className="readout w-10 shrink-0 text-right text-xs text-slate-400">
-                            {f.confidence.toFixed(2)}
-                          </span>
-                        </div>
+                      {s.probeFindings.map((e, i) => (
+                        <EvidenceRow key={i} e={e} />
                       ))}
                     </div>
                   )}
@@ -551,5 +552,84 @@ function SpecialistCard({
         </div>
       )}
     </Plane>
+  );
+}
+
+/**
+ * One piece of evidence, drawn according to what it actually is.
+ *
+ * <p>A confidence bar is only drawn for evidence that carries a confidence.
+ * Drawing an empty bar for recovered text would say "zero percent sure", which
+ * is the opposite of "no measurement was taken".
+ */
+function EvidenceRow({ e }: { e: EvidenceItem }) {
+  if (e.kind === "TEXT") {
+    return (
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="micro text-sky-400">text</span>
+          {e.label && <span className="micro">{e.label}</span>}
+          <span className="micro text-slate-500">no confidence — extracted content</span>
+        </div>
+        <p className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-slate-300">
+          {e.text}
+        </p>
+      </div>
+    );
+  }
+
+  if (e.kind === "FIELD") {
+    return (
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="micro text-violet-400">field</span>
+        <span className="shrink-0 text-xs text-slate-400">{e.label}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-300">{e.text}</span>
+      </div>
+    );
+  }
+
+  if (e.kind === "ROW") {
+    return (
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="micro text-amber-400">row</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-slate-300">
+          {JSON.stringify(e.attributes ?? {})}
+        </span>
+      </div>
+    );
+  }
+
+  if (e.kind === "NOTE") {
+    return (
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="micro">note</span>
+        <span className="min-w-0 flex-1 text-xs text-slate-400">{e.text}</span>
+      </div>
+    );
+  }
+
+  // DETECTION / CLASSIFICATION — the original shape, unchanged when scored.
+  const c = e.confidence;
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <span className="min-w-0 flex-1 truncate text-xs text-slate-300">{e.label}</span>
+      {c === null ? (
+        <span className="micro shrink-0 text-slate-500">unscored</span>
+      ) : (
+        <>
+          <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-edge/60">
+            <div
+              className={`h-full rounded-full ${
+                c >= 0.7 ? "bg-emerald-500/70" : c >= 0.4 ? "bg-amber-500/70" : "bg-rose-500/70"
+              }`}
+              style={{ width: `${Math.max(3, c * 100)}%` }}
+            />
+          </div>
+          <span className="readout w-10 shrink-0 text-right text-xs text-slate-400">
+            {c.toFixed(2)}
+          </span>
+        </>
+      )}
+    </div>
   );
 }

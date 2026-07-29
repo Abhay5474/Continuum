@@ -24,7 +24,7 @@ class ContextBuilderTest {
     }
 
     private static ContextBuilder.StepResult ok(String name, SpecialistProvider.Finding... findings) {
-        return new ContextBuilder.StepResult(name, List.of(findings), 0, null);
+        return ContextBuilder.StepResult.ofFindings(name, List.of(findings), 0, null);
     }
 
     // --- the central guarantee ----------------------------------------------
@@ -173,7 +173,8 @@ class ContextBuilderTest {
     @DisplayName("A failed specialist contributes no findings and no confidence")
     void failureContributesNothing() {
         ContextBuilder.Context ctx = ContextBuilder.build("triage", null, List.of(
-                new ContextBuilder.StepResult("detector", List.of(f("wound", 0.99)), 0, "connection refused")));
+                ContextBuilder.StepResult.ofFindings("detector", List.of(f("wound", 0.99)), 0,
+                        "connection refused")));
 
         // The findings list on an errored step is not evidence — an adapter may
         // have populated it from a partial body. Trusting it would let a failure

@@ -1,7 +1,9 @@
 package io.continuum.specialist;
 
 import io.continuum.persistence.entity.SpecialistConnectionEntity;
+import io.continuum.tool.Evidence;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -60,6 +62,28 @@ public interface SpecialistProvider {
      * confidence policy treat that as "no signal", not take the request down.
      */
     List<Finding> parse(Object responseBody);
+
+    /**
+     * Maps a provider response onto general {@link Evidence}.
+     *
+     * <p>The generalised form of {@link #parse}. An adapter that only ever
+     * returns detections need not implement it — the default lifts its findings
+     * into detection evidence, so {@link RoboflowProvider} and every custom
+     * adapter written before this method existed keep working untouched.
+     *
+     * <p>An adapter <b>must</b> override it when its provider can return
+     * something that is not a labelled score: recovered text, named fields,
+     * tabular rows. Those cannot be expressed as a {@code Finding} without
+     * inventing a confidence, and inventing one is the failure this exists to
+     * prevent.
+     */
+    default List<Evidence> parseEvidence(Object responseBody) {
+        List<Evidence> out = new ArrayList<>();
+        for (Finding f : parse(responseBody)) {
+            out.add(Evidence.detection(f.label(), f.confidence(), f.region()));
+        }
+        return out;
+    }
 
     /** An outbound call, ready for the hardened HTTP activity. */
     record Call(String url, String method, Map<String, String> headers, Object body) {

@@ -16,7 +16,7 @@ class ConfidencePolicyTest {
 
     private static ContextBuilder.Context withTop(double confidence) {
         return ContextBuilder.build("triage", "what now?", List.of(
-                new ContextBuilder.StepResult("detector",
+                ContextBuilder.StepResult.ofFindings("detector",
                         List.of(new SpecialistProvider.Finding("wound", confidence, null)), 0, null)));
     }
 

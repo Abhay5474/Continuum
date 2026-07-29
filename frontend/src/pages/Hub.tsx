@@ -26,6 +26,10 @@ type Entry = {
   baseUrl: string;
   modelPath: string;
   inputKind: string;
+  toolKind: string;
+  toolKindLabel: string;
+  /** Whether this kind of tool produces confidences at all. */
+  scored: boolean;
   suggestedConfidence: number;
   tags: string[];
   needs: string[];
@@ -176,10 +180,20 @@ function EntryCard({
       <button onClick={onToggle} aria-expanded={open} className="w-full px-3 py-2.5 text-left">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-sm font-medium text-slate-200">{e.title}</span>
-          <span className="micro">{e.inputKind}</span>
-          <span className="readout text-[10px] text-slate-500">
-            suggests {e.suggestedConfidence.toFixed(2)}
-          </span>
+          <span className="micro">{e.inputKind} in</span>
+          <span className="micro text-aurora">{e.toolKindLabel}</span>
+          {e.scored ? (
+            <span className="readout text-[10px] text-slate-500">
+              suggests {e.suggestedConfidence.toFixed(2)}
+            </span>
+          ) : (
+            <span
+              className="readout text-[10px] text-slate-500"
+              title="This kind of tool returns content rather than scored detections, so a confidence threshold does not apply to it."
+            >
+              no confidence
+            </span>
+          )}
         </div>
         <p className="mt-0.5 text-xs text-slate-500">{e.description}</p>
       </button>

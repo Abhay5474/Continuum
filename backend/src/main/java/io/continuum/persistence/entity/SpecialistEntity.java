@@ -50,6 +50,15 @@ public class SpecialistEntity {
     @Column(name = "input_kind", nullable = false, length = 16)
     private String inputKind = "image";
 
+    /**
+     * What shape of work this tool does — detection, OCR, transcription and so
+     * on. Distinct from {@code inputKind}: an OCR tool and a document extractor
+     * both take a document and return completely different things.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tool_kind", nullable = false, length = 24)
+    private io.continuum.tool.ToolKind toolKind = io.continuum.tool.ToolKind.DETECTION;
+
     @Column(name = "min_confidence", nullable = false)
     private double minConfidence = 0.30;
 
@@ -104,6 +113,11 @@ public class SpecialistEntity {
     public String getName() { return name; }
     public String getModelPath() { return modelPath; }
     public String getInputKind() { return inputKind; }
+    public io.continuum.tool.ToolKind getToolKind() { return toolKind; }
+    public void setToolKind(io.continuum.tool.ToolKind k) {
+        this.toolKind = k == null ? io.continuum.tool.ToolKind.CUSTOM : k;
+        this.updatedAt = Instant.now();
+    }
     public double getMinConfidence() { return minConfidence; }
     public int getTimeoutSeconds() { return timeoutSeconds; }
     public Status getStatus() { return status; }
@@ -131,6 +145,25 @@ public class SpecialistEntity {
      * {@code FAILED} on purpose: the endpoint answered, so the credential and
      * the path are right and the adapter is what needs attention.
      */
+    /**
+     * The probe could not run because Continuum has no sample of this input kind.
+     *
+     * <p>Deliberately not {@link Status#FAILED}. Nothing is broken — no request
+     * was made, so the endpoint has not been accused of anything. The tool stays
+     * DRAFT, which is exactly what it is: never proved to work, and therefore
+     * not usable in a pipeline until the developer supplies a sample.
+     */
+    public void recordSampleRequired(String message) {
+        this.probeStatus = null;
+        this.probeMs = null;
+        this.probeResponse = null;
+        this.probeFindings = "[]";
+        this.probeError = truncate(message);
+        this.probedAt = Instant.now();
+        this.updatedAt = Instant.now();
+        this.status = Status.DRAFT;
+    }
+
     public void recordProbe(int httpStatus, long ms, String rawResponse, String findingsJson,
                             int findingCount, String error) {
         this.probeStatus = httpStatus;
