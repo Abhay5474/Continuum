@@ -17,6 +17,10 @@ public final class SpecialistProviders {
         register(new DeepgramProvider());
         register(new AssemblyAIProvider());
         register(new OcrSpaceProvider());
+        register(new HuggingFaceProvider());
+        // Google is more accurate and more setup than the free-tier options
+        // above, so it sits below them rather than in front.
+        register(new GoogleVisionProvider());
         register(new GenericHttpProvider());
     }
 

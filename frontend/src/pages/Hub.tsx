@@ -225,6 +225,8 @@ const PATH_LABEL: Record<string, string> = {
   deepgram: "Model",
   assemblyai: "Model",
   ocrspace: "Path",
+  huggingface: "Model id (required)",
+  googlevision: "Feature",
 };
 
 const PATH_HINT: Record<string, string> = {
@@ -232,12 +234,19 @@ const PATH_HINT: Record<string, string> = {
   deepgram: "nova-2",
   assemblyai: "leave blank",
   ocrspace: "leave blank",
+  huggingface: "unitary/toxic-bert",
+  googlevision: "DOCUMENT_TEXT_DETECTION",
 };
 
 const PATH_NOTE: Record<string, string> = {
   deepgram: "A Deepgram model name, not a URL. nova-2 is the sensible default.",
   assemblyai: "Not used — AssemblyAI picks the model itself. Leave it blank.",
   ocrspace: "Not used — OCR.space has a single endpoint. Leave it blank.",
+  huggingface:
+    "Any model id from the Hub. This is the entire choice being made, so there is no default.",
+  googlevision:
+    "Which job Vision does: DOCUMENT_TEXT_DETECTION for OCR, LABEL_DETECTION for labels, " +
+    "SAFE_SEARCH_DETECTION for moderation.",
 };
 
 function EntryCard({

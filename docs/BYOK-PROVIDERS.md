@@ -16,8 +16,8 @@ one provider:
 4. how to read the response back into `Evidence`
 
 That is the whole job. `RoboflowProvider` was the first one; this document
-covers the three added after it, chosen for having a free tier so a developer
-can wire one up end to end before paying anybody.
+covers the five added after it, prioritised by whether a developer can wire one
+up end to end without paying anybody first.
 
 ---
 
@@ -29,16 +29,23 @@ can wire one up end to end before paying anybody.
 | **Deepgram** | audio → transcript | free credits | 1 | 🟡 fixture-tested |
 | **AssemblyAI** | audio → transcript | yes | 3+ | 🟡 fixture-tested |
 | **OCR.space** | image/scanned PDF → text | yes, generous | 1 | 🟡 fixture-tested |
+| **Hugging Face** | text/image → labels, moderation, ASR, summaries | yes, serverless | 1 | 🟡 fixture-tested |
+| **Google Vision** | image → OCR, labels, safe search | 1,000 units/month | 1 | 🟡 fixture-tested |
 
-All three appear in the Hub with a **free tier** badge, need only an API key, and
-install through the existing flow into the existing `SpecialistInvoker`. No new
-execution path, no new credential store.
+They install through the existing flow into the existing `SpecialistInvoker`. No
+new execution path, no new credential store. The four free-tier ones carry a
+**free tier** badge in the Hub; Google Vision does not, because its free
+allowance runs out.
+
+Ordering is deliberate. Google is more accurate than OCR.space and more work to
+start using, so it sits below it — reach for the free one to get something
+working, and move up when accuracy on real documents starts to matter.
 
 ---
 
 ## What had to change first
 
-Three adapters could not have been written against the invoker as it stood.
+Some of these could not have been written against the invoker as it stood.
 
 **Bodies could only be text.** `GuardedHttpSender.send` took a `String`.
 Deepgram reads the request body *as the media file*, and AssemblyAI's upload
@@ -90,6 +97,28 @@ if (!e.scored() || e.confidence() >= specialist.getMinConfidence()) kept.add(e);
 The same reasoning applies to OCR: recognition confidence says how clearly a
 character was read, not whether what it says is true.
 
+### The other side of the rule
+
+**Classifier scores are not like this, and are scored normally.** A Hugging Face
+moderation model saying "0.94 toxic" or Google returning "0.98 Dog" is a class
+probability — exactly the number a threshold exists to compare against. Those
+come back as scored `Evidence.classification` and are filtered like any
+detection.
+
+The distinction is not configuration. Hugging Face serves both from the same
+endpoint with the same URL shape, so the adapter decides from the **response
+shape**: labels and scores become scored classifications, a `{"text": ...}` from
+an ASR model on the same provider becomes unscored text. Getting that right from
+the shape alone is most of what `HuggingFaceProvider` does.
+
+### And a third case: words instead of numbers
+
+Google's safe-search answers `VERY_UNLIKELY` … `VERY_LIKELY`. Those are ordered
+categories, and there is no defensible number for `POSSIBLE`. Converting them
+would invent the precision a moderation rule is then compared against, so they
+come back as unscored `Evidence.field` carrying Google's own word. A pipeline
+decides on what Google actually asserted.
+
 ---
 
 ## Failure shapes are told apart
@@ -104,12 +133,26 @@ causes that need opposite responses. Each is a distinct `Evidence.note`:
 | AssemblyAI, job errored | the provider's own error message |
 | OCR.space, blank page | "read the file and found no text — the page may be blank, or too low-resolution" |
 | OCR.space, processing failed | the provider's own error message |
+| Hugging Face, bad model id | the provider's own error, which arrives in a 200 body |
+| Google Vision, per-image failure | the provider's message, also inside a 200 body |
+| Google Vision, nothing found | "found nothing for the requested feature — for OCR that usually means no legible text" |
 
 The AssemblyAI unfinished case is the one worth calling out. It must never read
 like silence: one means raise the timeout, the other means check the recording.
 
-**OCR.space reports failure inside a 200 body**, not in the status code, so a
-call that "succeeded" is still checked for `IsErroredOnProcessing`.
+**Three of these report failure inside a 200 body**, not in the status code:
+OCR.space via `IsErroredOnProcessing`, Hugging Face via a top-level `error`
+(which is how a mistyped model id arrives), and Google Vision via an `error`
+object nested per-image. A call that "succeeded" is still checked in all three.
+
+### Hugging Face cold starts
+
+A model that has not been called recently is unloaded, and Hugging Face answers
+**HTTP 503, "currently loading"**. The invoker treats any 4xx/5xx as failure,
+which would make a perfectly good tool look broken the first time it was used
+each day. The adapter sends `x-wait-for-model: true`, so Hugging Face holds the
+request until the model is ready — one slow call instead of one confusing
+failure.
 
 ---
 
@@ -192,6 +235,9 @@ has not been true since the Evidence model landed.
 | Probe sample follows tool kind | ✅ verified |
 | Request shapes match each provider's documented contract | 🟡 **fixture-tested only** |
 | Transcripts and OCR text are unscored | ✅ verified |
+| Classifier scores ARE scored, from the same providers | ✅ verified |
+| Google safe-search stays categorical | ✅ verified |
+| Hugging Face maps 6 task shapes from the response alone | ✅ verified (fixtures) |
 | Failure shapes distinguished | ✅ verified |
 | AssemblyAI's 3-stage sequence drives correctly | 🟡 fixture-tested (the `next()` loop is exercised, the network is not) |
 | **Live calls to Deepgram / AssemblyAI / OCR.space** | ❌ **`LIVE_UNVERIFIED` — this environment cannot reach any of them** |
@@ -199,25 +245,29 @@ has not been true since the Evidence model landed.
 Measured from this deployment:
 
 ```
-api.assemblyai.com          -> 000   (refused at CONNECT)
-api.deepgram.com            -> 000   (refused at CONNECT)
-api.ocr.space               -> 000   (refused at CONNECT)
-api-inference.huggingface.co-> 000   (refused at CONNECT)
+api.assemblyai.com           -> 000   (refused at CONNECT)
+api.deepgram.com             -> 000   (refused at CONNECT)
+api.ocr.space                -> 000   (refused at CONNECT)
+api-inference.huggingface.co -> 000   (refused at CONNECT)
+vision.googleapis.com        -> 000   (refused at CONNECT)
 ```
 
 `ByokProviderLiveIT` holds one test per provider, each gated on that provider's
 key and **skipped** here. A skipped test is not a passing test.
 
 ```
-DEEPGRAM_API_KEY=…   mvn test -Dtest=ByokProviderLiveIT
-ASSEMBLYAI_API_KEY=… mvn test -Dtest=ByokProviderLiveIT
-OCRSPACE_API_KEY=…   mvn test -Dtest=ByokProviderLiveIT
+DEEPGRAM_API_KEY=…      mvn test -Dtest=ByokProviderLiveIT
+ASSEMBLYAI_API_KEY=…    mvn test -Dtest=ByokProviderLiveIT
+OCRSPACE_API_KEY=…      mvn test -Dtest=ByokProviderLiveIT
+HUGGINGFACE_API_KEY=…   mvn test -Dtest=ByokProviderLiveIT
+GOOGLE_VISION_API_KEY=… mvn test -Dtest=ByokProviderLiveIT
 ```
 
-The OCR.space test is the strongest of the three: the probe image has known text
-drawn on it, so a working OCR **must** return "CONTINUUM PROBE". The audio tests
-can only assert that a real WAV was accepted and the response understood, since
-a tone has no words in it.
+The two OCR tests are the strongest: the probe image has known text drawn on it,
+so a working recogniser **must** return "CONTINUUM PROBE". The audio tests can
+only assert that a real WAV was accepted and the response understood, since a
+tone has no words in it. The Hugging Face test doubles as the cold-start check —
+reaching a result at all is what proves `x-wait-for-model` works.
 
 If a live test fails, the fixtures in `ByokProviderTest` are what to fix — they
 encode an assumption about a contract, and the service is the authority. No
@@ -227,10 +277,11 @@ credential appears in any source file, fixture or properties file.
 
 ## Not built
 
-- **Hugging Face** (moderation, classification) — next in priority
-- **Google Vision / Azure Document Intelligence** — deliberately after the free
-  tier providers; they need a cloud project and a service account before
-  returning a character
-- **Callback-based long audio** — see the polling limitation above
+- **Azure Document Intelligence / Google Document AI** — structured document
+  extraction. Genuinely more configuration than anything above: form models,
+  training, and a region to pick.
+- **Callback-based long audio** — see the polling limitation above.
 - **Multipart request bodies** — no adapter needs one yet. OpenAI Whisper would;
   that is why it was not chosen first.
+- **Google Vision via service account** — the API-key path is enough to use it,
+  and OAuth would mean token refresh inside the invoker.

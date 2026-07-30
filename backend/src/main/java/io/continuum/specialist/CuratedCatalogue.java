@@ -116,6 +116,81 @@ public class CuratedCatalogue implements CatalogueSource {
                     SOURCE),
 
             new CatalogueEntry(
+                    "huggingface-moderation",
+                    "Content moderation (Hugging Face)",
+                    "Score text for toxicity, hate or self-harm before it reaches a model or a "
+                            + "person. Pick any moderation model on the Hub — the response shape "
+                            + "is the same.",
+                    "huggingface", "https://api-inference.huggingface.co", "unitary/toxic-bert",
+                    "text", ToolKind.MODERATION,
+                    // Deliberately low. A moderation check that only fires when
+                    // it is certain is a moderation check that misses things,
+                    // and the cost of a false positive here is a review.
+                    0.30,
+                    List.of("huggingface", "moderation", "toxicity", "safety", "abuse", "text",
+                            "free"),
+                    List.of("modelPath", "secret"),
+                    "Bring your own Hugging Face token; the serverless tier is free. Paste any "
+                            + "model id — unitary/toxic-bert is a reasonable start. These scores "
+                            + "are real class probabilities, so unlike a transcript they are "
+                            + "filtered on the threshold. First call each day may be slow: "
+                            + "Continuum asks Hugging Face to wait while a cold model loads "
+                            + "rather than reporting the 503 as a broken tool.",
+                    SOURCE),
+
+            new CatalogueEntry(
+                    "huggingface-classify",
+                    "Text or image classification (Hugging Face)",
+                    "Sort text or images into categories using any classifier on the Hub — "
+                            + "sentiment, topic, language, species, defect type.",
+                    "huggingface", "https://api-inference.huggingface.co", "", "text",
+                    ToolKind.CLASSIFICATION,
+                    0.50,
+                    List.of("huggingface", "classification", "classify", "sentiment", "topic",
+                            "label", "text", "image", "free"),
+                    List.of("modelPath", "secret"),
+                    "Paste a model id from the Hub. Text goes as JSON and an image goes as raw "
+                            + "bytes — the adapter picks based on what your pipeline supplies, so "
+                            + "one entry covers both. Supply \"candidateLabels\" in the input to "
+                            + "use a zero-shot model without training anything.",
+                    SOURCE),
+
+            new CatalogueEntry(
+                    "googlevision-ocr",
+                    "OCR — high accuracy (Google Cloud Vision)",
+                    "Read text off photos and scans with Google's recogniser. Slower to set up "
+                            + "than OCR.space and noticeably better on hard documents.",
+                    "googlevision", "https://vision.googleapis.com", "DOCUMENT_TEXT_DETECTION",
+                    "image", ToolKind.OCR,
+                    0.50,
+                    List.of("google", "vision", "ocr", "text", "document", "scan", "image"),
+                    List.of("secret"),
+                    "Needs a Google Cloud API key — a plain key on the query string, not a "
+                            + "service account, so there is no JWT signing to set up. The first "
+                            + "1,000 units a month are free. Try OCR.space first if you just want "
+                            + "something working; come here when accuracy on real documents "
+                            + "starts to matter.",
+                    SOURCE),
+
+            new CatalogueEntry(
+                    "googlevision-safesearch",
+                    "Image moderation (Google Cloud Vision)",
+                    "Check an image for adult, violent or medical content before showing it to "
+                            + "anyone.",
+                    "googlevision", "https://vision.googleapis.com", "SAFE_SEARCH_DETECTION",
+                    "image", ToolKind.MODERATION,
+                    0.30,
+                    List.of("google", "vision", "moderation", "safesearch", "adult", "violence",
+                            "image", "safety"),
+                    List.of("secret"),
+                    "Google answers in words — VERY_UNLIKELY through VERY_LIKELY — not numbers, "
+                            + "and Continuum passes the word through rather than inventing a "
+                            + "score for it. There is no honest number for \"POSSIBLE\", and a "
+                            + "made-up one would be the thing your moderation rule was compared "
+                            + "against.",
+                    SOURCE),
+
+            new CatalogueEntry(
                     "http-detect",
                     "Object detection (your own endpoint)",
                     "Your own model behind HTTP — FastAPI, SageMaker, TorchServe, an internal "

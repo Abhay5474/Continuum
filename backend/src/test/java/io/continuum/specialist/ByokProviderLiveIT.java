@@ -15,7 +15,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The tests that talk to the real Deepgram, AssemblyAI and OCR.space.
+ * The tests that talk to the real Deepgram, AssemblyAI, OCR.space, Hugging Face
+ * and Google Vision.
  *
  * <p><b>Every one of them is skipped in this deployment, and that is reported
  * rather than hidden.</b> All three hosts are refused at CONNECT here, so each
@@ -29,9 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * service":
  *
  * <pre>
- *   DEEPGRAM_API_KEY=…   mvn test -Dtest=ByokProviderLiveIT
- *   ASSEMBLYAI_API_KEY=… mvn test -Dtest=ByokProviderLiveIT
- *   OCRSPACE_API_KEY=…   mvn test -Dtest=ByokProviderLiveIT
+ *   DEEPGRAM_API_KEY=…      mvn test -Dtest=ByokProviderLiveIT
+ *   ASSEMBLYAI_API_KEY=…    mvn test -Dtest=ByokProviderLiveIT
+ *   OCRSPACE_API_KEY=…      mvn test -Dtest=ByokProviderLiveIT
+ *   HUGGINGFACE_API_KEY=…   mvn test -Dtest=ByokProviderLiveIT
+ *   GOOGLE_VISION_API_KEY=… mvn test -Dtest=ByokProviderLiveIT
  * </pre>
  *
  * <p>If one fails there, the fixtures in {@link ByokProviderTest} are what to
@@ -139,6 +142,49 @@ class ByokProviderLiveIT {
         // worth catching.
         assertThat(((Map<?, ?>) body).get("status")).isIn("completed", "error");
         assertThat(p.parseEvidence(body)).isNotEmpty();
+        assertThat(String.valueOf(body)).doesNotContain(key);
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "HUGGINGFACE_API_KEY", matches = ".+")
+    @DisplayName("Hugging Face classifies text, and the cold-start wait works")
+    void huggingFaceLive() throws Exception {
+        HuggingFaceProvider p = new HuggingFaceProvider();
+        String key = System.getenv("HUGGINGFACE_API_KEY");
+
+        Object body = send(p, key, p.buildCall(connection("huggingface"), "unitary/toxic-bert",
+                Map.of("text", "you are a horrible person")));
+
+        List<Evidence> ev = p.parseEvidence(body);
+
+        // Reaching here at all is half the test: a cold model answers 503, and
+        // x-wait-for-model is what turns that into a slow success rather than a
+        // failure the invoker reports as a broken tool.
+        assertThat(ev).isNotEmpty();
+        // A classifier's scores are genuine probabilities, so these must be
+        // scored — the opposite of the transcript cases above.
+        assertThat(ev).anySatisfy(e -> assertThat(e.scored()).isTrue());
+        assertThat(String.valueOf(body)).doesNotContain(key);
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "GOOGLE_VISION_API_KEY", matches = ".+")
+    @DisplayName("Google Vision reads the text Continuum drew on its own sample image")
+    void googleVisionLive() throws Exception {
+        GoogleVisionProvider p = new GoogleVisionProvider();
+        String key = System.getenv("GOOGLE_VISION_API_KEY");
+
+        Object body = send(p, key, p.buildCall(connection("googlevision"),
+                "DOCUMENT_TEXT_DETECTION",
+                Map.of("imageBase64", SampleMedia.pngWithTextBase64())));
+
+        List<Evidence> ev = p.parseEvidence(body);
+
+        assertThat(ev).isNotEmpty();
+        assertThat(ev.get(0).kind()).isEqualTo(Evidence.Kind.TEXT);
+        // Known text on the probe image, so a working OCR must return it.
+        assertThat(ev.get(0).text().replaceAll("\\s+", " "))
+                .containsIgnoringCase("CONTINUUM PROBE");
         assertThat(String.valueOf(body)).doesNotContain(key);
     }
 

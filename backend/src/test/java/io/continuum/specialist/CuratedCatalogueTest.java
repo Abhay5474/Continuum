@@ -28,9 +28,8 @@ class CuratedCatalogueTest {
         // fact worth pinning. What matters is that the winner is one of them.
         assertThat(catalogue.search("transcription", 10).get(0).id())
                 .isIn("deepgram-transcribe", "assemblyai-transcribe");
-        // No BYOK moderation adapter exists yet, so this one is still the
-        // self-hosted template.
-        assertThat(catalogue.search("moderation", 10).get(0).id()).isEqualTo("http-moderation");
+        assertThat(catalogue.search("moderation", 10).get(0).id())
+                .isIn("huggingface-moderation", "googlevision-safesearch");
     }
 
     @Test
