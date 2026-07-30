@@ -217,6 +217,29 @@ function SourceChip({ s }: { s: SourceState }) {
   );
 }
 
+/**
+ * What the "path" field means differs per provider, and calling it "Path"
+ * everywhere left people pasting a URL into a field that wanted a model name.
+ */
+const PATH_LABEL: Record<string, string> = {
+  deepgram: "Model",
+  assemblyai: "Model",
+  ocrspace: "Path",
+};
+
+const PATH_HINT: Record<string, string> = {
+  roboflow: "your-project/3",
+  deepgram: "nova-2",
+  assemblyai: "leave blank",
+  ocrspace: "leave blank",
+};
+
+const PATH_NOTE: Record<string, string> = {
+  deepgram: "A Deepgram model name, not a URL. nova-2 is the sensible default.",
+  assemblyai: "Not used — AssemblyAI picks the model itself. Leave it blank.",
+  ocrspace: "Not used — OCR.space has a single endpoint. Leave it blank.",
+};
+
 function EntryCard({
   e,
   open,
@@ -271,6 +294,14 @@ function EntryCard({
               title="A shape that ships with Continuum. You point it at your own endpoint."
             >
               template
+            </span>
+          )}
+          {e.tags?.includes("free") && (
+            <span
+              className="rounded border border-emerald-500/40 px-1 py-0.5 text-[10px] uppercase tracking-wide text-emerald-400/90"
+              title="This provider has a free tier or free credits, so you can wire it up end to end before paying anyone."
+            >
+              free tier
             </span>
           )}
           <span className="micro">{e.inputKind} in</span>
@@ -355,13 +386,16 @@ function EntryCard({
           )}
 
           <label className="block">
-            <Micro>{needsPath ? "Model path (required)" : "Path"}</Micro>
+            <Micro>{needsPath ? "Model path (required)" : PATH_LABEL[e.provider] ?? "Path"}</Micro>
             <input
               value={modelPath}
               onChange={(ev) => setModelPath(ev.target.value)}
-              placeholder={e.provider === "roboflow" ? "your-project/3" : "/predict"}
+              placeholder={PATH_HINT[e.provider] ?? "/predict"}
               className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 font-mono text-sm text-slate-200 outline-none focus:border-aurora/60"
             />
+            {!needsPath && PATH_NOTE[e.provider] && (
+              <p className="mt-1 text-xs text-slate-600">{PATH_NOTE[e.provider]}</p>
+            )}
           </label>
 
           <button

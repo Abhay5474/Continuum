@@ -3,6 +3,8 @@ package io.continuum.specialist;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.continuum.persistence.entity.SpecialistEntity;
 import io.continuum.persistence.repository.SpecialistRepository;
+import io.continuum.tool.SampleMedia;
+import io.continuum.tool.ToolKind;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -115,7 +117,7 @@ public class SpecialistService {
         SpecialistEntity s = require(developerId, id);
 
         Map<String, Object> input = sample == null || sample.isEmpty()
-                ? defaultSampleFor(s.getInputKind())
+                ? defaultSampleFor(s.getInputKind(), s.getToolKind())
                 : sample;
 
         if (input == null) {
@@ -189,12 +191,41 @@ public class SpecialistService {
      * is worse than no probe, because the tool is then marked READY.
      */
     static Map<String, Object> defaultSampleFor(String inputKind) {
+        return defaultSampleFor(inputKind, null);
+    }
+
+    /**
+     * @param toolKind what the tool does, which changes what a useful sample is.
+     *                 A detector handed an image with text on it is no better
+     *                 off than with a blank one; an OCR tool handed a blank one
+     *                 is being asked to read nothing.
+     */
+    static Map<String, Object> defaultSampleFor(String inputKind, ToolKind toolKind) {
+        boolean reader = toolKind == ToolKind.OCR || toolKind == ToolKind.EXTRACTION;
+
         return switch (inputKind == null ? "image" : inputKind) {
             case "text" -> Map.of("text", "The quick brown fox jumps over the lazy dog.");
             case "json" -> Map.of("sample", true);
-            case "image" -> Map.of("imageBase64", SAMPLE_IMAGE_BASE64);
-            // No universal sample exists. The developer supplies one.
-            case "audio", "document" -> null;
+            case "image" -> {
+                // Real text for a tool whose job is reading it, the pixel
+                // otherwise — a detector has nothing to find either way, and
+                // the pixel is the shape every existing detector was probed with.
+                String png = reader ? SampleMedia.pngWithTextBase64() : null;
+                yield Map.of("imageBase64", png == null ? SAMPLE_IMAGE_BASE64 : png);
+            }
+            case "audio" -> {
+                // A genuine WAV — a real header and a real tone, not an empty
+                // string. A speech provider can decode it, so the probe
+                // exercises the credential, the URL and the response shape.
+                // It will correctly report no speech, which is a successful
+                // probe and not a claim that the provider transcribes well.
+                String wav = SampleMedia.wavBase64();
+                yield wav == null ? null : Map.of("audioBase64", wav);
+            }
+            case "document" -> {
+                String pdf = SampleMedia.pdfWithTextBase64();
+                yield pdf == null ? null : Map.of("documentBase64", pdf);
+            }
             default -> Map.of("imageBase64", SAMPLE_IMAGE_BASE64);
         };
     }

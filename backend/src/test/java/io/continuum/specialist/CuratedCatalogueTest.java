@@ -19,9 +19,39 @@ class CuratedCatalogueTest {
     @Test
     @DisplayName("A task word finds the entry for that task, first")
     void searchRanksTheObviousMatchFirst() {
-        assertThat(catalogue.search("ocr", 10).get(0).id()).isEqualTo("http-ocr");
+        // Where a bring-your-own-key provider covers the task, it wins: it needs
+        // only a key, whereas the "your own endpoint" entry asks the developer
+        // to go and host a service before anything works.
+        assertThat(catalogue.search("ocr", 10).get(0).id()).isEqualTo("ocrspace-ocr");
+        // Deepgram and AssemblyAI are equally good answers to "transcription",
+        // so which of the two comes first is an alphabetical tiebreak and not a
+        // fact worth pinning. What matters is that the winner is one of them.
+        assertThat(catalogue.search("transcription", 10).get(0).id())
+                .isIn("deepgram-transcribe", "assemblyai-transcribe");
+        // No BYOK moderation adapter exists yet, so this one is still the
+        // self-hosted template.
         assertThat(catalogue.search("moderation", 10).get(0).id()).isEqualTo("http-moderation");
-        assertThat(catalogue.search("transcription", 10).get(0).id()).isEqualTo("http-transcribe");
+    }
+
+    @Test
+    @DisplayName("A usable entry outranks one that needs an endpoint you must host")
+    void readyToUseEntriesRankAbove() {
+        List<CatalogueEntry> found = catalogue.search("transcription", 10);
+
+        int deepgram = indexOf(found, "deepgram-transcribe");
+        int selfHosted = indexOf(found, "http-transcribe");
+
+        assertThat(deepgram).isGreaterThanOrEqualTo(0);
+        assertThat(selfHosted).isGreaterThan(deepgram);
+    }
+
+    private static int indexOf(List<CatalogueEntry> entries, String id) {
+        for (int i = 0; i < entries.size(); i++) {
+            if (entries.get(i).id().equals(id)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     @Test

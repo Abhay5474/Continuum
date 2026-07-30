@@ -27,6 +27,15 @@ public class SpecialistConnectionEntity {
         QUERY,
         /** {@code Authorization: Bearer ...}. */
         BEARER,
+        /**
+         * {@code Authorization: Token ...} — Deepgram's scheme.
+         *
+         * <p>Its own style rather than a HEADER connection whose value happens
+         * to start with "Token ", because that would mean storing the word
+         * "Token" as part of the secret. A rotated key would then silently lose
+         * its prefix and every call would 401.
+         */
+        TOKEN,
         /** A public endpoint with no credential. */
         NONE
     }

@@ -94,6 +94,14 @@ public record CatalogueEntry(String id, String title, String description, String
         if (inputKind.equalsIgnoreCase(q)) {
             score += 4;
         }
+        // An entry that needs only a key can be working in a minute. One that
+        // needs a base URL is asking the developer to go and host a service
+        // first. When both answer the same query, the usable one goes on top —
+        // someone searching "transcription" wants a transcriber, not a form for
+        // the transcriber they have not written yet.
+        if (score > 0 && !needs.contains("baseUrl")) {
+            score += 5;
+        }
         return score;
     }
 }

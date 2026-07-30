@@ -80,6 +80,22 @@ public class GuardedHttpSender {
      */
     public Result send(String url, String method, Map<String, String> headers, String body,
                        int timeoutSeconds) throws IOException, InterruptedException {
+        return send(url, method, headers,
+                body == null ? null : body.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                timeoutSeconds);
+    }
+
+    /**
+     * Sends a request whose body is bytes rather than text.
+     *
+     * <p>Needed because some providers take a media file as the raw request
+     * body — Deepgram wants the audio itself with an {@code audio/*} content
+     * type, and AssemblyAI's upload endpoint wants octets. Base64-ing those
+     * through the string path would corrupt them: the provider is expecting the
+     * file, not a text encoding of it.
+     */
+    public Result send(String url, String method, Map<String, String> headers, byte[] body,
+                       int timeoutSeconds) throws IOException, InterruptedException {
         Target target;
         try {
             target = resolve(url);
@@ -99,12 +115,15 @@ public class GuardedHttpSender {
         }
 
         String verb = method == null ? "POST" : method.toUpperCase();
+        HttpRequest.BodyPublisher publisher = body == null
+                ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofByteArray(body);
         switch (verb) {
             case "GET" -> b.GET();
             case "DELETE" -> b.DELETE();
-            case "PUT" -> b.PUT(HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
-            case "PATCH" -> b.method("PATCH", HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
-            default -> b.POST(HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
+            case "PUT" -> b.PUT(publisher);
+            case "PATCH" -> b.method("PATCH", publisher);
+            default -> b.POST(publisher);
         }
 
         boolean pinned = target.pin();

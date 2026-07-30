@@ -85,7 +85,60 @@ public interface SpecialistProvider {
         return out;
     }
 
-    /** An outbound call, ready for the hardened HTTP activity. */
+    /**
+     * A further call this provider needs before it has an answer.
+     *
+     * <p>Most providers answer in one round trip. Some cannot: AssemblyAI takes
+     * an upload, then a job submission, then polling until the job finishes.
+     * That is a quirk of one provider, so it belongs inside that provider's
+     * adapter rather than in the invoker — which is what this seam is for.
+     *
+     * @param call  what to send next
+     * @param delayMillis how long to wait first, for a provider being polled
+     */
+    record Next(Call call, int delayMillis) {
+
+        public static Next of(Call call) {
+            return new Next(call, 0);
+        }
+
+        public static Next after(int delayMillis, Call call) {
+            return new Next(call, delayMillis);
+        }
+    }
+
+    /**
+     * What to send after a response arrives, or null when this response is the
+     * answer.
+     *
+     * <p>Called with the parsed body of the round that just returned, so an
+     * adapter can carry state through the provider's own identifiers — an upload
+     * URL, a job id — rather than the invoker holding a session.
+     *
+     * <p>Must not throw. An adapter that cannot work out what to do next should
+     * return null and let {@link #parseEvidence} report what it has.
+     *
+     * @param round 1 for the response to the first call
+     */
+    default Next next(SpecialistConnectionEntity connection, Object responseBody, int round) {
+        return null;
+    }
+
+    /**
+     * A ceiling on round trips, so a provider that never reports completion
+     * cannot hold a customer request open indefinitely.
+     */
+    default int maxRounds() {
+        return 1;
+    }
+
+    /**
+     * An outbound call, ready for the hardened HTTP activity.
+     *
+     * <p>{@code body} may be a {@code String} (sent verbatim), a {@code byte[]}
+     * (sent raw, for providers that take the media file as the request body), or
+     * any other object, which is serialised as JSON.
+     */
     record Call(String url, String method, Map<String, String> headers, Object body) {
     }
 

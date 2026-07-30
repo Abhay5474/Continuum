@@ -60,6 +60,62 @@ public class CuratedCatalogue implements CatalogueSource {
                     SOURCE),
 
             new CatalogueEntry(
+                    "deepgram-transcribe",
+                    "Audio transcription (Deepgram)",
+                    "Turn a recording into text a language model can actually read — a call, a "
+                            + "voice note, a meeting. One call, and the transcript comes straight "
+                            + "back.",
+                    "deepgram", "https://api.deepgram.com", "nova-2", "audio",
+                    ToolKind.TRANSCRIPTION,
+                    0.50,
+                    List.of("deepgram", "audio", "speech", "transcription", "voice", "meeting",
+                            "free"),
+                    List.of("secret"),
+                    "Bring your own Deepgram key — free credits are enough to try this end to "
+                            + "end. Continuum sends the audio as the raw request body, which is "
+                            + "what Deepgram expects, and hands back the transcript as text. "
+                            + "Deepgram's recogniser confidence is shown but never filtered on: a "
+                            + "threshold applied to it would discard a whole transcript for being "
+                            + "slightly unclear.",
+                    SOURCE),
+
+            new CatalogueEntry(
+                    "assemblyai-transcribe",
+                    "Audio transcription (AssemblyAI)",
+                    "The same job as Deepgram, done as a queued job rather than a single call. "
+                            + "Worth having when you already hold an AssemblyAI key.",
+                    "assemblyai", "https://api.assemblyai.com", "", "audio",
+                    ToolKind.TRANSCRIPTION,
+                    0.50,
+                    List.of("assemblyai", "audio", "speech", "transcription", "voice", "meeting",
+                            "free"),
+                    List.of("secret"),
+                    "Bring your own AssemblyAI key; the free tier covers testing. This one "
+                            + "uploads, queues a job and polls until it finishes, all inside the "
+                            + "one call your application makes. Long recordings may outlast the "
+                            + "timeout — raise it on the specialist, and if it still runs out you "
+                            + "are told the job is unfinished rather than that the audio was "
+                            + "silent.",
+                    SOURCE),
+
+            new CatalogueEntry(
+                    "ocrspace-ocr",
+                    "OCR — scanned image or PDF to text (OCR.space)",
+                    "Read text off a photo, a screenshot or a scanned PDF. This is the partner "
+                            + "to Continuum's built-in PDF reader: that one handles documents "
+                            + "that already contain text, this one handles the scans that don't.",
+                    "ocrspace", "https://api.ocr.space", "", "image", ToolKind.OCR,
+                    0.50,
+                    List.of("ocr", "ocrspace", "scan", "image", "pdf", "document", "text", "free"),
+                    List.of("secret"),
+                    "Bring your own OCR.space key — the free tier is generous enough for real "
+                            + "use. It takes images and PDFs alike, so one pipeline covers both "
+                            + "without you knowing in advance which will arrive. Recovered text "
+                            + "is unscored: recognition confidence says how clearly a character "
+                            + "was read, not whether what it says is true.",
+                    SOURCE),
+
+            new CatalogueEntry(
                     "http-detect",
                     "Object detection (your own endpoint)",
                     "Your own model behind HTTP — FastAPI, SageMaker, TorchServe, an internal "
@@ -113,9 +169,12 @@ public class CuratedCatalogue implements CatalogueSource {
                     List.of("audio", "speech", "transcription", "whisper", "voice", "meeting",
                             "http", "custom"),
                     List.of("baseUrl", "modelPath", "secret"),
-                    "Returns segments as findings. The context builder states the confidence per "
-                            + "segment, so the model can hedge on the parts that were unclear "
-                            + "rather than on the whole transcript.",
+                    "For a transcription service you host yourself. If you use Deepgram or "
+                            + "AssemblyAI, take those entries instead — they already know each "
+                            + "provider's request shape. A transcript arrives as unscored text: "
+                            + "there is no confidence to threshold on, and the model is told the "
+                            + "words were machine-recognised so it does not treat them as "
+                            + "verbatim.",
                     SOURCE),
 
             new CatalogueEntry(

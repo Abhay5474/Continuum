@@ -11,6 +11,12 @@ public final class SpecialistProviders {
 
     static {
         register(new RoboflowProvider());
+        // Free-tier, bring-your-own-key providers, in the order they are worth
+        // reaching for: audio has two because they fail differently — Deepgram
+        // is one call, AssemblyAI queues a job.
+        register(new DeepgramProvider());
+        register(new AssemblyAIProvider());
+        register(new OcrSpaceProvider());
         register(new GenericHttpProvider());
     }
 

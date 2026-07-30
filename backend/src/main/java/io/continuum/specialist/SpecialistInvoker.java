@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Calls one specialist and normalises what comes back.
@@ -41,6 +42,15 @@ import java.util.Map;
 public class SpecialistInvoker {
 
     private static final Logger log = LoggerFactory.getLogger(SpecialistInvoker.class);
+
+    /**
+     * A hard ceiling on round trips, whatever an adapter asks for.
+     *
+     * <p>A polling provider that never reports completion would otherwise hold a
+     * customer's request open for as long as its own timeout allowed. The
+     * specialist's timeout bounds the wall clock; this bounds the call count.
+     */
+    private static final int MAX_ROUNDS = 20;
 
     private final SpecialistConnectionService connections;
     private final GuardedHttpSender sender;
@@ -135,69 +145,122 @@ public class SpecialistInvoker {
             return failed(specialist, traceId, start, "Could not build the call: " + e.getMessage());
         }
 
-        String url = call.url();
-        Map<String, String> headers = new LinkedHashMap<>(call.headers());
         String secret = connections.secretFor(connection).orElse(null);
 
-        // Present the credential the way this provider expects. Roboflow wants a
-        // query parameter; most want a header or a bearer token.
-        switch (connection.getAuthStyle()) {
-            case BEARER -> {
-                if (secret != null) {
-                    headers.put("Authorization", "Bearer " + secret);
-                }
-            }
-            case HEADER -> {
-                if (secret != null && connection.getAuthParam() != null) {
-                    headers.put(connection.getAuthParam(), secret);
-                }
-            }
-            case QUERY -> {
-                if (secret != null && connection.getAuthParam() != null) {
-                    url += (url.contains("?") ? "&" : "?")
-                            + URLEncoder.encode(connection.getAuthParam(), StandardCharsets.UTF_8)
-                            + "=" + URLEncoder.encode(secret, StandardCharsets.UTF_8);
-                }
-            }
-            case NONE -> { }
-        }
-        headers.putIfAbsent("Content-Type", "application/json");
+        // Most providers answer in one round trip. A few cannot — AssemblyAI
+        // uploads, submits a job, then polls — and the adapter drives that
+        // through next(), so the sequencing stays with the provider that needs
+        // it rather than leaking into every call site.
+        GuardedHttpSender.Result res = null;
+        Object parsedBody = null;
+        int rounds = Math.max(1, Math.min(adapter.maxRounds(), MAX_ROUNDS));
+        long deadline = start + TimeUnit.SECONDS.toNanos(
+                Math.max(1, Math.min(300, specialist.getTimeoutSeconds())));
 
-        String body;
-        try {
-            body = call.body() instanceof String s ? s : mapper.writeValueAsString(call.body());
-        } catch (Exception e) {
-            return failed(specialist, traceId, start, "Could not serialise the request: " + e.getMessage());
+        for (int round = 1; round <= rounds; round++) {
+            String url = call.url();
+            Map<String, String> headers = new LinkedHashMap<>(call.headers());
+
+            // Present the credential the way this provider expects. Roboflow
+            // wants a query parameter; Deepgram wants "Token", AssemblyAI wants
+            // the bare key, most want a bearer token.
+            switch (connection.getAuthStyle()) {
+                case BEARER -> {
+                    if (secret != null) {
+                        headers.put("Authorization", "Bearer " + secret);
+                    }
+                }
+                case TOKEN -> {
+                    if (secret != null) {
+                        headers.put("Authorization", "Token " + secret);
+                    }
+                }
+                case HEADER -> {
+                    if (secret != null && connection.getAuthParam() != null) {
+                        headers.put(connection.getAuthParam(), secret);
+                    }
+                }
+                case QUERY -> {
+                    if (secret != null && connection.getAuthParam() != null) {
+                        url += (url.contains("?") ? "&" : "?")
+                                + URLEncoder.encode(connection.getAuthParam(), StandardCharsets.UTF_8)
+                                + "=" + URLEncoder.encode(secret, StandardCharsets.UTF_8);
+                    }
+                }
+                case NONE -> { }
+            }
+            headers.putIfAbsent("Content-Type", "application/json");
+
+            // A byte[] body goes out raw. Providers that take the media file
+            // itself would be handed a corrupt file by the string path.
+            byte[] body;
+            try {
+                body = call.body() instanceof byte[] raw
+                        ? raw
+                        : (call.body() instanceof String s ? s : mapper.writeValueAsString(call.body()))
+                                .getBytes(StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                return failed(specialist, traceId, start,
+                        "Could not serialise the request: " + e.getMessage());
+            }
+
+            int remaining = (int) Math.max(1,
+                    TimeUnit.NANOSECONDS.toSeconds(deadline - System.nanoTime()));
+            try {
+                res = sender.send(url, call.method(), headers, body, remaining);
+            } catch (GuardedHttpSender.NonRetryable e) {
+                return failed(specialist, traceId, start, e.getMessage());
+            } catch (Exception e) {
+                return failed(specialist, traceId, start,
+                        "Specialist call failed: " + e.getClass().getSimpleName() + " " + e.getMessage());
+            }
+
+            if (res.status() >= 400) {
+                // The provider's own message is the useful part; a developer
+                // debugging a bad model path needs to see it verbatim.
+                long failedMs = (System.nanoTime() - start) / 1_000_000;
+                String detail = "Specialist returned " + res.status() + ": " + truncate(res.body());
+                recordFailure(connection, detail);
+                return trace(specialist, traceId,
+                        new Result(false, List.of(), 0, res.body(), res.status(), failedMs, detail));
+            }
+
+            try {
+                parsedBody = mapper.readValue(res.body(), Object.class);
+            } catch (Exception e) {
+                // Not JSON. Hand the adapter the raw text — some endpoints answer
+                // with a bare string — and let it report nothing if it cannot cope.
+                parsedBody = res.body();
+            }
+
+            SpecialistProvider.Next next;
+            try {
+                next = adapter.next(connection, parsedBody, round);
+            } catch (RuntimeException e) {
+                log.warn("Adapter {} threw deciding the next call: {}", adapter.name(), e.getMessage());
+                next = null;
+            }
+            if (next == null || next.call() == null) {
+                break;
+            }
+            if (System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(next.delayMillis()) >= deadline) {
+                // Out of budget mid-sequence. The adapter reports what it has,
+                // which for a poll is "still processing" — a truthful partial
+                // answer rather than a timeout the developer cannot interpret.
+                break;
+            }
+            if (next.delayMillis() > 0) {
+                try {
+                    Thread.sleep(next.delayMillis());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            call = next.call();
         }
 
-        GuardedHttpSender.Result res;
-        try {
-            res = sender.send(url, call.method(), headers, body, specialist.getTimeoutSeconds());
-        } catch (GuardedHttpSender.NonRetryable e) {
-            return failed(specialist, traceId, start, e.getMessage());
-        } catch (Exception e) {
-            return failed(specialist, traceId, start,
-                    "Specialist call failed: " + e.getClass().getSimpleName() + " " + e.getMessage());
-        }
         long ms = (System.nanoTime() - start) / 1_000_000;
-
-        if (res.status() >= 400) {
-            // The provider's own message is the useful part; a developer
-            // debugging a bad model path needs to see it verbatim.
-            String detail = "Specialist returned " + res.status() + ": " + truncate(res.body());
-            recordFailure(connection, detail);
-            return trace(specialist, traceId,
-                    new Result(false, List.of(), 0, res.body(), res.status(), ms, detail));
-        }
-
-        Object parsedBody;
-        try {
-            parsedBody = mapper.readValue(res.body(), Object.class);
-        } catch (Exception e) {
-            // Not JSON. Hand the adapter the raw text — some endpoints answer
-            // with a bare string — and let it report nothing if it cannot cope.
-            parsedBody = res.body();
-        }
 
         List<Evidence> all;
         try {
