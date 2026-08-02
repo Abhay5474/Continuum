@@ -24,7 +24,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class InputIngestorTest {
 
-    private final InputIngestor ingestor = new InputIngestor(new PdfTextTool());
+    // A real transform service with the real transformers: ingestion's contract
+    // is that structured payloads are recognised and everything else passes
+    // through untouched, and a stub would not test the second half.
+    private final InputIngestor ingestor = new InputIngestor(new PdfTextTool(),
+            new io.continuum.context.ContextTransformService(
+                    java.util.List.of(new io.continuum.context.transform.SpreadsheetTransformer(),
+                            new io.continuum.context.transform.LogTransformer(),
+                            new io.continuum.context.transform.EmailThreadTransformer()),
+                    null));
 
     private static String pdfBase64(String line) throws Exception {
         try (PDDocument doc = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {

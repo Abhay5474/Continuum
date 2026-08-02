@@ -35,6 +35,7 @@ import Specialists from "./pages/Specialists";
 import Pipelines from "./pages/Pipelines";
 import Admission from "./pages/Admission";
 import CompressionPolicy from "./pages/CompressionPolicy";
+import ContextTransformers from "./pages/ContextTransformers";
 import Counterfactual from "./pages/Counterfactual";
 import CostAdmission from "./pages/CostAdmission";
 import LoopGuard from "./pages/LoopGuard";
@@ -96,6 +97,7 @@ const router = createBrowserRouter([
           { path: "scheduling", element: <Scheduling /> },
           { path: "cost-limits", element: <CostAdmission /> },
           { path: "compression", element: <CompressionPolicy /> },
+          { path: "context", element: <ContextTransformers /> },
           { path: "counterfactual", element: <Counterfactual /> },
           { path: "loops", element: <LoopGuard /> },
           { path: "saga", element: <Saga /> },

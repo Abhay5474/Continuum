@@ -70,6 +70,29 @@
             <version>3.0.3</version>
         </dependency>
 
+        <!--
+            Spreadsheet structure, for the context layer. A spreadsheet is a
+            rendering rather than a data model — merged headers, hidden rows,
+            number formats and formulas all carry meaning that CSV export
+            destroys. POI is the only way to read any of it.
+        -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.3.0</version>
+        </dependency>
+
+        <!--
+            MIME parsing for email threads. Hand-rolling this would mean
+            re-implementing RFC 5322 header folding, transfer encodings and
+            multipart boundaries, each of which fails silently when wrong.
+        -->
+        <dependency>
+            <groupId>org.eclipse.angus</groupId>
+            <artifactId>angus-mail</artifactId>
+            <version>2.0.3</version>
+        </dependency>
+
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>

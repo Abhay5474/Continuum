@@ -40,6 +40,7 @@ const GROUPS: Group[] = [
       { to: "/specialists", label: "Specialists", desc: "Call a smaller model before the big one" },
       { to: "/guard", label: "Prompt Guard", desc: "PII redaction, injection blocking, compression" },
       { to: "/cache", label: "Semantic Cache", desc: "Reuse answers to equivalent questions" },
+      { to: "/context", label: "Context Transformers", desc: "Turn spreadsheets, logs and email into context a model can reason over" },
       { to: "/compression", label: "Compression Budget", desc: "Compress each part of a prompt by what it can spare" },
       { to: "/mmu", label: "Context Optimizer", desc: "Context virtualization and paging" },
       { to: "/memory", label: "Memory", desc: "Long-context memory tiers" },

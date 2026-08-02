@@ -573,6 +573,56 @@ export const portal = {
     },
   },
 
+  // --- Context transformers: application data -> canonical LLM context ---
+  context: {
+    capabilities: () =>
+      portalHttp<any[]>("/api/portal/developer/context/capabilities", "GET"),
+
+    /** Transforms an uploaded file. The server detects what it is from bytes. */
+    transformFile: (file: File, budget = "standard") => {
+      const form = new FormData();
+      form.append("file", file);
+      return portalUpload<any>(
+        `/api/portal/developer/context/transform?budget=${budget}`,
+        form
+      );
+    },
+
+    /**
+     * Transforms pasted text.
+     *
+     * <p>Sent as text/plain rather than JSON so a log containing quotes and
+     * backslashes does not have to survive being escaped into a JSON string
+     * first — which is exactly the kind of input this feature exists for.
+     */
+    transformText: async (text: string, filename = "pasted-input", budget = "standard") => {
+      const res = await fetch(
+        `${BASE}/api/portal/developer/context/transform` +
+          `?budget=${budget}&filename=${encodeURIComponent(filename)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "text/plain", ...authHeaders() },
+          body: text,
+        }
+      );
+      if (!res.ok) {
+        let message = `${res.status}`;
+        try {
+          const body = await res.json();
+          message = body.message ?? body.error ?? message;
+        } catch {
+          /* status code is the best available message */
+        }
+        if (res.status === 401) throw new UnauthorizedError(message);
+        throw new Error(message);
+      }
+      return res.json();
+    },
+
+    recent: (limit = 25) =>
+      portalHttp<any[]>(`/api/portal/developer/context/transforms?limit=${limit}`, "GET"),
+  },
+
   // --- Customer-defined workflows ---
   defs: {
     list: () => portalHttp<any[]>("/api/portal/developer/workflows/definitions", "GET"),
