@@ -265,7 +265,12 @@ export default function App() {
         )}
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      {/* One entrance for every page, keyed on the route.
+          Applied in the shell rather than in thirty-seven pages: a page that
+          forgot it would be the only one that snapped in, and that
+          inconsistency reads as a bug rather than as restraint. Short and
+          small — 260ms and 6px is "it arrived", not "watch this". */}
+      <main key={location.pathname} className="page-enter mx-auto max-w-7xl px-4 py-6">
         <Outlet />
       </main>
     </div>

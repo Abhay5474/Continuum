@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Continuum — introduction</title>
+<style>
+  /* The video wears the console's own tokens. An explainer that looks like a
+     different product than the thing it explains teaches the wrong shape. */
+  :root {
+    --ink: #06080c;
+    --panel: #0e1118;
+    --edge: #1e232e;
+    --text: #e2e8f0;
+    --dim: #94a3b8;
+    --faint: #64748b;
+    --aurora: #4C8BF5;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+    --s8: #e66767;
+    --ok: #34D399;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* A very low-contrast engineering grid plus one aurora wash. Both are
+     atmosphere; neither competes with a word on screen. */
+  .bg {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(900px 420px at 82% -10%, rgba(76,139,245,0.10), transparent 62%),
+      radial-gradient(700px 380px at 10% 110%, rgba(25,158,112,0.06), transparent 60%),
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px) 0 0 / 100% 44px,
+      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px) 0 0 / 44px 100%;
+  }
+  .vignette { position: fixed; inset: 0; background: radial-gradient(circle at 50% 45%, transparent 55%, rgba(0,0,0,0.55)); }
+
+  .scene { position: fixed; inset: 0; display: flex; flex-direction: column;
+           justify-content: center; padding: 0 96px; opacity: 0; }
+
+  .eyebrow { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+             color: var(--faint); margin-bottom: 18px; }
+  h1 { font-size: 74px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.02; }
+  h2 { font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; max-width: 20ch; }
+  .lede { font-size: 21px; color: var(--dim); margin-top: 20px; max-width: 46ch; line-height: 1.5; }
+  .note { font-size: 15px; color: var(--faint); margin-top: 10px; }
+
+  .row { display: flex; align-items: center; gap: 20px; }
+  .cols { display: flex; gap: 44px; align-items: flex-start; }
+
+  .card { background: var(--panel); border: 1px solid var(--edge); border-radius: 12px;
+          padding: 18px 20px; min-width: 190px; }
+  .card .k { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
+  .card .v { font-size: 22px; font-weight: 600; margin-top: 8px; }
+  .card .s { font-size: 13px; color: var(--dim); margin-top: 6px; }
+
+  .chip { border: 1px solid var(--edge); border-radius: 999px; padding: 8px 16px;
+          font-size: 15px; color: var(--dim); background: rgba(14,17,24,0.75); white-space: nowrap; }
+
+  .arrow { color: #2b3444; flex: none; }
+
+  .bar { height: 10px; border-radius: 0 5px 5px 0; }
+  .track { height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px; position: relative; }
+  .track > .bar { position: absolute; inset: 0 auto 0 0; }
+
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .logo { width: 68px; height: 68px; border-radius: 17px;
+          background: linear-gradient(140deg, #4C8BF5, #2f6ad0);
+          display: grid; place-items: center;
+          box-shadow: 0 0 44px rgba(76,139,245,0.35); }
+
+  /* Captions are burned in, so the video is usable with the sound off — which
+     is how most of it will actually be watched. */
+  .caption { position: fixed; left: 0; right: 0; bottom: 46px; text-align: center;
+             padding: 0 140px; font-size: 19px; line-height: 1.45; color: #cbd5e1;
+             text-shadow: 0 2px 12px rgba(0,0,0,0.9); opacity: 0; }
+  .progress { position: fixed; left: 0; bottom: 0; height: 2px; background: var(--aurora); opacity: 0.5; }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<!-- 1 — intro -->
+<section class="scene" data-scene="intro">
+  <div class="row" data-at="0.15">
+    <div class="logo">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+        <path d="M20 12a8 8 0 1 1-2.4-5.7" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M20 4v5h-5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h1>Continuum</h1>
+  </div>
+  <p class="lede" data-at="0.8" style="font-size:24px">
+    A reliability layer between your application and a language model.
+  </p>
+  <div class="row" style="margin-top:38px; gap:12px">
+    <span class="chip" data-at="1.9">your app</span>
+    <span class="arrow" data-at="2.2">——▸</span>
+    <span class="chip" data-at="2.5" style="border-color:rgba(76,139,245,0.5); color:#cfe0ff">Continuum</span>
+    <span class="arrow" data-at="2.8">——▸</span>
+    <span class="chip" data-at="3.1">Gemini · Claude · Groq</span>
+  </div>
+</section>
+
+<!-- 2 — problem -->
+<section class="scene" data-scene="problem">
+  <div class="eyebrow" data-at="0.1">without a layer</div>
+  <h2 data-at="0.25">A model cannot really read a photo, a recording or a spreadsheet.</h2>
+  <div class="row" style="margin-top:40px; gap:14px">
+    <span class="chip" data-at="1.2">📷 image</span>
+    <span class="chip" data-at="1.45">🎙 audio</span>
+    <span class="chip" data-at="1.7">▦ spreadsheet</span>
+    <span class="arrow" data-at="2.1">——▸</span>
+    <span class="chip" data-at="2.4">the model</span>
+  </div>
+  <div class="card" data-at="3.6" style="margin-top:34px; max-width:640px; border-color:rgba(230,103,103,0.4)">
+    <div class="k" style="color:var(--s8)">the answer</div>
+    <div class="v" style="font-weight:500; font-size:19px; line-height:1.5">
+      “The invoice total is ₹15,200 and the wound appears infected.”
+    </div>
+    <div class="s" data-at="5.2" style="color:var(--s8)">
+      Confident. Unsourced. Indistinguishable from a correct answer.
+    </div>
+  </div>
+</section>
+
+<!-- 3 — specialists -->
+<section class="scene" data-scene="specialists">
+  <div class="eyebrow" data-at="0.1">specialists · bring your own key</div>
+  <h2 data-at="0.25" style="max-width:24ch">Continuum calls a purpose-built model first.</h2>
+  <div class="cols" style="margin-top:40px">
+    <div class="card" data-at="1.6">
+      <div class="k">image</div><div class="v" style="color:var(--s1)">Roboflow</div>
+      <div class="s">detections + boxes</div>
+    </div>
+    <div class="card" data-at="2.1">
+      <div class="k">audio</div><div class="v" style="color:var(--s3)">Deepgram</div>
+      <div class="s">a transcript</div>
+    </div>
+    <div class="card" data-at="2.6">
+      <div class="k">scan</div><div class="v" style="color:var(--s4)">OCR.space</div>
+      <div class="s">recovered text</div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:34px; gap:14px">
+    <span class="arrow" data-at="3.4">▾</span>
+    <span class="chip" data-at="3.7" style="border-color:rgba(76,139,245,0.5); color:#cfe0ff">
+      normalised into one shape — Evidence
+    </span>
+  </div>
+  <p class="note" data-at="4.6">Your key, your account. Continuum never hosts a model.</p>
+</section>
+
+<!-- 4 — evidence -->
+<section class="scene" data-scene="evidence">
+  <div class="eyebrow" data-at="0.1">the evidence model</div>
+  <h2 data-at="0.25" style="max-width:26ch">A confidence appears only where one was measured.</h2>
+  <div style="margin-top:38px; display:flex; flex-direction:column; gap:16px; max-width:720px">
+    <div class="card" data-at="1.3">
+      <div class="row" style="justify-content:space-between">
+        <div><div class="k">detection</div><div class="v" style="font-size:19px">wound</div></div>
+        <div class="mono" style="color:var(--s1); font-size:20px">0.88</div>
+      </div>
+      <div class="track" style="margin-top:12px"><div class="bar" data-grow="1.7" style="background:var(--s1)"></div></div>
+    </div>
+    <div class="card" data-at="2.9">
+      <div class="row" style="justify-content:space-between">
+        <div><div class="k">transcript</div><div class="v" style="font-size:19px">“the boiler is knocking”</div></div>
+        <div class="mono" style="color:var(--faint); font-size:15px">no score</div>
+      </div>
+      <div class="s" data-at="4.3">A threshold here would delete the whole transcript, not a weak part of it.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 — context -->
+<section class="scene" data-scene="context">
+  <div class="eyebrow" data-at="0.1">context transformers · no model at all</div>
+  <h2 data-at="0.25" style="max-width:26ch">Continuum also transforms data itself.</h2>
+  <div class="cols" style="margin-top:38px">
+    <div class="card" data-at="1.5" style="min-width:300px">
+      <div class="k">spreadsheet</div>
+      <div class="v" style="font-size:18px">merged headers kept</div>
+      <div class="s mono" style="font-size:12px; line-height:1.7">
+        Revenue · Q4 <span style="color:var(--s4)">(₹ crore)</span><br>
+        subtotals marked, not deleted
+      </div>
+    </div>
+    <div class="card" data-at="2.4" style="min-width:340px">
+      <div class="k">10,000 log lines</div>
+      <div class="v" style="font-size:18px">→ one incident</div>
+      <!-- Two bars on one scale. A lone 1.6% sliver beside the words
+           "98.4% smaller" reads as though the bar meant 1.6%. -->
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:7px">
+        <div class="row" style="gap:10px">
+          <span class="mono" style="font-size:11px; color:var(--faint); width:44px">raw</span>
+          <div class="track" style="flex:1"><div class="bar" data-grow="2.9" data-to="1" style="background:#3d4658"></div></div>
+        </div>
+        <div class="row" style="gap:10px">
+          <span class="mono" style="font-size:11px; color:var(--faint); width:44px">after</span>
+          <div class="track" style="flex:1"><div class="bar" data-grow="3.3" data-to="0.016" style="background:var(--s3)"></div></div>
+        </div>
+      </div>
+      <div class="s" data-at="3.9" style="color:var(--ok)">98.4% smaller — measured, not claimed</div>
+    </div>
+  </div>
+  <p class="note" data-at="5.0">Deterministic. The same bytes give the same result, forever.</p>
+</section>
+
+<!-- 6 — reliability -->
+<section class="scene" data-scene="reliability">
+  <div class="eyebrow" data-at="0.1">around all of it</div>
+  <h2 data-at="0.25" style="max-width:24ch">The reliability layer.</h2>
+  <div style="margin-top:38px; display:flex; flex-wrap:wrap; gap:12px; max-width:900px">
+    <span class="chip" data-at="1.1">model routing</span>
+    <span class="chip" data-at="1.3">admission control</span>
+    <span class="chip" data-at="1.5">semantic cache</span>
+    <span class="chip" data-at="1.7">compression budget</span>
+    <span class="chip" data-at="1.9">cost limits</span>
+    <span class="chip" data-at="2.1">loop detection</span>
+    <span class="chip" data-at="2.3">compensation</span>
+    <span class="chip" data-at="2.5" style="border-color:rgba(52,211,153,0.45); color:#a7f3d0">answer verification</span>
+  </div>
+  <p class="lede" data-at="3.3" style="font-size:19px">
+    The last one checks the answer against the evidence it was given — and can replace it when
+    they disagree.
+  </p>
+</section>
+
+<!-- 7 — close -->
+<section class="scene" data-scene="close">
+  <div class="eyebrow" data-at="0.1">every run</div>
+  <h2 data-at="0.25" style="max-width:22ch">leaves a trace.</h2>
+  <div style="margin-top:34px; display:flex; flex-direction:column; gap:11px; max-width:760px">
+    <div class="row" data-at="1.1" style="gap:14px"><span class="mono" style="color:var(--s1); width:22px">1</span><span style="color:var(--dim)">input received — PDF read in place, no OCR needed</span></div>
+    <div class="row" data-at="1.5" style="gap:14px"><span class="mono" style="color:var(--s1); width:22px">2</span><span style="color:var(--dim)">specialist ran — 2 findings, top confidence 0.88</span></div>
+    <div class="row" data-at="1.9" style="gap:14px"><span class="mono" style="color:var(--s1); width:22px">3</span><span style="color:var(--dim)">the exact prompt the model was given</span></div>
+    <div class="row" data-at="2.3" style="gap:14px"><span class="mono" style="color:var(--s1); width:22px">4</span><span style="color:var(--dim)">answer verified against the findings</span></div>
+    <div class="row" data-at="2.9" style="gap:14px"><span class="mono" style="color:var(--s4); width:22px">!</span><span style="color:var(--s4)">unit not determined — and deliberately not guessed</span></div>
+  </div>
+  <p class="lede" data-at="4.2" style="font-size:22px; color:#e2e8f0">
+    Continuum · make the middle visible.
+  </p>
+</section>
+
+<div class="caption" id="cap"></div>
+<div class="progress" id="prog" style="width:0"></div>
+<div class="vignette"></div>
+
+<script>
+/**
+ * Deterministic timeline.
+ *
+ * render(t) fully describes the frame at time t — no CSS animation, no
+ * requestAnimationFrame. That is what makes the capture exact: the renderer can
+ * be asked for any frame in any order and gets the same pixels every time.
+ */
+const SCENES = window.__SCENES__ || [];
+const CAPTIONS = window.__CAPTIONS__ || {};
+const TOTAL = SCENES.reduce((n, s) => n + s.duration, 0);
+
+const els = [...document.querySelectorAll('[data-at]')];
+const bars = [...document.querySelectorAll('[data-grow]')];
+
+/** Ease-out cubic. Motion decelerates into place; nothing overshoots. */
+const ease = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+
+function windowOf(id) {
+  let start = 0;
+  for (const s of SCENES) {
+    if (s.id === id) return [start, start + s.duration];
+    start += s.duration;
+  }
+  return [0, 0];
+}
+
+window.__render = function (t) {
+  document.getElementById('prog').style.width = ((t / TOTAL) * 100) + '%';
+
+  document.querySelectorAll('.scene').forEach((sec) => {
+    const [a, b] = windowOf(sec.dataset.scene);
+    const local = t - a;
+    // 0.45s crossfade at each edge, so scenes dissolve rather than cut.
+    const fadeIn = ease(local / 0.45);
+    const fadeOut = 1 - ease((local - (b - a - 0.45)) / 0.45);
+    const vis = local >= -0.45 && local <= b - a + 0.1;
+    sec.style.opacity = vis ? Math.max(0, Math.min(fadeIn, fadeOut)) : 0;
+    sec.dataset.local = local;
+  });
+
+  els.forEach((el) => {
+    const sec = el.closest('.scene');
+    const local = parseFloat(sec.dataset.local);
+    const at = parseFloat(el.dataset.at);
+    const p = ease((local - at) / 0.55);
+    el.style.opacity = p;
+    // A short rise, never a slide across the screen. 14px reads as "arriving";
+    // 100px reads as a slideshow transition.
+    el.style.transform = `translateY(${(1 - p) * 14}px)`;
+  });
+
+  bars.forEach((el) => {
+    const sec = el.closest('.scene');
+    const local = parseFloat(sec.dataset.local);
+    const at = parseFloat(el.dataset.grow);
+    const to = parseFloat(el.dataset.to || '0.88');
+    el.style.width = (ease((local - at) / 0.9) * to * 100) + '%';
+  });
+
+  const cap = document.getElementById('cap');
+  let acc = 0, text = '', vis = 0;
+  for (const s of SCENES) {
+    if (t >= acc && t < acc + s.duration) {
+      text = CAPTIONS[s.id] || '';
+      const local = t - acc;
+      vis = Math.min(ease(local / 0.35), 1 - ease((local - (s.duration - 0.4)) / 0.4));
+    }
+    acc += s.duration;
+  }
+  cap.textContent = text;
+  cap.style.opacity = Math.max(0, vis);
+};
+</script>
+</body>
+</html>

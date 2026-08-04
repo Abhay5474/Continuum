@@ -1,0 +1,37 @@
+[
+  {
+    "id": "intro",
+    "text": "Continuum is a reliability layer between your application and a language model. Its job is to make what happens in between visible.",
+    "duration": 9.66
+  },
+  {
+    "id": "problem",
+    "text": "Sent straight to a model, a photo, a recording or a spreadsheet is data it cannot really read. It answers anyway, and you cannot tell it was guessing.",
+    "duration": 11.12
+  },
+  {
+    "id": "specialists",
+    "text": "So Continuum calls a specialist first, using your own provider key. Images to Roboflow, audio to Deepgram, scans to an optical reader. What returns becomes evidence.",
+    "duration": 13.05
+  },
+  {
+    "id": "evidence",
+    "text": "Evidence carries a confidence only where one was measured. A transcript has no score, so no threshold is applied to it. Nothing is invented to fill a gap.",
+    "duration": 12.13
+  },
+  {
+    "id": "context",
+    "text": "Continuum also transforms data itself, with no model at all. A spreadsheet keeps its merged headers and units. Ten thousand log lines become an incident, ninety eight percent smaller.",
+    "duration": 14.53
+  },
+  {
+    "id": "reliability",
+    "text": "Around it sit routing, admission control, caching, and a check that the answer matches the evidence it was given.",
+    "duration": 8.38
+  },
+  {
+    "id": "close",
+    "text": "Every run leaves a trace. What was found, what it cost, where each number came from, and what Continuum refused to guess.",
+    "duration": 9.66
+  }
+]

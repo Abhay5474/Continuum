@@ -23,3 +23,12 @@ frontend/.vite/
 
 # Logs
 *.log
+
+# Rendered video intermediates. The finished MP4 is committed under
+# frontend/public; the frames and padded WAVs that produced it are not — they
+# are ~1900 PNGs and rebuild in a couple of minutes from build.mjs.
+video/frames/
+video/*.wav
+video/voice.wav
+video/audio-list.txt
+video/node_modules

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { CodeBlock, ThemeToggle } from "../components/ui";
 import { Magnetic } from "../system/motion";
 import World from "../world/World";
+import IntroVideo from "../components/IntroVideo";
 import { Facts, Scene } from "../world/Scene";
 import ContextMmuDemo from "../world/demos/ContextMmuDemo";
 import WorkflowDemo from "../world/demos/WorkflowDemo";
@@ -36,7 +37,7 @@ export default function Landing() {
             Event-sourced · deterministic replay · exactly-once
           </div>
 
-          <h1 className="mx-auto mt-8 max-w-5xl text-[3.1rem] font-semibold leading-[0.94] tracking-[-0.035em] text-slate-50 sm:text-[7.5rem]">
+          <h1 className="mx-auto mt-8 max-w-5xl text-[3.1rem] font-semibold leading-[0.94] tracking-[-0.035em] text-slate-50 sm:text-[6.1rem]">
             An operating layer
             <br />
             <span className="text-gradient">for AI systems.</span>
@@ -66,7 +67,14 @@ export default function Landing() {
           </div>
         </div>
 
-        <div className="absolute bottom-10 flex flex-col items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-slate-600">
+        {/* The introduction sits under the claim rather than in place of it.
+            Someone who already knows what they want clicks the button; someone
+            who does not gets seventy nine seconds that explain it. */}
+        <div className="mt-12 w-full animate-fade-up [animation-delay:220ms]">
+          <IntroVideo />
+        </div>
+
+        <div className="mt-14 flex flex-col items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-slate-600">
           <span>Descend</span>
           <span className="h-8 w-px animate-pulse bg-gradient-to-b from-slate-600 to-transparent" />
         </div>

@@ -368,9 +368,35 @@ body {
 }
 .settle { animation: settle 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+/* A page arriving. Deliberately understated: the content is what changed, not
+   the container, so the motion says "this is new" and then gets out of the way. */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.page-enter { animation: pageEnter 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* A value that just changed, so a number updating under a poll is noticed
+   rather than silently different. Colour, not movement — a figure that jumps
+   is harder to read at the moment you most want to read it. */
+@keyframes valueSettle {
+  0%   { color: rgb(var(--accent-ink, 108 160 250)); }
+  100% { color: inherit; }
+}
+.value-settle { animation: valueSettle 900ms ease-out both; }
+
+/* Reduced motion is a correctness requirement, not a courtesy: someone who has
+   asked the OS to stop animation has usually done so because animation makes
+   them ill. So this disables everything — including the chart transitions,
+   which a hand-maintained list of class names kept missing. */
 @media (prefers-reduced-motion: reduce) {
-  .core-breath, .core-spin, .core-spin-rev, .degrading, .incident-pulse, .settle {
-    animation: none !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
