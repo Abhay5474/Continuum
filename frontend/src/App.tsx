@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { portal } from "./api";
 import { ThemeToggle } from "./components/ui";
-import AmbientField from "./world/AmbientField";
 import { useOperator } from "./system/OperatorAccess";
 
 /**
@@ -117,10 +116,6 @@ export default function App() {
 
   return (
     <div className="min-h-full">
-      {/* One insertion point for the whole console: the field picks its
-          arrangement from the route, so every feature page gets a signature
-          without any page having to know about it. */}
-      <AmbientField />
       <header className="sticky top-0 z-30 border-b border-edge/70 bg-ink/85 backdrop-blur-md">
         <div ref={navRef} className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5">
           <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">

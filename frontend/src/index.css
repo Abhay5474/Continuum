@@ -4,7 +4,7 @@
 
 /* ---- theme variables: dark is the default ---- */
 :root {
-  --ink: 6 8 12;         /* #06080c — instrument black */
+  --ink: 0 0 0;          /* black — the background is a background */
   --panel: 14 17 24;     /* #0e1118 — recessed plane */
   --edge: 30 35 46;      /* #1e232e — hairline */
   --grid: 255 255 255;   /* engineering grid, used at very low alpha */
@@ -15,8 +15,6 @@
   --topo-text: 226 232 240;
   --topo-label: 133 147 171;
   --topo-label-off: 74 82 101;
-  --aurora-glow: 0.05;
-  --neon-glow: 0.035;
 
   /* State colours as *text*. The fills glow on instrument black; as text on
      paper they are pastel and unreadable, so the ink variant flips with the
@@ -43,7 +41,7 @@
      colour-vision deficiency, so a 9th series folds into "Other" rather than
      getting a generated hue.
 
-     Validated against this surface (#06080c) — worst adjacent CVD ΔE 8.4,
+     Validated against instrument black — worst adjacent CVD ΔE 8.4,
      worst adjacent normal-vision ΔE 19.3, all eight above 3:1 contrast.
      Deliberately distinct from the state colours above, so a series colour can
      never impersonate "critical". */
@@ -73,13 +71,16 @@
   /* The emphasis form: one series in colour, the rest in this. */
   --series-mute: #3d4658;
   --chart-grid: rgba(255, 255, 255, 0.07);
-  --chart-surface: #06080c;
+  --chart-surface: #000000;
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --ink: 248 249 251;    /* near-white app background */
-  --panel: 255 255 255;  /* planes */
+  --ink: 255 255 255;    /* white */
+  /* Panels are a hair *below* the page rather than above it. On a white
+     background there is no lighter shade left to raise them into, so a plane
+     reads as recessed — which is what a plane was always meant to be. */
+  --panel: 250 251 252;
   --edge: 226 230 237;   /* hairlines */
   --grid: 15 23 42;
   --grid-alpha: 0.035;
@@ -87,8 +88,6 @@
   --topo-text: 15 23 42;
   --topo-label: 71 85 105;
   --topo-label-off: 148 163 184;
-  --aurora-glow: 0.045;
-  --neon-glow: 0.03;
   --state-idle-ink: #4B5563;
   --state-healthy-ink: #047857;
   --state-active-ink: #1D4ED8;
@@ -113,7 +112,7 @@
   --accent-wash: rgba(240, 78, 62, 0.08);
   --accent-edge: rgba(240, 78, 62, 0.28);
 
-  /* Same eight hues, stepped for paper and validated against #f8f9fb.
+  /* Same eight hues, stepped for paper and validated against white.
      Aqua, yellow and magenta sit below 3:1 here by design — every chart that
      uses them ships visible direct labels and a table view, which is the
      relief the contrast rule requires. */
@@ -170,14 +169,13 @@ body,
   height: 100%;
 }
 
+/* Flat. There was an indigo wash here, and an animated node field behind it;
+   both have gone. A background whose job is to sit behind a table of numbers
+   has no business being interesting — every gradient and every moving dot was
+   contrast the readouts had to win back. */
 body {
   @apply bg-ink text-slate-200;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* Faint single-hue indigo wash — restrained, not a light show. */
-  background-image:
-    radial-gradient(1200px 560px at 88% -12%, rgba(76, 139, 245, var(--aurora-glow)), transparent 62%),
-    radial-gradient(1000px 460px at -5% 112%, rgba(125, 169, 255, var(--neon-glow)), transparent 62%);
-  background-attachment: fixed;
 }
 
 /* In light mode, remap the light text scale the components use so dark-on-dark
