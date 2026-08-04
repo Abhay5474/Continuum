@@ -42,6 +42,7 @@ export type Kind =
   | "incident"
   | "conversation"
   | "document"
+  | "image"
   | "custom";
 
 /** Normalises the several vocabularies the API uses onto one set of marks. */
@@ -57,6 +58,9 @@ export function kindOf(raw?: string | null): Kind {
   if (k.includes("incident") || k.includes("log")) return "incident";
   if (k.includes("conversation") || k.includes("email")) return "conversation";
   if (k.includes("document") || k.includes("pdf")) return "document";
+  // Last, and only as a whole word: "image" appears inside plenty of capability
+  // names ("OCR — scanned image to text") that have a better mark than a photo.
+  if (/\b(image|photo|picture|vision)\b/.test(k)) return "image";
   return "custom";
 }
 
@@ -72,6 +76,7 @@ const KIND_HUE: Record<Kind, string> = {
   incident: "var(--series-8)",
   conversation: "var(--series-3)",
   document: "var(--series-4)",
+  image: "var(--series-6)",
   custom: "var(--series-mute)",
 };
 
@@ -86,6 +91,7 @@ export const KIND_LABEL: Record<Kind, string> = {
   incident: "Incident context",
   conversation: "Conversation",
   document: "Document",
+  image: "Image",
   custom: "Custom",
 };
 
@@ -176,6 +182,14 @@ export function KindMark({ kind, size = 34 }: { kind: Kind; size?: number }) {
           <>
             <path d="M4.5 6.5h10v7h-6l-4 3z" stroke={hue} strokeWidth="1.5" fill="none" strokeLinejoin="round" />
             <path d="M10.5 10.5h9v6h-3l-3 2.5v-2.5h-3z" stroke={hue} strokeWidth="1.5" fill="none" strokeLinejoin="round" opacity=".5" />
+          </>
+        );
+      case "image":
+        return (
+          <>
+            <rect x="4" y="5.5" width="16" height="13" rx="2" stroke={hue} strokeWidth="1.5" fill="none" />
+            <circle cx="9" cy="10" r="1.6" fill={hue} />
+            <path d="M4.5 16.5 9 12l3 3 2.5-2.5 4 4" stroke={hue} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </>
         );
       case "document":
@@ -802,6 +816,254 @@ export function Empty({ title, hint, action }: { title: string; hint?: string; a
       {hint && <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-600">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Workspace layout
+ * ------------------------------------------------------------------ */
+
+/**
+ * List on the left, the thing you picked on the right.
+ *
+ * <p>Replaces the accordion. An accordion answers "show me this one" by pushing
+ * everything below it off the screen, so comparing two pipelines means opening,
+ * scrolling, closing, scrolling, opening. Here the list never moves and the
+ * detail is always in the same place — which is also why the eye can go straight
+ * to it rather than hunting for where the page expanded.
+ *
+ * <p>Below the breakpoint it stacks: on a phone there is only ever room for one
+ * of the two, and a 240px column beside a detail pane is neither.
+ */
+export function Split({ list, detail }: { list: ReactNode; detail: ReactNode }) {
+  return (
+    <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(210px,254px)_minmax(0,1fr)]">
+      <div className="min-w-0">{list}</div>
+      <div className="min-w-0">{detail}</div>
+    </div>
+  );
+}
+
+/**
+ * One control for a set of exclusive views.
+ *
+ * <p>The pages this replaces stacked every configuration area vertically inside
+ * a bordered box inside a card, so the shape of the page said "five equally
+ * important things" when in practice you are doing exactly one of them. A
+ * segmented control says that: one at a time, and you can see the others exist.
+ */
+export function Segmented<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string; badge?: ReactNode }[];
+}) {
+  return (
+    <div role="tablist" className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-edge/60">
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(o.value)}
+            className={`relative -mb-px flex items-center gap-1.5 py-2 text-[12.5px] transition-colors ${
+              on ? "text-slate-100" : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            {o.label}
+            {o.badge}
+            {/* The indicator is a rule under the live tab, not a filled pill.
+                A pill is the same shape as a button and invites a second click. */}
+            <span
+              className="absolute inset-x-0 -bottom-px h-[1.5px] transition-opacity duration-200"
+              style={{ background: "var(--accent)", opacity: on ? 1 : 0 }}
+              aria-hidden
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * A number stated in type rather than framed in a box.
+ *
+ * <p>Four bordered stat cards across the top of a page is the most reliably
+ * ignored element in any console: it is the same furniture on every screen, so
+ * the eye learns to skip the whole band. A run of label-over-value in the page's
+ * own type is read, because it looks like the page rather than like a widget.
+ */
+export function Stat({
+  label,
+  value,
+  unit,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: ReactNode;
+  unit?: string;
+  tone?: "ok" | "warn" | "bad" | "accent";
+  hint?: string;
+}) {
+  const colour = tone
+    ? {
+        ok: "var(--state-healthy-ink)",
+        warn: "var(--state-warning-ink)",
+        bad: "var(--state-critical-ink)",
+        accent: "var(--accent-ink)",
+      }[tone]
+    : undefined;
+  return (
+    <div title={hint} className="min-w-0">
+      <div className="micro truncate">{label}</div>
+      <div
+        className="readout mt-1 text-[19px] leading-none tracking-tight text-slate-100"
+        style={colour ? { color: colour } : undefined}
+      >
+        {value}
+        {unit && <span className="ml-1 text-[11px] text-slate-500">{unit}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** A run of {@link Stat}s, spaced rather than boxed. */
+export function Stats({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap gap-x-9 gap-y-4">{children}</div>;
+}
+
+/**
+ * A proportional bar.
+ *
+ * <p>Non-zero always draws at least three pixels. A bar that rounds a real value
+ * down to nothing says "none" when the answer is "a little", and that is the one
+ * error a bar chart must not make.
+ */
+export function Bar({
+  fraction,
+  tone = "accent",
+  width = 84,
+}: {
+  fraction: number;
+  tone?: "accent" | "ok" | "warn" | "bad" | "mute";
+  width?: number;
+}) {
+  const pct = Math.min(1, Math.max(0, fraction)) * 100;
+  const colour = {
+    accent: "var(--accent)",
+    ok: "var(--state-healthy-ink)",
+    warn: "var(--state-warning-ink)",
+    bad: "var(--state-critical-ink)",
+    mute: "var(--series-mute)",
+  }[tone];
+  return (
+    <span
+      className="inline-block shrink-0 overflow-hidden rounded-full align-middle"
+      style={{ width, height: 5, background: "rgb(var(--edge))" }}
+      aria-hidden
+    >
+      <span
+        className="block h-full rounded-full transition-[width] duration-500 ease-out"
+        style={{ width: pct === 0 ? 0 : `max(3px, ${pct}%)`, background: colour }}
+      />
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Sequence
+ * ------------------------------------------------------------------ */
+
+/**
+ * A vertical run of events on a spine.
+ *
+ * <p>For anything that happened in order: a request through the layer, the
+ * stages of a transform. The rail is what makes it a sequence — a stack of
+ * bordered rows is a list, and a list does not say that the third thing happened
+ * because of the second.
+ */
+export function Spine({ children }: { children: ReactNode }) {
+  return <ol className="relative ml-[7px] border-l border-edge pl-6">{children}</ol>;
+}
+
+export function SpineNode({
+  tone = "idle",
+  head,
+  aside,
+  trailing,
+  onClick,
+  open = false,
+  children,
+  index = 0,
+  revealed = true,
+}: {
+  tone?: "ok" | "warn" | "bad" | "idle" | "accent" | "skipped";
+  head: ReactNode;
+  aside?: ReactNode;
+  trailing?: ReactNode;
+  onClick?: () => void;
+  open?: boolean;
+  children?: ReactNode;
+  index?: number;
+  revealed?: boolean;
+}) {
+  const colour = {
+    ok: "var(--state-healthy-ink)",
+    warn: "var(--state-warning-ink)",
+    bad: "var(--state-critical-ink)",
+    idle: "var(--state-idle-ink)",
+    accent: "var(--accent)",
+    skipped: "var(--series-mute)",
+  }[tone];
+  return (
+    <li
+      className="relative py-1.5 transition-all duration-300"
+      style={{
+        opacity: revealed ? 1 : 0,
+        transform: revealed ? "none" : "translateY(4px)",
+        transitionDelay: `${index * 20}ms`,
+      }}
+    >
+      {/* The node sits on the rail, half outside the padding box. Hollow when
+          the step was skipped: an outline reads as "this position exists and
+          nothing happened in it", which is exactly what a skip is. */}
+      <span
+        className="absolute -left-[29px] top-[13px] h-[9px] w-[9px] rounded-full"
+        style={{
+          background: tone === "skipped" ? "rgb(var(--panel))" : colour,
+          boxShadow: `0 0 0 2px rgb(var(--ink)), inset 0 0 0 ${tone === "skipped" ? 1.5 : 0}px ${colour}`,
+        }}
+        aria-hidden
+      />
+      <div
+        role={onClick ? "button" : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (onClick && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={`-mx-2 flex items-center gap-3 rounded-md px-2 py-1 ${
+          onClick ? "cursor-pointer hover:bg-slate-500/[0.055]" : ""
+        }`}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] text-slate-200">{head}</div>
+          {aside && <div className="mt-0.5 truncate text-[11.5px] text-slate-500">{aside}</div>}
+        </div>
+        {trailing}
+      </div>
+      {open && children && <div className="mt-2">{children}</div>}
+    </li>
   );
 }
 

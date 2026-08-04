@@ -259,9 +259,17 @@ export function Switch({
         aria-label={label}
         disabled={disabled}
         onClick={() => onChange(!checked)}
+        // The on-state wears the theme's accent: aurora on instrument black,
+        // coral on paper. A toggle is chrome, so it follows the chrome colour
+        // rather than keeping a hard-coded blue that belongs to one theme.
+        style={
+          checked
+            ? { background: "var(--accent-strong)", borderColor: "var(--accent-strong)" }
+            : undefined
+        }
         className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors ${
-          checked ? "border-aurora/60 bg-aurora/70" : "border-edge bg-edge/40"
-        } ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-aurora/60"}`}
+          checked ? "" : "border-edge bg-edge/40"
+        } ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-[color:var(--accent-edge)]"}`}
       >
         <span
           className={`h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
