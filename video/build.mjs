@@ -6,17 +6,16 @@
  * for by time, in any order, and the capture is reproducible rather than a
  * recording of whatever the machine managed that second.
  *
- * <p>Narration is espeak-ng, which is what this environment has. It is
- * intelligible and unmistakably synthetic; the captions are burned in so the
- * video works with the sound off, which is how most of it will be watched.
- * Swapping in a better voice means replacing the WAVs and re-running this — the
- * timeline is derived from their durations, so nothing else needs touching.
+ * <p>Narration comes from `regen-audio.mjs`, which uses Festival's CMU SLT
+ * arctic HTS voice. That was picked by measurement rather than by ear — see
+ * `score-voice.mjs`. The captions are burned in so the video also works with
+ * the sound off, which is how a good deal of it will be watched.
  *
  *   node build.mjs
  */
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -75,10 +74,17 @@ for (const s of scenes) {
 execFileSync('bash', ['-c', `printf "%s\\n" ${parts.map((p) => JSON.stringify(p)).join(' ')} > ${JSON.stringify(listPath)}`]);
 
 const voice = join(HERE, 'voice.wav');
+// Mastering, not colouring. The previous chain lowpassed at 7.6kHz — which
+// throws away most of the consonant energy that carries intelligibility — and
+// then made up the loss with a flat gain that left the mix at -27 dB mean.
+// loudnorm targets the -16 LUFS that web video is normally mixed to, so the
+// narration sits at a sane level next to everything else in a browser tab.
 execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', listPath,
-  // A gentle shelf and a touch of room take the hardest edge off a synthetic
-  // voice. It is still synthetic; it is no longer piercing.
-  '-af', 'highpass=f=90,lowpass=f=7600,acompressor=threshold=-18dB:ratio=3:attack=8:release=180,volume=1.35',
+  '-af', [
+    'highpass=f=70',            // rumble only; the voice starts well above this
+    'deesser=i=0.4',            // HTS sibilance is a little hot at 32kHz
+    'loudnorm=I=-16:TP=-1.5:LRA=11',
+  ].join(','),
   '-ar', '44100', '-ac', '2', voice]);
 
 const out = join(HERE, '..', 'frontend', 'public', 'continuum-intro.mp4');
@@ -90,5 +96,19 @@ execFileSync('ffmpeg', ['-y', '-v', 'error',
   '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
   '-c:a', 'aac', '-b:a', '96k', '-shortest', out]);
 
+// The player's chapters and transcript are emitted here rather than typed into
+// the component. They were hand-kept before, and a rewritten line silently left
+// every chapter marker pointing at the wrong second. One source of truth.
+let at = 0;
+const chapters = scenes.map((s) => {
+  const row = { id: s.id, label: s.label ?? s.id, at: Math.round(at * 100) / 100, text: s.text };
+  at += s.duration;
+  return row;
+});
+const meta = join(HERE, '..', 'frontend', 'src', 'generated', 'intro-chapters.json');
+mkdirSync(dirname(meta), { recursive: true });
+writeFileSync(meta, JSON.stringify({ total: Math.round(total * 100) / 100, chapters }, null, 2));
+
 const size = execFileSync('bash', ['-c', `du -h ${JSON.stringify(out)} | cut -f1`]).toString().trim();
 console.log(`\nwrote ${out} (${size}, ${total.toFixed(1)}s)`);
+console.log(`wrote ${meta}`);

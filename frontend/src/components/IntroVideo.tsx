@@ -16,32 +16,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * also the only form a search engine or a reader in a hurry can use.
  */
 
-const CHAPTERS: { at: number; label: string }[] = [
-  { at: 0, label: "What Continuum is" },
-  { at: 9.7, label: "Why raw data fails" },
-  { at: 20.8, label: "Specialists" },
-  { at: 33.8, label: "The evidence model" },
-  { at: 46.0, label: "Context transformers" },
-  { at: 60.5, label: "Reliability" },
-  { at: 68.9, label: "The trace" },
-];
+/**
+ * Chapters, timings and transcript come from the build, not from this file.
+ *
+ * <p>They were typed in here once. Then the narration was rewritten, every
+ * marker silently pointed at the wrong second, and nothing failed — which is
+ * the worst kind of wrong. `video/build.mjs` now emits this from the measured
+ * audio, so a rewritten line moves the chapters with it.
+ */
+import intro from "../generated/intro-chapters.json";
 
-const TRANSCRIPT = [
-  "Continuum is a reliability layer between your application and a language model. Its job is to make what happens in between visible.",
-  "Sent straight to a model, a photo, a recording or a spreadsheet is data it cannot really read. It answers anyway, and you cannot tell it was guessing.",
-  "So Continuum calls a specialist first, using your own provider key. Images to Roboflow, audio to Deepgram, scans to an optical reader. What returns becomes evidence.",
-  "Evidence carries a confidence only where one was measured. A transcript has no score, so no threshold is applied to it. Nothing is invented to fill a gap.",
-  "Continuum also transforms data itself, with no model at all. A spreadsheet keeps its merged headers and units. Ten thousand log lines become an incident, ninety eight percent smaller.",
-  "Around it sit routing, admission control, caching, and a check that the answer matches the evidence it was given.",
-  "Every run leaves a trace. What was found, what it cost, where each number came from, and what Continuum refused to guess.",
-];
+const CHAPTERS = intro.chapters;
+const TOTAL = intro.total;
 
 export default function IntroVideo() {
   const video = useRef<HTMLVideoElement | null>(null);
   const [started, setStarted] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [t, setT] = useState(0);
-  const [duration, setDuration] = useState(78.5);
+  const [duration, setDuration] = useState(TOTAL);
   const [transcript, setTranscript] = useState(false);
 
   const play = useCallback(() => {
@@ -66,7 +59,7 @@ export default function IntroVideo() {
     const el = video.current;
     if (!el) return;
     const onTime = () => setT(el.currentTime);
-    const onMeta = () => setDuration(el.duration || 78.5);
+    const onMeta = () => setDuration(el.duration || TOTAL);
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     el.addEventListener("timeupdate", onTime);
@@ -112,7 +105,7 @@ export default function IntroVideo() {
         {!started && (
           <button
             onClick={play}
-            aria-label="Play the introduction, 79 seconds, with narration"
+            aria-label={`Play the introduction, ${Math.round(TOTAL)} seconds, with narration`}
             /* A scrim centred behind the label rather than a flat wash over
                the whole frame: the poster stays legible at the edges and the
                overlay text is not fighting the picture underneath it. */
@@ -129,7 +122,9 @@ export default function IntroVideo() {
                 </svg>
               </span>
               <span className="text-sm font-medium text-slate-100">Watch the introduction</span>
-              <span className="text-xs text-slate-400">79 seconds · narrated · captions on screen</span>
+              <span className="text-xs text-slate-400">
+                {Math.round(TOTAL)} seconds · narrated · captions on screen
+              </span>
             </span>
           </button>
         )}
@@ -195,15 +190,15 @@ export default function IntroVideo() {
         </button>
         {transcript && (
           <div className="mt-3 space-y-2.5 rounded-lg border border-edge/70 bg-panel/40 p-4 text-left">
-            {TRANSCRIPT.map((line, i) => (
-              <p key={i} className="pl-12 -indent-12 text-sm leading-relaxed text-slate-400">
+            {CHAPTERS.map((c) => (
+              <p key={c.id} className="pl-12 -indent-12 text-sm leading-relaxed text-slate-400">
                 <button
-                  onClick={() => seek(CHAPTERS[i]?.at ?? 0)}
+                  onClick={() => seek(c.at)}
                   className="mr-2 text-[11px] text-slate-600 transition-colors hover:text-aurora"
                 >
-                  {fmtTime(CHAPTERS[i]?.at ?? 0)}
+                  {fmtTime(c.at)}
                 </button>
-                {line}
+                {c.text}
               </p>
             ))}
             <p className="pt-1 text-xs text-slate-600">

@@ -1,37 +1,44 @@
 [
   {
     "id": "intro",
-    "text": "Continuum is a reliability layer between your application and a language model. Its job is to make what happens in between visible.",
-    "duration": 9.66
+    "label": "What Continuum is",
+    "text": "Continuum is a reliability layer. It sits between your application and a language model. Its job is to make the middle visible.",
+    "duration": 9.39
   },
   {
     "id": "problem",
-    "text": "Sent straight to a model, a photo, a recording or a spreadsheet is data it cannot really read. It answers anyway, and you cannot tell it was guessing.",
-    "duration": 11.12
+    "label": "Why raw data fails",
+    "text": "Send a photo, a recording, or a spreadsheet straight to a model, and it cannot really read them. It will answer anyway. And you cannot tell that it was guessing.",
+    "duration": 10.63
   },
   {
     "id": "specialists",
-    "text": "So Continuum calls a specialist first, using your own provider key. Images to Roboflow, audio to Deepgram, scans to an optical reader. What returns becomes evidence.",
-    "duration": 13.05
+    "label": "Specialists",
+    "text": "Continuum calls a specialist first. It uses your provider key. Images go to Roboflow. Audio goes to Deepgram. Scans go to an optical reader. What comes back becomes evidence.",
+    "duration": 12.73
   },
   {
     "id": "evidence",
-    "text": "Evidence carries a confidence only where one was measured. A transcript has no score, so no threshold is applied to it. Nothing is invented to fill a gap.",
-    "duration": 12.13
+    "label": "The evidence model",
+    "text": "Evidence carries a confidence score only where one was measured. A transcript has no score. So no threshold is applied to it. Nothing is invented to fill a gap.",
+    "duration": 11.17
   },
   {
     "id": "context",
-    "text": "Continuum also transforms data itself, with no model at all. A spreadsheet keeps its merged headers and units. Ten thousand log lines become an incident, ninety eight percent smaller.",
-    "duration": 14.53
+    "label": "Context transformers",
+    "text": "Continuum also transforms data by itself, with no model at all. A spreadsheet keeps its merged headers and its units. Ten thousand log lines become one incident. Ninety eight percent smaller.",
+    "duration": 13.63
   },
   {
     "id": "reliability",
-    "text": "Around it sit routing, admission control, caching, and a check that the answer matches the evidence it was given.",
-    "duration": 8.38
+    "label": "Reliability",
+    "text": "Around all of this sits the reliability layer. Model routing. Admission control. Caching. And a check that the answer matches the evidence.",
+    "duration": 10.29
   },
   {
     "id": "close",
-    "text": "Every run leaves a trace. What was found, what it cost, where each number came from, and what Continuum refused to guess.",
-    "duration": 9.66
+    "label": "The trace",
+    "text": "Every run leaves a trace. What was found. What it cost. Where each number came from. And what Continuum refused to guess.",
+    "duration": 8.7
   }
 ]
