@@ -29,6 +29,14 @@
   --state-critical-ink: #F4566E;
   --state-offline-ink: #6A7386;
 
+  /* On instrument black the accent stays the aurora blue the console was built
+     around. Coral is the paper identity. */
+  --accent: #4C8BF5;
+  --accent-strong: #6BA1F7;
+  --accent-ink: #8FBAFA;
+  --accent-wash: rgba(76, 139, 245, 0.10);
+  --accent-edge: rgba(76, 139, 245, 0.32);
+
   /* ---- data-visualisation palette ----------------------------------------
      Categorical slots encode *identity* (which series). Assigned in fixed
      order and never cycled: the order is what makes the palette safe under
@@ -89,6 +97,22 @@
   --state-critical-ink: #BE123C;
   --state-offline-ink: #6B7280;
 
+  /* ---- light-mode brand accent -------------------------------------------
+     Coral, and only on chrome: buttons, focus rings, active states, the
+     hairlines that carry emphasis. It is deliberately NOT applied to the
+     data-visualisation palette below or to any feature animation — a brand
+     colour leaking into a chart would start encoding meaning it does not have.
+
+     Three steps because one coral cannot do three jobs. Measured, not picked:
+       --accent         #F04E3E  3.58:1 on white — clears the 3:1 UI bar
+       --accent-strong  #D93B2B  4.55:1 — clears AA for white-on-button
+       --accent-ink     #C7301F  5.42:1 — comfortable as text on white */
+  --accent: #F04E3E;
+  --accent-strong: #D93B2B;
+  --accent-ink: #C7301F;
+  --accent-wash: rgba(240, 78, 62, 0.08);
+  --accent-edge: rgba(240, 78, 62, 0.28);
+
   /* Same eight hues, stepped for paper and validated against #f8f9fb.
      Aqua, yellow and magenta sit below 3:1 here by design — every chart that
      uses them ships visible direct labels and a table view, which is the
@@ -133,6 +157,12 @@
   color: #4338ca;
   box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.3);
 }
+
+/* A side panel parked off-screen with translate-x-full still contributes to
+   the document's scrollable width, so every page with one grew a horizontal
+   scrollbar and a band of dead space. Transforms do not affect layout; they do
+   affect overflow. */
+html { overflow-x: hidden; }
 
 html,
 body,

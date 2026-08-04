@@ -1,19 +1,58 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout } from "../system/primitives";
-import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import Hub from "./Hub";
+import { PageHeader } from "../system/primitives";
+import { ErrorState, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
+import type { Kind } from "../system/hub";
+import {
+  Because,
+  Code,
+  CommandBar,
+  Dot,
+  Empty,
+  Facts,
+  Field,
+  Flow,
+  Ghost,
+  KIND_LABEL,
+  KindMark,
+  Primary,
+  ProviderLine,
+  Rail,
+  Row,
+  RowSkeleton,
+  Section,
+  SidePanel,
+  kindOf,
+} from "../system/hub";
 
 /**
- * Specialist models — the layer that calls something other than the LLM.
+ * Specialists — one workspace, not a directory.
  *
- * <p>The probe view is the reason this page exists. Nobody can tell a developer
- * the shape of their own model's response reliably, so Continuum sends one real
- * request and shows two things side by side: what the endpoint actually
- * returned, and what Continuum understood from it. A developer who can see both
- * knows whether the integration works. A developer reading a description of it
- * is guessing.
+ * <p>This used to be two pages: a list of installed specialists and a "Hub" of
+ * things you could add. Both rendered as grids of bordered cards carrying five
+ * pills each, which is what a database looks like when it is printed onto a
+ * screen. Every fact was present and none of it was legible, because a card has
+ * nowhere to put structure except more chrome.
+ *
+ * <p>The rebuild starts from what someone actually arrives here to do, which is
+ * one of exactly three things.
+ *
+ * <ol>
+ *   <li><b>"I need something that can read a scan."</b> A capability search — so
+ *       search is the primary control, it takes an intention rather than a
+ *       keyword, and every result says why it matched.</li>
+ *   <li><b>"Is the thing I installed working?"</b> A status check — so running
+ *       specialists come first, each showing its state and last probe without
+ *       being opened.</li>
+ *   <li><b>"What does this actually return?"</b> Understanding — so selecting
+ *       anything opens a panel whose centrepiece is the transformation drawn:
+ *       input, specialist, output. That is the question being asked, and a
+ *       paragraph is a worse answer than a picture.</li>
+ * </ol>
+ *
+ * <p>Nothing about the API, the adapters, the probe lifecycle or the search
+ * endpoint changed. Same data, arranged so it can be read.
  */
 
 type Provider = {
@@ -37,6 +76,14 @@ type Connection = {
   lastError: string | null;
 };
 
+type EvidenceItem = {
+  kind: "DETECTION" | "CLASSIFICATION" | "TEXT" | "FIELD" | "ROW" | "NOTE";
+  label: string | null;
+  confidence: number | null;
+  scored: boolean;
+  text: string | null;
+};
+
 type Specialist = {
   id: number;
   name: string;
@@ -57,28 +104,88 @@ type Specialist = {
   probeFindings: EvidenceItem[];
 };
 
-/**
- * One thing a tool observed. Confidence is nullable on purpose: an OCR engine
- * has no opinion about how sure it is, and rendering 0.00 there would read as
- * "certainly not".
- */
-type EvidenceItem = {
-  kind: "DETECTION" | "CLASSIFICATION" | "TEXT" | "FIELD" | "ROW" | "NOTE";
-  label?: string;
-  confidence: number | null;
+type Entry = {
+  id: string;
+  title: string;
+  description: string;
+  provider: string;
+  baseUrl: string;
+  modelPath: string;
+  inputKind: string;
+  toolKind: string;
+  toolKindLabel: string;
   scored: boolean;
-  text?: string;
-  attributes?: Record<string, unknown>;
+  suggestedConfidence: number;
+  tags: string[];
+  needs: string[];
+  note: string;
+  source: string;
 };
+
+type SourceState = {
+  name: string;
+  available: boolean;
+  live?: boolean;
+  results?: number;
+  reason?: string | null;
+};
+
+/** What each capability hands the model. Shown in the flow, not described. */
+const OUTPUT_OF: Record<string, string> = {
+  detection: "labelled regions, each with a confidence",
+  classification: "labels with confidences",
+  ocr: "recovered text · no confidence",
+  transcription: "a transcript · no confidence",
+  extraction: "named fields",
+  moderation: "safety labels with scores",
+  table: "columns, units and rows",
+  incident: "patterns, exceptions, a timeline",
+  conversation: "messages in order",
+  document: "text and structure",
+  custom: "whatever the endpoint returns",
+};
+
+const INPUT_LABEL: Record<string, string> = {
+  image: "an image",
+  audio: "a recording",
+  text: "text",
+  json: "a JSON payload",
+  document: "a document",
+};
+
+const SUGGESTIONS = [
+  "read text from a scan",
+  "transcribe a recording",
+  "detect objects in an image",
+  "check text for abuse",
+];
+
+/** Why a row matched, in the words of the thing that matched. */
+function matchReason(e: Entry, q: string): string | null {
+  const t = q.toLowerCase().trim();
+  if (!t) return null;
+  const words = t.split(/\s+/).filter((w) => w.length > 2);
+  const hay = `${e.title} ${e.description} ${e.tags.join(" ")} ${e.toolKindLabel}`.toLowerCase();
+  if (!words.some((w) => hay.includes(w))) return null;
+  if (e.toolKindLabel && words.some((w) => e.toolKindLabel.toLowerCase().includes(w))) {
+    return `${e.toolKindLabel.toLowerCase()} is exactly what this does`;
+  }
+  const sentence = e.description.split(/(?<=\.)\s/)[0];
+  return sentence.length > 96 ? sentence.slice(0, 95) + "…" : sentence;
+}
 
 export default function Specialists() {
   const toast = useToast();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const [specialists, setSpecialists] = useState<Specialist[] | null>(null);
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [sources, setSources] = useState<SourceState[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState<number | null>(null);
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState<{ kind: "installed" | "catalogue"; id: string } | null>(null);
+  const [connectFor, setConnectFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -97,539 +204,735 @@ export default function Specialists() {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
-  const run = async (fn: () => Promise<any>, message: string) => {
+  // Same catalogue endpoint as before, debounced so typing an intention does
+  // not fan out a request per keystroke.
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await portal.specialists.catalogue(q);
+        if (!cancelled) {
+          setEntries(r.entries ?? []);
+          setSources(r.sources ?? []);
+        }
+      } catch {
+        if (!cancelled) setEntries([]);
+      }
+    }, 170);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [q]);
+
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true);
     try {
       await fn();
+      toast(ok, "success");
       await load();
-      toast(message);
     } catch (e: any) {
-      toast(e?.message ?? "That did not work", "error");
+      toast(e?.message ?? "That did not work.", "error");
+      throw e;
     } finally {
       setBusy(false);
     }
   };
 
+  const installed = specialists ?? [];
+  const connectionOf = (id: number) => (connections ?? []).find((c) => c.id === id);
+
+  const matchedInstalled = useMemo(() => {
+    const t = q.toLowerCase().trim();
+    if (!t) return installed;
+    return installed.filter((s) =>
+      `${s.name} ${s.toolKindLabel} ${s.modelPath} ${s.inputKind}`.toLowerCase().includes(t)
+    );
+  }, [installed, q]);
+
+  // Grouped by what the capability does, in a fixed order so the list does not
+  // reshuffle as results change.
+  const grouped = useMemo(() => {
+    const order: Kind[] = [
+      "ocr", "transcription", "detection", "classification",
+      "moderation", "extraction", "table", "incident", "conversation",
+      "document", "custom",
+    ];
+    const by = new Map<Kind, Entry[]>();
+    for (const e of entries) {
+      const k = kindOf(e.toolKind || e.toolKindLabel);
+      (by.get(k) ?? by.set(k, []).get(k)!).push(e);
+    }
+    return order.filter((k) => by.has(k)).map((k) => [k, by.get(k)!] as const);
+  }, [entries]);
+
+  const selected = useMemo(() => {
+    if (!sel) return null;
+    if (sel.kind === "installed") {
+      const s = installed.find((x) => String(x.id) === sel.id);
+      return s ? ({ kind: "installed", s } as const) : null;
+    }
+    const e = entries.find((x) => x.id === sel.id);
+    return e ? ({ kind: "catalogue", e } as const) : null;
+  }, [sel, installed, entries]);
+
   if (error) return <ErrorState message={error} onRetry={load} />;
 
-  const ready = (specialists ?? []).filter((s) => s.status === "READY").length;
+  const searching = q.trim().length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl pb-24">
       <PageHeader
         title="Specialists"
-        subtitle="Call a smaller, sharper model before the big one. Continuum shapes its findings into context the language model can reason about."
+        subtitle="A purpose-built model runs before the language model, and hands it evidence instead of a raw file"
       />
 
-      <Plane className="grid gap-6 p-5 sm:grid-cols-4">
-        <Readout label="Connections" value={connections?.length ?? 0} />
-        <Readout
-          label="Verified"
-          value={(connections ?? []).filter((c) => c.status === "VERIFIED").length}
-          state={(connections ?? []).some((c) => c.status === "FAILING") ? "critical" : "idle"}
+      <div className="mt-6">
+        <CommandBar
+          value={q}
+          onChange={setQ}
+          placeholder="What do you need it to do?   e.g. read text from a scan"
+          suggestions={SUGGESTIONS}
         />
-        <Readout label="Specialists" value={specialists?.length ?? 0} />
-        <Readout label="Ready" value={ready} state={ready > 0 ? "healthy" : "idle"} />
-      </Plane>
+      </div>
 
-      {/* The Hub sits above the manual forms on purpose: adding by hand means
-          knowing six things, and most people should not have to. */}
-      <Hub onInstalled={load} />
+      {(!searching || matchedInstalled.length > 0) && (
+        <Section
+          title={searching ? "Already running" : "Running"}
+          count={specialists ? matchedInstalled.length : undefined}
+          hint={
+            installed.length === 0
+              ? undefined
+              : "Probed before use — a specialist that has not answered correctly cannot enter a pipeline."
+          }
+        >
+          {specialists === null ? (
+            <RowSkeleton rows={3} />
+          ) : matchedInstalled.length === 0 ? (
+            <Empty
+              title="Nothing running yet"
+              hint="Search above for a capability — reading a scan, transcribing a recording, detecting objects — and add it with your own provider key."
+            />
+          ) : (
+            <Rail>
+              {matchedInstalled.map((s) => {
+                const kind = kindOf(s.toolKind || s.toolKindLabel);
+                const conn = connectionOf(s.connectionId);
+                const tone = s.status === "READY" ? "ok" : s.status === "DRAFT" ? "idle" : "bad";
+                return (
+                  <Row
+                    key={s.id}
+                    selected={sel?.kind === "installed" && sel.id === String(s.id)}
+                    onClick={() => setSel({ kind: "installed", id: String(s.id) })}
+                    mark={<KindMark kind={kind} />}
+                    title={s.name}
+                    status={
+                      <Dot
+                        tone={tone}
+                        label={
+                          s.status === "READY"
+                            ? "Ready"
+                            : s.status === "DRAFT"
+                              ? "Not probed"
+                              : s.status === "UNPARSEABLE"
+                                ? "Answer not understood"
+                                : "Failing"
+                        }
+                      />
+                    }
+                    subtitle={`${INPUT_LABEL[s.inputKind] ?? s.inputKind} → ${OUTPUT_OF[kind] ?? "a result"}`}
+                    meta={
+                      <Facts
+                        items={[
+                          { k: "via", v: conn?.provider ?? "—" },
+                          { k: "model", v: s.modelPath || "—" },
+                          s.scored
+                            ? { k: "threshold", v: s.minConfidence.toFixed(2) }
+                            : {
+                                k: "threshold",
+                                v: "not applicable",
+                                title:
+                                  "This tool returns content rather than scored findings, so a confidence threshold does not apply to it.",
+                              },
+                          ...(s.probeMs !== null ? [{ k: "probe", v: `${s.probeMs}ms` }] : []),
+                        ]}
+                      />
+                    }
+                    actions={
+                      <>
+                        <Ghost
+                          disabled={busy}
+                          onClick={() => void run(() => portal.specialists.probe(s.id), "Probe sent").catch(() => {})}
+                        >
+                          Probe
+                        </Ghost>
+                        <Ghost
+                          tone="danger"
+                          disabled={busy}
+                          onClick={() => void run(() => portal.specialists.remove(s.id), "Removed").catch(() => {})}
+                        >
+                          Remove
+                        </Ghost>
+                      </>
+                    }
+                  />
+                );
+              })}
+            </Rail>
+          )}
+        </Section>
+      )}
 
-      <ConnectionsSection
-        providers={providers}
-        connections={connections}
+      <Section
+        title={searching ? "Capabilities that match" : "Add a capability"}
+        count={entries.length || undefined}
+        hint={
+          searching
+            ? undefined
+            : "Each calls a third-party model with your own key. Continuum normalises whatever comes back into one shape."
+        }
+      >
+        {entries.length === 0 ? (
+          <Empty
+            title={searching ? `Nothing matches “${q}”` : "No capabilities available"}
+            hint={
+              searching
+                ? "Try naming the job rather than a vendor — “read text from a scan” rather than a product name."
+                : undefined
+            }
+          />
+        ) : (
+          <div className="space-y-6">
+            {grouped.map(([groupKind, rows]) => (
+              <div key={groupKind}>
+                {/* A category heading, not a bordered section. Sixteen rows in
+                    one run is a directory; five runs of three is a menu. */}
+                {!searching && (
+                  <div className="mb-1.5 flex items-baseline gap-2 px-3">
+                    <span className="text-[11.5px] font-medium text-slate-400">
+                      {KIND_LABEL[groupKind]}
+                    </span>
+                    <span className="readout text-[10.5px] text-slate-700">{rows.length}</span>
+                  </div>
+                )}
+                <Rail>
+          {rows.map((e) => {
+              const kind = kindOf(e.toolKind || e.toolKindLabel);
+              const reason = matchReason(e, q);
+              const live = e.tags?.includes("live");
+              const free = e.tags?.includes("free");
+              return (
+                <Row
+                  key={e.id}
+                  selected={sel?.kind === "catalogue" && sel.id === e.id}
+                  onClick={() => setSel({ kind: "catalogue", id: e.id })}
+                  mark={<KindMark kind={kind} />}
+                  title={e.title}
+                  status={
+                    live ? (
+                      <Dot tone="busy" label="live from provider" />
+                    ) : free ? (
+                      <Dot tone="ok" label="free tier" />
+                    ) : undefined
+                  }
+                  subtitle={`${INPUT_LABEL[e.inputKind] ?? e.inputKind} → ${OUTPUT_OF[kind] ?? "a result"}`}
+                  meta={
+                    reason ? (
+                      <Because reason={reason} />
+                    ) : (
+                      <Facts
+                        items={[
+                          { k: "via", v: e.provider },
+                          {
+                            k: "needs",
+                            v: e.needs.includes("baseUrl") ? "your endpoint + key" : "your API key",
+                          },
+                        ]}
+                      />
+                    )
+                  }
+                  actions={<Ghost tone="accent">Inspect</Ghost>}
+                />
+              );
+            })}
+                </Rail>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title="Providers"
+        hint="Your keys, encrypted at rest and decrypted only at call time. No endpoint returns one."
+      >
+        <Rail>
+          {providers
+            .filter((p) => p.name !== "http")
+            .map((p) => {
+              const conn = (connections ?? []).find((c) => c.provider === p.name);
+              const src = sources.find((s) => s.name.toLowerCase() === p.name.toLowerCase());
+              const label = p.label.replace(/\s*\(.*\)$/, "");
+              return (
+                <ProviderLine
+                  key={p.name}
+                  name={label}
+                  connected={!!conn?.hasCredential}
+                  detail={
+                    conn?.hasCredential
+                      ? conn.status === "FAILING"
+                        ? conn.lastError ?? "The last call failed"
+                        : src && !src.available && src.reason
+                          ? src.reason
+                          : `${conn.name} · takes ${p.inputKinds.join(", ")}`
+                      : `Connect to use ${label} models with your own key`
+                  }
+                  action={
+                    conn?.hasCredential ? (
+                      <Ghost
+                        tone="danger"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(
+                            () => portal.specialists.deleteConnection(conn.id),
+                            "Disconnected"
+                          ).catch(() => {})
+                        }
+                      >
+                        Disconnect
+                      </Ghost>
+                    ) : (
+                      <Ghost tone="accent" onClick={() => setConnectFor(p.name)}>
+                        Connect
+                      </Ghost>
+                    )
+                  }
+                />
+              );
+            })}
+        </Rail>
+      </Section>
+
+      <DetailPanel
+        selected={selected}
+        connections={connections ?? []}
         busy={busy}
-        onAdd={(body) => run(() => portal.specialists.addConnection(body), "Connection added")}
-        onDelete={(id) => run(() => portal.specialists.deleteConnection(id), "Connection removed")}
+        onClose={() => setSel(null)}
+        onProbe={(id) => void run(() => portal.specialists.probe(id), "Probe sent").catch(() => {})}
+        onInstall={async (entryId, body) => {
+          try {
+            await run(async () => {
+              const r: any = await portal.specialists.install(entryId, body);
+              if (r?.specialist?.status && r.specialist.status !== "READY") {
+                throw new Error(`Added, but the probe came back ${r.specialist.status}.`);
+              }
+            }, "Added and probed — ready to use");
+            setSel(null);
+          } catch {
+            /* the toast already said why; the panel stays open so it can be fixed */
+          }
+        }}
       />
 
-      <SpecialistsSection
-        connections={connections ?? []}
-        specialists={specialists}
+      <ConnectPanel
+        provider={providers.find((p) => p.name === connectFor) ?? null}
         busy={busy}
-        open={open}
-        onToggle={(id) => setOpen(open === id ? null : id)}
-        onAdd={(body) => run(() => portal.specialists.add(body), "Specialist registered — probe it next")}
-        onProbe={(id) => run(() => portal.specialists.probe(id), "Probe sent")}
-        onDelete={(id) => run(() => portal.specialists.remove(id), "Specialist removed")}
+        onClose={() => setConnectFor(null)}
+        onSave={async (body) => {
+          try {
+            await run(() => portal.specialists.addConnection(body), "Connected");
+            setConnectFor(null);
+          } catch {
+            /* stays open */
+          }
+        }}
       />
     </div>
   );
 }
 
-/* ---------------------------------------------------------------- connections */
+/* ------------------------------------------------------------------ *
+ * Detail
+ * ------------------------------------------------------------------ */
 
-function ConnectionsSection({
-  providers,
+function DetailPanel({
+  selected,
   connections,
   busy,
-  onAdd,
-  onDelete,
+  onClose,
+  onProbe,
+  onInstall,
 }: {
-  providers: Provider[];
-  connections: Connection[] | null;
+  selected:
+    | { readonly kind: "installed"; readonly s: Specialist }
+    | { readonly kind: "catalogue"; readonly e: Entry }
+    | null;
+  connections: Connection[];
   busy: boolean;
-  onAdd: (b: any) => void;
-  onDelete: (id: number) => void;
+  onClose: () => void;
+  onProbe: (id: number) => void;
+  onInstall: (entryId: string, body: any) => void;
 }) {
-  const [adding, setAdding] = useState(false);
-  const [provider, setProvider] = useState("roboflow");
+  const [name, setName] = useState("");
+  const [modelPath, setModelPath] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [secret, setSecret] = useState("");
+  const [reuse, setReuse] = useState<number | "">("");
+
+  const entry = selected?.kind === "catalogue" ? selected.e : null;
+  const entryId = entry?.id;
+
+  useEffect(() => {
+    if (!entry) return;
+    setName(entry.title);
+    setModelPath(entry.modelPath);
+    setBaseUrl(entry.baseUrl);
+    setSecret("");
+    setReuse("");
+    // Keyed on the entry, so switching between two capabilities resets the form
+    // rather than carrying one's model path onto the other.
+  }, [entryId]);
+
+  if (!selected) {
+    return (
+      <SidePanel open={false} title="" onClose={onClose}>
+        {null}
+      </SidePanel>
+    );
+  }
+
+  if (selected.kind === "installed") {
+    const s = selected.s;
+    const kind = kindOf(s.toolKind || s.toolKindLabel);
+    const conn = connections.find((c) => c.id === s.connectionId);
+    return (
+      <SidePanel
+        open
+        onClose={onClose}
+        mark={<KindMark kind={kind} size={38} />}
+        title={s.name}
+        subtitle={`${s.toolKindLabel} · via ${conn?.provider ?? "unknown provider"}`}
+        footer={
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-slate-600">
+              {s.probedAt ? `Last probed ${dateTimeOf(s.probedAt)}` : "Never probed"}
+            </span>
+            <Primary onClick={() => onProbe(s.id)} disabled={busy}>
+              Probe again
+            </Primary>
+          </div>
+        }
+      >
+        <Field label="What it does">
+          <Flow
+            vertical
+            mark={<KindMark kind={kind} size={26} />}
+            input={INPUT_LABEL[s.inputKind] ?? s.inputKind}
+            node={s.name}
+            nodeSub={s.modelPath || conn?.provider}
+            output={OUTPUT_OF[kind] ?? "a result"}
+          />
+        </Field>
+
+        <Field label="Configuration">
+          <Facts
+            items={[
+              { k: "model", v: s.modelPath || "—" },
+              { k: "input", v: s.inputKind },
+              { k: "timeout", v: `${s.timeoutSeconds}s` },
+              {
+                k: "threshold",
+                v: s.scored ? s.minConfidence.toFixed(2) : "not applicable",
+                title: s.scored
+                  ? "Findings below this are not reported."
+                  : "This tool returns content rather than scored findings, so a threshold would discard all of it or none.",
+              },
+            ]}
+          />
+        </Field>
+
+        <Field label="Authentication">
+          {conn
+            ? `${conn.name} · ${conn.authStyle.toLowerCase()} · ${conn.hasCredential ? "key stored, encrypted" : "no key stored"}`
+            : "No connection"}
+        </Field>
+
+        {s.probeFindings?.length > 0 && (
+          <Field label="What the last probe returned">
+            <div className="space-y-1.5">
+              {s.probeFindings.slice(0, 6).map((f, i) => (
+                <div key={i} className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate text-slate-300">
+                    {f.label ?? f.text ?? f.kind.toLowerCase()}
+                  </span>
+                  <span className="readout shrink-0 text-[11px]">
+                    {f.scored && f.confidence !== null ? (
+                      <span style={{ color: "var(--accent-ink)" }}>{f.confidence.toFixed(2)}</span>
+                    ) : (
+                      <span className="text-slate-600">unscored</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Field>
+        )}
+
+        {s.probeError && (
+          <Field label="Last error">
+            <span style={{ color: "var(--state-critical-ink)" }}>{s.probeError}</span>
+          </Field>
+        )}
+
+        {s.probeResponse && (
+          <Field label="Raw provider response">
+            <Code>{s.probeResponse.slice(0, 1400)}</Code>
+          </Field>
+        )}
+      </SidePanel>
+    );
+  }
+
+  const e = selected.e;
+  const kind = kindOf(e.toolKind || e.toolKindLabel);
+  const reusable = connections.filter((c) => c.provider === e.provider && c.hasCredential);
+  const usingExisting = reuse !== "";
+  const needsPath = e.needs.includes("modelPath");
+  const needsBase = e.needs.includes("baseUrl");
+  const ready =
+    name.trim() !== "" &&
+    (!needsPath || modelPath.trim() !== "") &&
+    (usingExisting || (secret.trim() !== "" && (!needsBase || baseUrl.trim() !== "")));
+
+  return (
+    <SidePanel
+      open
+      onClose={onClose}
+      mark={<KindMark kind={kind} size={38} />}
+      title={e.title}
+      subtitle={`${e.toolKindLabel} · ${e.provider}`}
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[11px] text-slate-600">Probed on add, so you find out now.</span>
+          <Primary
+            disabled={busy || !ready}
+            onClick={() =>
+              onInstall(e.id, {
+                name: name.trim(),
+                baseUrl: baseUrl.trim() || undefined,
+                modelPath: modelPath.trim() || undefined,
+                connectionId: usingExisting ? (reuse as number) : undefined,
+                secret: usingExisting ? undefined : secret,
+              })
+            }
+          >
+            {busy ? "Adding…" : "Add and probe"}
+          </Primary>
+        </div>
+      }
+    >
+      <Field label="What it does">
+        <Flow
+          vertical
+          mark={<KindMark kind={kind} size={26} />}
+          input={INPUT_LABEL[e.inputKind] ?? e.inputKind}
+          node={e.title}
+          nodeSub={e.provider}
+          output={OUTPUT_OF[kind] ?? "a result"}
+        />
+      </Field>
+
+      <Field label="Purpose">{e.description}</Field>
+      <Field label="Worth knowing">
+        <span className="text-slate-400">{e.note}</span>
+      </Field>
+
+      <div className="mt-6 border-t border-edge/70 pt-4">
+        <div className="micro">Add it</div>
+
+        <FormRow label="Name it">
+          <input
+            value={name}
+            onChange={(ev) => setName(ev.target.value)}
+            className={INPUT_CLASS}
+          />
+        </FormRow>
+
+        {reusable.length > 0 && (
+          <FormRow label="Credential">
+            <select
+              value={reuse}
+              onChange={(ev) => setReuse(ev.target.value === "" ? "" : Number(ev.target.value))}
+              className={INPUT_CLASS}
+            >
+              <option value="">Use a new key…</option>
+              {reusable.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Reuse “{c.name}”
+                </option>
+              ))}
+            </select>
+          </FormRow>
+        )}
+
+        {!usingExisting && (
+          <>
+            {needsBase && (
+              <FormRow label="Base URL">
+                <input
+                  value={baseUrl}
+                  onChange={(ev) => setBaseUrl(ev.target.value)}
+                  placeholder="https://models.your-company.internal"
+                  className={MONO_CLASS}
+                />
+              </FormRow>
+            )}
+            <FormRow
+              label="API key"
+              hint="Encrypted at rest, decrypted only at call time. No endpoint returns it."
+            >
+              <input
+                type="password"
+                value={secret}
+                autoComplete="off"
+                onChange={(ev) => setSecret(ev.target.value)}
+                className={MONO_CLASS}
+              />
+            </FormRow>
+          </>
+        )}
+
+        <FormRow label={needsPath ? "Model path (required)" : "Model path"}>
+          <input
+            value={modelPath}
+            onChange={(ev) => setModelPath(ev.target.value)}
+            placeholder={e.provider === "roboflow" ? "your-project/3" : "leave blank if unused"}
+            className={MONO_CLASS}
+          />
+        </FormRow>
+      </div>
+    </SidePanel>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Connecting a provider
+ * ------------------------------------------------------------------ */
+
+function ConnectPanel({
+  provider,
+  busy,
+  onClose,
+  onSave,
+}: {
+  provider: Provider | null;
+  busy: boolean;
+  onClose: () => void;
+  onSave: (b: any) => void;
+}) {
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [secret, setSecret] = useState("");
+  const providerName = provider?.name;
 
-  const selected = providers.find((p) => p.name === provider);
+  useEffect(() => {
+    if (!provider) return;
+    setName(`${provider.label.replace(/\s*\(.*\)$/, "")} key`);
+    setBaseUrl(provider.baseUrl ?? "");
+    setSecret("");
+  }, [providerName]);
+
+  const label = provider?.label.replace(/\s*\(.*\)$/, "") ?? "";
+  const ready =
+    !!provider &&
+    name.trim() !== "" &&
+    secret.trim() !== "" &&
+    (!provider.requiresBaseUrl || baseUrl.trim() !== "");
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Micro>Connections · your credentials, encrypted and never shown again</Micro>
-        <button
-          onClick={() => setAdding((a) => !a)}
-          className="rounded-md border border-edge px-2.5 py-1 text-xs text-slate-300 hover:border-aurora/50"
-        >
-          {adding ? "Cancel" : "Add connection"}
-        </button>
-      </div>
+    <SidePanel
+      open={!!provider}
+      onClose={onClose}
+      title={`Connect ${label}`}
+      subtitle="Your key, your account. Continuum never hosts a model."
+      footer={
+        <div className="flex justify-end">
+          <Primary
+            disabled={busy || !ready}
+            onClick={() =>
+              onSave({
+                name: name.trim(),
+                provider: provider!.name,
+                baseUrl: baseUrl.trim() || undefined,
+                secret,
+              })
+            }
+          >
+            {busy ? "Connecting…" : "Connect"}
+          </Primary>
+        </div>
+      }
+    >
+      {provider && (
+        <>
+          <Field label="What this unlocks">
+            Capabilities that take {provider.inputKinds.join(", ")} and run on {label}.
+          </Field>
 
-      {adding && (
-        <Plane className="space-y-3 p-5">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="min-w-0">
-              <span className="micro">Provider</span>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
-              >
-                {providers.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="min-w-0">
-              <span className="micro">Name it</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Vet clinic Roboflow"
-                className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-aurora/60"
-              />
-            </label>
-          </div>
+          <FormRow label="Label">
+            <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLASS} />
+          </FormRow>
 
-          {selected?.requiresBaseUrl && (
-            <label className="block min-w-0">
-              <span className="micro">Endpoint</span>
+          {(provider.requiresBaseUrl || provider.baseUrl) && (
+            <FormRow label={`Base URL${provider.requiresBaseUrl ? " (required)" : ""}`}>
               <input
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://models.example.com"
-                className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-aurora/60"
+                className={MONO_CLASS}
               />
-            </label>
+            </FormRow>
           )}
 
-          <label className="block min-w-0">
-            <span className="micro">API key</span>
+          <FormRow
+            label="API key"
+            hint="Stored with AES-GCM and decrypted only at call time. Never returned by an endpoint, never written to a log, never sent to a language model."
+          >
             <input
               type="password"
               value={secret}
+              autoComplete="off"
               onChange={(e) => setSecret(e.target.value)}
-              placeholder="Your own key for this provider"
-              className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-aurora/60"
+              className={MONO_CLASS}
             />
-            <p className="mt-1 text-xs text-slate-600">
-              Encrypted before it is stored and decrypted only when a call is made. It is never
-              returned to this page, logged, or included in an error.
-            </p>
-          </label>
-
-          <button
-            disabled={busy || !name.trim() || (selected?.requiresBaseUrl && !baseUrl.trim())}
-            onClick={() => {
-              onAdd({ name, provider, baseUrl: baseUrl || undefined, secret: secret || undefined });
-              setName("");
-              setBaseUrl("");
-              setSecret("");
-              setAdding(false);
-            }}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-          >
-            Add connection
-          </button>
-        </Plane>
-      )}
-
-      {connections === null ? (
-        <SkeletonRows rows={2} />
-      ) : connections.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
-          No connections yet. Add one to point Continuum at a model you already have access to.
-        </Plane>
-      ) : (
-        <Plane className="divide-y divide-edge/40">
-          {connections.map((c) => (
-            <div key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${
-                  c.status === "VERIFIED"
-                    ? "bg-emerald-400"
-                    : c.status === "FAILING"
-                      ? "bg-rose-400"
-                      : "bg-slate-600"
-                }`}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-slate-200">{c.name}</div>
-                <div className="truncate text-xs text-slate-500">
-                  {c.provider} · {c.baseUrl} · {c.authStyle.toLowerCase()} auth
-                  {c.hasCredential ? "" : " · no credential"}
-                </div>
-                {c.lastError && <div className="mt-0.5 text-xs text-rose-400">{c.lastError}</div>}
-              </div>
-              <span className="micro shrink-0">{c.status}</span>
-              <button
-                disabled={busy}
-                onClick={() => onDelete(c.id)}
-                className="shrink-0 rounded border border-edge px-2 py-0.5 text-xs text-slate-400 hover:border-rose-500/50 hover:text-rose-300 disabled:opacity-40"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-        </Plane>
-      )}
-    </section>
-  );
-}
-
-/* ---------------------------------------------------------------- specialists */
-
-function SpecialistsSection({
-  connections,
-  specialists,
-  busy,
-  open,
-  onToggle,
-  onAdd,
-  onProbe,
-  onDelete,
-}: {
-  connections: Connection[];
-  specialists: Specialist[] | null;
-  busy: boolean;
-  open: number | null;
-  onToggle: (id: number) => void;
-  onAdd: (b: any) => void;
-  onProbe: (id: number) => void;
-  onDelete: (id: number) => void;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [connectionId, setConnectionId] = useState<number | "">("");
-  const [name, setName] = useState("");
-  const [modelPath, setModelPath] = useState("");
-  const [minConfidence, setMinConfidence] = useState(0.3);
-
-  return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Micro>Specialists · a model, and what a probe learned about it</Micro>
-        <button
-          disabled={connections.length === 0}
-          onClick={() => setAdding((a) => !a)}
-          className="rounded-md border border-edge px-2.5 py-1 text-xs text-slate-300 hover:border-aurora/50 disabled:opacity-40"
-        >
-          {adding ? "Cancel" : "Add specialist"}
-        </button>
-      </div>
-
-      {adding && (
-        <Plane className="space-y-3 p-5">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="min-w-0">
-              <span className="micro">Connection</span>
-              <select
-                value={connectionId}
-                onChange={(e) => setConnectionId(Number(e.target.value))}
-                className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
-              >
-                <option value="">Choose…</option>
-                {connections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="min-w-0">
-              <span className="micro">Name it</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Animal injury detector"
-                className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-aurora/60"
-              />
-            </label>
-            <label className="min-w-0">
-              <span className="micro">Model path</span>
-              <input
-                value={modelPath}
-                onChange={(e) => setModelPath(e.target.value)}
-                placeholder="animal-injury/3"
-                className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-aurora/60"
-              />
-            </label>
-            <label className="min-w-0">
-              <span className="micro">Ignore findings below</span>
-              <select
-                value={minConfidence}
-                onChange={(e) => setMinConfidence(Number(e.target.value))}
-                className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
-              >
-                {[0.1, 0.3, 0.5, 0.7].map((v) => (
-                  <option key={v} value={v}>
-                    {v.toFixed(1)}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-slate-600">
-                Weaker findings are withheld entirely rather than passed on with a caveat — a
-                detection nobody trusts should not reach the model at all.
-              </p>
-            </label>
-          </div>
-          <button
-            disabled={busy || !connectionId || !name.trim() || !modelPath.trim()}
-            onClick={() => {
-              onAdd({ connectionId, name, modelPath, minConfidence });
-              setName("");
-              setModelPath("");
-              setAdding(false);
-            }}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-          >
-            Register specialist
-          </button>
-        </Plane>
-      )}
-
-      {specialists === null ? (
-        <SkeletonRows rows={2} />
-      ) : specialists.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
-          No specialists yet. Register one against a connection, then probe it — Continuum sends a
-          real request and shows you exactly what comes back.
-        </Plane>
-      ) : (
-        <div className="space-y-2">
-          {specialists.map((s) => (
-            <SpecialistCard
-              key={s.id}
-              s={s}
-              busy={busy}
-              open={open === s.id}
-              onToggle={() => onToggle(s.id)}
-              onProbe={() => onProbe(s.id)}
-              onDelete={() => onDelete(s.id)}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-const STATUS_NOTE: Record<Specialist["status"], string> = {
-  DRAFT: "Never probed. Cannot be used until one real request has succeeded.",
-  READY: "Probed, and Continuum understood the response.",
-  UNPARSEABLE: "The endpoint answered, so the credential and path are right — but nothing could be read from the response.",
-  FAILED: "The probe did not reach a usable answer.",
-};
-
-function SpecialistCard({
-  s,
-  busy,
-  open,
-  onToggle,
-  onProbe,
-  onDelete,
-}: {
-  s: Specialist;
-  busy: boolean;
-  open: boolean;
-  onToggle: () => void;
-  onProbe: () => void;
-  onDelete: () => void;
-}) {
-  const dot =
-    s.status === "READY"
-      ? "bg-emerald-400"
-      : s.status === "FAILED"
-        ? "bg-rose-400"
-        : s.status === "UNPARSEABLE"
-          ? "bg-amber-400"
-          : "bg-slate-600";
-
-  return (
-    <Plane className="overflow-hidden">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
-        <button onClick={onToggle} aria-expanded={open} className="min-w-0 flex-1 text-left">
-          <div className="text-sm font-medium text-slate-200">{s.name}</div>
-          <div className="truncate text-xs text-slate-500">
-            {s.modelPath} · {s.inputKind} in · {s.toolKindLabel}
-            {s.scored
-              ? ` · ignores below ${s.minConfidence.toFixed(2)}`
-              : " · returns content, so no confidence threshold applies"}
-            {s.probedAt ? ` · probed ${dateTimeOf(s.probedAt)}` : ""}
-          </div>
-        </button>
-        <span className="micro shrink-0">{s.status}</span>
-        <button
-          disabled={busy}
-          onClick={onProbe}
-          className="shrink-0 rounded-md border border-edge px-2.5 py-1 text-xs text-slate-300 hover:border-aurora/50 disabled:opacity-40"
-        >
-          {s.probedAt ? "Re-probe" : "Probe"}
-        </button>
-        <button
-          disabled={busy}
-          onClick={onDelete}
-          className="shrink-0 rounded border border-edge px-2 py-0.5 text-xs text-slate-400 hover:border-rose-500/50 hover:text-rose-300 disabled:opacity-40"
-        >
-          Remove
-        </button>
-      </div>
-
-      {open && (
-        <div className="border-t border-edge/60 px-4 py-3">
-          <p className="text-xs text-slate-500">{STATUS_NOTE[s.status]}</p>
-
-          {s.probeError && <p className="mt-2 text-xs text-rose-400">{s.probeError}</p>}
-
-          {s.probedAt && (
-            <>
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                <div className="min-w-0">
-                  <div className="micro mb-1.5">
-                    What your model returned{s.probeStatus ? ` · HTTP ${s.probeStatus}` : ""}
-                    {s.probeMs != null ? ` · ${s.probeMs}ms` : ""}
-                  </div>
-                  <pre className="well max-h-56 overflow-auto p-3 text-[11px] leading-relaxed text-slate-400">
-                    {s.probeResponse ?? "—"}
-                  </pre>
-                </div>
-                <div className="min-w-0">
-                  <div className="micro mb-1.5 text-aurora">What Continuum understood</div>
-                  {s.probeFindings.length === 0 ? (
-                    <div className="well p-3 text-[11px] text-slate-500">
-                      Nothing parseable. The adapter did not recognise this shape — the response is
-                      shown on the left so you can see what it expected to find.
-                    </div>
-                  ) : (
-                    <div className="well space-y-1.5 p-3">
-                      {s.probeFindings.map((e, i) => (
-                        <EvidenceRow key={i} e={e} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <p className="mt-2 text-xs text-slate-600">
-                Both sides are kept because a description of an integration is not evidence it works.
-                The left is your endpoint's own words; the right is the shape every downstream step
-                will actually see.
-              </p>
-            </>
-          )}
-        </div>
-      )}
-    </Plane>
-  );
-}
-
-/**
- * One piece of evidence, drawn according to what it actually is.
- *
- * <p>A confidence bar is only drawn for evidence that carries a confidence.
- * Drawing an empty bar for recovered text would say "zero percent sure", which
- * is the opposite of "no measurement was taken".
- */
-function EvidenceRow({ e }: { e: EvidenceItem }) {
-  if (e.kind === "TEXT") {
-    return (
-      <div className="min-w-0">
-        <div className="flex items-baseline gap-2">
-          <span className="micro text-sky-400">text</span>
-          {e.label && <span className="micro">{e.label}</span>}
-          <span className="micro text-slate-500">no confidence — extracted content</span>
-        </div>
-        <p className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-slate-300">
-          {e.text}
-        </p>
-      </div>
-    );
-  }
-
-  if (e.kind === "FIELD") {
-    return (
-      <div className="flex min-w-0 items-baseline gap-2">
-        <span className="micro text-violet-400">field</span>
-        <span className="shrink-0 text-xs text-slate-400">{e.label}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-300">{e.text}</span>
-      </div>
-    );
-  }
-
-  if (e.kind === "ROW") {
-    return (
-      <div className="flex min-w-0 items-baseline gap-2">
-        <span className="micro text-amber-400">row</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-slate-300">
-          {JSON.stringify(e.attributes ?? {})}
-        </span>
-      </div>
-    );
-  }
-
-  if (e.kind === "NOTE") {
-    return (
-      <div className="flex min-w-0 items-baseline gap-2">
-        <span className="micro">note</span>
-        <span className="min-w-0 flex-1 text-xs text-slate-400">{e.text}</span>
-      </div>
-    );
-  }
-
-  // DETECTION / CLASSIFICATION — the original shape, unchanged when scored.
-  const c = e.confidence;
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="min-w-0 flex-1 truncate text-xs text-slate-300">{e.label}</span>
-      {c === null ? (
-        <span className="micro shrink-0 text-slate-500">unscored</span>
-      ) : (
-        <>
-          <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-edge/60">
-            <div
-              className={`h-full rounded-full ${
-                c >= 0.7 ? "bg-emerald-500/70" : c >= 0.4 ? "bg-amber-500/70" : "bg-rose-500/70"
-              }`}
-              style={{ width: `${Math.max(3, c * 100)}%` }}
-            />
-          </div>
-          <span className="readout w-10 shrink-0 text-right text-xs text-slate-400">
-            {c.toFixed(2)}
-          </span>
+          </FormRow>
         </>
       )}
-    </div>
+    </SidePanel>
+  );
+}
+
+const INPUT_CLASS =
+  "mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 text-[13px] text-slate-200 outline-none transition-colors focus:border-slate-500";
+const MONO_CLASS =
+  "mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 font-mono text-[12px] text-slate-200 outline-none transition-colors focus:border-slate-500";
+
+function FormRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="mt-3 block">
+      <span className="text-[11.5px] text-slate-500">{label}</span>
+      {children}
+      {hint && <span className="mt-1 block text-[11px] leading-relaxed text-slate-600">{hint}</span>}
+    </label>
   );
 }
