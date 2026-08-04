@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Switch } from "../system/primitives";
 import { ChartFrame, TargetVsActual } from "../system/charts";
-import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { ErrorState, useToast } from "../components/ui";
+import { Empty, Facts, Ghost, Hop, KindMark, Rail, Route, Row, RowSkeleton, Stage, Stat, Stats } from "../system/hub";
 
 /**
  * Adaptive compression policy.
@@ -12,6 +13,13 @@ import { ErrorState, SkeletonRows, useToast } from "../components/ui";
  * without the achieved figure beside it there is no way to see that protected
  * spans stopped the budget being reached — which is the compressor correctly
  * refusing to drop content it was told to keep.
+ *
+ * <p><b>On the shape of this screen.</b> This feature does nothing unless prompt
+ * compression is on, and that lives on another page. The old layout stated the
+ * dependency in a sentence of amber text halfway down, which is the easiest
+ * thing on a screen to not read. It is now a stage on the path, greyed out when
+ * it is off — you cannot look at this page without seeing that the thing
+ * upstream of it is not running.
  */
 
 type Region = {
@@ -75,39 +83,67 @@ export default function CompressionPolicy() {
   const totalOut = regions.reduce((n, r) => n + r.tokensOut, 0);
   const saved = totalIn - totalOut;
   const skips = (status?.skipped ?? []).reduce((n, s) => n + s.count, 0);
+  const upstream = !!status?.compressionEnabled;
+  const on = !!status?.enabled;
 
   return (
-    <section className="space-y-5">
-      <PageHeader
-        title="Compression Budget"
-        subtitle="One ratio for the whole prompt is the wrong shape — instructions, examples and the question do not carry information at the same density."
-      />
+    <section className="page-enter">
+      <header>
+        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Compression Budget</h1>
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
+          One ratio for the whole prompt is the wrong shape — instructions, examples and the question
+          do not carry information at the same density.
+        </p>
+      </header>
 
-      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
-        <Readout label="Tokens in" value={totalIn} size="sm" />
-        <Readout
-          label="Tokens sent"
-          value={totalOut}
-          size="sm"
-          state={totalOut > 0 ? "active" : "idle"}
-        />
-        <Readout
-          label="Tokens saved"
-          value={saved}
-          size="sm"
-          state={saved > 0 ? "healthy" : "idle"}
-        />
-        <Readout
-          label="Prompts skipped"
-          value={skips}
-          size="sm"
-          hint="Too short to be worth the fidelity cost."
-        />
-      </Plane>
+      {/* The dependency, drawn. This budget allocates work that the compressor
+          upstream of it does; when that is off there is nothing to allocate,
+          and a greyed stage says so before any number is read. */}
+      <div className="mt-6">
+        <Route>
+          <Stage label="a prompt" sub="from your app" />
+          <Hop />
+          <Stage
+            label="Compression"
+            sub={upstream ? "on" : "off — nothing to allocate"}
+            state={upstream ? "on" : "bad"}
+            mark={<KindMark kind="extraction" size={26} />}
+          />
+          <Hop label="per region" />
+          <Stage
+            label="Budget controller"
+            sub={on ? `${regions.length} regions` : `one flat ratio of ${status?.defaultRatio ?? 0.55}`}
+            state={on ? "on" : "off"}
+            mark={<KindMark kind="table" size={26} />}
+            selected
+          />
+          <Hop label="billed" />
+          <Stage label="the provider" sub="sees the trimmed prompt" />
+        </Route>
+        {!upstream && (
+          <p className="mt-2 text-xs" style={{ color: "var(--state-warning-ink)" }}>
+            Prompt compression itself is off, so this budget has nothing to allocate. Turn it on under
+            Prompt Guard.
+          </p>
+        )}
+      </div>
 
-      <Plane className="space-y-3 p-4">
+      <div className="mt-7">
+        <Stats>
+          <Stat label="Tokens in" value={totalIn} />
+          <Stat label="Tokens sent" value={totalOut} tone={totalOut > 0 ? "accent" : undefined} />
+          <Stat label="Tokens saved" value={saved} tone={saved > 0 ? "ok" : undefined} />
+          <Stat
+            label="Prompts skipped"
+            value={skips}
+            hint="Too short to be worth the fidelity cost."
+          />
+        </Stats>
+      </div>
+
+      <div className="mt-8">
         <Switch
-          checked={!!status?.enabled}
+          checked={on}
           busy={busy}
           onChange={(next) =>
             act(
@@ -118,102 +154,114 @@ export default function CompressionPolicy() {
           label="Per-region compression budget"
           hint="Off by default. While it is off, every message the compressor touches gets the same ratio."
         />
-        {!status?.compressionEnabled && (
-          <p className="text-xs text-amber-400/90">
-            Prompt compression itself is off, so nothing is being compressed and this budget has
-            nothing to allocate. Turn it on under Prompt Guard.
-          </p>
-        )}
-        <p className="text-xs text-slate-600">
+        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
           When off, every touched message is compressed to{" "}
-          <span className="readout">{status?.defaultRatio ?? 0.55}</span>. When on, each region gets
-          its own budget, and a prompt under{" "}
-          <span className="readout">{status?.shortPromptTokens ?? 400}</span> tokens is left alone
-          entirely — below that there is little to remove and the fidelity cost outweighs the saving.
+          <span className="readout text-slate-400">{status?.defaultRatio ?? 0.55}</span>. When on,
+          each region gets its own budget, and a prompt under{" "}
+          <span className="readout text-slate-400">{status?.shortPromptTokens ?? 400}</span> tokens is
+          left alone entirely — below that there is little to remove and the fidelity cost outweighs
+          the saving.
         </p>
-      </Plane>
+      </div>
 
-      {status === null ? (
-        <SkeletonRows rows={3} />
-      ) : (
-        <Plane className="space-y-4 p-4">
-          {/* A dumbbell rather than a meter each. The reader's question is the
-              gap between asked-for and achieved, and a bar showing only the
-              achieved value makes them hold the target in their head. */}
-          <ChartFrame
-            title="Budget per region"
-            valueLabel="Kept"
-            data={regions.map((r) => ({
-              key: r.region,
-              label: r.label,
-              value: r.achieved ?? r.target,
-            }))}
-          >
-            <TargetVsActual
-              format={(n) => `${Math.round(n * 100)}%`}
-              rows={regions.map((r) => ({
+      <section className="mt-10">
+        {status === null ? (
+          <RowSkeleton rows={3} />
+        ) : (
+          <>
+            {/* A dumbbell rather than a meter each. The reader's question is the
+                gap between asked-for and achieved, and a bar showing only the
+                achieved value makes them hold the target in their head. */}
+            <div className="max-w-3xl">
+            <ChartFrame
+              title="Budget per region"
+              valueLabel="Kept"
+              data={regions.map((r) => ({
                 key: r.region,
                 label: r.label,
-                target: r.target,
-                actual: r.achieved,
-                hint:
-                  r.tokensIn > 0
-                    ? `${r.tokensIn} → ${r.tokensOut} tokens across ${r.messages} messages`
-                    : "not seen yet",
+                value: r.achieved ?? r.target,
               }))}
-            />
-          </ChartFrame>
-          <p className="text-xs text-slate-600">
-            A region sitting well <em>above</em> its target is one where protected spans dominate —
-            numbers, identifiers, quoted text and code are never dropped, so a demonstration block
-            full of clause numbers cannot reach an aggressive budget. That is the compressor
-            refusing to remove content it was told to keep, and it is the correct outcome. A region
-            below its target would be the real fault: compressing harder than asked.
-          </p>
-        </Plane>
-      )}
-
-      {(status?.skipped ?? []).length > 0 && (
-        <Plane className="space-y-2 p-4">
-          <Micro>Prompts the budget declined to compress</Micro>
-          {status!.skipped.map((s, i) => (
-            <div key={i} className="flex items-baseline gap-3">
-              <span className="readout shrink-0 text-xs text-slate-400">×{s.count}</span>
-              <span className="text-xs text-slate-500">{s.reason}</span>
+            >
+              <TargetVsActual
+                format={(n) => `${Math.round(n * 100)}%`}
+                rows={regions.map((r) => ({
+                  key: r.region,
+                  label: r.label,
+                  target: r.target,
+                  actual: r.achieved,
+                  hint:
+                    r.tokensIn > 0
+                      ? `${r.tokensIn} → ${r.tokensOut} tokens across ${r.messages} messages`
+                      : "not seen yet",
+                }))}
+              />
+            </ChartFrame>
             </div>
-          ))}
-        </Plane>
-      )}
+            <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
+              A region sitting well <em>above</em> its target is one where protected spans dominate —
+              numbers, identifiers, quoted text and code are never dropped, so a demonstration block
+              full of clause numbers cannot reach an aggressive budget. That is the compressor
+              refusing to remove content it was told to keep, and it is the correct outcome. A region
+              below its target would be the real fault: compressing harder than asked.
+            </p>
+          </>
+        )}
+      </section>
 
-      <Plane className="p-4">
-        <Micro>Where the numbers come from</Micro>
-        <p className="mt-1.5 text-xs text-slate-600">
+      <section className="mt-10">
+        <h2 className="flex items-baseline gap-2 text-[13px] font-semibold tracking-tight text-slate-200">
+          Declined to compress
+          {skips > 0 && <span className="readout text-[11px] font-normal text-slate-600">{skips}</span>}
+        </h2>
+        <div className="mt-3">
+          {(status?.skipped ?? []).length === 0 ? (
+            <Empty
+              title="Nothing has been declined"
+              hint="Prompts short enough that trimming would cost more fidelity than it saves in tokens land here."
+            />
+          ) : (
+            <Rail>
+              {status!.skipped.map((s, i) => (
+                <Row
+                  key={i}
+                  title={s.reason}
+                  meta={<Facts items={[{ k: "prompts", v: s.count }]} />}
+                />
+              ))}
+            </Rail>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-10 max-w-2xl">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+          Where the numbers come from
+        </h2>
+        <p className="mt-2 text-xs leading-relaxed text-slate-600">
           LLMLingua (Jiang et al., EMNLP 2023) measures that instructions tolerate losing 10–20%,
           demonstrations 60–80%, and the question 0–10%. Examples are largely redundant with each
           other — that is what makes them examples — while an instruction is a list of requirements
           where every clause matters.
         </p>
-        <p className="mt-2 text-xs text-slate-600">
+        <p className="mt-2.5 text-xs leading-relaxed text-slate-600">
           Region detection is a heuristic, and the two mistakes are not equally costly: calling an
           instruction a demonstration throws away most of it and silently changes what the model was
           asked to do. So a message is only classed as examples on strong evidence — two or more
           marker lines — and anything unrecognised falls back to the ratio used before this existed.
-          <b className="text-slate-500"> Unsure means gentler, never harsher.</b>
+          <b className="text-slate-400"> Unsure means gentler, never harsher.</b>
         </p>
-        <p className="mt-2 text-xs text-slate-600">
+        <p className="mt-2.5 text-xs leading-relaxed text-slate-600">
           The per-region tallies above are held in memory and reset when the service restarts. The
           cumulative token savings are stored durably and appear under Prompt Guard.
         </p>
-      </Plane>
+      </section>
 
       {totalIn > 0 && (
-        <button
-          disabled={busy}
-          onClick={() => act(() => portal.compressionPolicy.reset(), "Tallies cleared.")}
-          className="rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 hover:border-aurora/50 disabled:opacity-40"
-        >
-          Clear tallies
-        </button>
+        <div className="mt-8">
+          <Ghost disabled={busy} onClick={() => act(() => portal.compressionPolicy.reset(), "Tallies cleared.")}>
+            Clear tallies
+          </Ghost>
+        </div>
       )}
     </section>
   );

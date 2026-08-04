@@ -1,8 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout } from "../system/primitives";
+import { Micro } from "../system/primitives";
 import { BarChart, BeforeAfter, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
+import {
+  Bar,
+  Code,
+  Empty,
+  Facts,
+  Ghost,
+  Hop,
+  KindMark,
+  Primary,
+  Rail,
+  Route,
+  Row,
+  Segmented,
+  Stage,
+  Stat,
+  Stats,
+  kindOf,
+} from "../system/hub";
 
 /**
  * The context layer.
@@ -11,11 +29,11 @@ import { ErrorState, useToast } from "../components/ui";
  * or against that claim: <b>the same data, said in a way a model can reason
  * over, costs less and preserves more.</b>
  *
- * <p>So the layout is a pipeline read left to right — what you sent, what
- * Continuum recovered, what the model receives — with the token counts under it
- * and the unresolved ambiguities beside it. The ambiguities are given the same
- * visual weight as the savings on purpose: a layer that quietly guessed a
- * currency would show a better number here and be worse software.
+ * <p>So the layout is a path read left to right — what you sent, what Continuum
+ * recovered, what the model receives — with the token counts under it and the
+ * unresolved ambiguities beside it. The ambiguities are given the same visual
+ * weight as the savings on purpose: a layer that quietly guessed a currency
+ * would show a better number here and be worse software.
  */
 
 type Ambiguity = { kind: string; where: string; detail: string };
@@ -98,6 +116,16 @@ const SAMPLES: Record<string, { name: string; body: string }> = {
   },
 };
 
+type Tab = "llm" | "structure" | "provenance" | "raw";
+
+/** {@code SEMANTIC_TABLE} and {@code timelineEvents} are field names, not prose. */
+function words(raw: string) {
+  return String(raw ?? "")
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase();
+}
+
 export default function ContextTransformers() {
   const toast = useToast();
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -108,7 +136,7 @@ export default function ContextTransformers() {
   const [budget, setBudget] = useState("standard");
   const [pasted, setPasted] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [tab, setTab] = useState<"llm" | "structure" | "provenance" | "raw">("llm");
+  const [tab, setTab] = useState<Tab>("llm");
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
@@ -162,64 +190,99 @@ export default function ContextTransformers() {
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Context Transformers"
-        subtitle="Application data into a canonical form a model can reason over — deterministic, in process, no model involved"
-      />
+    <div className="page-enter">
+      <header>
+        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">
+          Context Transformers
+        </h1>
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
+          Application data into a canonical form a model can reason over — deterministic, in process,
+          with no model involved.
+        </p>
+      </header>
 
-      {/* What this is, stated once. The distinction from Specialists is the
-          thing developers get wrong, so it is said at the top rather than
-          buried in a tooltip. */}
-      <Plane className="p-4">
-        <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-          <div className="min-w-[16rem] flex-1">
-            <Micro>What this is</Micro>
-            <p className="mt-1 text-sm text-slate-400">
-              A <span className="text-slate-200">Specialist</span> calls somebody else's model with
-              your key. A <span className="text-slate-200">transformer</span> is Continuum doing the
-              work itself: no API key, no model, no network. The same bytes produce the same output
-              forever, which is what makes it safe to put in a cached, replayed, audited prompt.
-            </p>
+      {/* The distinction from Specialists is the thing developers get wrong, so
+          it is drawn rather than written: nothing on this path leaves the
+          process. */}
+      <div className="mt-6">
+        <Route>
+          <Stage label="your data" sub="a file, or bytes on the wire" />
+          <Hop label="in process" />
+          <Stage
+            label="a transformer"
+            sub="no key, no model, no network"
+            state="on"
+            mark={<KindMark kind="table" size={26} />}
+            selected
+          />
+          <Hop label="canonical" />
+          <Stage label="the prompt" sub="the same bytes, forever the same text" />
+        </Route>
+        <p className="mt-3 max-w-2xl text-[12.5px] leading-relaxed text-slate-500">
+          A <span className="text-slate-300">Specialist</span> calls somebody else's model with your
+          key. A <span className="text-slate-300">transformer</span> is Continuum doing the work
+          itself. The same bytes produce the same output forever, which is what makes it safe to put
+          in a cached, replayed, audited prompt.
+        </p>
+      </div>
+
+      {capabilities.length > 0 && (
+        <section className="mt-8">
+          <h2 className="flex items-baseline gap-2 text-[13px] font-semibold tracking-tight text-slate-200">
+            What it recognises
+            <span className="readout text-[11px] font-normal text-slate-600">{capabilities.length}</span>
+          </h2>
+          <div className="mt-3">
+            <Rail>
+              {capabilities.map((c) => (
+                <Row
+                  key={c.name}
+                  mark={<KindMark kind={kindOf(`${c.produces} ${c.name}`)} size={28} />}
+                  // The label already reads "Email thread → Conversation", so
+                  // a "produces: Conversation" fact underneath would say the
+                  // same thing twice at two different weights.
+                  title={c.label}
+                  subtitle={c.summary}
+                />
+              ))}
+            </Rail>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {capabilities.map((c) => (
-              <span
-                key={c.name}
-                title={c.summary}
-                className="rounded-md border border-edge px-2 py-1 text-xs text-slate-300"
-              >
-                {c.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      </Plane>
+        </section>
+      )}
 
       {/* Input */}
-      <Plane className="space-y-3 p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <Micro>Give it something</Micro>
-          <div className="flex gap-1">
-            {BUDGETS.map((b) => (
-              <button
-                key={b.key}
-                onClick={() => setBudget(b.key)}
-                title={b.hint}
-                className={`rounded px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
-                  budget === b.key
-                    ? "chip-on"
-                    : "text-slate-500 hover:text-slate-300"
-                }`}
-              >
-                {b.label}
-              </button>
-            ))}
+      <section className="mt-9">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Give it something</h2>
+          <div className="flex items-center gap-4">
+            <span className="micro">render at</span>
+            {BUDGETS.map((b) => {
+              const on = budget === b.key;
+              return (
+                <button
+                  key={b.key}
+                  onClick={() => setBudget(b.key)}
+                  title={b.hint}
+                  className="relative text-[12px] transition-colors"
+                  style={{ color: on ? "var(--accent-ink)" : "rgb(100 116 139)" }}
+                >
+                  {b.label}
+                  <span
+                    className="absolute inset-x-0 -bottom-1 h-[1.5px] transition-opacity"
+                    style={{ background: "var(--accent)", opacity: on ? 1 : 0 }}
+                    aria-hidden
+                  />
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="cursor-pointer rounded-md border border-edge px-2.5 py-1 text-xs text-slate-300 transition-colors hover:border-aurora/60">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <label
+            className="cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] text-slate-300 transition-colors hover:text-slate-100"
+            style={{ boxShadow: "inset 0 0 0 1px rgb(var(--edge))" }}
+          >
             Upload a file
             <input
               ref={fileInput}
@@ -246,23 +309,22 @@ export default function ContextTransformers() {
               </button>
             </span>
           ) : (
-            <span className="text-xs text-slate-600">
+            <span className="text-[11.5px] text-slate-600">
               A spreadsheet, a log file, or an email — recognised from its bytes, not its name.
             </span>
           )}
           <span className="mx-1 text-xs text-slate-700">or</span>
           {Object.entries(SAMPLES).map(([key, s]) => (
-            <button
+            <Ghost
               key={key}
               onClick={() => {
                 setPasted(s.body);
                 setFile(null);
                 if (fileInput.current) fileInput.current.value = "";
               }}
-              className="rounded-md border border-edge px-2 py-1 text-xs text-slate-400 transition-colors hover:border-aurora/60 hover:text-slate-200"
             >
               try a sample {key}
-            </button>
+            </Ghost>
           ))}
         </div>
 
@@ -275,81 +337,103 @@ export default function ContextTransformers() {
           disabled={!!file}
           rows={5}
           placeholder="…or paste a log, a CSV, or a raw email here."
-          className={`w-full rounded-md border border-edge bg-ink/60 px-2.5 py-2 font-mono text-[11px] text-slate-300 outline-none transition-colors focus:border-aurora/60 ${
+          className={`mt-3 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-2 font-mono text-[11px] text-slate-300 outline-none transition-colors focus:border-[color:var(--accent-edge)] ${
             file ? "opacity-40" : ""
           }`}
         />
 
-        <button
-          onClick={run}
-          disabled={busy}
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-40"
-        >
-          {busy ? "Transforming…" : "Transform"}
-        </button>
-      </Plane>
+        <div className="mt-3">
+          <Primary onClick={run} disabled={busy}>
+            {busy ? "Transforming…" : "Transform"}
+          </Primary>
+        </div>
+      </section>
 
-      {result && <ResultView result={result} tab={tab} onTab={setTab} />}
+      {result && (
+        <div className="mt-9">
+          <ResultView result={result} tab={tab} onTab={setTab} />
+        </div>
+      )}
 
-      {history.length > 0 && (
-        <Plane className="space-y-3 p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <Micro>Recent transformations</Micro>
+      <section className="mt-10">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <h2 className="flex items-baseline gap-2 text-[13px] font-semibold tracking-tight text-slate-200">
+            Recent transformations
+            {history.length > 0 && (
+              <span className="readout text-[11px] font-normal text-slate-600">{history.length}</span>
+            )}
+          </h2>
+          {history.length > 0 && (
             <span className="text-xs text-slate-600">
               {totals.saved > 0
                 ? `${totals.saved.toLocaleString()} tokens saved across ${history.length} runs`
                 : "no net saving yet"}
             </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[42rem] text-left text-xs">
-              <thead>
-                <tr className="text-slate-600">
-                  <th className="pb-2 font-normal">Source</th>
-                  <th className="pb-2 font-normal">Recovered as</th>
-                  <th className="pb-2 font-normal">Structure</th>
-                  <th className="pb-2 text-right font-normal">Before</th>
-                  <th className="pb-2 text-right font-normal">After</th>
-                  <th className="pb-2 text-right font-normal">Change</th>
-                </tr>
-              </thead>
-              <tbody className="text-slate-400">
-                {history.map((h) => (
-                  <tr key={h.id} className="border-t border-edge/40">
-                    <td className="py-1.5 font-mono text-[11px] text-slate-300">
-                      {h.sourceName ?? "—"}
-                    </td>
-                    <td className="py-1.5">{h.contextType}</td>
-                    <td className="py-1.5 text-slate-500">{h.structure ?? "—"}</td>
-                    <td className="readout py-1.5 text-right">{h.tokensBefore.toLocaleString()}</td>
-                    <td className="readout py-1.5 text-right">{h.tokensAfter.toLocaleString()}</td>
-                    <td
-                      className={`readout py-1.5 text-right ${
-                        h.saved > 0 ? "text-emerald-400" : h.saved < 0 ? "text-amber-400" : ""
-                      }`}
-                    >
-                      {h.saved === 0 ? "—" : `${h.saved > 0 ? "−" : "+"}${Math.abs(h.reduction * 100).toFixed(0)}%`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Plane>
-      )}
+          )}
+        </div>
+        <div className="mt-3">
+          {history.length === 0 ? (
+            <Empty
+              title="Nothing transformed yet"
+              hint="Transform something above, or send a file through the gateway. Every run is recorded here with its token cost before and after."
+            />
+          ) : (
+            <Rail>
+              {history.map((h) => {
+                const grew = h.saved < 0;
+                return (
+                  <Row
+                    key={h.id}
+                    mark={<KindMark kind={kindOf(h.contextType)} size={28} />}
+                    title={h.sourceName ?? "pasted input"}
+                    subtitle={`${words(h.contextType)}${h.structure ? ` · ${words(h.structure)}` : ""}`}
+                    status={
+                      <span
+                        className="readout text-[11px]"
+                        style={{
+                          color: h.saved > 0
+                            ? "var(--state-healthy-ink)"
+                            : grew
+                              ? "var(--state-warning-ink)"
+                              : "rgb(100 116 139)",
+                        }}
+                      >
+                        {h.saved === 0
+                          ? "no change"
+                          : `${h.saved > 0 ? "−" : "+"}${Math.abs(h.reduction * 100).toFixed(0)}%`}
+                      </span>
+                    }
+                    meta={
+                      <Facts
+                        items={[
+                          { k: "before", v: h.tokensBefore.toLocaleString() },
+                          { k: "after", v: h.tokensAfter.toLocaleString() },
+                          ...(h.ambiguities > 0
+                            ? [{ k: "unresolved", v: h.ambiguities, title: "Things it refused to guess" }]
+                            : []),
+                        ]}
+                      />
+                    }
+                  />
+                );
+              })}
+            </Rail>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
 
-/** The pipeline, the numbers, and what could not be determined. */
+/** The path, the numbers, and what could not be determined. */
 function ResultView({
   result,
   tab,
   onTab,
 }: {
   result: Result;
-  tab: "llm" | "structure" | "provenance" | "raw";
-  onTab: (t: "llm" | "structure" | "provenance" | "raw") => void;
+  tab: Tab;
+  onTab: (t: Tab) => void;
 }) {
   const s = result.tokenStats;
   const grew = !s.improved && s.before > 0;
@@ -366,73 +450,82 @@ function ResultView({
   );
 
   return (
-    <div className="space-y-4">
-      {/* The pipeline, as a shape rather than a paragraph. */}
-      <Plane className="p-4">
-        <Micro>What happened</Micro>
-        <div className="mt-3 flex flex-wrap items-stretch gap-2">
-          <Stage
-            label="Your input"
-            value={result.sourceName ?? "input"}
-            detail={`${s.before.toLocaleString()} tokens as text`}
-          />
-          <Arrow />
-          <Stage
-            label="Transformation"
-            value={result.transformer ?? "none"}
-            detail={result.transformed ? "deterministic, in process" : "nothing recognised it"}
-            accent={result.transformed}
-          />
-          <Arrow />
-          <Stage
-            label="Canonical context"
-            value={result.contextLabel}
-            detail={Object.entries(result.structure)
-              .slice(0, 3)
-              .map(([k, v]) => `${v} ${k}`)
-              .join(", ")}
-            accent={result.transformed}
-          />
-          <Arrow />
-          <Stage
-            label="Sent to the model"
-            value={`${s.after.toLocaleString()} tokens`}
-            detail={grew ? "larger than the original" : `${(s.reduction * 100).toFixed(1)}% smaller`}
-            accent={s.improved}
-          />
-        </div>
-      </Plane>
+    <div>
+      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What happened</h2>
 
-      {/* The numbers. */}
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <Plane className="space-y-4 p-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Readout label="Before" value={s.before} unit="tokens" size="sm" />
-            <Readout
-              label="After"
-              value={s.after}
-              unit="tokens"
-              size="sm"
-              state={s.improved ? "active" : "degraded"}
-            />
-            <Readout
-              label="Reduction"
-              value={`${(s.reduction * 100).toFixed(1)}%`}
-              size="sm"
-              state={s.improved ? "active" : "degraded"}
-              hint="Measured against a plain-text rendering of the same input — not against the raw bytes, which would report a saving that means nothing."
-            />
-            <Readout
-              label="Unresolved"
-              value={result.ambiguities.length}
-              size="sm"
-              state={result.ambiguities.length > 0 ? "degraded" : "idle"}
-              hint="Things the transformer could not determine and refused to guess."
-            />
-          </div>
-          {/* Two bars on one scale rather than a ratio meter: the claim of the
-              whole layer is a comparison, and a comparison should be a length
-              the reader can see instead of two numbers they subtract. */}
+      <div className="mt-3">
+        <Route>
+          <Stage
+            label={result.sourceName ?? "your input"}
+            sub={`${s.before.toLocaleString()} tokens as text`}
+          />
+          <Hop />
+          <Stage
+            label={result.transformer ?? "nothing recognised it"}
+            sub={result.transformed ? "deterministic, in process" : "passed through unchanged"}
+            state={result.transformed ? "on" : "bad"}
+            mark={<KindMark kind={kindOf(result.contextType)} size={26} />}
+            selected={result.transformed}
+          />
+          <Hop />
+          <Stage
+            label={result.contextLabel}
+            sub={
+              Object.entries(result.structure)
+                .slice(0, 3)
+                .map(([k, v]) => `${v} ${words(k)}`)
+                .join(", ") || "no structure recovered"
+            }
+          />
+          <Hop label="rendered" />
+          <Stage
+            label={`${s.after.toLocaleString()} tokens`}
+            sub={grew ? "larger than the original" : `${(s.reduction * 100).toFixed(1)}% smaller`}
+            state={s.improved ? "on" : "off"}
+          />
+        </Route>
+      </div>
+
+      <div className="mt-7">
+        <Stats>
+          <Stat label="Before" value={s.before.toLocaleString()} unit="tokens" />
+          <Stat
+            label="After"
+            value={s.after.toLocaleString()}
+            unit="tokens"
+            tone={s.improved ? "ok" : "warn"}
+          />
+          {/* "Reduction: −504%" is a double negative the reader has to unpick.
+              When the canonical form is larger the measurement has a different
+              name, so it is given one. */}
+          <Stat
+            label={s.improved ? "Reduction" : "Growth"}
+            value={`${Math.abs(s.reduction * 100).toFixed(1)}%`}
+            tone={s.improved ? "ok" : "warn"}
+            hint="Measured against a plain-text rendering of the same input — not against the raw bytes, which would report a saving that means nothing."
+          />
+          <Stat
+            label="Unresolved"
+            value={result.ambiguities.length}
+            tone={result.ambiguities.length > 0 ? "warn" : undefined}
+            hint="Things the transformer could not determine and refused to guess."
+          />
+        </Stats>
+      </div>
+
+      <div className="mt-7 grid items-start gap-x-10 gap-y-8 lg:grid-cols-2">
+        {/* Two bars on one scale rather than a ratio meter: the claim of the
+            whole layer is a comparison, and a comparison should be a length the
+            reader can see instead of two numbers they subtract. */}
+        <ChartFrame
+          title="Tokens, before and after"
+          valueLabel="Tokens"
+          caption="Against a plain-text rendering of the same input, not against the raw bytes."
+          data={[
+            { key: "before", label: "Raw", value: s.before },
+            { key: "after", label: "Canonical", value: s.after },
+          ]}
+        >
           <BeforeAfter
             beforeLabel="Raw"
             afterLabel="Canonical"
@@ -441,172 +534,150 @@ function ResultView({
             unit="tok"
             goodDirection="down"
           />
-          {grew && (
-            // Said plainly rather than hidden. A structured rendering is
-            // sometimes larger, and a page that only ever showed wins would be
-            // advertising rather than instrumentation.
-            <p className="text-xs text-amber-400/90">
-              The canonical form is larger than the flattened original here. That is normal for
-              small inputs, where the header block costs more than the repetition it removes — the
-              structure is still worth having, but the token saving is not the reason.
-            </p>
-          )}
-        </Plane>
+        </ChartFrame>
 
-        <Plane className="space-y-2 p-4">
-          {Object.keys(result.structure).length === 0 ? (
-            <>
-              <Micro>Structure recovered</Micro>
-              <p className="text-sm text-slate-500">Nothing structural was recovered.</p>
-            </>
-          ) : (
-            <ChartFrame
-              title="Structure recovered"
-              valueLabel="Count"
-              caption="What the transformer found that a flat export would have lost."
-              data={structureBars}
-            >
-              <BarChart data={structureBars} />
-            </ChartFrame>
-          )}
-        </Plane>
+        {structureBars.length === 0 ? (
+          <div>
+            <Micro>Structure recovered</Micro>
+            <p className="mt-1.5 text-[13px] text-slate-500">Nothing structural was recovered.</p>
+          </div>
+        ) : (
+          <ChartFrame
+            title="Structure recovered"
+            valueLabel="Count"
+            caption="What the transformer found that a flat export would have lost."
+            data={structureBars}
+          >
+            <BarChart data={structureBars} />
+          </ChartFrame>
+        )}
       </div>
 
-      {/* Ambiguities get their own panel, at full weight. */}
+      {grew && (
+        // Said plainly rather than hidden. A structured rendering is sometimes
+        // larger, and a page that only ever showed wins would be advertising
+        // rather than instrumentation.
+        <p
+          className="mt-6 max-w-2xl border-l-2 pl-3.5 text-xs leading-relaxed text-slate-400"
+          style={{ borderColor: "var(--state-warning-ink)" }}
+        >
+          The canonical form is larger than the flattened original here. That is normal for small
+          inputs, where the header block costs more than the repetition it removes — the structure is
+          still worth having, but the token saving is not the reason.
+        </p>
+      )}
+
+      {/* Ambiguities at full weight, on their own rule. */}
       {result.ambiguities.length > 0 && (
-        <Plane className="space-y-2 border-amber-500/25 p-4">
-          <Micro>Not determined — and deliberately not guessed</Micro>
-          <p className="text-xs text-slate-500">
+        <section className="mt-9">
+          <h3
+            className="border-l-2 pl-3.5 text-[13px] font-semibold tracking-tight"
+            style={{ borderColor: "var(--state-warning-ink)", color: "var(--state-warning-ink)" }}
+          >
+            Not determined — and deliberately not guessed
+          </h3>
+          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-500">
             These travel into the prompt as well as this page. A model told a unit is unknown says
             so; one that is handed a guessed unit reasons in it and never questions it.
           </p>
-          <ul className="space-y-1.5 pt-1">
-            {result.ambiguities.map((a, i) => (
-              <li key={i} className="flex flex-wrap items-baseline gap-2 text-xs">
-                <span className="rounded border border-amber-500/40 px-1 py-0.5 text-[10px] uppercase tracking-wide text-amber-400/90">
-                  {a.kind}
-                </span>
-                <span className="font-mono text-slate-300">{a.where}</span>
-                <span className="text-slate-500">{a.detail}</span>
-              </li>
-            ))}
-          </ul>
-        </Plane>
+          <div className="mt-3">
+            <Rail>
+              {result.ambiguities.map((a, i) => (
+                <Row
+                  key={i}
+                  title={<span className="font-mono text-[12.5px]">{a.where}</span>}
+                  subtitle={a.detail}
+                  status={
+                    <span className="micro" style={{ color: "var(--state-warning-ink)" }}>
+                      {a.kind}
+                    </span>
+                  }
+                />
+              ))}
+            </Rail>
+          </div>
+        </section>
       )}
 
       {/* The output itself, in the four forms that matter. */}
-      <Plane className="p-4">
-        <div className="flex flex-wrap gap-1 border-b border-edge/60 pb-2">
-          {[
-            { k: "llm", label: "What the model receives" },
-            { k: "structure", label: "Machine-readable" },
-            { k: "provenance", label: `Provenance (${result.provenance.length})` },
-            { k: "raw", label: "Original, flattened" },
-          ].map((t) => (
-            <button
-              key={t.k}
-              onClick={() => onTab(t.k as typeof tab)}
-              className={`rounded px-2.5 py-1 text-xs transition-colors ${
-                tab === t.k
-                  ? "chip-on"
-                  : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <section className="mt-9">
+        <Segmented<Tab>
+          value={tab}
+          onChange={onTab}
+          options={[
+            { value: "llm", label: "What the model receives" },
+            { value: "structure", label: "Machine-readable" },
+            {
+              value: "provenance",
+              label: "Provenance",
+              badge: (
+                <span className="readout text-[10px] text-slate-600">{result.provenance.length}</span>
+              ),
+            },
+            { value: "raw", label: "Original, flattened" },
+          ]}
+        />
 
-        <div className="pt-3">
-          {tab === "llm" && (
-            <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap break-words rounded-md bg-ink/70 p-3 font-mono text-[11px] leading-relaxed text-slate-300">
-              {result.rendered}
-            </pre>
-          )}
-          {tab === "structure" && (
-            <pre className="max-h-[28rem] overflow-auto rounded-md bg-ink/70 p-3 font-mono text-[11px] leading-relaxed text-slate-300">
-              {JSON.stringify(result.data, null, 2)}
-            </pre>
-          )}
+        <div className="mt-4">
+          {tab === "llm" && <Code>{result.rendered}</Code>}
+          {tab === "structure" && <Code>{JSON.stringify(result.data, null, 2)}</Code>}
           {tab === "provenance" &&
             (result.provenance.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No sources were recorded for this input.
-              </p>
+              <p className="text-[13px] text-slate-500">No sources were recorded for this input.</p>
             ) : (
               <>
-                <p className="pb-2 text-xs text-slate-500">
+                <p className="max-w-2xl pb-3 text-xs leading-relaxed text-slate-500">
                   Where the values came from. A number a model was given that nobody can trace back
                   is a number nobody can check.
                 </p>
-                <ul className="max-h-[26rem] space-y-1 overflow-auto">
-                  {result.provenance.map((p, i) => (
-                    <li key={i} className="font-mono text-[11px] text-slate-400">
-                      <span className="text-slate-300">{p.document}</span>
-                      <span className="text-slate-600"> → </span>
-                      <span className="text-aurora">{p.locator}</span>
-                      {p.detail && <span className="text-slate-600"> ({p.detail})</span>}
-                    </li>
+                <Rail>
+                  {result.provenance.slice(0, 60).map((p, i) => (
+                    <Row
+                      key={i}
+                      title={<span className="font-mono text-[12px]">{p.document}</span>}
+                      subtitle={p.detail ?? undefined}
+                      status={
+                        <span className="readout text-[11px]" style={{ color: "var(--accent-ink)" }}>
+                          {p.locator}
+                        </span>
+                      }
+                    />
                   ))}
-                </ul>
+                </Rail>
+                {result.provenance.length > 60 && (
+                  <p className="mt-2 text-xs text-slate-600">
+                    {result.provenance.length - 60} more sources, in the machine-readable form.
+                  </p>
+                )}
               </>
             ))}
           {tab === "raw" && (
-            <p className="text-sm text-slate-500">
-              The comparison baseline is a plain-text rendering of your input — the CSV a
-              spreadsheet flattens to, the log lines themselves. It is not shown here because it is
-              your data; the {s.before.toLocaleString()}-token figure above is measured from it.
-            </p>
+            <div className="max-w-2xl">
+              <p className="text-[13px] leading-relaxed text-slate-500">
+                The comparison baseline is a plain-text rendering of your input — the CSV a
+                spreadsheet flattens to, the log lines themselves. It is not shown here because it is
+                your data; the {s.before.toLocaleString()}-token figure above is measured from it.
+              </p>
+              <div className="mt-4 flex items-center gap-3">
+                <span className="micro w-20 shrink-0">baseline</span>
+                <Bar fraction={1} tone="mute" width={180} />
+                <span className="readout text-[11px] text-slate-500">
+                  {s.before.toLocaleString()}
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-center gap-3">
+                <span className="micro w-20 shrink-0">canonical</span>
+                <Bar
+                  fraction={s.before > 0 ? s.after / s.before : 0}
+                  tone={s.improved ? "ok" : "warn"}
+                  width={180}
+                />
+                <span className="readout text-[11px] text-slate-500">{s.after.toLocaleString()}</span>
+              </div>
+            </div>
           )}
         </div>
-      </Plane>
-    </div>
-  );
-}
-
-function Stage({
-  label,
-  value,
-  detail,
-  accent = false,
-}: {
-  label: string;
-  value: string;
-  detail?: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={`min-w-[9rem] flex-1 rounded-md border px-3 py-2 transition-colors ${
-        accent ? "border-aurora/40 bg-aurora/[0.04]" : "border-edge/60"
-      }`}
-    >
-      <Micro>{label}</Micro>
-      <div
-        className={`mt-1 truncate text-sm font-medium ${
-          accent ? "text-aurora" : "text-slate-200"
-        }`}
-        title={value}
-      >
-        {value}
-      </div>
-      {detail && <div className="mt-0.5 truncate text-[11px] text-slate-500" title={detail}>{detail}</div>}
-    </div>
-  );
-}
-
-function Arrow() {
-  return (
-    <div className="flex items-center self-center text-slate-700" aria-hidden>
-      <svg width="18" height="10" viewBox="0 0 18 10" fill="none">
-        <path
-          d="M0 5h15M11 1l4 4-4 4"
-          stroke="currentColor"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      </section>
     </div>
   );
 }

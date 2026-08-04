@@ -279,7 +279,9 @@ export function Switch({
       </button>
       <div className="min-w-0">
         <div className="text-sm font-medium text-slate-200">{label}</div>
-        {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
+        {/* Capped, because a hint set to the full width of a 1400px console is
+            a line length nobody reads to the end of. */}
+        {hint && <p className="mt-0.5 max-w-2xl text-xs leading-relaxed text-slate-500">{hint}</p>}
         {locked && (
           <p className="mt-1 text-xs text-amber-400/90">
             {locked}

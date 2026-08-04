@@ -1,9 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, portal } from "../api";
-import { Micro, Readout, Plane, StateDot } from "../system/primitives";
-import { STATE } from "../system/tokens";
+import { Micro, Switch } from "../system/primitives";
 import FeatureToggle from "../system/FeatureToggle";
 import { timeOf, toMillis } from "../system/time";
+import {
+  Bar,
+  Dot,
+  Empty,
+  Facts,
+  Field,
+  Hop,
+  KindMark,
+  Rail,
+  Route,
+  Row,
+  SidePanel,
+  Stage,
+  Stat,
+  Stats,
+} from "../system/hub";
 
 /**
  * Context MMU — the memory space.
@@ -56,106 +71,125 @@ export default function MmuProfiler() {
   }, [stubs]);
   const maxAge = ranked.length ? Math.max(...ranked.map((s) => s.age), 1) : 1;
 
+  const setWorkingSet = async (next: boolean) => {
+    setBusyWs(true);
+    try {
+      await api.get<any>("/api/mmu/profile");
+      await fetch("/api/mmu/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("continuum.portal.session") ?? ""}`,
+        },
+        body: JSON.stringify({ workingSet: next }),
+      });
+      api.get<any>("/api/mmu/profile").then(setProfile).catch(() => {});
+    } finally {
+      setBusyWs(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="page-enter">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Context Optimizer</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
-            Working set stays resident · the rest pages out and faults back on reference
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Context Optimizer</h1>
+          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
+            The working set stays resident inside the model's window. Everything else pages out to a
+            semantic stub and faults back in when it is referenced.
           </p>
         </div>
         <FeatureToggle status={portal.v7.status} enable={portal.v7.enable} disable={portal.v7.disable} />
       </header>
 
+      <div className="mt-6">
+        <Route>
+          <Stage
+            label="the conversation"
+            sub={virtualTokens ? `${virtualTokens.toLocaleString()} tokens addressable` : "unpaged"}
+          />
+          <Hop label="paged" />
+          <Stage
+            label="Context Optimizer"
+            sub={active ? `${stubs.length} page${stubs.length === 1 ? "" : "s"} held` : "idle"}
+            state={active ? "on" : "off"}
+            mark={<KindMark kind="table" size={26} />}
+            selected
+          />
+          <Hop label="resident" />
+          <Stage
+            label="the model's window"
+            sub={residentTokens ? `${residentTokens.toLocaleString()} tokens sent` : "nothing sent yet"}
+          />
+        </Route>
+      </div>
+
       {/* Working-set assembly: what is kept is decided by the current request,
           not by what happens to be newest. */}
-      <Plane className="space-y-3 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-slate-200">Working-set assembly</div>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Off by default — eviction is positional, oldest paged out first. With it on, what
-              stays resident is scored against the request being answered now, so an order number
-              stated in message three survives a question asked in message forty.
-            </p>
-          </div>
-          <button
-            disabled={busyWs}
-            onClick={async () => {
-              setBusyWs(true);
-              try {
-                await api.get<any>("/api/mmu/profile");
-                await fetch("/api/mmu/settings", {
-                  method: "PUT",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem("continuum.portal.session") ?? ""}`,
-                  },
-                  body: JSON.stringify({ workingSet: !p.workingSet }),
-                });
-                api.get<any>("/api/mmu/profile").then(setProfile).catch(() => {});
-              } finally {
-                setBusyWs(false);
-              }
-            }}
-            className={`shrink-0 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-40 ${
-              p.workingSet
-                ? "border-aurora/60 bg-aurora/10 text-slate-200"
-                : "border-edge text-slate-400 hover:border-aurora/40"
-            }`}
-          >
-            {p.workingSet ? "On" : "Off"}
-          </button>
-        </div>
-        <p className="text-xs text-slate-600">
-          Scored 0.7 × relevance to the current request + 0.3 × recency. Relevance outweighs
-          recency because recency is only a proxy for it, and when a direct measurement is
-          available the proxy should not outvote it. The measure is lexical, so it will miss a
-          paraphrase sharing no vocabulary — better than position, worse than understanding.
+      <div className="mt-8">
+        <Switch
+          checked={!!p.workingSet}
+          busy={busyWs}
+          onChange={setWorkingSet}
+          label="Working-set assembly"
+          hint="Off by default — eviction is positional, oldest paged out first. With it on, what stays resident is scored against the request being answered now, so an order number stated in message three survives a question asked in message forty."
+        />
+        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
+          Scored 0.7 × relevance to the current request + 0.3 × recency. Relevance outweighs recency
+          because recency is only a proxy for it, and when a direct measurement is available the proxy
+          should not outvote it. The measure is lexical, so it will miss a paraphrase sharing no
+          vocabulary — better than position, worse than understanding.
         </p>
-      </Plane>
+      </div>
 
       {!active ? (
-        <Plane className="p-8 text-center">
-          <Micro>Address space idle</Micro>
-          <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-Turn it on above, then send a long conversation through the gateway.
-          </p>
-        </Plane>
+        <div className="mt-10">
+          <Empty
+            title="Address space idle"
+            hint="Turn it on above, then send a long conversation through the gateway. Nothing is paged until there is more context than the window can hold."
+          />
+        </div>
       ) : (
         <>
           {/* ---- the address space ---- */}
-          <section>
+          <section className="mt-10">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <Micro>Virtual context · last request</Micro>
+              <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+                Virtual context · last request
+              </h2>
               <span className="readout text-[11px] text-slate-500">
                 {virtualTokens.toLocaleString()} tokens addressable
               </span>
             </div>
 
-            <div className="mt-2 flex h-16 w-full overflow-hidden rounded-lg border border-edge/70">
+            <div
+              className="mt-3 flex h-16 w-full overflow-hidden rounded-lg"
+              style={{ boxShadow: "inset 0 0 0 1px rgb(var(--edge))" }}
+            >
               <div
                 className="relative flex items-center justify-center transition-[width] duration-700 ease-out"
                 style={{
                   width: `${Math.max(residentFrac * 100, 6)}%`,
-                  background: `linear-gradient(180deg, ${STATE.active.color}33, ${STATE.active.color}14)`,
-                  borderRight: `1px solid ${STATE.active.color}66`,
+                  background: "var(--accent-wash)",
+                  borderRight: "1px solid var(--accent-edge)",
                 }}
               >
                 <div className="text-center">
-                  <div className="readout text-sm font-semibold" style={{ color: STATE.active.color }}>
+                  <div className="readout text-sm font-semibold" style={{ color: "var(--accent-ink)" }}>
                     {residentTokens.toLocaleString()}
                   </div>
                   <div className="micro">Resident</div>
                 </div>
               </div>
               <div className="relative flex flex-1 items-center justify-center bg-ink/60">
+                {/* Hatched, because "paged out" is absence rather than a second
+                    category — a solid fill would read as two things of equal
+                    standing sharing the window. */}
                 <div
                   className="pointer-events-none absolute inset-0 opacity-40"
                   style={{
                     backgroundImage:
-                      "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 7px)",
+                      "repeating-linear-gradient(135deg, rgb(127 140 165 / 0.16) 0 1px, transparent 1px 7px)",
                   }}
                 />
                 <div className="relative text-center">
@@ -167,14 +201,14 @@ Turn it on above, then send a long conversation through the gateway.
               </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1">
-              <span className="text-[11px] text-slate-400">
+            <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-1">
+              <span className="text-[11.5px] text-slate-500">
                 <span className="readout font-semibold text-slate-200">
                   {((p.tokenReduction ?? 0) * 100).toFixed(0)}%
                 </span>{" "}
                 fewer tokens sent across {p.requests} request{p.requests === 1 ? "" : "s"}
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11.5px] text-slate-500">
                 <span className="readout font-semibold text-slate-200">
                   {Number(p.compressionRatio ?? 1).toFixed(1)}×
                 </span>{" "}
@@ -184,179 +218,204 @@ Turn it on above, then send a long conversation through the gateway.
           </section>
 
           {/* ---- fault economics ---- */}
-          <section className="grid grid-cols-2 gap-x-8 gap-y-4 border-y border-edge/60 py-4 sm:grid-cols-3 lg:grid-cols-6">
-            <Readout label="Page faults" value={p.pageFaults ?? 0} size="sm"
-              state={(p.pageFaults ?? 0) > 0 ? "warning" : "healthy"}
-              hint="References to paged-out context that had to be faulted back in" />
-            <Readout label="Prefetches" value={p.prefetches ?? 0} size="sm"
-              state={(p.prefetches ?? 0) > 0 ? "healthy" : "idle"}
-              hint="Pages brought in before they were referenced" />
-            <Readout label="Fault p50" value={p.faultLatencyP50Ms ?? 0} unit="ms" size="sm" />
-            <Readout label="Fault p95" value={p.faultLatencyP95Ms ?? 0} unit="ms" size="sm"
-              state={(p.faultLatencyP95Ms ?? 0) > 400 ? "warning" : "idle"} />
-            <Readout label="Materialize" value={Number(p.avgMaterializationMs ?? 0).toFixed(0)} unit="ms avg" size="sm"
-              hint="Time to fold a stub's event stream back into full context" />
-            <Readout label="Dirty flushes" value={p.dirtyFlushes ?? 0} size="sm"
-              state={(p.dirtyFlushes ?? 0) > 0 ? "active" : "idle"}
-              hint="Modified pages written back to the persistent stream" />
+          <section className="mt-9">
+            <Stats>
+              <Stat
+                label="Page faults"
+                value={p.pageFaults ?? 0}
+                tone={(p.pageFaults ?? 0) > 0 ? "warn" : "ok"}
+                hint="References to paged-out context that had to be faulted back in."
+              />
+              <Stat
+                label="Prefetches"
+                value={p.prefetches ?? 0}
+                tone={(p.prefetches ?? 0) > 0 ? "ok" : undefined}
+                hint="Pages brought in before they were referenced."
+              />
+              <Stat label="Fault p50" value={p.faultLatencyP50Ms ?? 0} unit="ms" />
+              <Stat
+                label="Fault p95"
+                value={p.faultLatencyP95Ms ?? 0}
+                unit="ms"
+                tone={(p.faultLatencyP95Ms ?? 0) > 400 ? "warn" : undefined}
+              />
+              <Stat
+                label="Materialize"
+                value={Number(p.avgMaterializationMs ?? 0).toFixed(0)}
+                unit="ms avg"
+                hint="Time to fold a stub's event stream back into full context."
+              />
+              <Stat
+                label="Dirty flushes"
+                value={p.dirtyFlushes ?? 0}
+                tone={(p.dirtyFlushes ?? 0) > 0 ? "accent" : undefined}
+                hint="Modified pages written back to the persistent stream."
+              />
+            </Stats>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-            {/* ---- page table ---- */}
-            <section>
-              <Micro>Page table · {stubs.length} stub{stubs.length === 1 ? "" : "s"}</Micro>
+          {/* ---- page table ---- */}
+          <section className="mt-10">
+            <h2 className="flex items-baseline gap-2 text-[13px] font-semibold tracking-tight text-slate-200">
+              Page table
+              <span className="readout text-[11px] font-normal text-slate-600">{stubs.length}</span>
+            </h2>
 
-              {ranked.length === 0 ? (
-                <Plane className="mt-2 p-6 text-center text-xs text-slate-500">
-                  No pages resident yet.
-                </Plane>
-              ) : (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {ranked.map((s) => {
-                    const heat = 1 - s.age / maxAge;
-                    const isSel = s.stubId === sel;
-                    const color = s.dirty ? STATE.warning.color : STATE.active.color;
-                    const alpha = Math.round(6 + heat * 26).toString(16).padStart(2, "0");
-                    return (
-                      <button
-                        key={s.stubId}
-                        onClick={() => setSel(isSel ? null : s.stubId)}
-                        title={`${s.stubId} · ${s.sourceTokens}→${s.stubTokens} tokens · v${s.version}${s.dirty ? " · dirty" : ""}`}
-                        className="relative h-12 w-12 rounded border transition-transform hover:-translate-y-0.5"
-                        style={{
-                          borderColor: isSel ? color : `${color}${heat > 0.5 ? "66" : "33"}`,
-                          background: `${color}${alpha}`,
-                          boxShadow: isSel ? `0 0 0 1px ${color}` : undefined,
-                        }}
+            {ranked.length === 0 ? (
+              <div className="mt-3">
+                <Empty title="No pages resident yet" />
+              </div>
+            ) : (
+              /* Kept as a grid of cells, which is not the card grid this
+                 redesign removed elsewhere: a page table *is* a grid of equal
+                 slots, and each cell here carries three measured values in
+                 twelve square millimetres. */
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {ranked.map((s) => {
+                  const heat = 1 - s.age / maxAge;
+                  const isSel = s.stubId === sel;
+                  const colour = s.dirty ? "var(--state-warning-ink)" : "var(--accent)";
+                  return (
+                    <button
+                      key={s.stubId}
+                      onClick={() => setSel(isSel ? null : s.stubId)}
+                      title={`${s.stubId} · ${s.sourceTokens}→${s.stubTokens} tokens · v${s.version}${s.dirty ? " · dirty" : ""}`}
+                      className="relative h-12 w-12 rounded-md transition-transform duration-150 hover:-translate-y-0.5"
+                      style={{
+                        background: `color-mix(in srgb, ${colour} ${Math.round(4 + heat * 14)}%, transparent)`,
+                        boxShadow: isSel
+                          ? `inset 0 0 0 1.5px ${colour}`
+                          : `inset 0 0 0 1px color-mix(in srgb, ${colour} ${heat > 0.5 ? 40 : 20}%, transparent)`,
+                      }}
+                    >
+                      <span className="readout absolute inset-x-0 top-1 text-[9px] text-slate-500">
+                        v{s.version}
+                      </span>
+                      <span
+                        className="readout absolute inset-x-0 bottom-1 text-[9px] font-semibold"
+                        style={{ color: colour }}
                       >
-                        <span className="absolute inset-x-0 top-1 readout text-[9px] text-slate-400">
-                          v{s.version}
-                        </span>
+                        {s.stubTokens}
+                      </span>
+                      {s.dirty && (
                         <span
-                          className="absolute inset-x-0 bottom-1 readout text-[9px] font-semibold"
-                          style={{ color }}
-                        >
-                          {s.stubTokens}
-                        </span>
-                        {s.dirty && (
-                          <span
-                            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full"
-                            style={{ background: STATE.warning.color }}
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="mt-3 flex flex-wrap items-center gap-4">
-                <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <StateDot state="active" size={6} /> clean page
-                </span>
-                <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <StateDot state="warning" size={6} /> dirty — pending write-behind
-                </span>
-                <span className="text-[10px] text-slate-500">vN = times mutated · number = stub tokens</span>
-                <span className="text-[10px] text-slate-500">brighter = touched more recently</span>
+                          className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full"
+                          style={{ background: "var(--state-warning-ink)" }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+            )}
 
-              {/* ---- request rail ---- */}
-              <div className="mt-6">
-                <Micro>Request rail · newest first</Micro>
-                <div className="mt-2 space-y-px">
-                  {recent.slice(0, 14).map((r: any) => {
-                    const cut = r.tokensWithoutMmu ? 1 - r.tokensSent / r.tokensWithoutMmu : 0;
-                    return (
-                      <div
-                        key={r.id}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded px-2 py-1.5 text-[11px] transition-colors hover:bg-edge/40"
-                      >
-                        <span className="readout w-16 shrink-0 text-slate-600">
-                          {timeOf(r.createdAt)}
-                        </span>
-                        <span className="relative h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-ink">
-                          <span
-                            className="absolute inset-y-0 left-0 rounded-full"
-                            style={{ width: `${(1 - cut) * 100}%`, background: STATE.active.color }}
-                          />
-                        </span>
-                        <span className="readout text-slate-400">
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
+              <Dot tone="busy" label="clean page" />
+              <Dot tone="warn" label="dirty — pending write-behind" />
+              <span className="text-[10.5px] text-slate-600">vN = times mutated · number = stub tokens</span>
+              <span className="text-[10.5px] text-slate-600">brighter = touched more recently</span>
+            </div>
+          </section>
+
+          {/* ---- request rail ---- */}
+          <section className="mt-10">
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+              Requests · newest first
+            </h2>
+            <div className="mt-3">
+              <Rail>
+                {recent.slice(0, 14).map((r: any) => {
+                  const cut = r.tokensWithoutMmu ? 1 - r.tokensSent / r.tokensWithoutMmu : 0;
+                  return (
+                    <Row
+                      key={r.id}
+                      title={
+                        <span className="readout text-[12.5px]">
                           {r.tokensWithoutMmu.toLocaleString()} → {r.tokensSent.toLocaleString()}
+                          <span className="ml-2" style={{ color: "var(--state-healthy-ink)" }}>
+                            −{(cut * 100).toFixed(0)}%
+                          </span>
                         </span>
-                        <span className="readout" style={{ color: STATE.healthy.color }}>
-                          −{(cut * 100).toFixed(0)}%
-                        </span>
-                        <span className="ml-auto flex items-center gap-3">
-                          {r.prefetches > 0 && (
-                            <span style={{ color: STATE.healthy.color }}>↑{r.prefetches} prefetch</span>
-                          )}
-                          {r.dirtyFlushes > 0 && (
-                            <span style={{ color: STATE.active.color }}>✎{r.dirtyFlushes} flush</span>
-                          )}
-                          {r.pageFaults > 0 ? (
-                            <span
-                              className="rounded px-1.5 py-0.5 font-semibold"
-                              style={{ background: `${STATE.warning.color}22`, color: STATE.warning.color }}
-                              title="Generation suspended, page materialized from the persistent stream, then resumed"
-                            >
-                              ▲ {r.pageFaults} fault · {r.faultLatencyMs}ms
-                            </span>
-                          ) : (
-                            <span className="text-slate-600">{r.stubsActive} resident</span>
-                          )}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
-
-            {/* ---- page inspector ---- */}
-            <aside>
-              <Micro>Page inspector</Micro>
-              {selected ? (
-                <div className="settle mt-2 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <StateDot state={selected.dirty ? "warning" : "active"} />
-                    <span className="font-mono text-xs text-slate-200">{selected.stubId}</span>
-                  </div>
-                  <Plane inset className="p-3">
-                    <p className="text-[11px] leading-relaxed text-slate-400">{selected.summary}</p>
-                  </Plane>
-                  <dl className="space-y-2">
-                    <Row k="Source tokens" v={selected.sourceTokens.toLocaleString()} />
-                    <Row k="Stub tokens" v={selected.stubTokens.toLocaleString()} />
-                    <Row k="Compression"
-                      v={`${(selected.sourceTokens / Math.max(1, selected.stubTokens)).toFixed(1)}×`} />
-                    <Row k="Version" v={`v${selected.version}${selected.version > 1 ? " · mutated" : ""}`} />
-                    <Row k="Write-behind" v={selected.dirty ? "pending" : "clean"} />
-                    <Row k="Last touched" v={timeOf(selected.updatedAt)} />
-                  </dl>
-                  <p className="text-[10px] leading-relaxed text-slate-600">
-                    A mutated page is not rewritten in place — its stream is appended to, and the page
-                    is re-folded from base plus deltas when it is next faulted in.
-                  </p>
-                </div>
-              ) : (
-                <Plane className="mt-2 p-4 text-[11px] leading-relaxed text-slate-500">
-                  Select a page to inspect its summary, compression and write-behind state.
-                </Plane>
-              )}
-            </aside>
-          </div>
+                      }
+                      subtitle={timeOf(r.createdAt)}
+                      status={
+                        r.pageFaults > 0 ? (
+                          <Dot
+                            tone="warn"
+                            label={`${r.pageFaults} fault · ${r.faultLatencyMs}ms`}
+                          />
+                        ) : (
+                          <span className="text-[11px] text-slate-600">{r.stubsActive} resident</span>
+                        )
+                      }
+                      meta={
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                          {/* The bar is what was sent, against what would have
+                              been sent unpaged. Same scale on every row. */}
+                          <Bar fraction={1 - cut} tone="accent" width={120} />
+                          <Facts
+                            items={[
+                              ...(r.prefetches > 0 ? [{ k: "prefetched", v: r.prefetches }] : []),
+                              ...(r.dirtyFlushes > 0 ? [{ k: "flushed", v: r.dirtyFlushes }] : []),
+                            ]}
+                          />
+                        </div>
+                      }
+                    />
+                  );
+                })}
+              </Rail>
+            </div>
+          </section>
         </>
       )}
-    </div>
-  );
-}
 
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-baseline justify-between border-b border-edge/40 pb-1.5">
-      <dt className="micro">{k}</dt>
-      <dd className="readout text-xs text-slate-200">{v}</dd>
+      {/* ---- page inspector ---- */}
+      <SidePanel
+        open={!!selected}
+        title={<span className="font-mono text-[13px]">{selected?.stubId ?? ""}</span>}
+        subtitle={selected ? (selected.dirty ? "dirty — write-behind pending" : "clean") : undefined}
+        mark={<KindMark kind="document" size={34} />}
+        onClose={() => setSel(null)}
+      >
+        {selected && (
+          <>
+            <Field label="Summary held in place of the text">
+              <p className="leading-relaxed text-slate-400">{selected.summary}</p>
+            </Field>
+            <Field label="Compression">
+              <div className="flex items-center gap-3">
+                <Bar
+                  fraction={selected.stubTokens / Math.max(1, selected.sourceTokens)}
+                  tone="accent"
+                  width={140}
+                />
+                <span className="readout text-[12px] text-slate-300">
+                  {(selected.sourceTokens / Math.max(1, selected.stubTokens)).toFixed(1)}×
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11.5px] text-slate-600">
+                {selected.sourceTokens.toLocaleString()} source tokens held as{" "}
+                {selected.stubTokens.toLocaleString()}.
+              </p>
+            </Field>
+            <Field label="State">
+              <Facts
+                items={[
+                  { k: "version", v: `v${selected.version}${selected.version > 1 ? " · mutated" : ""}` },
+                  { k: "write-behind", v: selected.dirty ? "pending" : "clean" },
+                  { k: "last touched", v: timeOf(selected.updatedAt) },
+                ]}
+              />
+            </Field>
+            <p className="mt-5 text-[11.5px] leading-relaxed text-slate-600">
+              <Micro>Why a version rather than a rewrite</Micro>
+              A mutated page is not rewritten in place — its stream is appended to, and the page is
+              re-folded from base plus deltas when it is next faulted in.
+            </p>
+          </>
+        )}
+      </SidePanel>
     </div>
   );
 }

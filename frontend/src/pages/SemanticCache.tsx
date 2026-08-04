@@ -1,9 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Switch } from "../system/primitives";
 import { ChartFrame, Donut } from "../system/charts";
-import { EmptyState, ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { ErrorState, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
+import {
+  Bar,
+  Empty,
+  Facts,
+  Ghost,
+  Hop,
+  KindMark,
+  Rail,
+  Route,
+  Row,
+  RowSkeleton,
+  Stage,
+  Stat,
+  Stats,
+} from "../system/hub";
 
 /**
  * Semantic cache.
@@ -14,6 +29,12 @@ import { dateTimeOf } from "../system/time";
  * too low and the cache answers a question nobody asked, which the caller cannot
  * detect. It is exposed here, with its consequence stated, rather than hidden in
  * a config file.
+ *
+ * <p><b>On the shape of this screen.</b> The threshold was three bordered cards
+ * in a row, which said "pick one of three products" rather than "this is one
+ * number on a scale and here is what moving it costs you". It is now a scale,
+ * with the trade named at each end — because the reason to be on this page is
+ * almost always to decide whether a hit you cannot see is worth the money.
  */
 
 type Status = {
@@ -33,6 +54,25 @@ const BANDS: [number, string, string][] = [
   [0.85, "Loose", "Catches more rewordings. Some answers will be near misses."],
   [0.92, "Balanced", "Serves clear rephrasings only. The recommended setting."],
   [0.98, "Strict", "Essentially identical prompts. Fewest hits, no surprises."],
+];
+
+/**
+ * Money, without rounding a real saving down to nothing.
+ *
+ * <p>Four decimal places turned $0.0000132 into "$0.0000", which reads as "this
+ * has saved you nothing" — the opposite of what the number says. Below the
+ * displayable floor it says so, rather than lying with a zero.
+ */
+function money(n: number) {
+  if (n > 0 && n < 0.0001) return "<$0.0001";
+  return `$${n.toFixed(4)}`;
+}
+
+const TTLS: [number, string][] = [
+  [3600, "1 hour"],
+  [86400, "1 day"],
+  [604800, "7 days"],
+  [2592000, "30 days"],
 ];
 
 export default function SemanticCache() {
@@ -74,7 +114,10 @@ export default function SemanticCache() {
 
   if (error) return <ErrorState message={error} onRetry={load} />;
 
-  const savedPct = status && status.hits + status.misses > 0 ? Math.round(status.hitRate * 100) : 0;
+  const total = (status?.hits ?? 0) + (status?.misses ?? 0);
+  const savedPct = total > 0 ? Math.round((status?.hitRate ?? 0) * 100) : 0;
+  const on = status?.enabled ?? false;
+  const threshold = status?.similarityThreshold ?? 0.92;
 
   // Colours here are status, not identity: a hit is good and a miss is neutral,
   // and that meaning is the point. A categorical slot would say "these are two
@@ -84,79 +127,112 @@ export default function SemanticCache() {
     { key: "misses", label: "Went to a provider", value: status?.misses ?? 0, color: "var(--series-mute)" },
   ];
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Semantic Cache"
-        subtitle="Answers a repeated question from a previous answer instead of paying a provider for it again. Scoped to your account and off by default."
-      />
+  const maxHits = Math.max(1, ...(rows ?? []).map((r) => r.hitCount ?? 0));
 
-      <Plane className="p-5">
+  return (
+    <div className="page-enter">
+      <header>
+        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Semantic Cache</h1>
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
+          Answers a repeated question from a previous answer instead of paying a provider for it
+          again. Scoped to your account, and off by default.
+        </p>
+      </header>
+
+      {/* Where the cache sits. It is the one stage on the path that can end a
+          request early, and that is worth drawing rather than describing. */}
+      <div className="mt-6">
+        <Route>
+          <Stage label="a prompt" sub="from your app" />
+          <Hop />
+          <Stage
+            label="Semantic cache"
+            sub={on ? (total > 0 ? `${savedPct}% answered here` : "warming up") : "off"}
+            state={on ? "on" : "off"}
+            mark={<KindMark kind="conversation" size={26} />}
+            selected
+          />
+          <Hop label={total > 0 ? `${100 - savedPct}% carry on` : undefined} />
+          <Stage label="the provider" sub="only for a genuine miss" />
+        </Route>
+      </div>
+
+      <div className="mt-7">
         <Switch
           label="Semantic cache"
           hint="Matches incoming prompts against your recent answers by meaning. A hit never crosses accounts or models."
-          checked={status?.enabled ?? false}
+          checked={on}
           busy={busy || status === null}
           onChange={(next) => run(() => portal.cache.setEnabled(next), next ? "Cache enabled" : "Cache disabled")}
         />
-      </Plane>
+      </div>
 
-      <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
+      <div className="mt-8 grid items-start gap-x-10 gap-y-8 lg:grid-cols-[auto_minmax(0,1fr)]">
         {/* The ring earns its place here because the hole holds the one number
             the page is about. Two segments, so it is a proportion at a glance
             rather than a comparison — for comparing close values this would be
             a bar. */}
-        <Plane className="p-5">
+        <div className="w-full max-w-sm">
           <ChartFrame
             title="Where requests went"
             data={cacheSplit}
             valueLabel="Requests"
-            caption={
-              status && status.hits + status.misses > 0
-                ? undefined
-                : "Nothing has been asked yet — the ring fills in with traffic."
-            }
+            caption={total > 0 ? undefined : "Nothing has been asked yet — the ring fills in with traffic."}
           >
-            <Donut
-              data={cacheSplit}
-              centerValue={`${savedPct}%`}
-              centerLabel="hit rate"
-              unit="reqs"
-            />
+            <Donut data={cacheSplit} centerValue={`${savedPct}%`} centerLabel="hit rate" unit="reqs" />
           </ChartFrame>
-        </Plane>
+        </div>
 
-        <Plane className="grid gap-6 p-5 sm:grid-cols-2">
-          <Readout
+        <Stats>
+          <Stat
             label="Tokens saved"
             value={status?.tokensSaved ?? 0}
-            state={status?.tokensSaved ? "healthy" : "idle"}
+            tone={status?.tokensSaved ? "ok" : undefined}
             hint="Tokens that were never sent to a provider because a stored answer matched."
           />
-          <Readout
+          <Stat
             label="Cost avoided"
-            value={`$${(status?.costSaved ?? 0).toFixed(4)}`}
-            hint="What the cached calls originally cost"
+            value={money(status?.costSaved ?? 0)}
+            hint="What the cached calls originally cost."
           />
-          <Readout label="Entries held" value={status?.entries ?? 0} />
-          <Readout
+          <Stat label="Entries held" value={status?.entries ?? 0} />
+          <Stat
             label="Answered from cache"
             value={status?.hits ?? 0}
-            state={status?.hits ? "healthy" : "idle"}
+            tone={status?.hits ? "ok" : undefined}
           />
-        </Plane>
+        </Stats>
       </div>
 
-      <section className="space-y-3">
-        <Micro>Match threshold</Micro>
-        <Plane className="p-5">
-          <p className="text-sm text-slate-400">
-            How close an incoming prompt has to be before a stored answer is served. A false hit is
-            worse than a miss, because the caller cannot tell it happened.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <section className="mt-10">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Match threshold</h2>
+        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+          How close an incoming prompt has to be before a stored answer is served. A false hit is
+          worse than a miss, because the caller cannot tell it happened.
+        </p>
+
+        {/* A scale, not three products. The three named points sit on it, so
+            picking one is visibly picking a position between two costs rather
+            than choosing between unrelated options. */}
+        <div className="mt-5 max-w-2xl">
+          <div className="flex items-baseline justify-between text-[11px]">
+            <span className="text-slate-500">more hits, some of them wrong</span>
+            <span className="text-slate-500">fewer hits, none of them wrong</span>
+          </div>
+          <div className="relative mt-2 h-1 rounded-full" style={{ background: "rgb(var(--edge))" }}>
+            <span
+              className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full transition-[left] duration-300 ease-out"
+              style={{
+                left: `${((threshold - 0.8) / 0.2) * 100}%`,
+                background: "var(--accent)",
+                boxShadow: "0 0 0 3px var(--accent-wash)",
+              }}
+              aria-hidden
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
             {BANDS.map(([value, name, note]) => {
-              const active = Math.abs((status?.similarityThreshold ?? 0.92) - value) < 0.005;
+              const active = Math.abs(threshold - value) < 0.005;
               return (
                 <button
                   key={name}
@@ -164,90 +240,105 @@ export default function SemanticCache() {
                   onClick={() =>
                     run(() => portal.cache.configure({ similarityThreshold: value }), `Threshold set to ${name}`)
                   }
-                  className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
-                    active ? "border-aurora/60 bg-aurora/10" : "border-edge hover:border-aurora/40"
-                  }`}
+                  className="min-w-0 flex-1 basis-48 text-left transition-opacity disabled:opacity-50"
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium text-slate-200">{name}</span>
-                    <span className="readout text-xs text-slate-500">{value.toFixed(2)}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className="text-[13px] font-medium"
+                      style={{ color: active ? "var(--accent-ink)" : "rgb(148 163 184)" }}
+                    >
+                      {name}
+                    </span>
+                    <span className="readout text-[11px] text-slate-600">{value.toFixed(2)}</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">{note}</p>
+                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">{note}</p>
+                  <span
+                    className="mt-1.5 block h-[2px] w-full rounded-full transition-opacity duration-200"
+                    style={{ background: "var(--accent)", opacity: active ? 1 : 0 }}
+                    aria-hidden
+                  />
                 </button>
               );
             })}
           </div>
+        </div>
 
-          <div className="mt-5 flex flex-wrap items-end gap-4 border-t border-edge/60 pt-4">
-            <label className="min-w-0">
-              <span className="micro">Entry lifetime</span>
-              <select
-                value={status?.ttlSeconds ?? 86400}
-                disabled={busy}
-                onChange={(e) =>
-                  run(() => portal.cache.configure({ ttlSeconds: Number(e.target.value) }), "Lifetime updated")
-                }
-                className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
-              >
-                <option value={3600}>1 hour</option>
-                <option value={86400}>1 day</option>
-                <option value={604800}>7 days</option>
-                <option value={2592000}>30 days</option>
-              </select>
-            </label>
-            <div className="ml-auto flex items-center gap-3">
-              <span className="text-xs text-slate-500">{status?.entries ?? 0} stored</span>
-              <button
-                disabled={busy || !status?.entries}
-                onClick={() => run(() => portal.cache.clear(), "Cache cleared")}
-                className="rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 hover:bg-edge/50 disabled:opacity-40"
-              >
-                Clear cache
-              </button>
-            </div>
+        <div className="mt-7 flex flex-wrap items-end gap-x-8 gap-y-4">
+          <label className="min-w-0">
+            <span className="micro">Entry lifetime</span>
+            <select
+              value={status?.ttlSeconds ?? 86400}
+              disabled={busy}
+              onChange={(e) =>
+                run(() => portal.cache.configure({ ttlSeconds: Number(e.target.value) }), "Lifetime updated")
+              }
+              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-[13px] text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
+            >
+              {TTLS.map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500">{status?.entries ?? 0} stored</span>
+            <Ghost
+              disabled={busy || !status?.entries}
+              onClick={() => run(() => portal.cache.clear(), "Cache cleared")}
+            >
+              Clear cache
+            </Ghost>
           </div>
-        </Plane>
+        </div>
       </section>
 
-      <section className="space-y-3">
-        <Micro>Stored answers</Micro>
-        {rows === null ? (
-          <SkeletonRows rows={3} />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            title="Nothing cached yet"
-            hint={
-              status?.enabled
-                ? "Send a request through the gateway; the answer is stored and the next equivalent question is served from here."
-                : "Turn the cache on to start storing answers."
-            }
-          />
-        ) : (
-          <Plane className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-sm">
-              <thead>
-                <tr className="border-b border-edge/70 text-left">
-                  {["Prompt", "Model", "Hits", "Tokens", "Expires"].map((h) => (
-                    <th key={h} className="px-4 py-2 micro font-medium">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-edge/40 last:border-0">
-                    <td className="max-w-md truncate px-4 py-2 text-slate-300">{r.prompt}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-slate-400">{r.model ?? "—"}</td>
-                    <td className="px-4 py-2 readout text-slate-300">{r.hitCount}</td>
-                    <td className="px-4 py-2 readout text-slate-500">{r.tokens}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-slate-500">{dateTimeOf(r.expiresAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Plane>
-        )}
+      <section className="mt-10">
+        <h2 className="flex items-baseline gap-2 text-[13px] font-semibold tracking-tight text-slate-200">
+          Stored answers
+          {rows && <span className="readout text-[11px] font-normal text-slate-600">{rows.length}</span>}
+        </h2>
+        <div className="mt-3">
+          {rows === null ? (
+            <RowSkeleton rows={3} />
+          ) : rows.length === 0 ? (
+            <Empty
+              title="Nothing cached yet"
+              hint={
+                on
+                  ? "Send a request through the gateway; the answer is stored and the next equivalent question is served from here."
+                  : "Turn the cache on to start storing answers."
+              }
+            />
+          ) : (
+            <Rail>
+              {rows.map((r) => (
+                <Row
+                  key={r.id}
+                  title={r.prompt}
+                  subtitle={`${r.model ?? "unknown model"} · expires ${dateTimeOf(r.expiresAt)}`}
+                  meta={
+                    <Facts
+                      items={[
+                        { k: "tokens", v: r.tokens },
+                        {
+                          k: "served",
+                          v: (
+                            <span className="inline-flex items-center gap-2">
+                              <Bar fraction={(r.hitCount ?? 0) / maxHits} width={48} />
+                              <span className="readout">{r.hitCount}×</span>
+                            </span>
+                          ),
+                          title: "How many times this stored answer has been reused",
+                        },
+                      ]}
+                    />
+                  }
+                />
+              ))}
+            </Rail>
+          )}
+        </div>
       </section>
     </div>
   );
