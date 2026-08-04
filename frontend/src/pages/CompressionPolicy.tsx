@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { ChartFrame, TargetVsActual } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
 /**
@@ -136,37 +137,32 @@ export default function CompressionPolicy() {
         <SkeletonRows rows={3} />
       ) : (
         <Plane className="space-y-4 p-4">
-          <Micro>Budget per region — target against achieved</Micro>
-          {regions.map((r) => {
-            const achieved = r.achieved;
-            // Above target means less was removed than allowed — usually
-            // protected spans. Below target would mean over-compression.
-            const over = achieved !== null && achieved < r.target - 0.02;
-            return (
-              <div key={r.region} className="space-y-1">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                  <span className="text-sm text-slate-200">{r.label}</span>
-                  <span className="micro">keep {Math.round(r.target * 100)}% target</span>
-                  {achieved !== null && (
-                    <span className={`micro ${over ? "text-amber-400" : "text-slate-400"}`}>
-                      kept {Math.round(achieved * 100)}% achieved
-                    </span>
-                  )}
-                  <span className="flex-1" />
-                  <span className="micro">
-                    {r.tokensIn > 0 ? `${r.tokensIn} → ${r.tokensOut} tokens` : "not seen yet"}
-                  </span>
-                </div>
-                <Meter
-                  value={achieved ?? r.target}
-                  state={
-                    r.region === "QUESTION" ? "healthy" : over ? "degraded" : "active"
-                  }
-                  height={6}
-                />
-              </div>
-            );
-          })}
+          {/* A dumbbell rather than a meter each. The reader's question is the
+              gap between asked-for and achieved, and a bar showing only the
+              achieved value makes them hold the target in their head. */}
+          <ChartFrame
+            title="Budget per region"
+            valueLabel="Kept"
+            data={regions.map((r) => ({
+              key: r.region,
+              label: r.label,
+              value: r.achieved ?? r.target,
+            }))}
+          >
+            <TargetVsActual
+              format={(n) => `${Math.round(n * 100)}%`}
+              rows={regions.map((r) => ({
+                key: r.region,
+                label: r.label,
+                target: r.target,
+                actual: r.achieved,
+                hint:
+                  r.tokensIn > 0
+                    ? `${r.tokensIn} → ${r.tokensOut} tokens across ${r.messages} messages`
+                    : "not seen yet",
+              }))}
+            />
+          </ChartFrame>
           <p className="text-xs text-slate-600">
             A region sitting well <em>above</em> its target is one where protected spans dominate —
             numbers, identifiers, quoted text and code are never dropped, so a demonstration block

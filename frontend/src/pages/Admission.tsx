@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Meter, Micro, PageHeader, Plane, Readout, Switch, Trace } from "../system/primitives";
+import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { BarChart, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
 /**
@@ -189,6 +190,21 @@ function ProviderCard({ p }: { p: ProviderState }) {
   const utilisation = p.limit > 0 ? p.inFlight / p.limit : 0;
   const congested = p.gradient < 0.8;
 
+  const outcomes = {
+    total: p.admitted + p.queued + p.shed,
+    data: [
+      { key: "admitted", label: "Admitted", value: p.admitted, color: "var(--series-3)" },
+      { key: "queued", label: "Queued", value: p.queued, color: "var(--series-4)" },
+      { key: "shed", label: "Shed", value: p.shed, color: "var(--series-8)" },
+    ],
+  };
+
+  const shedReasons = foldTail(
+    Object.entries(p.shedBy ?? {})
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => ({ key: k, label: k, value: v }))
+  );
+
   return (
     <Plane className="space-y-3 p-4">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -196,8 +212,6 @@ function ProviderCard({ p }: { p: ProviderState }) {
         <span className="micro">{p.samples} samples</span>
         {p.drops > 0 && <span className="micro text-rose-400">{p.drops} backoffs</span>}
         <span className="flex-1" />
-        <Trace points={p.limitHistory.length > 1 ? p.limitHistory : [p.limit, p.limit]}
-               state={congested ? "degraded" : "active"} width={110} height={24} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -234,19 +248,64 @@ function ProviderCard({ p }: { p: ProviderState }) {
         />
       </div>
 
+      {/* The limit is the whole feature, and it is a shape over time: an AIMD
+          sawtooth reads as "it is probing and backing off", which a single
+          current number cannot say. Hover gives the reading. */}
+      {p.limitHistory.length > 1 && (
+        <ChartFrame
+          title="Inferred limit over time"
+          valueLabel="Limit"
+          data={p.limitHistory.map((v, i) => ({
+            key: String(i),
+            label: `reading ${i + 1}`,
+            value: v,
+          }))}
+        >
+          <SeriesChart
+            height={90}
+            unit="concurrent"
+            format={(n) => n.toFixed(0)}
+            series={[
+              {
+                key: "limit",
+                label: "Inferred limit",
+                points: p.limitHistory,
+                color: congested ? "var(--state-degraded-ink)" : "var(--series-1)",
+              },
+            ]}
+          />
+        </ChartFrame>
+      )}
+
+      {/* Part-to-whole, because the question is what share of traffic this
+          provider actually served. Status colours, not identity ones: admitted
+          is good and shed is not, and that meaning is the point. */}
+      {outcomes.total > 0 && (
+        <ChartFrame
+          title="What happened to requests"
+          valueLabel="Requests"
+          data={outcomes.data}
+        >
+          <StackedBar data={outcomes.data} unit="reqs" />
+        </ChartFrame>
+      )}
+
+      {shedReasons.length > 0 && (
+        <ChartFrame
+          title="Why requests were shed"
+          valueLabel="Requests"
+          caption="Shedding is deliberate refusal under load, so the reason is the actionable part."
+          data={shedReasons}
+        >
+          <BarChart data={shedReasons} unit="reqs" />
+        </ChartFrame>
+      )}
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
         <span>
           gradient <span className="readout text-slate-300">{p.gradient.toFixed(2)}</span>
         </span>
-        <span>admitted {p.admitted}</span>
-        <span>queued {p.queued}</span>
-        <span className={p.shed > 0 ? "text-amber-400" : ""}>shed {p.shed}</span>
-        {Object.entries(p.shedBy ?? {}).map(([k, v]) => (
-          <span key={k} className="micro">
-            {k} {v}
-          </span>
-        ))}
-        <span>peak {p.peakInFlight}</span>
+        <span>peak in flight {p.peakInFlight}</span>
       </div>
 
       <p className="text-xs text-slate-600">

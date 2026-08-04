@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { BarChart, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
 /**
@@ -76,6 +77,20 @@ export default function CostAdmission() {
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   const callers = status?.callers ?? [];
+
+  // Emphasis rather than eight hues: the story is "this one is consuming the
+  // budget", and colouring every caller differently buries exactly that.
+  const tokensByCaller = foldTail(
+    callers.map((c) => ({
+      key: c.caller,
+      label: c.caller.length > 22 ? c.caller.slice(0, 21) + "…" : c.caller,
+      value: c.tokensCharged,
+      hint: `${c.caller} — ${c.admitted} admitted, ${c.refused} refused`,
+    }))
+  );
+  const heaviest = tokensByCaller.length > 1
+    ? tokensByCaller.reduce((a, b) => (b.value > a.value ? b : a)).key
+    : undefined;
   const admitted = callers.reduce((n, c) => n + c.admitted, 0);
   const refused = callers.reduce((n, c) => n + c.refused, 0);
   const byTokens = callers.reduce((n, c) => n + c.refusedByTokens, 0);
@@ -190,7 +205,23 @@ export default function CostAdmission() {
           here.
         </Plane>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-4">
+          {/* Across callers, before the per-caller detail. One caller usually
+              dominates a shared allowance, and that is invisible when the page
+              only shows each caller's own share of its own limit. One hue: the
+              bar length already encodes the value, so colouring by it would
+              spend the identity channel twice. */}
+          <Plane className="p-4">
+            <ChartFrame
+              title="Tokens charged, by caller"
+              valueLabel="Tokens"
+              caption="Who is actually consuming the shared token budget."
+              data={tokensByCaller}
+            >
+              <BarChart data={tokensByCaller} emphasis={heaviest} unit="tok" />
+            </ChartFrame>
+          </Plane>
+
           {callers.map((c) => {
             const tokenBound = c.tokenShare >= c.requestShare;
             return (

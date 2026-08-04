@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { ChartFrame, Histogram } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 
@@ -80,8 +81,6 @@ export default function Uncertainty() {
 
   if (error) return <ErrorState message={error} onRetry={load} />;
 
-  const maxBucket = Math.max(1, ...(status?.histogram ?? []).map((h) => h.count));
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -142,24 +141,36 @@ export default function Uncertainty() {
       {/* ---- distribution ---- */}
       {(status?.measured ?? 0) > 0 && (
         <section className="space-y-3">
-          <Micro>Confidence distribution · a single average would hide a split workload</Micro>
           <Plane className="p-5">
-            <div className="flex h-28 items-end gap-1.5">
-              {status!.histogram.map((h) => (
-                <div key={h.from} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
-                  <div
-                    className={`w-full rounded-sm transition-all duration-500 ${
-                      h.to <= status!.lowConfidence ? "bg-amber-500/60" : "bg-aurora/60"
-                    }`}
-                    style={{ height: `${Math.max(h.count > 0 ? 4 : 1, (h.count / maxBucket) * 100)}%` }}
-                    title={`${h.count} answer${h.count === 1 ? "" : "s"} at confidence ${h.from.toFixed(1)}–${h.to.toFixed(1)}`}
-                  />
-                  <span className="readout text-[9px] text-slate-600">{h.from.toFixed(1)}</span>
-                </div>
-              ))}
-            </div>
+            {/* Ordered bins, so the x-axis carries meaning and a magnitude ramp
+                is correct here — unlike nominal categories, where a ramp would
+                re-encode bar height as colour. */}
+            <ChartFrame
+              title="Confidence distribution · a single average would hide a split workload"
+              valueLabel="Answers"
+              caption="Each bar is a confidence band. A workload split between certain and unsure averages to a middle figure that describes neither."
+              data={status!.histogram.map((h) => ({
+                key: String(h.from),
+                label: `${h.from.toFixed(1)}–${h.to.toFixed(1)}`,
+                value: h.count,
+              }))}
+            >
+              <Histogram
+                height={140}
+                xLabel="confidence"
+                bins={status!.histogram.map((h) => ({
+                  label: h.from.toFixed(1),
+                  value: h.count,
+                  hint: `${h.count} answer${h.count === 1 ? "" : "s"} at confidence ${h.from.toFixed(1)}–${h.to.toFixed(1)}`,
+                }))}
+              />
+            </ChartFrame>
             <p className="mt-3 text-xs text-slate-500">
-              Amber bars fall below your low-confidence threshold and are flagged in the response.
+              Bands at or below{" "}
+              <span className="readout text-amber-400">
+                {status!.lowConfidence.toFixed(2)}
+              </span>{" "}
+              are flagged as low confidence in the response your application receives.
             </p>
           </Plane>
         </section>
@@ -221,7 +232,9 @@ export default function Uncertainty() {
       {/* ---- settings ---- */}
       <section className="space-y-3">
         <Micro>Sampling</Micro>
-        <Plane className="flex flex-wrap items-end gap-6 p-5">
+        {/* items-start, not items-end: a note under one control used to push
+            that control's label down and leave the row misaligned. */}
+        <Plane className="flex flex-wrap items-start gap-6 p-5">
           <label>
             <span className="micro">Samples</span>
             <select
@@ -255,10 +268,6 @@ export default function Uncertainty() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 max-w-[15rem] text-xs text-slate-600">
-              At zero every sample is identical and the measurement would report certainty about
-              everything, so it cannot be set there.
-            </p>
           </label>
           <label>
             <span className="micro">Flag below</span>
@@ -287,6 +296,10 @@ export default function Uncertainty() {
           >
             Clear history
           </button>
+          <p className="w-full text-xs text-slate-600">
+            Temperature cannot be set to zero: every sample would be identical and the measurement
+            would report certainty about everything.
+          </p>
         </Plane>
       </section>
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { portal } from "../api";
-import { Meter, Micro, PageHeader, Plane, Readout } from "../system/primitives";
+import { Micro, PageHeader, Plane, Readout } from "../system/primitives";
+import { BarChart, BeforeAfter, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
 
 /**
@@ -207,7 +208,7 @@ export default function ContextTransformers() {
                 title={b.hint}
                 className={`rounded px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
                   budget === b.key
-                    ? "bg-indigo-600/20 text-indigo-300 ring-1 ring-indigo-500/40"
+                    ? "chip-on"
                     : "text-slate-500 hover:text-slate-300"
                 }`}
               >
@@ -353,6 +354,17 @@ function ResultView({
   const s = result.tokenStats;
   const grew = !s.improved && s.before > 0;
 
+  const structureBars = foldTail(
+    Object.entries(result.structure)
+      .filter(([, v]) => typeof v === "number" && v > 0)
+      .map(([k, v]) => ({
+        key: k,
+        label: k.replace(/([A-Z])/g, " $1").toLowerCase(),
+        value: v as number,
+      })),
+    7
+  );
+
   return (
     <div className="space-y-4">
       {/* The pipeline, as a shape rather than a paragraph. */}
@@ -418,10 +430,16 @@ function ResultView({
               hint="Things the transformer could not determine and refused to guess."
             />
           </div>
-          <Meter
-            value={s.before > 0 ? Math.min(1, s.after / s.before) : 0}
-            state={s.improved ? "active" : "degraded"}
-            label="Prompt cost, after as a share of before"
+          {/* Two bars on one scale rather than a ratio meter: the claim of the
+              whole layer is a comparison, and a comparison should be a length
+              the reader can see instead of two numbers they subtract. */}
+          <BeforeAfter
+            beforeLabel="Raw"
+            afterLabel="Canonical"
+            before={s.before}
+            after={s.after}
+            unit="tok"
+            goodDirection="down"
           />
           {grew && (
             // Said plainly rather than hidden. A structured rendering is
@@ -436,20 +454,20 @@ function ResultView({
         </Plane>
 
         <Plane className="space-y-2 p-4">
-          <Micro>Structure recovered</Micro>
           {Object.keys(result.structure).length === 0 ? (
-            <p className="text-sm text-slate-500">Nothing structural was recovered.</p>
+            <>
+              <Micro>Structure recovered</Micro>
+              <p className="text-sm text-slate-500">Nothing structural was recovered.</p>
+            </>
           ) : (
-            <dl className="space-y-1.5">
-              {Object.entries(result.structure).map(([k, v]) => (
-                <div key={k} className="flex items-baseline justify-between gap-3">
-                  <dt className="text-xs capitalize text-slate-500">
-                    {k.replace(/([A-Z])/g, " $1").toLowerCase()}
-                  </dt>
-                  <dd className="readout text-sm text-slate-200">{v.toLocaleString()}</dd>
-                </div>
-              ))}
-            </dl>
+            <ChartFrame
+              title="Structure recovered"
+              valueLabel="Count"
+              caption="What the transformer found that a flat export would have lost."
+              data={structureBars}
+            >
+              <BarChart data={structureBars} />
+            </ChartFrame>
           )}
         </Plane>
       </div>
@@ -490,7 +508,7 @@ function ResultView({
               onClick={() => onTab(t.k as typeof tab)}
               className={`rounded px-2.5 py-1 text-xs transition-colors ${
                 tab === t.k
-                  ? "bg-indigo-600/20 text-indigo-300"
+                  ? "chip-on"
                   : "text-slate-500 hover:text-slate-300"
               }`}
             >

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { ChartFrame, Donut } from "../system/charts";
 import { EmptyState, ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 
@@ -75,6 +76,14 @@ export default function SemanticCache() {
 
   const savedPct = status && status.hits + status.misses > 0 ? Math.round(status.hitRate * 100) : 0;
 
+  // Colours here are status, not identity: a hit is good and a miss is neutral,
+  // and that meaning is the point. A categorical slot would say "these are two
+  // different things" when what matters is that one of them is the win.
+  const cacheSplit = [
+    { key: "hits", label: "Served from cache", value: status?.hits ?? 0, color: "var(--series-3)" },
+    { key: "misses", label: "Went to a provider", value: status?.misses ?? 0, color: "var(--series-mute)" },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -92,21 +101,51 @@ export default function SemanticCache() {
         />
       </Plane>
 
-      <Plane className="grid gap-6 p-5 sm:grid-cols-2 lg:grid-cols-5">
-        <Readout label="Hit rate" value={savedPct} unit="%" state={savedPct > 0 ? "healthy" : "idle"} />
-        <Readout label="Hits" value={status?.hits ?? 0} />
-        <Readout label="Misses" value={status?.misses ?? 0} />
-        <Readout
-          label="Tokens saved"
-          value={status?.tokensSaved ?? 0}
-          state={status?.tokensSaved ? "healthy" : "idle"}
-        />
-        <Readout
-          label="Cost avoided"
-          value={`$${(status?.costSaved ?? 0).toFixed(4)}`}
-          hint="What the cached calls originally cost"
-        />
-      </Plane>
+      <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
+        {/* The ring earns its place here because the hole holds the one number
+            the page is about. Two segments, so it is a proportion at a glance
+            rather than a comparison — for comparing close values this would be
+            a bar. */}
+        <Plane className="p-5">
+          <ChartFrame
+            title="Where requests went"
+            data={cacheSplit}
+            valueLabel="Requests"
+            caption={
+              status && status.hits + status.misses > 0
+                ? undefined
+                : "Nothing has been asked yet — the ring fills in with traffic."
+            }
+          >
+            <Donut
+              data={cacheSplit}
+              centerValue={`${savedPct}%`}
+              centerLabel="hit rate"
+              unit="reqs"
+            />
+          </ChartFrame>
+        </Plane>
+
+        <Plane className="grid gap-6 p-5 sm:grid-cols-2">
+          <Readout
+            label="Tokens saved"
+            value={status?.tokensSaved ?? 0}
+            state={status?.tokensSaved ? "healthy" : "idle"}
+            hint="Tokens that were never sent to a provider because a stored answer matched."
+          />
+          <Readout
+            label="Cost avoided"
+            value={`$${(status?.costSaved ?? 0).toFixed(4)}`}
+            hint="What the cached calls originally cost"
+          />
+          <Readout label="Entries held" value={status?.entries ?? 0} />
+          <Readout
+            label="Answered from cache"
+            value={status?.hits ?? 0}
+            state={status?.hits ? "healthy" : "idle"}
+          />
+        </Plane>
+      </div>
 
       <section className="space-y-3">
         <Micro>Match threshold</Micro>
