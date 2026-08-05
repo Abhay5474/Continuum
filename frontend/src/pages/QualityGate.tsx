@@ -1,8 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
-import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { PageHeader, Switch } from "../system/primitives";
+import { ErrorState, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
+import {
+  Bar,
+  Code,
+  Dot,
+  Empty,
+  Facts,
+  Field,
+  Ghost,
+  Hop,
+  KindMark,
+  Rail,
+  Route,
+  Row,
+  RowSkeleton,
+  Segmented,
+  SidePanel,
+  Stage,
+  Stat,
+  Stats,
+} from "../system/hub";
 
 /**
  * Response quality gate.
@@ -20,11 +40,17 @@ import { dateTimeOf } from "../system/time";
  *       the same defect — so the repair success rate is prominent and every
  *       repair is inspectable side by side.</li>
  * </ul>
+ *
+ * <p><b>On the shape of this screen.</b> Three modes as three bordered cards
+ * read as three products; they are one setting with three positions, and the
+ * position you are in changes what the numbers underneath mean. The mode is a
+ * segmented control now, and the case for moving it is stated directly beneath.
  */
 
 type Dimension = { name: string; checked: number; failed: number; meanScore: number | null };
+type Mode = "OFF" | "MONITOR" | "ENFORCE";
 type Status = {
-  mode: "OFF" | "MONITOR" | "ENFORCE";
+  mode: Mode;
   threshold: number;
   maxRepairs: number;
   budgetMs: number;
@@ -41,7 +67,7 @@ type Status = {
   extraMs: number;
 };
 
-const MODES: [Status["mode"], string, string][] = [
+const MODES: [Mode, string, string][] = [
   ["OFF", "Off", "The gate never runs. Answers are returned exactly as the model produced them."],
   ["MONITOR", "Monitor", "Checks every answer and records what it would have done — without changing anything. Start here."],
   ["ENFORCE", "Enforce", "Checks and repairs. Only worth turning on once monitoring shows repairs actually help."],
@@ -53,6 +79,8 @@ const DIMENSION_NOTES: Record<string, string> = {
   grounding: "Figures asserted in the answer should appear in the supplied context",
   relevance: "The answer is about the question at all",
 };
+
+const DIMS = ["adherence", "completeness", "grounding", "relevance"];
 
 export default function QualityGatePage() {
   const toast = useToast();
@@ -103,81 +131,92 @@ export default function QualityGatePage() {
 
   if (error) return <ErrorState message={error} onRetry={load} />;
 
-  const monitoring = status?.mode === "MONITOR";
+  const mode = status?.mode ?? "OFF";
+  const monitoring = mode === "MONITOR";
   const successRate = status?.repairSuccessRate;
+  const modeNote = MODES.find(([v]) => v === mode)?.[2];
+  const selected = (rows ?? []).find((r) => r.id === open) ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="page-enter">
       <PageHeader
         title="Quality Gate"
         subtitle="Checks a finished answer against the request that asked for it. Off by default; the gate can rewrite an answer, so it has to earn that first."
       />
 
-      <RepairEngine
-        enabled={!!(status as any)?.repairEngineEnabled}
-        busy={busy}
-        stats={repairStats}
-        attempts={repairs}
-        onToggle={(next) =>
-          run(
-            () => portal.quality.configure({ repairEngineEnabled: next }),
-            next ? "Repair engine on." : "Repair engine off."
-          )
-        }
-      />
+      {/* Where it sits. This is the only stage on the path that runs *after*
+          the model, and that is the whole reason it is allowed to rewrite. */}
+      <div className="mt-6">
+        <Route>
+          <Stage label="the model's answer" sub="as produced" />
+          <Hop />
+          <Stage
+            label="Quality Gate"
+            sub={
+              mode === "OFF"
+                ? "off"
+                : monitoring
+                  ? "watching, changing nothing"
+                  : "repairing when it helps"
+            }
+            state={mode === "OFF" ? "off" : monitoring ? "on" : "on"}
+            mark={<KindMark kind="moderation" size={26} />}
+            selected
+          />
+          <Hop label={mode === "ENFORCE" ? "checked" : "unchanged"} />
+          <Stage label="your app" sub="what the customer reads" />
+        </Route>
+      </div>
 
       {/* ---- mode ---- */}
-      <section className="space-y-3">
-        <Micro>Mode</Micro>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {MODES.map(([value, name, note]) => {
-            const active = status?.mode === value;
-            return (
-              <button
-                key={value}
-                disabled={busy}
-                onClick={() => run(() => portal.quality.configure({ mode: value }), `Mode: ${name}`)}
-                className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
-                  active ? "border-aurora/60 bg-aurora/10" : "border-edge hover:border-aurora/40"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${active ? "bg-aurora" : "bg-edge"}`} />
-                  <span className="text-sm font-medium text-slate-200">{name}</span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">{note}</p>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      <div className="mt-7">
+        <Segmented<Mode>
+          value={mode}
+          onChange={(v) => run(() => portal.quality.configure({ mode: v }), `Mode: ${v}`)}
+          options={MODES.map(([value, label]) => ({
+            value,
+            label,
+            badge:
+              value === mode && value !== "OFF" ? (
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} aria-hidden />
+              ) : undefined,
+          }))}
+        />
+        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-500">{modeNote}</p>
+      </div>
 
       {/* ---- the case for or against enforcing ---- */}
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
-        <Readout label="Checked" value={status?.checked ?? 0} />
-        <Readout
-          label={monitoring ? "Would have acted" : "Acted on"}
-          value={status?.wouldAct ?? 0}
-          hint={`${Math.round((status?.wouldActRate ?? 0) * 100)}% of answers`}
-          state={(status?.wouldAct ?? 0) > 0 ? "warning" : "idle"}
-        />
-        <Readout
-          label="Repairs that helped"
-          value={successRate == null ? "—" : `${Math.round(successRate * 100)}%`}
-          state={successRate == null ? "idle" : successRate >= 0.6 ? "healthy" : "critical"}
-          hint={`${status?.repairsImproved ?? 0} of ${status?.repairAttempts ?? 0} attempts`}
-        />
-        <Readout label="Blocked" value={status?.blocked ?? 0} hint="Refusals — never repaired" />
-        <Readout
-          label="Added latency"
-          value={status?.extraMs ?? 0}
-          unit="ms"
-          hint={`$${(status?.extraCost ?? 0).toFixed(5)} spent repairing`}
-        />
+      <div className="mt-7">
+        <Stats>
+          <Stat label="Checked" value={status?.checked ?? 0} />
+          <Stat
+            label={monitoring ? "Would have acted" : "Acted on"}
+            value={status?.wouldAct ?? 0}
+            hint={`${Math.round((status?.wouldActRate ?? 0) * 100)}% of answers`}
+            tone={(status?.wouldAct ?? 0) > 0 ? "warn" : undefined}
+          />
+          <Stat
+            label="Repairs that helped"
+            value={successRate == null ? "—" : `${Math.round(successRate * 100)}%`}
+            tone={successRate == null ? undefined : successRate >= 0.6 ? "ok" : "bad"}
+            hint={`${status?.repairsImproved ?? 0} of ${status?.repairAttempts ?? 0} attempts`}
+          />
+          <Stat label="Blocked" value={status?.blocked ?? 0} hint="Refusals — never repaired" />
+          <Stat
+            label="Added latency"
+            value={status?.extraMs ?? 0}
+            unit="ms"
+            hint={`$${(status?.extraCost ?? 0).toFixed(5)} spent repairing`}
+          />
+        </Stats>
       </div>
 
       {status && status.checked > 0 && (
-        <p className="text-xs text-slate-500">
+        <Case
+          tone={
+            monitoring ? "idle" : successRate != null && successRate < 0.5 ? "bad" : successRate != null ? "ok" : "idle"
+          }
+        >
           {monitoring ? (
             <>
               Monitoring only — nothing has been changed. The gate would have acted on{" "}
@@ -186,227 +225,326 @@ export default function QualityGatePage() {
                 " That is a high rate; check the dimension breakdown below before enforcing, in case one check is producing noise."}
             </>
           ) : successRate != null && successRate < 0.5 ? (
-            <span className="text-rose-400">
+            <>
               Fewer than half of repairs improved the answer. The gate is spending a second call and
               returning the same defect — monitor rather than enforce until that changes.
-            </span>
+            </>
           ) : successRate != null ? (
-            <span className="text-emerald-400">
+            <>
               {status.repairsImproved} of {status.repairAttempts} repairs scored better than the
               original. Repairs that did not are discarded, so a failed repair costs a call but never
               a worse answer.
-            </span>
+            </>
           ) : null}
-        </p>
+        </Case>
       )}
 
       {/* ---- which check is doing the work ---- */}
-      <section className="space-y-3">
-        <Micro>Dimensions · which check is doing the work, and which is only noise</Micro>
-        <Plane className="divide-y divide-edge/40">
-          {(status?.dimensions ?? []).map((d) => {
-            const rate = d.checked === 0 ? 0 : d.failed / d.checked;
-            return (
-              <div key={d.name} className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium capitalize text-slate-200">{d.name}</div>
-                  <div className="text-xs text-slate-500">{DIMENSION_NOTES[d.name]}</div>
-                </div>
-                <div className="flex w-40 shrink-0 items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-edge/60">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        rate > 0.5 ? "bg-rose-500/70" : rate > 0 ? "bg-amber-500/70" : "bg-emerald-500/60"
-                      }`}
-                      style={{ width: `${Math.max(rate > 0 ? 3 : 0, rate * 100)}%` }}
-                    />
-                  </div>
-                  <span className="readout w-20 shrink-0 text-right text-xs text-slate-400">
-                    {d.failed}/{d.checked}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </Plane>
+      <section className="mt-10">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Dimensions</h2>
+        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+          Which check is doing the work, and which is only noise. A dimension failing almost
+          everything is usually a threshold problem rather than a fleet of bad answers.
+        </p>
+        <div className="mt-3">
+          <Rail>
+            {(status?.dimensions ?? []).map((d) => {
+              const rate = d.checked === 0 ? 0 : d.failed / d.checked;
+              return (
+                <Row
+                  key={d.name}
+                  title={<span className="capitalize">{d.name}</span>}
+                  subtitle={DIMENSION_NOTES[d.name]}
+                  trailing={
+                    <>
+                      <Bar
+                        fraction={rate}
+                        tone={rate > 0.5 ? "bad" : rate > 0 ? "warn" : "ok"}
+                        width={90}
+                      />
+                      <span className="readout w-14 text-right text-[11px] text-slate-500">
+                        {d.failed}/{d.checked}
+                      </span>
+                    </>
+                  }
+                />
+              );
+            })}
+          </Rail>
+        </div>
       </section>
 
       {/* ---- settings ---- */}
-      <section className="space-y-3">
-        <Micro>Limits</Micro>
-        <Plane className="flex flex-wrap items-end gap-6 p-5">
-          <label>
-            <span className="micro">Act below</span>
-            <select
-              value={status?.threshold ?? 0.6}
-              disabled={busy}
-              onChange={(e) =>
-                run(() => portal.quality.configure({ threshold: Number(e.target.value) }), "Threshold updated")
-              }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
-            >
-              {[0.4, 0.6, 0.8].map((t) => (
-                <option key={t} value={t}>
-                  {t.toFixed(1)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="micro">Repair attempts</span>
-            <select
-              value={status?.maxRepairs ?? 1}
-              disabled={busy}
-              onChange={(e) =>
-                run(() => portal.quality.configure({ maxRepairs: Number(e.target.value) }), "Repair limit updated")
-              }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
-            >
-              <option value={0}>0 — check only</option>
-              <option value={1}>1 attempt</option>
-              <option value={2}>2 attempts</option>
-            </select>
-          </label>
-          <label>
-            <span className="micro">Latency budget</span>
-            <select
-              value={status?.budgetMs ?? 4000}
-              disabled={busy}
-              onChange={(e) =>
-                run(() => portal.quality.configure({ budgetMs: Number(e.target.value) }), "Budget updated")
-              }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
-            >
-              {[1000, 2000, 4000, 8000].map((b) => (
-                <option key={b} value={b}>
-                  {b / 1000}s
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 max-w-[16rem] text-xs text-slate-600">
-              Past this the original answer is returned unchanged. A slow correct answer is worse than
-              a fast flawed one for anything interactive.
-            </p>
-          </label>
-          <button
+      <section className="mt-10">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Limits</h2>
+        <div className="mt-4 flex flex-wrap items-start gap-x-8 gap-y-5">
+          <Pick
+            label="Act below"
+            value={status?.threshold ?? 0.6}
+            disabled={busy}
+            onChange={(v) => run(() => portal.quality.configure({ threshold: v }), "Threshold updated")}
+            options={[0.4, 0.6, 0.8].map((t) => [t, t.toFixed(1)])}
+          />
+          <Pick
+            label="Repair attempts"
+            value={status?.maxRepairs ?? 1}
+            disabled={busy}
+            onChange={(v) => run(() => portal.quality.configure({ maxRepairs: v }), "Repair limit updated")}
+            options={[
+              [0, "0 — check only"],
+              [1, "1 attempt"],
+              [2, "2 attempts"],
+            ]}
+          />
+          <Pick
+            label="Latency budget"
+            value={status?.budgetMs ?? 4000}
+            disabled={busy}
+            onChange={(v) => run(() => portal.quality.configure({ budgetMs: v }), "Budget updated")}
+            options={[1000, 2000, 4000, 8000].map((b) => [b, `${b / 1000}s`])}
+            note="Past this the original answer is returned unchanged. A slow correct answer is worse than a fast flawed one for anything interactive."
+          />
+        </div>
+        <div className="mt-5">
+          <Ghost
             disabled={busy || !status?.checked}
             onClick={() => run(() => portal.quality.clear(), "History cleared")}
-            className="ml-auto rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 hover:bg-edge/50 disabled:opacity-40"
           >
             Clear history
-          </button>
-        </Plane>
+          </Ghost>
+        </div>
       </section>
 
+      <div className="mt-10">
+        <RepairEngine
+          enabled={!!(status as any)?.repairEngineEnabled}
+          busy={busy}
+          stats={repairStats}
+          attempts={repairs}
+          onToggle={(next) =>
+            run(
+              () => portal.quality.configure({ repairEngineEnabled: next }),
+              next ? "Repair engine on." : "Repair engine off."
+            )
+          }
+        />
+      </div>
+
       {/* ---- the checks themselves ---- */}
-      <section className="space-y-3">
-        <Micro>Checks · newest first</Micro>
-        {rows === null ? (
-          <SkeletonRows rows={4} />
-        ) : rows.length === 0 ? (
-          <Plane className="p-8 text-center text-sm text-slate-500">
-            Nothing checked yet. Set the mode to Monitor and send a request through the gateway.
-          </Plane>
-        ) : (
-          <div className="space-y-2">
-            {rows.map((r) => (
-              <Check key={r.id} row={r} open={open === r.id} onToggle={() => setOpen(open === r.id ? null : r.id)} />
-            ))}
-          </div>
-        )}
+      <section className="mt-10">
+        <h2 className="flex items-baseline gap-2 text-[13px] font-semibold tracking-tight text-slate-200">
+          Checks
+          {rows && <span className="readout text-[11px] font-normal text-slate-600">{rows.length}</span>}
+          <span className="text-[11px] font-normal text-slate-600">newest first</span>
+        </h2>
+        <div className="mt-3">
+          {rows === null ? (
+            <RowSkeleton rows={4} />
+          ) : rows.length === 0 ? (
+            <Empty
+              title="Nothing checked yet"
+              hint="Set the mode to Monitor and send a request through the gateway. Monitoring records what the gate would have done without changing a single answer."
+            />
+          ) : (
+            <Rail>
+              {rows.map((r) => (
+                <CheckRow key={r.id} row={r} selected={open === r.id} onOpen={() => setOpen(r.id)} />
+              ))}
+            </Rail>
+          )}
+        </div>
       </section>
+
+      <CheckPanel row={selected} onClose={() => setOpen(null)} />
     </div>
   );
 }
 
-function Check({ row, open, onToggle }: { row: any; open: boolean; onToggle: () => void }) {
-  const dims: Record<string, number> = row.dimensions ?? {};
-  const hasRepair = !!row.repairedAnswer;
-
-  const badge =
-    row.applied === "REPAIR"
-      ? ["Repaired", "text-emerald-400 border-emerald-500/40"]
-      : row.applied === "REPAIR_REJECTED"
-        ? ["Repair discarded", "text-slate-400 border-edge"]
-        : row.applied === "BUDGET_EXCEEDED"
-          ? ["Over budget", "text-amber-400 border-amber-500/40"]
-          : row.action === "PASS"
-            ? ["Passed", "text-slate-500 border-edge"]
-            : row.action === "BLOCK"
-              ? ["Blocked", "text-rose-400 border-rose-500/40"]
-              : ["Would repair", "text-amber-400 border-amber-500/40"];
-
+/**
+ * The argument, on a coloured rule.
+ *
+ * <p>This paragraph is the one on the page that decides whether someone lets
+ * the gate rewrite customer-facing text, so it gets a mark of its own rather
+ * than being another line of grey body copy.
+ */
+function Case({ tone, children }: { tone: "ok" | "bad" | "idle"; children: React.ReactNode }) {
+  const colour = {
+    ok: "var(--state-healthy-ink)",
+    bad: "var(--state-critical-ink)",
+    idle: "var(--state-idle-ink)",
+  }[tone];
   return (
-    <Plane className="overflow-hidden">
-      <button
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full min-w-0 items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-edge/30"
-      >
-        <span className="readout w-10 shrink-0 text-sm text-slate-300">{row.score.toFixed(2)}</span>
-        <div className="flex w-28 shrink-0 gap-1">
-          {["adherence", "completeness", "grounding", "relevance"].map((d) => (
-            <span
-              key={d}
-              title={`${d}: ${(dims[d] ?? 1).toFixed(2)}`}
-              className={`h-4 flex-1 rounded-sm ${
-                (dims[d] ?? 1) >= 1 ? "bg-emerald-500/40" : (dims[d] ?? 1) > 0 ? "bg-amber-500/50" : "bg-rose-500/50"
-              }`}
-            />
-          ))}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm text-slate-400">{row.defects ?? "meets the request"}</div>
-          <div className="mt-0.5 text-xs text-slate-600">
-            {row.mode} · {row.model} · {dateTimeOf(row.createdAt)}
-          </div>
-        </div>
-        <span className={`shrink-0 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider ${badge[1]}`}>
-          {badge[0]}
-        </span>
-        <span className={`shrink-0 text-slate-600 transition-transform ${open ? "rotate-90" : ""}`}>›</span>
-      </button>
+    <p
+      className="mt-5 max-w-2xl border-l-2 pl-3.5 text-xs leading-relaxed text-slate-400"
+      style={{ borderColor: colour }}
+    >
+      {children}
+    </p>
+  );
+}
 
-      {open && (
-        <div className="border-t border-edge/60 px-4 py-3">
+/** A labelled select, without the box a form field used to come wrapped in. */
+function Pick({
+  label,
+  value,
+  onChange,
+  options,
+  disabled,
+  note,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  options: [number, string][];
+  disabled?: boolean;
+  note?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="micro">{label}</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-[13px] text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
+      >
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+      {note && <p className="mt-1.5 max-w-[17rem] text-[11.5px] leading-relaxed text-slate-600">{note}</p>}
+    </label>
+  );
+}
+
+/** The four dimension scores, as four marks rather than four numbers. */
+function DimStrip({ dims }: { dims: Record<string, number> }) {
+  return (
+    <span className="flex w-24 shrink-0 gap-1" aria-hidden>
+      {DIMS.map((d) => {
+        const v = dims[d] ?? 1;
+        return (
+          <span
+            key={d}
+            title={`${d}: ${v.toFixed(2)}`}
+            className="h-3.5 flex-1 rounded-sm"
+            style={{
+              background:
+                v >= 1
+                  ? "color-mix(in srgb, var(--state-healthy-ink) 45%, transparent)"
+                  : v > 0
+                    ? "color-mix(in srgb, var(--state-warning-ink) 55%, transparent)"
+                    : "color-mix(in srgb, var(--state-critical-ink) 55%, transparent)",
+            }}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
+function verdictOf(row: any): { label: string; tone: "ok" | "warn" | "bad" | "idle" } {
+  if (row.applied === "REPAIR") return { label: "repaired", tone: "ok" };
+  if (row.applied === "REPAIR_REJECTED") return { label: "repair discarded", tone: "idle" };
+  if (row.applied === "BUDGET_EXCEEDED") return { label: "over budget", tone: "warn" };
+  if (row.action === "PASS") return { label: "passed", tone: "idle" };
+  if (row.action === "BLOCK") return { label: "blocked", tone: "bad" };
+  return { label: "would repair", tone: "warn" };
+}
+
+function CheckRow({ row, selected, onOpen }: { row: any; selected: boolean; onOpen: () => void }) {
+  const v = verdictOf(row);
+  return (
+    <Row
+      selected={selected}
+      onClick={onOpen}
+      mark={
+        <span className="flex w-14 shrink-0 flex-col items-start gap-1">
+          <span className="readout text-[13px] text-slate-200">{row.score.toFixed(2)}</span>
+          <DimStrip dims={row.dimensions ?? {}} />
+        </span>
+      }
+      title={row.defects ?? "meets the request"}
+      status={<Dot tone={v.tone} label={v.label} />}
+      subtitle={`${String(row.mode).toLowerCase()} · ${row.model} · ${dateTimeOf(row.createdAt)}`}
+    />
+  );
+}
+
+/**
+ * One check, opened.
+ *
+ * <p>Before and after stacked rather than side by side: the panel is narrower
+ * than a two-column diff needs, and two 30-character columns of prose is worse
+ * for reading than the same text one after the other.
+ */
+function CheckPanel({ row, onClose }: { row: any | null; onClose: () => void }) {
+  const v = row ? verdictOf(row) : null;
+  const hasRepair = !!row?.repairedAnswer;
+  return (
+    <SidePanel
+      open={!!row}
+      title={row ? `Scored ${row.score.toFixed(2)}` : ""}
+      subtitle={row ? `${row.model} · ${dateTimeOf(row.createdAt)}` : undefined}
+      mark={<KindMark kind="moderation" size={34} />}
+      onClose={onClose}
+    >
+      {row && (
+        <>
+          <Field label="Verdict">
+            <Dot tone={v!.tone} label={v!.label} />
+            <p className="mt-1.5 leading-relaxed text-slate-400">
+              {row.defects ?? "No defect this gate can check for."}
+            </p>
+          </Field>
+
+          <Field label="Dimensions">
+            <div className="space-y-1.5">
+              {DIMS.map((d) => {
+                const val = (row.dimensions ?? {})[d] ?? 1;
+                return (
+                  <div key={d} className="flex items-center gap-3">
+                    <span className="w-28 shrink-0 text-[11.5px] capitalize text-slate-500">{d}</span>
+                    <Bar fraction={val} tone={val >= 1 ? "ok" : val > 0 ? "warn" : "bad"} width={110} />
+                    <span className="readout text-[11px] text-slate-500">{val.toFixed(2)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </Field>
+
           {hasRepair ? (
             <>
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="min-w-0">
-                  <div className="micro mb-1.5">Before · {row.score.toFixed(2)}</div>
-                  <p className="well max-h-48 overflow-y-auto p-3 text-xs leading-relaxed text-slate-400">
-                    {row.originalAnswer}
-                  </p>
-                </div>
-                <div className="min-w-0">
-                  <div className="micro mb-1.5 text-emerald-400">
-                    After · {(row.repairScore ?? 0).toFixed(2)}
-                  </div>
-                  <p className="well max-h-48 overflow-y-auto p-3 text-xs leading-relaxed text-slate-300">
-                    {row.repairedAnswer}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-slate-500">
+              <Field label={`Before · ${row.score.toFixed(2)}`}>
+                <Code>{row.originalAnswer}</Code>
+              </Field>
+              <Field label={`After · ${(row.repairScore ?? 0).toFixed(2)}`}>
+                <Code>{row.repairedAnswer}</Code>
+              </Field>
+              <p className="mt-4 text-[11.5px] leading-relaxed text-slate-500">
                 {row.applied === "REPAIR"
                   ? `The repair scored higher and was returned to the caller. It cost $${(row.extraCost ?? 0).toFixed(5)} and ${row.extraMs}ms.`
-                  : `The repair did not score higher, so the original was returned unchanged. A failed repair costs a call but never a worse answer.`}
+                  : "The repair did not score higher, so the original was returned unchanged. A failed repair costs a call but never a worse answer."}
               </p>
             </>
           ) : (
-            <p className="text-xs text-slate-500">
-              {row.action === "PASS"
-                ? "No defect this gate can check for. The answer was returned as produced."
-                : row.mode === "MONITOR"
-                  ? `Monitoring — the gate would have repaired this answer but changed nothing. Defect: ${row.defects}`
-                  : row.action === "BLOCK"
-                    ? "The model refused. Repairing a refusal buys the same refusal twice, so it is never attempted."
-                    : `No repair ran. Defect: ${row.defects}`}
-            </p>
+            <Field label="What happened">
+              <p className="leading-relaxed text-slate-400">
+                {row.action === "PASS"
+                  ? "No defect this gate can check for. The answer was returned as produced."
+                  : row.mode === "MONITOR"
+                    ? `Monitoring — the gate would have repaired this answer but changed nothing. Defect: ${row.defects}`
+                    : row.action === "BLOCK"
+                      ? "The model refused. Repairing a refusal buys the same refusal twice, so it is never attempted."
+                      : `No repair ran. Defect: ${row.defects}`}
+              </p>
+            </Field>
           )}
-        </div>
+        </>
       )}
-    </Plane>
+    </SidePanel>
   );
 }
 
@@ -438,10 +576,10 @@ function RepairEngine({
   const total = kept + discarded;
 
   return (
-    <section className="space-y-3">
-      <Micro>Answer Repair Engine</Micro>
+    <section>
+      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Answer repair engine</h2>
 
-      <Plane className="space-y-3 p-4">
+      <div className="mt-4">
         <Switch
           checked={enabled}
           busy={busy}
@@ -449,66 +587,65 @@ function RepairEngine({
           label="Targeted repair"
           hint="Off by default. With it off the gate does one generic repair pass. With it on, each defect kind gets its own instruction, the answer is re-scored after every attempt, and an attempt that scored lower than what it replaced is thrown away."
         />
-        <p className="text-xs text-slate-600">
-          A model asked to reconsider will find fault with correct work and degrade it — that is
-          the finding in Huang et al., <em>Large Language Models Cannot Self-Correct Reasoning
-          Yet</em> (ICLR 2024). Nothing here relies on the model's opinion of its own answer: every
-          attempt is scored by the same external gate, so a repair that did not help is discarded
-          rather than shipped.
+        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
+          A model asked to reconsider will find fault with correct work and degrade it — that is the
+          finding in Huang et al., <em>Large Language Models Cannot Self-Correct Reasoning Yet</em>{" "}
+          (ICLR 2024). Nothing here relies on the model's opinion of its own answer: every attempt is
+          scored by the same external gate, so a repair that did not help is discarded rather than
+          shipped.
         </p>
-      </Plane>
+      </div>
 
       {total > 0 && (
-        <div className="flex flex-wrap gap-x-9 gap-y-4">
-          <Readout label="Attempts" value={total} size="sm" />
-          <Readout label="Kept" value={kept} size="sm" state={kept > 0 ? "healthy" : "idle"} />
-          <Readout
-            label="Discarded"
-            value={discarded}
-            size="sm"
-            state={discarded > 0 ? "degraded" : "idle"}
-            hint="Scored no better than the answer they replaced, so the original was kept."
-          />
-          <Readout
-            label="Score gained"
-            value={(stats?.totalScoreGained ?? 0).toFixed(2)}
-            size="sm"
-            hint="Summed improvement across every kept attempt."
-          />
+        <div className="mt-6">
+          <Stats>
+            <Stat label="Attempts" value={total} />
+            <Stat label="Kept" value={kept} tone={kept > 0 ? "ok" : undefined} />
+            <Stat
+              label="Discarded"
+              value={discarded}
+              tone={discarded > 0 ? "warn" : undefined}
+              hint="Scored no better than the answer they replaced, so the original was kept."
+            />
+            <Stat
+              label="Score gained"
+              value={(stats?.totalScoreGained ?? 0).toFixed(2)}
+              hint="Summed improvement across every kept attempt."
+            />
+          </Stats>
         </div>
       )}
 
-      {attempts.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
-          No repair attempts yet. They appear here as the gate finds defects worth fixing —
-          including the attempts that were thrown away.
-        </Plane>
-      ) : (
-        <div className="space-y-1.5">
-          {attempts.map((a) => (
-            <Plane key={a.id} className="px-4 py-2.5">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${
-                    a.kept ? "bg-emerald-400" : "bg-slate-600"
-                  }`}
-                />
-                <span className="micro w-28 shrink-0">{a.strategy}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-300">{a.note}</span>
-                <span className="readout shrink-0 text-xs text-slate-400">
-                  {a.scoreBefore?.toFixed(2)} → {a.scoreAfter?.toFixed(2)}
-                </span>
-                <span className={`micro shrink-0 ${a.kept ? "text-emerald-400" : "text-slate-500"}`}>
-                  {a.kept ? "kept" : "discarded"}
-                </span>
-              </div>
-              {a.defects && (
-                <p className="mt-1 truncate text-xs text-slate-600">{a.defects}</p>
-              )}
-            </Plane>
-          ))}
-        </div>
-      )}
+      <div className="mt-5">
+        {attempts.length === 0 ? (
+          <Empty
+            title="No repair attempts yet"
+            hint="They appear here as the gate finds defects worth fixing — including the attempts that were thrown away."
+          />
+        ) : (
+          <Rail>
+            {attempts.map((a) => (
+              <Row
+                key={a.id}
+                title={a.note}
+                subtitle={a.defects || undefined}
+                status={<Dot tone={a.kept ? "ok" : "idle"} label={a.kept ? "kept" : "discarded"} />}
+                meta={
+                  <Facts
+                    items={[
+                      { k: "strategy", v: a.strategy },
+                      {
+                        k: "score",
+                        v: `${a.scoreBefore?.toFixed(2)} → ${a.scoreAfter?.toFixed(2)}`,
+                      },
+                    ]}
+                  />
+                }
+              />
+            ))}
+          </Rail>
+        )}
+      </div>
     </section>
   );
 }

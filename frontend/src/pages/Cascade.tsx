@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
-import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { Meter, PageHeader, Switch } from "../system/primitives";
+import { ErrorState, useToast } from "../components/ui";
+import {
+  Dot,
+  Empty,
+  Ghost,
+  Hop,
+  KindMark,
+  Rail,
+  Route,
+  Row,
+  RowSkeleton,
+  Stage,
+  Stat,
+  Stats,
+} from "../system/hub";
 
 /**
  * Verify-then-Escalate.
@@ -101,21 +115,53 @@ export default function Cascade() {
   const accepted = (status?.requests ?? 0) - (status?.escalated ?? 0);
 
   return (
-    <div className="space-y-6">
+    <div className="page-enter">
       <PageHeader
         title="Model Cascade"
         subtitle="Answer with the cheap model, check the answer, and pay for the expensive one only when the check fails."
       />
 
+      {/* The ladder, as a path. Two tiers and a judge between them is the whole
+          feature, and it is a shape rather than a paragraph. */}
+      <div className="mt-6">
+        <Route>
+          <Stage label="a request" sub="from your app" />
+          <Hop />
+          <Stage
+            label={status?.cheapTier?.model ?? "cheap tier"}
+            sub="every request starts here"
+            state={status?.enabled ? "on" : "off"}
+            mark={<KindMark kind="classification" size={26} />}
+          />
+          <Hop label="judged" />
+          <Stage
+            label={status?.strongTier?.model ?? "strong tier"}
+            sub={
+              (status?.requests ?? 0) > 0
+                ? `${Math.round((status?.escalationRate ?? 0) * 100)}% climb here`
+                : "only on a failed judgement"
+            }
+            state={status?.enabled ? "on" : "off"}
+            mark={<KindMark kind="classification" size={26} />}
+            selected
+          />
+          <Hop />
+          <Stage label="your app" sub="one answer, either way" />
+        </Route>
+      </div>
+
       {status && !status.available && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-2.5 text-sm text-slate-400">
-          <span className="text-amber-300">Not available.</span> A cascade needs two active models at
-          different prices. This deployment's registry offers no meaningful price gap, so the cascade
-          declines rather than adding a second call for nothing.
-        </div>
+        <p
+          className="mt-4 max-w-2xl border-l-2 pl-3.5 text-xs leading-relaxed text-slate-400"
+          style={{ borderColor: "var(--state-warning-ink)" }}
+        >
+          <span style={{ color: "var(--state-warning-ink)" }}>Not available.</span> A cascade needs
+          two active models at different prices. This deployment's registry offers no meaningful
+          price gap, so the cascade declines rather than adding a second call for nothing.
+        </p>
       )}
 
-      <Plane className="p-5">
+      <div className="mt-7">
         <Switch
           label="Verify-then-escalate"
           hint="Every request starts on the cheap tier. The answer is judged against the request, and only a failed judgement pays for the strong tier."
@@ -126,61 +172,81 @@ export default function Cascade() {
             run(() => portal.cascade.setEnabled(next), next ? "Cascade enabled" : "Cascade disabled")
           }
         />
-      </Plane>
+      </div>
 
       {/* ---- the ladder: where requests actually left ---- */}
-      <section className="space-y-3">
-        <Micro>Escalation ladder · live</Micro>
-        <Ladder status={status} accepted={accepted} />
+      <section className="mt-9">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+          Where requests left
+        </h2>
+        <div className="mt-3">
+          <Ladder status={status} accepted={accepted} />
+        </div>
       </section>
 
       {/* ---- savings, next to the numbers that could disprove them ---- */}
-      <section className="space-y-3">
-        <Micro>Did it work</Micro>
-        <div className="flex flex-wrap gap-x-9 gap-y-4">
-          <Readout
-            label="Saved"
-            value={`$${(status?.saved ?? 0).toFixed(4)}`}
-            state={(status?.saved ?? 0) > 0 ? "healthy" : "idle"}
-            hint={`vs $${(status?.strongOnlySpend ?? 0).toFixed(4)} on the strong model alone`}
-          />
-          <Readout
-            label="Reduction"
-            value={Math.round((status?.savedPct ?? 0) * 100)}
-            unit="%"
-            state={(status?.savedPct ?? 0) > 0 ? "healthy" : "idle"}
-          />
-          <Readout
-            label="Wasted escalations"
-            value={status?.wastedEscalations ?? 0}
-            state={(status?.wastedEscalations ?? 0) > 0 ? "warning" : "idle"}
-            hint="Escalated, and the strong model agreed anyway"
-          />
-          <Readout
-            label="Missed escalations"
-            value={status?.missedEscalations ?? 0}
-            state={(status?.missedEscalations ?? 0) > 0 ? "critical" : "healthy"}
-            hint={
-              (status?.auditSamples ?? 0) === 0
-                ? "No audit samples yet"
-                : `of ${status?.auditSamples} audited`
-            }
-          />
+      <section className="mt-9">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Did it work</h2>
+        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+          The saving never appears on its own. Beside it are the two numbers that would expose it as
+          a lie: escalations that were not needed, and the ones the judge should have made.
+        </p>
+        <div className="mt-4">
+          <Stats>
+            <Stat
+              label="Saved"
+              value={`$${(status?.saved ?? 0).toFixed(4)}`}
+              tone={(status?.saved ?? 0) > 0 ? "ok" : undefined}
+              hint={`vs $${(status?.strongOnlySpend ?? 0).toFixed(4)} on the strong model alone`}
+            />
+            <Stat
+              label="Reduction"
+              value={Math.round((status?.savedPct ?? 0) * 100)}
+              unit="%"
+              tone={(status?.savedPct ?? 0) > 0 ? "ok" : undefined}
+            />
+            <Stat
+              label="Wasted escalations"
+              value={status?.wastedEscalations ?? 0}
+              tone={(status?.wastedEscalations ?? 0) > 0 ? "warn" : undefined}
+              hint="Escalated, and the strong model agreed anyway"
+            />
+            <Stat
+              label="Missed escalations"
+              value={status?.missedEscalations ?? 0}
+              tone={(status?.missedEscalations ?? 0) > 0 ? "bad" : "ok"}
+              hint={
+                (status?.auditSamples ?? 0) === 0
+                  ? "No audit samples yet"
+                  : `of ${status?.auditSamples} audited`
+              }
+            />
+          </Stats>
         </div>
 
         {status && status.requests > 0 && (
-          <p className="text-xs text-slate-500">
+          <p
+            className="mt-5 max-w-2xl border-l-2 pl-3.5 text-xs leading-relaxed text-slate-400"
+            style={{
+              borderColor:
+                status.missedEscalations > 0
+                  ? "var(--state-critical-ink)"
+                  : status.auditSamples > 0
+                    ? "var(--state-healthy-ink)"
+                    : "var(--state-idle-ink)",
+            }}
+          >
             {status.missedEscalations > 0 ? (
-              <span className="text-rose-400">
+              <>
                 On the audited slice the judge accepted {status.missedEscalations} answer
                 {status.missedEscalations === 1 ? "" : "s"} the strong model disagreed with. Raise the
                 threshold.
-              </span>
+              </>
             ) : status.auditSamples > 0 ? (
-              <span className="text-emerald-400">
+              <>
                 Across {status.auditSamples} audited request{status.auditSamples === 1 ? "" : "s"}, the
                 strong model agreed with every answer the judge accepted.
-              </span>
+              </>
             ) : (
               "Turn up the audit rate to measure the escalations the judge is missing — savings alone cannot tell you."
             )}
@@ -188,7 +254,7 @@ export default function Cascade() {
         )}
 
         {status?.overCap && (
-          <p className="text-xs text-amber-400">
+          <p className="mt-3 max-w-2xl text-xs leading-relaxed" style={{ color: "var(--state-warning-ink)" }}>
             Escalation rate is {(status.escalationRate * 100).toFixed(0)}%, above the{" "}
             {(status.escalationCap * 100).toFixed(0)}% cap. At this rate the cascade costs more than
             using the strong model directly.
@@ -197,23 +263,46 @@ export default function Cascade() {
       </section>
 
       {/* ---- tiers ---- */}
-      <section className="space-y-3">
-        <Micro>Tiers · derived from the active model registry by price</Micro>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TierPlane tier={status?.cheapTier ?? null} role="Cheap tier" note="Every request starts here" />
-          <TierPlane tier={status?.strongTier ?? null} role="Strong tier" note="Only on a failed judgement" />
+      <section className="mt-9">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Tiers</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Derived from the active model registry by price — not configured here.
+        </p>
+        <div className="mt-3">
+          <Rail>
+            <TierRow tier={status?.cheapTier ?? null} role="Cheap" note="Every request starts here" />
+            <TierRow tier={status?.strongTier ?? null} role="Strong" note="Only on a failed judgement" />
+          </Rail>
         </div>
       </section>
 
       {/* ---- threshold ---- */}
-      <section className="space-y-3">
-        <Micro>Escalation threshold</Micro>
-        <Plane className="p-5">
-          <p className="text-sm text-slate-400">
-            How confident the judge must be to let a cheap answer through. The score is calibrated
-            against your own traffic, so this means the same thing as your workload changes.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <section className="mt-9">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+          Escalation threshold
+        </h2>
+        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+          How confident the judge must be to let a cheap answer through. The score is calibrated
+          against your own traffic, so this means the same thing as your workload changes.
+        </p>
+
+        <div className="mt-5 max-w-2xl">
+          <div className="flex items-baseline justify-between text-[11px]">
+            <span className="text-slate-500">cheaper, more weak answers accepted</span>
+            <span className="text-slate-500">costlier, almost nothing slips</span>
+          </div>
+          <div className="relative mt-2 h-1 rounded-full" style={{ background: "rgb(var(--edge))" }}>
+            <span
+              className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full transition-[left] duration-300 ease-out"
+              style={{
+                left: `${(((status?.threshold ?? 0.75) - 0.5) / 0.45) * 100}%`,
+                background: "var(--accent)",
+                boxShadow: "0 0 0 3px var(--accent-wash)",
+              }}
+              aria-hidden
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
             {BANDS.map(([value, name, note]) => {
               const active = Math.abs((status?.threshold ?? 0.75) - value) < 0.005;
               return (
@@ -221,179 +310,187 @@ export default function Cascade() {
                   key={name}
                   disabled={busy}
                   onClick={() => run(() => portal.cascade.configure({ threshold: value }), `Threshold: ${name}`)}
-                  className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
-                    active ? "border-aurora/60 bg-aurora/10" : "border-edge hover:border-aurora/40"
-                  }`}
+                  className="min-w-0 flex-1 basis-48 text-left transition-opacity disabled:opacity-50"
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium text-slate-200">{name}</span>
-                    <span className="readout text-xs text-slate-500">{value.toFixed(2)}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className="text-[13px] font-medium"
+                      style={{ color: active ? "var(--accent-ink)" : "rgb(148 163 184)" }}
+                    >
+                      {name}
+                    </span>
+                    <span className="readout text-[11px] text-slate-600">{value.toFixed(2)}</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">{note}</p>
+                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">{note}</p>
+                  <span
+                    className="mt-1.5 block h-[2px] w-full rounded-full transition-opacity duration-200"
+                    style={{ background: "var(--accent)", opacity: active ? 1 : 0 }}
+                    aria-hidden
+                  />
                 </button>
               );
             })}
           </div>
+        </div>
 
-          <div className="mt-5 flex flex-wrap items-end gap-5 border-t border-edge/60 pt-4">
-            <label className="min-w-0">
-              <span className="micro">Audit rate</span>
-              <select
-                value={status?.auditRate ?? 0.05}
-                disabled={busy}
-                onChange={(e) =>
-                  run(() => portal.cascade.configure({ auditRate: Number(e.target.value) }), "Audit rate updated")
-                }
-                className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
-              >
-                <option value={0}>Off — no miss measurement</option>
-                <option value={0.02}>2% of requests</option>
-                <option value={0.05}>5% of requests</option>
-                <option value={0.1}>10% of requests</option>
-              </select>
-              <p className="mt-1 max-w-xs text-xs text-slate-600">
-                Runs both tiers on a sample to find the escalations the judge missed. Costs a second
-                call on those requests.
-              </p>
-            </label>
-            <div className="ml-auto flex items-center gap-3">
-              <span className="text-xs text-slate-500">
-                calibration: {status?.calibration?.observations ?? 0} labelled
-              </span>
-              <button
-                disabled={busy || !status?.requests}
-                onClick={() => run(() => portal.cascade.reset(), "Cascade history cleared")}
-                className="rounded-md border border-edge px-3 py-1.5 text-sm text-slate-300 hover:bg-edge/50 disabled:opacity-40"
-              >
-                Reset history
-              </button>
-            </div>
+        <div className="mt-7 flex flex-wrap items-start gap-x-8 gap-y-4">
+          <label className="min-w-0">
+            <span className="micro">Audit rate</span>
+            <select
+              value={status?.auditRate ?? 0.05}
+              disabled={busy}
+              onChange={(e) =>
+                run(() => portal.cascade.configure({ auditRate: Number(e.target.value) }), "Audit rate updated")
+              }
+              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-[13px] text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
+            >
+              <option value={0}>Off — no miss measurement</option>
+              <option value={0.02}>2% of requests</option>
+              <option value={0.05}>5% of requests</option>
+              <option value={0.1}>10% of requests</option>
+            </select>
+            <p className="mt-1.5 max-w-xs text-[11.5px] leading-relaxed text-slate-600">
+              Runs both tiers on a sample to find the escalations the judge missed. Costs a second
+              call on those requests.
+            </p>
+          </label>
+          <div className="flex items-center gap-3 self-end">
+            <span className="text-xs text-slate-500">
+              calibration: {status?.calibration?.observations ?? 0} labelled
+            </span>
+            <Ghost
+              disabled={busy || !status?.requests}
+              onClick={() => run(() => portal.cascade.reset(), "Cascade history cleared")}
+            >
+              Reset history
+            </Ghost>
           </div>
-        </Plane>
+        </div>
       </section>
 
       {/* ---- should this cascade run speculatively? ---- */}
       {status?.speculation && (
-        <Plane className="space-y-3 p-4">
-          <Micro>Should the strong model run in parallel instead of afterwards?</Micro>
-          <p className="text-xs text-slate-600">
+        <section className="mt-10">
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+            Should the strong model run in parallel instead of afterwards?
+          </h2>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
             Speculative execution fires both tiers at once and returns whichever the judge accepts,
             turning the cascade&rsquo;s latency penalty into a cost penalty. Whether that is a good
             trade depends entirely on how often this account actually escalates — so the answer is
             computed from the rate measured above, not from intuition.
           </p>
 
-          <Meter
-            value={Math.min(1, status.speculation.escalationRate)}
-            state={status.speculation.worthwhile ? "healthy" : "degraded"}
-            label={`Escalation rate against the ${Math.round(
-              status.speculation.breakEven * 100
-            )}% break-even`}
-            height={8}
-          />
-
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <Readout
-              label="Extra spend"
-              value={`$${status.speculation.extraSpendUsd.toFixed(5)}`}
-              size="sm"
-              state="degraded"
-              hint="Paying for the strong model on requests that never needed it."
-            />
-            <Readout
-              label="Latency saved"
-              value={Math.round(status.speculation.latencySavedMs)}
-              unit="ms"
-              size="sm"
-              state="healthy"
-              hint="On escalating requests, the strong call was already running."
-            />
-            <Readout
-              label="Verdict"
-              value={status.speculation.worthwhile ? "worth it" : "not yet"}
-              size="sm"
-              state={status.speculation.worthwhile ? "healthy" : "idle"}
+          <div className="mt-4 max-w-xl">
+            <Meter
+              value={Math.min(1, status.speculation.escalationRate)}
+              state={status.speculation.worthwhile ? "healthy" : "degraded"}
+              label={`Escalation rate against the ${Math.round(
+                status.speculation.breakEven * 100
+              )}% break-even`}
+              height={8}
             />
           </div>
 
-          <p className="text-xs text-slate-500">{status.speculation.summary}</p>
-          <p className="text-xs text-slate-600">
+          <div className="mt-5">
+            <Stats>
+              <Stat
+                label="Extra spend"
+                value={`$${status.speculation.extraSpendUsd.toFixed(5)}`}
+                tone="warn"
+                hint="Paying for the strong model on requests that never needed it."
+              />
+              <Stat
+                label="Latency saved"
+                value={Math.round(status.speculation.latencySavedMs)}
+                unit="ms"
+                tone="ok"
+                hint="On escalating requests, the strong call was already running."
+              />
+              <Stat
+                label="Verdict"
+                value={status.speculation.worthwhile ? "worth it" : "not yet"}
+                tone={status.speculation.worthwhile ? "ok" : undefined}
+              />
+            </Stats>
+          </div>
+
+          <p className="mt-4 max-w-2xl text-xs leading-relaxed text-slate-500">
+            {status.speculation.summary}
+          </p>
+          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-600">
             Whether a millisecond is worth a cent is a product decision, not an arithmetic one. Both
             numbers are shown rather than collapsed into a single score, because there is no
             universal exchange rate between latency and money.
           </p>
-        </Plane>
+        </section>
       )}
 
       {/* ---- calibration curve ---- */}
       {(status?.calibration?.observations ?? 0) > 0 && (
-        <section className="space-y-3">
-          <Micro>Calibration · raw judge score → measured probability the cheap answer sufficed</Micro>
-          <CalibrationCurve
-            curve={status!.calibration.curve}
-            threshold={status!.threshold}
-            calibrated={status!.calibration.calibrated}
-          />
+        <section className="mt-10">
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Calibration</h2>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+            Raw judge score against the measured probability that the cheap answer actually sufficed.
+          </p>
+          <div className="mt-4">
+            <CalibrationCurve
+              curve={status!.calibration.curve}
+              threshold={status!.threshold}
+              calibrated={status!.calibration.calibrated}
+            />
+          </div>
         </section>
       )}
 
       {/* ---- decision tape ---- */}
-      <section className="space-y-3">
-        <Micro>Decisions · newest first</Micro>
-        {rows === null ? (
-          <SkeletonRows rows={4} />
-        ) : rows.length === 0 ? (
-          <Plane className="p-8 text-center text-sm text-slate-500">
-            No decisions yet. Send a request through the gateway with the cascade on and each one
-            appears here with the judge's reasoning.
-          </Plane>
-        ) : (
-          <Plane className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-xs">
-              <thead>
-                <tr className="border-b border-edge/60 text-left">
-                  {["Confidence", "Outcome", "Why", "Model", "Cost", "Latency"].map((h) => (
-                    <th key={h} className="px-3 py-2">
-                      <span className="micro">{h}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-edge/30 last:border-0">
-                    <td className="px-3 py-2">
-                      <ConfidenceBar value={r.confidence} threshold={r.threshold} />
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2">
-                      {r.escalated ? (
-                        <span className="text-amber-400">escalated</span>
-                      ) : r.audit ? (
-                        <span className="text-slate-400">accepted · audited</span>
-                      ) : (
-                        <span className="text-emerald-400">accepted</span>
-                      )}
-                      {r.agreedWithStrong === true && r.escalated && (
-                        <span className="ml-1.5 text-[10px] text-slate-600">(agreed — wasted)</span>
-                      )}
-                      {r.agreedWithStrong === false && !r.escalated && (
-                        <span className="ml-1.5 text-[10px] text-rose-400">(missed)</span>
-                      )}
-                    </td>
-                    <td className="max-w-xs truncate px-3 py-2 text-slate-500" title={r.concerns ?? ""}>
-                      {r.concerns ?? "no concerns"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-slate-400">
-                      {r.escalated ? r.strongModel : r.cheapModel}
-                    </td>
-                    <td className="readout px-3 py-2 text-slate-500">${(r.cost ?? 0).toFixed(5)}</td>
-                    <td className="readout px-3 py-2 text-slate-500">{r.totalLatencyMs}ms</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Plane>
-        )}
+      <section className="mt-10">
+        <h2 className="flex items-baseline gap-2 text-[13px] font-semibold tracking-tight text-slate-200">
+          Decisions
+          {rows && <span className="readout text-[11px] font-normal text-slate-600">{rows.length}</span>}
+          <span className="text-[11px] font-normal text-slate-600">newest first</span>
+        </h2>
+        <div className="mt-3">
+          {rows === null ? (
+            <RowSkeleton rows={4} />
+          ) : rows.length === 0 ? (
+            <Empty
+              title="No decisions yet"
+              hint="Send a request through the gateway with the cascade on and each one appears here with the judge's reasoning."
+            />
+          ) : (
+            <Rail>
+              {rows.map((r) => {
+                const wasted = r.agreedWithStrong === true && r.escalated;
+                const missed = r.agreedWithStrong === false && !r.escalated;
+                return (
+                  <Row
+                    key={r.id}
+                    title={r.concerns ?? "no concerns"}
+                    subtitle={`${r.escalated ? r.strongModel : r.cheapModel} · $${(r.cost ?? 0).toFixed(5)} · ${r.totalLatencyMs}ms`}
+                    status={
+                      <Dot
+                        tone={missed ? "bad" : r.escalated ? "warn" : "ok"}
+                        label={
+                          missed
+                            ? "accepted — should not have been"
+                            : wasted
+                              ? "escalated — agreed anyway"
+                              : r.escalated
+                                ? "escalated"
+                                : r.audit
+                                  ? "accepted · audited"
+                                  : "accepted"
+                        }
+                      />
+                    }
+                    trailing={<ConfidenceBar value={r.confidence} threshold={r.threshold} />}
+                  />
+                );
+              })}
+            </Rail>
+          )}
+        </div>
       </section>
     </div>
   );
@@ -412,8 +509,11 @@ function Ladder({ status, accepted }: { status: Status | null; accepted: number 
   const pctAccepted = total === 0 ? 0 : (accepted / total) * 100;
 
   return (
-    <Plane className="p-5">
-      <div className="flex h-9 w-full min-w-0 overflow-hidden rounded border border-edge/70">
+    <div>
+      <div
+        className="flex h-9 w-full min-w-0 overflow-hidden rounded-md"
+        style={{ boxShadow: "inset 0 0 0 1px rgb(var(--edge))" }}
+      >
         {total === 0 ? (
           <div className="flex flex-1 items-center justify-center text-xs text-slate-600">
             no traffic yet
@@ -446,31 +546,40 @@ function Ladder({ status, accepted }: { status: Status | null; accepted: number 
           <span className="h-2 w-2 rounded-sm bg-amber-500/60" />
           escalated to {status?.strongTier?.model ?? "the strong tier"}
         </span>
-        <span className="ml-auto readout">
+        <span className="readout ml-auto">
           {total} request{total === 1 ? "" : "s"}
         </span>
       </div>
-    </Plane>
+    </div>
   );
 }
 
-function TierPlane({ tier, role, note }: { tier: Tier | null; role: string; note: string }) {
+function TierRow({ tier, role, note }: { tier: Tier | null; role: string; note: string }) {
   return (
-    <Plane className="p-4">
-      <Micro>{role}</Micro>
-      {tier ? (
-        <>
-          <div className="mt-1.5 text-sm font-medium text-slate-200">{tier.model}</div>
-          <div className="mt-0.5 text-xs text-slate-500">
+    <Row
+      mark={<KindMark kind="classification" size={28} />}
+      title={tier?.model ?? "—"}
+      subtitle={note}
+      status={<span className="micro">{role}</span>}
+      trailing={
+        tier ? (
+          <span className="text-right">
+            <span className="readout block text-[12.5px] text-slate-300">
+              ${tier.costPer1k.toFixed(5)}
+            </span>
+            <span className="text-[10.5px] text-slate-600">per 1k in</span>
+          </span>
+        ) : undefined
+      }
+      meta={
+        tier ? (
+          <span className="text-[11.5px] text-slate-600">
             {tier.provider}
-            {tier.label ? ` · ${tier.label}` : ""} · ${tier.costPer1k.toFixed(5)}/1k in
-          </div>
-        </>
-      ) : (
-        <div className="mt-1.5 text-sm text-slate-600">—</div>
-      )}
-      <p className="mt-2 text-xs text-slate-600">{note}</p>
-    </Plane>
+            {tier.label ? ` · ${tier.label}` : ""}
+          </span>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -491,7 +600,7 @@ function CalibrationCurve({
   calibrated: boolean;
 }) {
   return (
-    <Plane className="p-5">
+    <div className="max-w-3xl">
       <div className="flex h-32 items-end gap-1">
         {curve.map((p) => {
           const h = p.calibrated == null ? 0 : Math.max(2, p.calibrated * 100);
@@ -523,7 +632,7 @@ function CalibrationCurve({
           ? "Bars show how often a cheap answer at that judge score actually matched the strong model. Amber bars fall below your threshold and would escalate."
           : "Not enough labelled outcomes yet — the raw judge score is being used unchanged. Hollow bars are bins with too few samples to trust."}
       </p>
-    </Plane>
+    </div>
   );
 }
 

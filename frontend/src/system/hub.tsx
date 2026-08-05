@@ -286,6 +286,7 @@ export function Row({
   subtitle,
   meta,
   status,
+  trailing,
   actions,
   onClick,
   selected = false,
@@ -294,7 +295,12 @@ export function Row({
   title: ReactNode;
   subtitle?: ReactNode;
   meta?: ReactNode;
+  /** Sits beside the title. For a word about the row: a state, a verdict. */
   status?: ReactNode;
+  /** Sits hard right and always visible. For a measurement: a bar, a count.
+      Numbers compare down a column, so they belong on a shared right edge —
+      inline after the title they start at a different x on every row. */
+  trailing?: ReactNode;
   actions?: ReactNode;
   onClick?: () => void;
   selected?: boolean;
@@ -336,6 +342,7 @@ export function Row({
         )}
         {meta && <div className="mt-1.5">{meta}</div>}
       </div>
+      {trailing && <div className="flex shrink-0 items-center gap-2.5">{trailing}</div>}
       {actions && (
         <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
           {actions}
