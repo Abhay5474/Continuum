@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { portal } from "../api";
-import { Micro } from "../system/primitives";
+import { Micro, Switch } from "../system/primitives";
 import { BarChart, BeforeAfter, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
 import {
   Bar,
   Code,
+  Dot,
   Empty,
   Facts,
   Ghost,
@@ -118,6 +119,14 @@ const SAMPLES: Record<string, { name: string; body: string }> = {
 
 type Tab = "llm" | "structure" | "provenance" | "raw";
 
+/** Which request paths hand a transformed context to a model. */
+type Reach = {
+  gatewayEnabled: boolean;
+  pipelineAlwaysOn: boolean;
+  minChars: number;
+  minLines: number;
+};
+
 /** {@code SEMANTIC_TABLE} and {@code timelineEvents} are field names, not prose. */
 function words(raw: string) {
   return String(raw ?? "")
@@ -137,16 +146,19 @@ export default function ContextTransformers() {
   const [pasted, setPasted] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [tab, setTab] = useState<Tab>("llm");
+  const [reach, setReach] = useState<Reach | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [caps, rows] = await Promise.all([
+      const [caps, rows, st] = await Promise.all([
         portal.context.capabilities(),
         portal.context.recent(15),
+        portal.context.status(),
       ]);
       setCapabilities(caps);
       setHistory(rows);
+      setReach(st);
       setError(null);
     } catch (e: any) {
       setError(e?.message ?? "Could not load the context layer.");
@@ -216,7 +228,17 @@ export default function ContextTransformers() {
             selected
           />
           <Hop label="canonical" />
-          <Stage label="the prompt" sub="the same bytes, forever the same text" />
+          {/* This stage used to read "the prompt" unconditionally, which was
+              only ever true for pipelines. It now says which paths are live. */}
+          <Stage
+            label="the prompt"
+            sub={
+              reach?.gatewayEnabled
+                ? "pipelines and chat completions"
+                : "pipelines only — chat is off"
+            }
+            state={reach ? (reach.gatewayEnabled ? "on" : "off") : "plain"}
+          />
         </Route>
         <p className="mt-3 max-w-2xl text-[12.5px] leading-relaxed text-slate-500">
           A <span className="text-slate-300">Specialist</span> calls somebody else's model with your
@@ -225,6 +247,26 @@ export default function ContextTransformers() {
           in a cached, replayed, audited prompt.
         </p>
       </div>
+
+      <Reaches
+        reach={reach}
+        busy={busy}
+        onToggle={async (next) => {
+          setBusy(true);
+          try {
+            setReach(await portal.context.setGateway(next));
+            toast(
+              next
+                ? "Chat completions will now be given the canonical form."
+                : "Chat completions go to the provider verbatim again."
+            );
+          } catch (e: any) {
+            toast(e?.message ?? "Could not change that setting.", "error");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
 
       {capabilities.length > 0 && (
         <section className="mt-8">
@@ -422,6 +464,76 @@ export default function ContextTransformers() {
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * Which request paths actually hand the canonical form to a model.
+ *
+ * <p>The page did not say. It drew one arrow into "the prompt" and left you to
+ * assume that covered everything you send, when in fact it covered the pipeline
+ * endpoint and not {@code /v1/chat/completions} — the one most callers use. A
+ * feature that works on one of two paths and shows one path is not a UI detail;
+ * it is the page making a claim the system does not honour.
+ *
+ * <p>Two rows, because the two paths genuinely differ and collapsing them into
+ * a single switch would imply turning it off stops transformation everywhere.
+ * It does not: a pipeline is configured, watched and traced, so it transforms
+ * unconditionally and always has.
+ */
+function Reaches({
+  reach,
+  busy,
+  onToggle,
+}: {
+  reach: Reach | null;
+  busy: boolean;
+  onToggle: (next: boolean) => void;
+}) {
+  return (
+    <section className="mt-8">
+      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+        Where this reaches a model
+      </h2>
+      <div className="mt-3">
+        <Rail>
+          <Row
+            mark={<KindMark kind="detection" size={28} />}
+            title="Pipelines"
+            subtitle="A recognised payload is transformed before the model sees it, and the exact prose appears in the run's trace."
+            status={<Dot tone="ok" label="always on" />}
+          />
+          <Row
+            mark={<KindMark kind="conversation" size={28} />}
+            title="Chat completions"
+            subtitle="Data pasted into a user message is transformed on its way out. Prose is never restructured."
+            meta={
+              reach ? (
+                <Facts
+                  items={[
+                    { k: "reads", v: "a whole message, or a fenced block" },
+                    {
+                      k: "floor",
+                      v: `${reach.minChars} characters · ${reach.minLines} lines`,
+                      title:
+                        "Below this the saving is not worth having, and a short message is the one a coincidence could ruin.",
+                    },
+                  ]}
+                />
+              ) : undefined
+            }
+            trailing={
+              <Switch
+                label="Transform data in chat messages"
+                checked={!!reach?.gatewayEnabled}
+                busy={busy || reach === null}
+                onChange={onToggle}
+              />
+            }
+          />
+        </Rail>
+      </div>
+    </section>
   );
 }
 

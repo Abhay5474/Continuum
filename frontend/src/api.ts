@@ -578,6 +578,19 @@ export const portal = {
     capabilities: () =>
       portalHttp<any[]>("/api/portal/developer/context/capabilities", "GET"),
 
+    /**
+     * Which request paths actually hand a transformed context to a model.
+     *
+     * <p>Pipelines always have. The chat endpoint does so only when switched
+     * on, and this page used to draw one arrow to "the prompt" regardless.
+     */
+    status: () => portalHttp<any>("/api/portal/developer/context/status", "GET"),
+    setGateway: (on: boolean) =>
+      portalHttp<any>(
+        `/api/portal/developer/context/gateway/${on ? "enable" : "disable"}`,
+        "POST"
+      ),
+
     /** Transforms an uploaded file. The server detects what it is from bytes. */
     transformFile: (file: File, budget = "standard") => {
       const form = new FormData();

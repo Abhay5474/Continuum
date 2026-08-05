@@ -55,6 +55,20 @@ public class DeveloperAuthEntity {
     @Column(name = "v8_firewall_enabled", nullable = false)
     private boolean v8FirewallEnabled = false;
 
+    /**
+     * Context transformation inside gateway messages. OFF by default: while
+     * false, a spreadsheet or log pasted into a chat message is forwarded to the
+     * provider exactly as the caller wrote it.
+     *
+     * <p>Separate from the pipeline path, which transforms unconditionally. A
+     * pipeline is a thing the developer configured and can watch run; a chat
+     * completion is an API call whose prompt they built themselves, and
+     * rewriting it without being asked would change an answer they are already
+     * depending on.
+     */
+    @Column(name = "context_transform_enabled", nullable = false)
+    private boolean contextTransformEnabled = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -79,6 +93,8 @@ public class DeveloperAuthEntity {
     public void setV7MmuEnabled(boolean v) { this.v7MmuEnabled = v; }
     public boolean isV8CompressionEnabled() { return v8CompressionEnabled; }
     public void setV8CompressionEnabled(boolean v) { this.v8CompressionEnabled = v; }
+    public boolean isContextTransformEnabled() { return contextTransformEnabled; }
+    public void setContextTransformEnabled(boolean v) { this.contextTransformEnabled = v; }
     public boolean isV8FirewallEnabled() { return v8FirewallEnabled; }
     public void setV8FirewallEnabled(boolean v) { this.v8FirewallEnabled = v; }
     public Instant getCreatedAt() { return createdAt; }

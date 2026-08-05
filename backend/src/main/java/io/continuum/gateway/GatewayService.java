@@ -77,6 +77,10 @@ public class GatewayService {
     // V8 prompt compression + firewall (additive; pass-through unless opted in).
     private final io.continuum.compression.PromptCompressionService compression;
     private final io.continuum.firewall.PromptFirewallService firewall;
+    // The context layer on the chat path (opt-in, OFF by default). Pipelines
+    // have always transformed a recognised payload; this is the same thing for
+    // /v1/chat/completions, which is the endpoint most callers use.
+    private final io.continuum.context.PromptContextService promptContext;
     // Billing quota enforcement (default FREE plan is generous ⇒ unchanged behaviour).
     private final io.continuum.billing.BillingService billing;
     // Semantic cache (opt-in, OFF by default): serves a previous answer when the
@@ -123,6 +127,7 @@ public class GatewayService {
                           io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit,
                           io.continuum.compression.PromptCompressionService compression,
                           io.continuum.firewall.PromptFirewallService firewall,
+                          io.continuum.context.PromptContextService promptContext,
                           io.continuum.billing.BillingService billing,
                           io.continuum.cache.SemanticCacheService semanticCache,
                           io.continuum.routing.RoutingStrategyService routingStrategy,
@@ -157,6 +162,7 @@ public class GatewayService {
         this.contextualBandit = contextualBandit;
         this.compression = compression;
         this.firewall = firewall;
+        this.promptContext = promptContext;
         this.billing = billing;
         this.semanticCache = semanticCache;
         this.routingStrategy = routingStrategy;
@@ -241,6 +247,19 @@ public class GatewayService {
         // prompt-injection BEFORE anything else touches the prompt. Pass-through
         // when off. A blocked request throws (mapped to a clean 4xx upstream).
         canonical = firewall.guardInbound(developerId, canonical);
+
+        // The context layer (opt-in, OFF by default): a spreadsheet, log or
+        // email thread pasted into a message becomes its canonical form before
+        // the model sees it — the same transformation pipelines have always
+        // done, on the endpoint most callers actually use. Pass-through when
+        // off and when nothing is recognised.
+        //
+        // After the firewall, so the transformer never sees unredacted PII and
+        // the security control stays first. Before the cache, so two callers
+        // who paste the same table worded differently share a cache entry —
+        // the key is taken from the text below, which is now the canonical
+        // form rather than whatever formatting each of them happened to use.
+        canonical = promptContext.maybeTransform(developerId, canonical);
 
         // Semantic cache (opt-in, OFF by default): if this question has already
         // been answered, return that answer instead of paying a provider for it

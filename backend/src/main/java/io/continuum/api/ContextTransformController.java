@@ -1,11 +1,13 @@
 package io.continuum.api;
 
 import io.continuum.context.ContextTransformService;
+import io.continuum.context.PromptContextService;
 import io.continuum.context.RenderBudget;
 import io.continuum.portal.PortalAuthFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -29,13 +31,35 @@ import java.util.Map;
 public class ContextTransformController {
 
     private final ContextTransformService service;
+    private final PromptContextService promptContext;
 
-    public ContextTransformController(ContextTransformService service) {
+    public ContextTransformController(ContextTransformService service,
+                                      PromptContextService promptContext) {
         this.service = service;
+        this.promptContext = promptContext;
     }
 
     private String dev(HttpServletRequest req) {
         return (String) req.getAttribute(PortalAuthFilter.DEVELOPER_ID_ATTRIBUTE);
+    }
+
+    /**
+     * Whether transformed context actually reaches a model, and on which path.
+     *
+     * <p>The console needs this to stop over-claiming. Pipelines have always
+     * transformed; the chat endpoint does so only when this is switched on, and
+     * a page that drew one arrow to "the prompt" was describing half the system.
+     */
+    @GetMapping("/status")
+    public Map<String, Object> status(HttpServletRequest req) {
+        return promptContext.status(dev(req));
+    }
+
+    /** Turns transformation on or off for {@code /v1/chat/completions}. */
+    @PostMapping("/gateway/{action}")
+    public Map<String, Object> setGateway(HttpServletRequest req, @PathVariable String action) {
+        promptContext.setEnabled(dev(req), "enable".equalsIgnoreCase(action));
+        return promptContext.status(dev(req));
     }
 
     /** What transformations exist, so the console does not hard-code them. */

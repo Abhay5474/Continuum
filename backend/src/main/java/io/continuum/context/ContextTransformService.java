@@ -143,10 +143,26 @@ public class ContextTransformService {
     public Result transformAndRecord(String developerId, byte[] input, String filename,
                                      RenderBudget budget) {
         Result r = transform(input, filename, budget);
+        record(developerId, r, filename, input == null ? 0 : input.length);
+        return r;
+    }
+
+    /**
+     * Writes one history row.
+     *
+     * <p>Separate from {@link #transformAndRecord} because the two callers want
+     * different things recorded. Someone who uploaded a file on the console
+     * asked a question, and "nothing recognised this" is the answer — worth a
+     * row. The gateway asks about every user message that goes past, and
+     * recording the ones it had no opinion about would write a row per request
+     * and bury the real transforms in them.
+     */
+    @Transactional
+    public void record(String developerId, Result r, String sourceName, int inputBytes) {
         try {
             ContextTransformEntity e = new ContextTransformEntity(developerId,
                     r.context() == null ? ContextType.PASSTHROUGH.name() : r.context().type().name(),
-                    r.transformer(), filename, input == null ? 0 : input.length,
+                    r.transformer(), sourceName, inputBytes,
                     r.stats().before(), r.stats().after(),
                     r.context() == null ? 0 : r.context().ambiguities().size(),
                     summarise(r));
@@ -155,7 +171,6 @@ public class ContextTransformService {
             // Observability is not worth failing a transformation over.
             log.debug("Could not record a context transform: {}", e.getMessage());
         }
-        return r;
     }
 
     @Transactional(readOnly = true)
