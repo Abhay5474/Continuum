@@ -95,7 +95,7 @@ export default function AcceptInvite() {
             <button
               onClick={accept}
               disabled={busy || password.length < 6}
-              className="mt-5 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              className="mt-5 w-full rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {busy ? "Joining…" : "Accept invite"}
             </button>

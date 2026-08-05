@@ -84,11 +84,11 @@ export default function DagCommandCenter() {
   if (workflowId) return <Constellation workflowId={workflowId} />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight">Verification</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Claims solved in parallel · verified independently · resolved by Bayesian aggregation
           </p>
         </div>
@@ -96,15 +96,15 @@ export default function DagCommandCenter() {
       </header>
 
       {runs.length === 0 ? (
-        <Plane className="p-8 text-center">
-          <Micro>No verification runs</Micro>
+        <div className="text-center">
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">No verification runs</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
 Turn it on above, then send a gateway request.
           </p>
-        </Plane>
+        </div>
       ) : (
         <section>
-          <Micro>Runs · newest first</Micro>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Runs · newest first</h2>
           <div className="mt-2 divide-y divide-edge/50">
             {runs.map((r) => {
               const conf = r.finalConfidence ?? 0;
@@ -375,7 +375,7 @@ function Constellation({ workflowId }: { workflowId: string }) {
 
             {run?.verdict && (
               <div className="mt-4">
-                <Micro>Synthesised answer</Micro>
+                <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Synthesised answer</h2>
                 <Plane inset className="mt-2 p-4">
                   <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-300">{run.verdict}</p>
                 </Plane>
@@ -409,14 +409,14 @@ function Constellation({ workflowId }: { workflowId: string }) {
                 {selected.outputJson && <Output json={selected.outputJson} />}
               </div>
             ) : (
-              <Plane className="p-4 text-[11px] leading-relaxed text-slate-500">
+              <div className="text-[11px] leading-relaxed text-slate-500">
                 Select a node to read the evidence it produced.
-              </Plane>
+              </div>
             )}
 
             {risks.length > 0 && (
               <div>
-                <Micro>Risk flags</Micro>
+                <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Risk flags</h2>
                 <div className="mt-2 space-y-1">
                   {risks.map((r, i) => (
                     <div key={i} className="flex items-start gap-2 text-[11px] text-slate-400">
@@ -447,7 +447,7 @@ function Output({ json }: { json: string }) {
   if (!parsed || typeof parsed !== "object") return null;
   return (
     <div>
-      <Micro>Output</Micro>
+      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Output</h2>
       <Plane inset className="mt-1.5 max-h-[420px] overflow-y-auto p-3">
         <DataView value={parsed} />
       </Plane>

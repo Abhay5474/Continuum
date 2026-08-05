@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
-import { Micro, Readout, Plane, StateDot } from "../system/primitives";
+import { Readout, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
 
@@ -70,7 +70,7 @@ export default function ReplayVerify() {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Replay Audit</h1>
         <p className="mt-0.5 max-w-2xl text-sm text-slate-500">
@@ -90,7 +90,7 @@ export default function ReplayVerify() {
         <button
           onClick={() => run(workflowId)}
           disabled={busy || !workflowId}
-          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="rounded bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {busy ? "Verifying…" : "Verify replay"}
         </button>
@@ -98,7 +98,7 @@ export default function ReplayVerify() {
 
       {runs.length > 0 && !report && (
         <div>
-          <Micro>Recent runs</Micro>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Recent runs</h2>
           <div className="mt-1 divide-y divide-edge/40">
             {runs.map((r: any) => (
               <button
@@ -172,7 +172,7 @@ export default function ReplayVerify() {
           {det?.applicable && det.checks?.length > 0 && (
             <section>
               <div className="flex items-baseline justify-between">
-                <Micro>Decision replay · {det.checked} steps</Micro>
+                <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Decision replay · {det.checked} steps</h2>
                 <span className="text-[10px] text-slate-600">
                   {divergences.length === 0 ? "every step resolves identically" : `${divergences.length} differ`}
                 </span>
@@ -202,7 +202,7 @@ export default function ReplayVerify() {
 
           {report.items?.length > 0 && (
             <section>
-              <Micro>Model outputs · {report.items.length} re-scored</Micro>
+              <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Model outputs · {report.items.length} re-scored</h2>
               <div className="mt-1 divide-y divide-edge/40">
                 {report.items.map((it: any) => (
                   <div key={it.commandSeq} className="py-2.5 text-[11px]">
@@ -223,10 +223,10 @@ export default function ReplayVerify() {
           )}
 
           {report.verdict === "NOTHING_TO_VERIFY" && (
-            <Plane className="p-6 text-center text-xs text-slate-500">
+            <div className="text-center text-xs text-slate-500">
               Publish a workflow definition and run it — its steps are recorded, which is what makes
               them verifiable.
-            </Plane>
+            </div>
           )}
         </>
       )}

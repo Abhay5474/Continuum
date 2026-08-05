@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ChartFrame, Histogram } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
@@ -82,7 +82,7 @@ export default function Uncertainty() {
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Answer Confidence"
         subtitle="Asks the same question several times and measures whether the model agrees with itself. Disagreement about meaning — not wording — is what a hallucination looks like from the outside."
@@ -90,7 +90,7 @@ export default function Uncertainty() {
 
       {/* ---- mode ---- */}
       <section className="space-y-3">
-        <Micro>When to measure</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">When to measure</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {MODES.map(([value, name, note]) => {
             const active = status?.mode === value;
@@ -109,7 +109,7 @@ export default function Uncertainty() {
                   />
                   <span className="text-sm font-medium text-slate-200">{name}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">{note}</p>
+                <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">{note}</p>
               </button>
             );
           })}
@@ -141,7 +141,7 @@ export default function Uncertainty() {
       {/* ---- distribution ---- */}
       {(status?.measured ?? 0) > 0 && (
         <section className="space-y-3">
-          <Plane className="p-5">
+          <div>
             {/* Ordered bins, so the x-axis carries meaning and a magnitude ramp
                 is correct here — unlike nominal categories, where a ramp would
                 re-encode bar height as colour. */}
@@ -165,21 +165,21 @@ export default function Uncertainty() {
                 }))}
               />
             </ChartFrame>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-3 text-xs text-slate-500 max-w-2xl leading-relaxed">
               Bands at or below{" "}
               <span className="readout text-amber-400">
                 {status!.lowConfidence.toFixed(2)}
               </span>{" "}
               are flagged as low confidence in the response your application receives.
             </p>
-          </Plane>
+          </div>
         </section>
       )}
 
       {/* ---- adaptive stopping ---- */}
       <section className="space-y-3">
-        <Micro>Adaptive consensus</Micro>
-        <Plane className="space-y-3 p-5">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Adaptive consensus</h2>
+        <div className="space-y-3">
           <Switch
             checked={!!status?.adaptiveEnabled}
             busy={busy}
@@ -214,27 +214,27 @@ export default function Uncertainty() {
             </select>
           </label>
 
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
             A Beta posterior over the leading answer's share, stopped when P(the leader is not the
             true majority) falls below the threshold — Adaptive-Consistency (Aggarwal et al., EMNLP
             2023), which is Wald's sequential test applied to sampling. Three identical answers
             gives 6.3%, still above a 5% bar; four gives 3.1% and stops. It never stops below two
             samples and never exceeds the configured budget, so this can only ever cost less.
           </p>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
             It cannot shorten a genuinely contested question, and should not — disagreement is
             exactly what the extra samples are for. The saving comes from the easy majority of
             traffic.
           </p>
-        </Plane>
+        </div>
       </section>
 
       {/* ---- settings ---- */}
       <section className="space-y-3">
-        <Micro>Sampling</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Sampling</h2>
         {/* items-start, not items-end: a note under one control used to push
             that control's label down and leave the row misaligned. */}
-        <Plane className="flex flex-wrap items-start gap-6 p-5">
+        <div className="flex flex-wrap items-start gap-6">
           <label>
             <span className="micro">Samples</span>
             <select
@@ -296,23 +296,23 @@ export default function Uncertainty() {
           >
             Clear history
           </button>
-          <p className="w-full text-xs text-slate-600">
+          <p className="w-full text-xs text-slate-600 max-w-2xl leading-relaxed">
             Temperature cannot be set to zero: every sample would be identical and the measurement
             would report certainty about everything.
           </p>
-        </Plane>
+        </div>
       </section>
 
       {/* ---- the disagreement itself ---- */}
       <section className="space-y-3">
-        <Micro>Measurements · click one to see what the samples actually said</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Measurements · click one to see what the samples actually said</h2>
         {rows === null ? (
           <SkeletonRows rows={4} />
         ) : rows.length === 0 ? (
-          <Plane className="p-8 text-center text-sm text-slate-500">
+          <div className="text-center text-sm text-slate-500">
             Nothing measured yet. Set a mode above, then send a request through the gateway — or add{" "}
             <code className="text-slate-400">"measureUncertainty": true</code> to a single call.
-          </Plane>
+          </div>
         ) : (
           <div className="space-y-2">
             {rows.map((r) => (
@@ -354,7 +354,7 @@ function Measurement({
   const breakdown: any[] = row.breakdown ?? [];
 
   return (
-    <Plane className="overflow-hidden">
+    <div className="overflow-hidden">
       <button
         onClick={onToggle}
         aria-expanded={open}
@@ -379,7 +379,7 @@ function Measurement({
       {open && (
         <div className="border-t border-edge/60 px-4 py-3">
           {breakdown.length === 0 ? (
-            <p className="text-xs text-slate-500">No breakdown stored for this measurement.</p>
+            <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">No breakdown stored for this measurement.</p>
           ) : (
             <div className="space-y-2">
               {breakdown.map((c, i) => (
@@ -395,12 +395,12 @@ function Measurement({
                       />
                     </div>
                   </div>
-                  <p className="min-w-0 flex-1 text-xs leading-relaxed text-slate-400">
+                  <p className="min-w-0 flex-1 text-xs leading-relaxed text-slate-400 max-w-2xl">
                     {c.representative}
                   </p>
                 </div>
               ))}
-              <p className="border-t border-edge/40 pt-2 text-xs text-slate-600">
+              <p className="border-t border-edge/40 pt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
                 {row.clusters === 1
                   ? "Every sample said the same thing. That is what a confident answer looks like."
                   : `The model gave ${row.clusters} incompatible answers to one question. Entropy ${row.entropy.toFixed(2)} nats.`}
@@ -410,7 +410,7 @@ function Measurement({
           )}
         </div>
       )}
-    </Plane>
+    </div>
   );
 }
 

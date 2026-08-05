@@ -27,10 +27,10 @@ export default function Memory() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-lg font-semibold tracking-tight text-slate-100">Memory</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
+        <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
           Hierarchical memory (working → episodic → long-term → archived) stored outside the context
           window. Retrieval ranks by relevance, recency and salience; compression summarizes cold memories.
         </p>
@@ -70,7 +70,7 @@ export default function Memory() {
                 <option key={t}>{t}</option>
               ))}
             </select>
-            <button onClick={store} className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white">
+            <button onClick={store} className="rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
               Store
             </button>
           </div>
@@ -85,7 +85,7 @@ export default function Memory() {
               placeholder="query…"
               className="flex-1 rounded-md border border-edge bg-ink px-3 py-1.5 text-sm"
             />
-            <button onClick={retrieve} className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white">
+            <button onClick={retrieve} className="rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
               Retrieve
             </button>
           </div>

@@ -116,7 +116,7 @@ export default function Scheduling() {
   const missed = providers.reduce((n, p) => n + p.missedDeadline, 0);
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-8">
       <PageHeader
         title="Priority & Deadlines"
         subtitle="Admission control answers whether there is room. This answers who gets it."
@@ -150,7 +150,7 @@ export default function Scheduling() {
         />
       </div>
 
-      <Plane className="space-y-3 p-4">
+      <div className="space-y-3">
         <Switch
           checked={!!status?.enabled}
           busy={busy}
@@ -163,7 +163,7 @@ export default function Scheduling() {
           label="Priority and deadline scheduling"
           hint="Off by default. While it is off a free slot goes to whichever waiting request happened to poll at the right moment."
         />
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           Ordering only applies while requests are actually waiting for capacity, so it does nothing
           until admission control is on and a provider is near its inferred limit. Set{" "}
           <span className="readout">criticality</span> to choose a band and{" "}
@@ -172,17 +172,17 @@ export default function Scheduling() {
           <span className="readout">422</span> rather than running: spending a slot on a result
           nobody can use also delays the requests that could still make theirs.
         </p>
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           Waiting is aged into the band — every{" "}
           <span className="readout">{status?.agingStepSeconds ?? 120}s</span> queued lifts a task one
           band, up to two. Without that, &ldquo;low priority&rdquo; quietly means &ldquo;never&rdquo;
           under sustained load.
         </p>
-      </Plane>
+      </div>
 
-      <Plane className="space-y-3 p-4">
-        <Micro>Order a queue without running it</Micro>
-        <p className="text-xs text-slate-600">
+      <div className="space-y-3">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Order a queue without running it</h2>
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           Nothing is executed. The same ordering the scheduler uses is applied to the tasks below,
           so the rules can be checked before they are trusted with real traffic.
         </p>
@@ -265,16 +265,16 @@ export default function Scheduling() {
             ))}
           </ol>
         )}
-      </Plane>
+      </div>
 
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : providers.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
+        <div className="text-center text-sm text-slate-500">
           Nothing has queued yet. A request only enters the queue when a provider is at its inferred
           limit, and the wait is bounded at a quarter second — so this stays empty until you are
           genuinely near capacity.
-        </Plane>
+        </div>
       ) : (
         <div className="space-y-2">
           {providers.map((p) => (
@@ -288,7 +288,7 @@ export default function Scheduling() {
                 )}
               </div>
               {p.queue.length === 0 ? (
-                <p className="text-xs text-slate-500">Nothing waiting right now.</p>
+                <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">Nothing waiting right now.</p>
               ) : (
                 <ol className="space-y-1">
                   {p.queue.map((d) => (
@@ -307,16 +307,16 @@ export default function Scheduling() {
         </div>
       )}
 
-      <Plane className="p-4">
-        <Micro>What this does not do</Micro>
-        <p className="mt-1.5 text-xs text-slate-600">
+      <div>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What this does not do</h2>
+        <p className="mt-1.5 text-xs text-slate-600 max-w-2xl leading-relaxed">
           Each instance orders its own waiters. Across several instances there is no global order,
           and there deliberately is not one: a shared queue would need a round trip to reach, and at
           a quarter-second wait that trip costs more than the ordering saves. Nothing is persisted
           either — a waiter exists only while its request is blocked, so a restart has no queue to
           lose.
         </p>
-      </Plane>
+      </div>
 
       {providers.length > 0 && (
         <button

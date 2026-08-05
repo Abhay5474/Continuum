@@ -66,7 +66,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <SkeletonCards />
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="min-w-0 rounded-lg border border-edge bg-panel p-4 lg:col-span-2">
@@ -90,7 +90,7 @@ export default function Dashboard() {
           History" and then announcing itself as nothing. */}
       <div>
         <h1 className="text-lg font-semibold tracking-tight text-slate-100">Run History</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
+        <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
           Every durable run, its event log and its replay
         </p>
       </div>
@@ -170,7 +170,7 @@ export default function Dashboard() {
             <button
               onClick={start}
               disabled={busy}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--accent-strong)] px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
             >
               {busy && <Spinner />}
               {busy ? "Starting…" : "Start workflow"}

@@ -202,7 +202,7 @@ function Inspector({ sel, onClose }: { sel: Subsystem; onClose: () => void }) {
         </button>
       </div>
 
-      <p className="text-xs leading-relaxed text-slate-400">{sel.summary}</p>
+      <p className="text-xs leading-relaxed text-slate-400 max-w-2xl">{sel.summary}</p>
 
       {!sel.installed ? (
         <div className="well p-3">
@@ -255,7 +255,7 @@ function CoreInspector({ t, onClose }: { t: Telemetry; onClose: () => void }) {
           Close
         </button>
       </div>
-      <p className="text-xs leading-relaxed text-slate-400">
+      <p className="text-xs leading-relaxed text-slate-400 max-w-2xl">
         The core state is the worst state among installed subsystems. It reflects what your
         traffic would actually experience, not an average.
       </p>

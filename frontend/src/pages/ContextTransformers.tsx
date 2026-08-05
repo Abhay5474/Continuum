@@ -645,7 +645,7 @@ function ResultView({
                   ))}
                 </Rail>
                 {result.provenance.length > 60 && (
-                  <p className="mt-2 text-xs text-slate-600">
+                  <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
                     {result.provenance.length - 60} more sources, in the machine-readable form.
                   </p>
                 )}

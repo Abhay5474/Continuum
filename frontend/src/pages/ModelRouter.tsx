@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { useOperator } from "../system/OperatorAccess";
-import { Micro, Readout, Plane, StateDot, Meter } from "../system/primitives";
+import { Readout, Plane, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
 import { Morph } from "../system/motion";
@@ -124,17 +124,17 @@ export default function ModelRouter() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight">Routing</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Scored per request · non-stationary contextual bandit · tail-latency hedging
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
           <div>
-            <Micro>Router</Micro>
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Router</h2>
             <button
               onClick={() => api.opPost(`/api/routing/enable?enabled=${!routing?.enabled}`).then(refresh)}
               disabled={!operator}
@@ -146,7 +146,7 @@ export default function ModelRouter() {
             </button>
           </div>
           <div>
-            <Micro>Strategy</Micro>
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Strategy</h2>
             <select
               value={routing?.configuredStrategy ?? "HEURISTIC"}
               onChange={(e) => api.opPost(`/api/routing/strategy?strategy=${e.target.value}`).then(refresh)}
@@ -160,7 +160,7 @@ export default function ModelRouter() {
             </select>
           </div>
           <div>
-            <Micro>Objective</Micro>
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Objective</h2>
             <select
               value={routing?.mode ?? "BALANCED"}
               onChange={(e) => api.opPost(`/api/routing/mode?mode=${e.target.value}`).then(refresh)}
@@ -201,11 +201,11 @@ export default function ModelRouter() {
         {tab === "network" && (<>
       {/* ---- the network ---- */}
       <section>
-        <Micro>Dispatch network · edge weight is measured call share</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Dispatch network · edge weight is measured call share</h2>
         {ranked.length === 0 ? (
-          <Plane className="mt-2 p-8 text-center text-sm text-slate-500">
+          <div className="mt-2 text-center text-sm text-slate-500">
             No provider traffic yet. Send a request through the gateway and the network will populate.
-          </Plane>
+          </div>
         ) : (
           <div className="mt-2 grid-field rounded-lg border border-edge/60">
             <Network
@@ -222,7 +222,7 @@ export default function ModelRouter() {
       {/* ---- provider table ---- */}
       {ranked.length > 0 && (
         <section>
-          <Micro>Providers</Micro>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Providers</h2>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -285,7 +285,7 @@ export default function ModelRouter() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ---- bandit beliefs ---- */}
         <section>
-          <Micro>Bandit belief · Beta posterior per context</Micro>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Bandit belief · Beta posterior per context</h2>
           <p className="mt-0.5 text-[10px] text-slate-600">
             {bandit?.nonStationary ? `discounted γ=${bandit.gamma} · tracks drift` : "undiscounted"} ·
             wider interval = less certain · overlap = still exploring
@@ -313,7 +313,7 @@ export default function ModelRouter() {
         {/* ---- hedging ---- */}
         <section>
           <div className="flex items-baseline justify-between gap-2">
-            <Micro>Tail-latency hedging</Micro>
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Tail-latency hedging</h2>
             <button
               onClick={() => api.opPost(`/api/hedging/enable?enabled=${!hedging?.enabled}`).then(refresh)}
               disabled={!operator}
@@ -369,7 +369,7 @@ export default function ModelRouter() {
         {tab === "probe" && (<>
       {/* ---- routing probe ---- */}
       <section>
-        <Micro>Probe · score a prompt without sending it</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Probe · score a prompt without sending it</h2>
         <div className="mt-2 flex flex-wrap gap-2">
           <input
             value={prompt}
@@ -379,7 +379,7 @@ export default function ModelRouter() {
           <button
             onClick={runProbe}
             disabled={probing}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+            className="rounded bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             {probing ? "Scoring…" : "Score"}
           </button>
@@ -395,7 +395,7 @@ export default function ModelRouter() {
               </div>
               {probe.chosenChain?.length > 1 && (
                 <div>
-                  <Micro>Failover chain</Micro>
+                  <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Failover chain</h2>
                   <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-slate-400">
                     {probe.chosenChain.map((c: string, i: number) => (
                       <span key={c} className="flex items-center gap-1">
@@ -408,7 +408,7 @@ export default function ModelRouter() {
               )}
             </div>
             <div>
-              <Micro>Scores</Micro>
+              <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Scores</h2>
               <div className="mt-1 space-y-1">
                 {(probe.scores ?? []).map((s: any) => {
                   const max = Math.max(...(probe.scores ?? []).map((x: any) => x.score ?? 0), 0.0001);
@@ -701,17 +701,17 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Micro>Decision ledger · learned routing against its own baseline</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Decision ledger · learned routing against its own baseline</h2>
         <span className="micro">
           strategy in force: <span className="text-slate-300">{strategy ?? "—"}</span>
         </span>
       </div>
 
       {(comparison?.decisions ?? 0) === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
+        <div className="text-center text-sm text-slate-500">
           No routing decisions recorded yet. Send traffic through the gateway and every choice —
           and the choice it overrode — lands here.
-        </Plane>
+        </div>
       ) : (
         <>
           <div className="flex flex-wrap gap-x-9 gap-y-4">
@@ -746,7 +746,7 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
             </p>
           )}
 
-          <Plane className="overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-xs">
               <thead>
                 <tr className="border-b border-edge/60 text-left">
@@ -776,7 +776,7 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
                 ))}
               </tbody>
             </table>
-          </Plane>
+          </div>
         </>
       )}
     </section>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
-import { Micro, Readout, Plane, StateDot, Meter } from "../system/primitives";
+import { Micro, Readout, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
 
@@ -151,15 +151,15 @@ export default function GodMode() {
 
   if (!loggedIn) {
     return (
-      <Plane className="mx-auto mt-16 max-w-md p-8 text-center">
+      <div className="mx-auto mt-16 max-w-md text-center">
         <Micro>Adaptive Policy</Micro>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-slate-400 max-w-2xl leading-relaxed">
           The autonomous memory and policy engine is scoped to your account.
         </p>
         <Link to="/signin" className="mt-4 inline-block rounded border border-edge px-4 py-2 text-sm hover:border-aurora/50">
           Sign in →
         </Link>
-      </Plane>
+      </div>
     );
   }
 
@@ -169,7 +169,7 @@ export default function GodMode() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight">Adaptive Policy</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Self-managing memory · policy proposals gated by digital-twin replay
           </p>
         </div>
@@ -188,13 +188,13 @@ export default function GodMode() {
       </header>
 
       {!enabled ? (
-        <Plane className="p-8 text-center">
+        <div className="text-center">
           <Micro>Off by default</Micro>
           <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">
             Nothing is retained while off. Enabling records gateway exchanges into your account's
             memory tiers only — wipe at any time.
           </p>
-        </Plane>
+        </div>
       ) : (
         <>
           <Tabs tab={tab} setTab={setTab} />
@@ -379,7 +379,7 @@ export default function GodMode() {
               <button
                 onClick={runSimulation}
                 disabled={busy}
-                className="ml-auto rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+                className="ml-auto rounded bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
               >
                 {busy ? "Replaying…" : "Run simulation"}
               </button>
@@ -391,9 +391,9 @@ export default function GodMode() {
                 <SimulationRow key={s.id} sim={s} />
               ))}
               {sims.length === 0 && (
-                <Plane className="p-6 text-center text-[11px] text-slate-500">
+                <div className="text-center text-[11px] text-slate-500">
                   No simulations yet. A replay needs recorded gateway traffic to draw from.
-                </Plane>
+                </div>
               )}
             </div>
           </section>
@@ -410,9 +410,9 @@ export default function GodMode() {
               <span className="micro">node size is utility · ring is times used</span>
             </div>
             {(graph?.nodes ?? []).length === 0 ? (
-              <Plane className="mt-2 p-6 text-center text-[11px] text-slate-500">
+              <div className="mt-2 text-center text-[11px] text-slate-500">
                 Nothing distilled yet — episodes promote once repeatedly useful.
-              </Plane>
+              </div>
             ) : (
               <div className="mt-2 grid-field rounded-lg border border-edge/60">
                 <ExperienceGraph graph={graph} />
@@ -427,7 +427,7 @@ export default function GodMode() {
             <>
           {/* ================= operations ================= */}
           <section>
-            <Micro>Operations</Micro>
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Operations</h2>
             <div className="mt-2 grid gap-4 lg:grid-cols-3">
               <div>
                 <span className="text-[11px] text-slate-400">Ingest a turn</span>
@@ -592,7 +592,7 @@ function Cascade({ mem, quotas, last }: { mem: any; quotas: any; last: any | nul
         return (
           <div key={t.key} className="flex flex-1 items-stretch gap-2">
             <div className="min-w-0 flex-1">
-              <Plane className="h-full p-3">
+              <div className="h-full">
                 <div className="flex items-baseline justify-between">
                   <span className="text-[11px] font-medium text-slate-300">{t.label}</span>
                   <span className="readout text-lg font-semibold" style={{ color: STATE[st].ink }}>
@@ -612,7 +612,7 @@ function Cascade({ mem, quotas, last }: { mem: any; quotas: any; last: any | nul
                   )}
                 </div>
                 <p className="mt-1.5 text-[10px] leading-snug text-slate-600">{t.desc}</p>
-              </Plane>
+              </div>
             </div>
 
             {i < TIERS.length - 1 && (
@@ -728,7 +728,7 @@ function SimulationRow({ sim }: { sim: any }) {
   ).filter((r) => r.b > 0 || r.c > 0);
 
   return (
-    <Plane className="p-4">
+    <div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <StateDot state={st} />
         <span className="text-sm font-semibold" style={{ color: STATE[st].ink }}>
@@ -776,7 +776,7 @@ function SimulationRow({ sim }: { sim: any }) {
           })}
         </div>
       )}
-    </Plane>
+    </div>
   );
 }
 

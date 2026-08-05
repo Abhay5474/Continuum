@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { BarChart, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
@@ -98,7 +98,7 @@ export default function CostAdmission() {
   const outstanding = callers.reduce((n, c) => n + c.outstanding, 0);
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-8">
       <PageHeader
         title="Cost-Aware Limits"
         subtitle="A fifty-step agent carrying twenty thousand tokens is not one request in the way that “hello” is one request."
@@ -134,7 +134,7 @@ export default function CostAdmission() {
         />
       </div>
 
-      <Plane className="space-y-3 p-4">
+      <div className="space-y-3">
         <Switch
           checked={!!status?.enabled}
           busy={busy}
@@ -188,22 +188,22 @@ export default function CostAdmission() {
           </button>
         </div>
 
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           Both allowances refill continuously, so nobody can save up a minute's worth and spend it
           in one burst. A request is admitted only when both have room — whichever a caller is
           nearest to exhausting is the one that limits them, so someone making many tiny calls is
           bounded by request count and someone making one enormous call is bounded by tokens.
           Neither can starve the other by choosing a shape.
         </p>
-      </Plane>
+      </div>
 
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : callers.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
+        <div className="text-center text-sm text-slate-500">
           No traffic yet. Once requests arrive, each caller's consumption of both allowances appears
           here.
-        </Plane>
+        </div>
       ) : (
         <div className="space-y-4">
           {/* Across callers, before the per-caller detail. One caller usually
@@ -211,7 +211,7 @@ export default function CostAdmission() {
               only shows each caller's own share of its own limit. One hue: the
               bar length already encodes the value, so colouring by it would
               spend the identity channel twice. */}
-          <Plane className="p-4">
+          <div>
             <ChartFrame
               title="Tokens charged, by caller"
               valueLabel="Tokens"
@@ -220,7 +220,7 @@ export default function CostAdmission() {
             >
               <BarChart data={tokensByCaller} emphasis={heaviest} unit="tok" />
             </ChartFrame>
-          </Plane>
+          </div>
 
           {callers.map((c) => {
             const tokenBound = c.tokenShare >= c.requestShare;
@@ -253,7 +253,7 @@ export default function CostAdmission() {
                   />
                 </div>
 
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
                   {tokenBound
                     ? `Bounded by tokens — this caller is using ${Math.round(
                         c.tokenShare * 100
@@ -270,9 +270,9 @@ export default function CostAdmission() {
         </div>
       )}
 
-      <Plane className="p-4">
-        <Micro>Reserve, then settle</Micro>
-        <p className="mt-1.5 text-xs text-slate-600">
+      <div>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Reserve, then settle</h2>
+        <p className="mt-1.5 text-xs text-slate-600 max-w-2xl leading-relaxed">
           A request's real token cost is not known until the response comes back, so admission
           reserves an estimate — the prompt plus the caller's completion cap, or{" "}
           <span className="readout">{status?.assumedCompletionTokens ?? 800}</span> tokens when they
@@ -280,18 +280,18 @@ export default function CostAdmission() {
           generous: under-reserving lets a caller through and discovers the cost too late, while
           over-reserving only makes them wait a moment longer and the excess is returned in full.
         </p>
-        <p className="mt-2 text-xs text-slate-600">
+        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
           A reservation whose request died before settling would hold allowance nobody is using, so
           every one is returned in a finally block and any that is somehow missed expires after{" "}
           <span className="readout">{status?.reservationTtlSeconds ?? 300}s</span>. The{" "}
           <span className="readout">in flight</span> count above is how many are currently held —
           if it climbs and never falls, reservations are leaking.
         </p>
-        <p className="mt-2 text-xs text-slate-600">
+        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
           Held in memory, per instance, like the existing rate limiter — three instances behind a
           load balancer allow three times the traffic. Stated rather than implied.
         </p>
-      </Plane>
+      </div>
 
       {callers.length > 0 && (
         <button

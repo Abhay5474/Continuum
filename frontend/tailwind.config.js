@@ -13,7 +13,10 @@ export default {
         // purple cast that reads as "AI product". Everything else that carries
         // colour in this UI is a system state (see src/system/tokens.ts).
         // Names kept for backwards compatibility across existing components.
-        aurora: "#4C8BF5",
+        // The console's accent, theme-aware: aurora blue on instrument black, coral
+        // on paper. Every `aurora` utility in the app — borders, washes, active
+        // states, dots — follows the theme rather than staying blue on white.
+        aurora: "rgb(var(--accent-rgb) / <alpha-value>)",
         neon: "#7DA9FF",
       },
       boxShadow: {

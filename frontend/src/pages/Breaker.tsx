@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 
@@ -85,13 +85,13 @@ export default function BreakerPage() {
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Semantic Breaker"
         subtitle="Trips a model out of rotation when its answers get worse — not when it errors. Off by default."
       />
 
-      <Plane className="p-5">
+      <div>
         <Switch
           label="Semantic circuit breaker"
           hint="Scores every answer against a learned baseline and diverts traffic away from a model whose quality has drifted. Your traffic trips your breakers only — no account can reroute another's."
@@ -101,7 +101,7 @@ export default function BreakerPage() {
             run(() => portal.breaker.configure({ enabled: next }), next ? "Breaker armed" : "Breaker disarmed")
           }
         />
-      </Plane>
+      </div>
 
       <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="Watching" value={status?.breakers.length ?? 0} unit="models" />
@@ -121,15 +121,15 @@ export default function BreakerPage() {
 
       {/* ---- the breakers ---- */}
       <section className="space-y-3">
-        <Micro>Models · quality against the learned baseline</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Models · quality against the learned baseline</h2>
         {status === null ? (
           <SkeletonRows rows={3} />
         ) : status.breakers.length === 0 ? (
-          <Plane className="p-8 text-center text-sm text-slate-500">
+          <div className="text-center text-sm text-slate-500">
             {status.enabled
               ? "No observations yet. Send traffic through the gateway and each model gets a breaker once it has enough history to know what normal looks like."
               : "Arm the breaker to start watching answer quality per model."}
-          </Plane>
+          </div>
         ) : (
           <div className="space-y-3">
             {status.breakers.map((b) => (
@@ -148,8 +148,8 @@ export default function BreakerPage() {
 
       {/* ---- settings ---- */}
       <section className="space-y-3">
-        <Micro>Sensitivity</Micro>
-        <Plane className="flex flex-wrap items-end gap-6 p-5">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Sensitivity</h2>
+        <div className="flex flex-wrap items-end gap-6">
           <label>
             <span className="micro">Warm-up</span>
             <select
@@ -222,20 +222,20 @@ export default function BreakerPage() {
           >
             Clear all
           </button>
-        </Plane>
+        </div>
       </section>
 
       {/* ---- transitions ---- */}
       <section className="space-y-3">
-        <Micro>Transitions</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Transitions</h2>
         {events === null ? (
           <SkeletonRows rows={2} />
         ) : events.length === 0 ? (
-          <Plane className="p-6 text-center text-sm text-slate-500">
+          <div className="text-center text-sm text-slate-500">
             Nothing has tripped. Every transition lands here with the evidence that caused it.
-          </Plane>
+          </div>
         ) : (
-          <Plane className="divide-y divide-edge/40">
+          <div className="divide-y divide-edge/40">
             {events.map((e) => (
               <div key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 text-xs">
                 <span className={`shrink-0 font-medium uppercase tracking-wider ${kindColour(e.kind)}`}>
@@ -248,7 +248,7 @@ export default function BreakerPage() {
                 <span className="readout shrink-0 text-slate-600">{dateTimeOf(e.createdAt)}</span>
               </div>
             ))}
-          </Plane>
+          </div>
         )}
       </section>
     </div>
@@ -275,7 +275,7 @@ function BreakerCard({ b, busy, onReset }: { b: Breaker; busy: boolean; onReset:
   const probing = b.state === "HALF_OPEN";
 
   return (
-    <Plane className={`p-4 ${open ? "border-rose-500/40" : probing ? "border-amber-500/40" : ""}`}>
+    <div>
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -336,7 +336,7 @@ function BreakerCard({ b, busy, onReset }: { b: Breaker; busy: boolean; onReset:
           {b.accumulated.toFixed(2)} accrued
         </span>
       </div>
-    </Plane>
+    </div>
   );
 }
 

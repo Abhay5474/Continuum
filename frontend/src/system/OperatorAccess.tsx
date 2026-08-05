@@ -135,7 +135,7 @@ function ElevateDialog({ onClose, onDone }: { onClose: () => void; onDone: () =>
           <button
             type="submit"
             disabled={busy || token.trim() === ""}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "Verifying…" : "Unlock"}
           </button>

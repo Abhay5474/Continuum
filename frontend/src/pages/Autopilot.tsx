@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { portal } from "../api";
-import { PageHeader, Plane, Micro } from "../system/primitives";
+import { PageHeader } from "../system/primitives";
 
 /**
  * Autopilot — beginner-friendly control plane UI. Reuses the developer session
@@ -40,7 +40,7 @@ export default function Autopilot() {
       <div className="mx-auto max-w-lg rounded-lg border border-edge bg-panel p-6 text-center">
         <div className="text-2xl">🧭</div>
         <h1 className="mt-2 text-lg font-semibold">Autopilot</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-slate-400 max-w-2xl leading-relaxed">
           Sign in on the <a href="/portal" className="text-indigo-400 underline">Developer Portal</a> to
           set up Autopilot for your application.
         </p>
@@ -64,7 +64,7 @@ export default function Autopilot() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* The nav calls this Optimization; the page called itself Autopilot with
           an emoji in the heading. One name, no emoji. */}
       <PageHeader
@@ -81,7 +81,7 @@ export default function Autopilot() {
               className="rounded-md border border-edge px-4 py-2 text-sm hover:bg-edge">Turn OFF</button>
           ) : (
             <button onClick={() => setShowWizard(true)} disabled={busy}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">
+              className="rounded-md bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
               Turn ON…
             </button>
           )}
@@ -139,7 +139,7 @@ export default function Autopilot() {
                 <Kv k="Latency cap" v={`${status.activePolicy.latencyCapMs} ms`} />
               </div>
               <button onClick={() => act(portal.autopilot.propose)} disabled={busy}
-                className="mt-3 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white">
+                className="mt-3 rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
                 Run optimization now
               </button>
             </Card>
@@ -235,8 +235,8 @@ function Explainer() {
     ["Reversible at any point", "Turning it off restores standard behaviour immediately, and every decision it made stays on the record."],
   ];
   return (
-    <Plane className="p-5">
-      <Micro>What optimization does</Micro>
+    <div>
+      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What optimization does</h2>
       <dl className="mt-4 grid gap-x-10 gap-y-5 sm:grid-cols-2">
         {items.map(([title, body]) => (
           <div key={title} className="border-l border-edge pl-4">
@@ -245,10 +245,10 @@ function Explainer() {
           </div>
         ))}
       </dl>
-      <p className="mt-5 border-t border-edge/70 pt-4 text-xs text-slate-500">
+      <p className="mt-5 border-t border-edge/70 pt-4 text-xs text-slate-500 max-w-2xl leading-relaxed">
         Off by default. While it is off your app behaves exactly as it does today.
       </p>
-    </Plane>
+    </div>
   );
 }
 
@@ -286,7 +286,7 @@ function Wizard({ onEnable, onCancel, busy }: {
           <div className="flex flex-wrap gap-2">
             {["BALANCED", "LOW_COST", "LOW_LATENCY", "HIGH_QUALITY", "SAFETY_FIRST"].map((m) => (
               <button key={m} onClick={() => setMode(m)}
-                className={`rounded-md px-3 py-1.5 text-sm ${mode === m ? "bg-indigo-600 text-white" : "border border-edge"}`}>
+                className={`rounded-md px-3 py-1.5 text-sm ${mode === m ? "bg-[color:var(--accent-strong)] text-white" : "border border-edge"}`}>
                 {m.replace("_", " ").toLowerCase()}
               </button>
             ))}
@@ -310,7 +310,7 @@ function Wizard({ onEnable, onCancel, busy }: {
           <div className="flex flex-wrap gap-2">
             {["gemini", "groq", "mock"].map((p) => (
               <button key={p} onClick={() => toggleProvider(p)}
-                className={`rounded-md px-3 py-1.5 text-sm capitalize ${providers.includes(p) ? "bg-indigo-600 text-white" : "border border-edge"}`}>
+                className={`rounded-md px-3 py-1.5 text-sm capitalize ${providers.includes(p) ? "bg-[color:var(--accent-strong)] text-white" : "border border-edge"}`}>
                 {p}
               </button>
             ))}
@@ -324,7 +324,7 @@ function Wizard({ onEnable, onCancel, busy }: {
 
       <div className="mt-4 flex gap-2">
         {step > 1 && <button onClick={() => setStep(step - 1)} className="rounded-md border border-edge px-3 py-1.5 text-sm">Back</button>}
-        {step < 3 && <button onClick={() => setStep(step + 1)} className="ml-auto rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white">Next</button>}
+        {step < 3 && <button onClick={() => setStep(step + 1)} className="ml-auto rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">Next</button>}
         {step === 3 && (
           <button disabled={busy || providers.length === 0}
             onClick={() => onEnable({ applicationName: appName, mode, maxCostPerRequest: maxCost, maxLatencyMs: maxLatency, allowedProviders: providers })}

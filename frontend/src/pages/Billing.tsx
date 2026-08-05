@@ -45,7 +45,7 @@ export default function Billing() {
       <div className="plane mx-auto mt-16 max-w-md p-8 text-center">
         <div className="text-3xl">💳</div>
         <h1 className="mt-2 text-lg font-semibold">Billing</h1>
-        <p className="mt-1 text-sm text-slate-400">Sign in through the Developer Portal to view your plan and usage.</p>
+        <p className="mt-1 text-sm text-slate-400 max-w-2xl leading-relaxed">Sign in through the Developer Portal to view your plan and usage.</p>
         <a href="/portal" className="mt-4 inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-semibold text-ink">
           Open Developer Portal →
         </a>
@@ -55,7 +55,7 @@ export default function Billing() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="plane p-6"><SkeletonRows rows={3} /></div>
         <div className="plane p-6"><SkeletonRows rows={3} /></div>
       </div>
@@ -71,7 +71,7 @@ export default function Billing() {
     <div className="space-y-6 animate-fade-up">
       <div>
         <h1 className="text-lg font-semibold tracking-tight text-slate-100">Billing &amp; Usage</h1>
-        <p className="mt-0.5 text-sm text-slate-500">Your plan, this month's token usage, and quota.</p>
+        <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">Your plan, this month's token usage, and quota.</p>
       </div>
 
       {/* usage meter */}
@@ -152,7 +152,7 @@ export default function Billing() {
           );
         })}
       </div>
-      <p className="text-center text-xs text-slate-600">
+      <p className="text-center text-xs text-slate-600 max-w-2xl leading-relaxed">
         {data?.paymentConfigured
           ? `Payments are processed by ${data.paymentProvider}. Downgrades apply immediately.`
           : "No payment processor is configured on this deployment, so paid plans cannot be self-served. Downgrades apply immediately; ask the operator to apply a paid plan."}

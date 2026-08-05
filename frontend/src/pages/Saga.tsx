@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
 /**
@@ -94,7 +94,7 @@ export default function Saga() {
   const stranded = status?.stepsStranded ?? 0;
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-8">
       <PageHeader
         title="Saga Compensation"
         subtitle="Durable execution guarantees each step runs once. It does not guarantee the set of them is all-or-nothing."
@@ -123,7 +123,7 @@ export default function Saga() {
         />
       </div>
 
-      <Plane className="space-y-3 p-4">
+      <div className="space-y-3">
         <Switch
           checked={!!status?.enabled}
           busy={busy}
@@ -136,16 +136,16 @@ export default function Saga() {
           label="Compensate on failure"
           hint="Off by default. Rollback issues real calls to real systems, so nobody should discover it by being opted in."
         />
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           The setting is read once, when a run starts, and pinned into that run. Toggling it cannot
           change how a workflow already in flight replays — a run must finish the way it began.
           Turning it on therefore affects new runs only.
         </p>
-      </Plane>
+      </div>
 
-      <Plane className="space-y-3 p-4">
-        <Micro>How to declare a compensation</Micro>
-        <p className="text-xs text-slate-600">
+      <div className="space-y-3">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">How to declare a compensation</h2>
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           Add <span className="readout">compensate</span> beside a step&rsquo;s{" "}
           <span className="readout">call</span>. You cannot roll back a charge at a payment
           provider — you can only issue a refund, which is why the undo is a call you write rather
@@ -154,20 +154,20 @@ export default function Saga() {
         <pre className="overflow-x-auto rounded-md border border-edge bg-ink/60 p-3 font-mono text-[11px] leading-relaxed text-slate-400">
           {EXAMPLE}
         </pre>
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           If <span className="readout">ship</span> fails, the refund runs first and the reservation
           is released second — reverse order of completion. That is not a detail: releasing the
           stock before the money is returned leaves a window where someone else can buy it.
         </p>
-      </Plane>
+      </div>
 
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : recent.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
+        <div className="text-center text-sm text-slate-500">
           No rollbacks yet. When a workflow with compensations fails partway, what was undone — and
           what could not be — appears here.
-        </Plane>
+        </div>
       ) : (
         <div className="space-y-2">
           {recent.map((r, i) => (
@@ -186,11 +186,11 @@ export default function Saga() {
                 <span className="micro">{new Date(r.at).toLocaleTimeString()}</span>
               </div>
 
-              <p className="text-xs text-slate-400">{r.summary}</p>
+              <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">{r.summary}</p>
 
               {r.compensated.length > 0 && (
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <Micro>undone</Micro>
+                  <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">undone</h2>
                   {r.compensated.map((s, j) => (
                     <span key={j} className="readout text-[11px] text-emerald-400">
                       {j > 0 && <span className="text-slate-600">→ </span>}
@@ -202,7 +202,7 @@ export default function Saga() {
 
               {r.uncompensated.length > 0 && (
                 <div className="rounded-md border border-rose-500/40 bg-rose-500/5 p-2">
-                  <Micro>still out there</Micro>
+                  <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">still out there</h2>
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                     {r.uncompensated.map((s, j) => (
                       <span key={j} className="readout text-[11px] text-rose-400">

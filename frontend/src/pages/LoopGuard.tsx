@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
 /**
@@ -127,7 +127,7 @@ export default function LoopGuard() {
   const events = status?.recent ?? [];
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-8">
       <PageHeader
         title="Loop Detection"
         subtitle="An agent that has lost the thread does not crash — it keeps working, and every step is billable."
@@ -156,7 +156,7 @@ export default function LoopGuard() {
         />
       </div>
 
-      <Plane className="space-y-3 p-4">
+      <div className="space-y-3">
         <Switch
           checked={!!status?.enabled}
           busy={busy}
@@ -192,17 +192,17 @@ export default function LoopGuard() {
           </span>
         </div>
 
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           Start in <span className="readout">MONITOR</span>. It records what it would have stopped
           without stopping anything, which is the only safe way to find out whether the detector
           agrees with you about your own agents. A false positive stops an agent that was working,
           and that is the more expensive mistake.
         </p>
-      </Plane>
+      </div>
 
-      <Plane className="space-y-3 p-4">
-        <Micro>Try it against a sequence</Micro>
-        <p className="text-xs text-slate-600">
+      <div className="space-y-3">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Try it against a sequence</h2>
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           One step per line, oldest first. Nothing is executed — the detector reads the steps and
           says what it sees. Progress is left unreported here, which is the pessimistic case: an
           agent that cannot say whether it advanced is exactly the one worth watching.
@@ -261,7 +261,7 @@ export default function LoopGuard() {
               )}
               {verdict.halted && <span className="micro text-rose-400">run would be stopped</span>}
             </div>
-            <p className="mt-1 text-xs text-slate-400">{verdict.reason}</p>
+            <p className="mt-1 text-xs text-slate-400 max-w-2xl leading-relaxed">{verdict.reason}</p>
             {Array.isArray(verdict.evidence) && verdict.evidence.length > 0 && (
               <ul className="mt-2 space-y-0.5">
                 {verdict.evidence.map((e: string, i: number) => (
@@ -273,11 +273,11 @@ export default function LoopGuard() {
             )}
           </div>
         )}
-      </Plane>
+      </div>
 
-      <Plane className="p-4">
-        <Micro>What it will not do</Micro>
-        <p className="mt-1.5 text-xs text-slate-600">
+      <div>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What it will not do</h2>
+        <p className="mt-1.5 text-xs text-slate-600 max-w-2xl leading-relaxed">
           Repetition alone never trips it. A loop over twenty files issues twenty similar steps and
           is not stuck, so the signal is repetition <em>without progress</em>. Arguments count as
           part of the step: <span className="readout">read file src/a.java</span> and{" "}
@@ -285,21 +285,21 @@ export default function LoopGuard() {
           because the vectoriser drops filenames, so a check on wording alone would fire on exactly
           the case it must not.
         </p>
-        <p className="mt-2 text-xs text-slate-600">
+        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
           Paraphrase detection is deliberately narrow. Measured on this codebase&rsquo;s vectoriser,
           a genuine reword can score 0.26 while two plainly different steps score 0.67 — the
           populations overlap and no threshold separates them. The threshold is set high: it catches
           near-identical rewording and misses the rest.
         </p>
-      </Plane>
+      </div>
 
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : events.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
+        <div className="text-center text-sm text-slate-500">
           Nothing caught yet. Loops found in your agents — or by the inspector above — appear here
           with the steps they are accusing.
-        </Plane>
+        </div>
       ) : (
         <div className="space-y-2">
           {events.map((e, i) => (
@@ -316,7 +316,7 @@ export default function LoopGuard() {
                 state={KIND_STATE[e.kind] ?? "active"}
                 height={4}
               />
-              <p className="text-xs text-slate-400">{e.reason}</p>
+              <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">{e.reason}</p>
               {e.evidence && (
                 <p className="break-words font-mono text-[11px] text-slate-500">{e.evidence}</p>
               )}

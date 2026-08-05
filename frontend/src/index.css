@@ -30,6 +30,10 @@
   /* On instrument black the accent stays the aurora blue the console was built
      around. Coral is the paper identity. */
   --accent: #4C8BF5;
+  /* The same accent as a bare RGB triplet, so Tailwind's `aurora` colour can be
+     defined against it and still take an alpha modifier (`bg-aurora/10`). The
+     hex forms above cannot: `rgb(#4C8BF5 / 0.1)` is not a colour. */
+  --accent-rgb: 76 139 245;
   --accent-strong: #6BA1F7;
   --accent-ink: #8FBAFA;
   --accent-wash: rgba(76, 139, 245, 0.10);
@@ -107,6 +111,7 @@
        --accent-strong  #D93B2B  4.55:1 — clears AA for white-on-button
        --accent-ink     #C7301F  5.42:1 — comfortable as text on white */
   --accent: #F04E3E;
+  --accent-rgb: 240 78 62;
   --accent-strong: #D93B2B;
   --accent-ink: #C7301F;
   --accent-wash: rgba(240, 78, 62, 0.08);

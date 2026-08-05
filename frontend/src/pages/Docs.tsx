@@ -245,7 +245,7 @@ curl -X POST https://api.continuum.dev/api/portal/developer/workflows/definition
 
           <section id="reference" className="scroll-mt-24">
             <h2 className="text-2xl font-bold tracking-tight">API reference</h2>
-            <p className="mt-2 text-sm text-slate-400">Core endpoints. All requests are JSON over HTTPS.</p>
+            <p className="mt-2 text-sm text-slate-400 max-w-2xl leading-relaxed">Core endpoints. All requests are JSON over HTTPS.</p>
             <div className="mt-4 overflow-x-auto rounded-xl border border-edge">
               <table className="w-full text-sm">
                 <thead className="bg-panel/60 text-xs uppercase tracking-wide text-slate-500">

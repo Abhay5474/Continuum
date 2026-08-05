@@ -48,7 +48,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
           </span>
           <div>
             <h1 className="text-lg font-semibold tracking-tight text-slate-100">Developer Portal</h1>
-            <p className="text-xs text-slate-400">Your API keys, credentials and analytics.</p>
+            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Your API keys, credentials and analytics.</p>
           </div>
         </div>
 
@@ -86,7 +86,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
           {mode === "signup" ? "Create account →" : "Log in →"}
         </button>
         {err && <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-sm text-rose-300">{err}</div>}
-        <p className="mt-4 text-center text-xs text-slate-500">
+        <p className="mt-4 text-center text-xs text-slate-500 max-w-2xl leading-relaxed">
           New here? <Link to="/docs" className="text-neon hover:underline">Read the quickstart</Link>
         </p>
       </div>
@@ -219,7 +219,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Billing / Settings / Sign out live in the account menu in the header. */}
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-lg font-semibold tracking-tight text-slate-100">API Keys &amp; Providers</h1>
@@ -279,7 +279,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       {/* credential vault */}
       <div className="rounded-lg border border-edge bg-panel p-4">
         <div className="font-medium">Configure Upstream Keys</div>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
           Store your own LLM provider API keys. They are encrypted with AES-256-GCM and decrypted only
           in-memory at request execution. Secrets are write-only — never displayed after saving.
         </p>
@@ -308,7 +308,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
                   </td>
                   <td className="py-2">
                     <div className="flex gap-2 text-xs">
-                      <button onClick={() => storeCred(p)} className="rounded bg-indigo-600 px-2 py-1 text-white">
+                      <button onClick={() => storeCred(p)} className="rounded bg-[color:var(--accent-strong)] px-2 py-1 text-white">
                         {isSet ? "Update" : "Configure"}
                       </button>
                       {isSet && <button onClick={() => verify(p)} className="rounded border border-edge px-2 py-1">Verify</button>}
@@ -345,7 +345,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
               Verification Engine <span className="text-xs text-slate-500">(Consensus DAG)</span>
               {v6Enabled && <span className="ml-2 rounded bg-neon/15 px-2 py-0.5 text-[10px] font-bold text-neon">ACTIVE</span>}
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
               Routes your gateway requests through a parallel DAG of solver and verifier nodes with
               Bayesian conflict resolution — every answer is checked, scored, and fully auditable in
               the <span className="text-slate-300">Execution Command Center</span>. Response format is unchanged.
@@ -360,7 +360,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
                 v6Enabled
                   ? "bg-neon/20 text-neon ring-1 ring-neon/50"
-                  : "bg-indigo-600 text-white hover:bg-indigo-500"}`}>
+                  : "bg-[color:var(--accent-strong)] text-white hover:opacity-90"}`}>
               {v6Enabled === null ? "…" : v6Enabled ? "Enabled — click to disable" : "Enable Verification Engine"}
             </button>
           </div>
@@ -402,7 +402,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
               Context Optimizer Virtualization <span className="text-xs text-slate-500">(Paging MMU)</span>
               {v7Enabled && <span className="ml-2 rounded bg-aurora/15 px-2 py-0.5 text-[10px] font-bold text-indigo-300">ACTIVE</span>}
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
               Continuum owns the Virtual Context Space: long histories are paged into semantic stubs
               (L2) backed by immutable event streams (L3); relevant pages are prefetched and page
               faults resolved mid-generation. Infinite-context workflows without bigger token limits —
@@ -413,7 +413,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
             className={`ml-auto rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
               v7Enabled
                 ? "bg-aurora/20 text-indigo-300 ring-1 ring-aurora/50"
-                : "bg-indigo-600 text-white hover:bg-indigo-500"}`}>
+                : "bg-[color:var(--accent-strong)] text-white hover:opacity-90"}`}>
             {v7Enabled === null ? "…" : v7Enabled ? "Enabled — click to disable" : "Enable Context Optimizer Virtualization"}
           </button>
         </div>
@@ -423,7 +423,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       <div className="rounded-lg border border-edge bg-panel p-4">
         <div className="flex items-center">
           <div className="font-medium">Continuum API keys</div>
-          <button onClick={issueKey} className="ml-auto rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white">Issue new key</button>
+          <button onClick={issueKey} className="ml-auto rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">Issue new key</button>
         </div>
         {newKey && (
           <div className="mt-2 flex items-center gap-2 rounded bg-ink p-2">
@@ -451,13 +451,13 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       {/* playground */}
       <div className="rounded-lg border border-edge bg-panel p-4">
         <div className="font-medium">Sandbox playground</div>
-        <p className="text-xs text-slate-400">Send a request through your gateway right now — no code required.</p>
+        <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Send a request through your gateway right now — no code required.</p>
         <textarea value={playPrompt} onChange={(e) => setPlayPrompt(e.target.value)}
           className="mt-2 h-16 w-full rounded-md border border-edge bg-ink p-2 text-sm outline-none focus:border-aurora/60" />
         <button
           onClick={runPlay}
           disabled={playBusy}
-          className="mt-2 flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+          className="mt-2 flex items-center gap-2 rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90 disabled:opacity-50"
         >
           {playBusy && <Spinner />}
           {playBusy ? "Sending…" : "Send through gateway"}

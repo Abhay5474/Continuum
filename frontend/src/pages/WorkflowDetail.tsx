@@ -53,7 +53,7 @@ export default function WorkflowDetailPage() {
   if (!detail) return <div className="text-slate-400">Loading…</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center gap-3">
         <Link to="/dashboard" className="text-sm text-slate-400 hover:text-slate-200">
           ← Back

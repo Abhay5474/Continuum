@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
 /**
@@ -112,7 +112,7 @@ export default function Counterfactual() {
   const armNames = (status?.arms ?? []).map((a) => a.arm);
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-8">
       <PageHeader
         title="Counterfactual Replay"
         subtitle="What would last week's traffic have cost on a different routing policy — answered before you switch, not after."
@@ -129,7 +129,7 @@ export default function Counterfactual() {
         <Readout label="Distinct models" value={armNames.length} size="sm" />
       </div>
 
-      <Plane className="space-y-3 p-4">
+      <div className="space-y-3">
         <Switch
           checked={!!status?.enabled}
           busy={busy}
@@ -142,24 +142,24 @@ export default function Counterfactual() {
           label="Counterfactual evaluation"
           hint="Off by default. It reads the request log and changes nothing on the request path — no traffic is re-sent to any provider."
         />
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           This is a batch evaluator, deliberately. Replaying one request against a different model
           and showing both answers is a demo; replaying every logged request against a candidate
           policy and reporting the cost delta is how you tune a routing threshold without
           experimenting on live traffic.
         </p>
-      </Plane>
+      </div>
 
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : armNames.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
+        <div className="text-center text-sm text-slate-500">
           No routed traffic logged yet. Send requests through the gateway and the models they used
           become the candidate policies you can replay against.
-        </Plane>
+        </div>
       ) : (
-        <Plane className="space-y-3 p-4">
-          <Micro>Candidate policy</Micro>
+        <div className="space-y-3">
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Candidate policy</h2>
 
           <div className="flex flex-wrap gap-2">
             {(["always", "threshold"] as const).map((m) => (
@@ -241,13 +241,13 @@ export default function Counterfactual() {
           {!status.enabled && (
             <span className="ml-3 text-xs text-slate-500">Turn evaluation on to replay.</span>
           )}
-        </Plane>
+        </div>
       )}
 
       {report && report.enabled !== false && (
         <>
-          <Plane className="space-y-3 p-4">
-            <Micro>Result — {report.policy}</Micro>
+          <div className="space-y-3">
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Result — {report.policy}</h2>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <Readout label="Actually spent" value={usd(report.actualCost)} size="sm" />
               <Readout
@@ -263,11 +263,11 @@ export default function Counterfactual() {
                 state={report.delta < 0 ? "healthy" : report.delta > 0 ? "degraded" : "idle"}
               />
             </div>
-            <p className="text-sm text-slate-300">{report.verdict}</p>
-          </Plane>
+            <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">{report.verdict}</p>
+          </div>
 
-          <Plane className="space-y-3 p-4">
-            <Micro>How much of that is measured</Micro>
+          <div className="space-y-3">
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">How much of that is measured</h2>
             <Meter
               value={report.agreedFraction}
               state={report.agreedFraction > 0.8 ? "healthy" : report.agreedFraction > 0.4 ? "active" : "degraded"}
@@ -290,11 +290,11 @@ export default function Counterfactual() {
                 hint="Estimated from that model's own history. Not measured."
               />
             </div>
-            <p className="text-xs text-slate-500">{report.caveat}</p>
-          </Plane>
+            <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">{report.caveat}</p>
+          </div>
 
-          <Plane className="space-y-2 p-4">
-            <Micro>Where the candidate would have sent traffic</Micro>
+          <div className="space-y-2">
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Where the candidate would have sent traffic</h2>
             {report.lines.map((l) => (
               <div key={l.arm} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <span className="font-mono text-xs text-slate-300">{l.arm}</span>
@@ -318,30 +318,30 @@ export default function Counterfactual() {
                 <span className="w-full text-[11px] text-slate-600">{l.basis}</span>
               </div>
             ))}
-          </Plane>
+          </div>
         </>
       )}
 
-      <Plane className="p-4">
-        <Micro>Why the answer is split in two</Micro>
-        <p className="mt-1.5 text-xs text-slate-600">
+      <div>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Why the answer is split in two</h2>
+        <p className="mt-1.5 text-xs text-slate-600 max-w-2xl leading-relaxed">
           Estimating how a policy you did <em>not</em> run would have performed, from logs of the one
           you <em>did</em>, is off-policy evaluation. The standard tool is the doubly robust
           estimator (Dudík, Langford &amp; Li, ICML 2011): a model of each arm's reward, corrected by
           how likely the logging policy was to take that action.
         </p>
-        <p className="mt-2 text-xs text-slate-600">
+        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
           That correction needs the logging policy to have had some chance of taking the other
           action. <b className="text-slate-500">Continuum's routing is deterministic</b>, so for any
           logged request the chosen arm has probability 1 and every other arm has 0. There is no
           overlap, and no arithmetic recovers information the logs do not contain.
         </p>
-        <p className="mt-2 text-xs text-slate-600">
+        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
           So the measured share and the modelled share are reported separately and never blended. A
           single number would hide the one thing worth knowing before changing your routing: how
           much of it is a guess.
         </p>
-      </Plane>
+      </div>
     </section>
   );
 }

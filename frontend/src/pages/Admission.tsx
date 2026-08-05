@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Meter, Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
 import { BarChart, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
@@ -82,7 +82,7 @@ export default function Admission() {
   const inFlight = providers.reduce((n, p) => n + p.inFlight, 0);
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-8">
       <PageHeader
         title="Admission Control"
         subtitle="How much a provider will actually take, measured from latency instead of guessed."
@@ -106,7 +106,7 @@ export default function Admission() {
         />
       </div>
 
-      <Plane className="space-y-3 p-4">
+      <div className="space-y-3">
         <Switch
           checked={!!status?.enabled}
           busy={busy}
@@ -119,17 +119,17 @@ export default function Admission() {
           label="Congestion-controlled admission"
           hint="Off by default. While it is off every request goes straight to the provider and overload is the provider's problem — which it solves with 429s."
         />
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           When on, Continuum holds concurrency at the limit it has inferred, lets a request wait up
           to {status?.queueMs ?? 250}ms for a slot, and refuses what will not fit — returning{" "}
           <span className="readout">429</span> with a <span className="readout">Retry-After</span>{" "}
           immediately rather than blocking. A fast honest refusal is worth more than a slow one:
           the caller can retry, degrade, or tell its user, none of which it can do while waiting.
         </p>
-      </Plane>
+      </div>
 
-      <Plane className="p-4">
-        <Micro>How importance decides who is refused first</Micro>
+      <div>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">How importance decides who is refused first</h2>
         <div className="mt-2 space-y-2">
           {Object.entries(status?.sheddingPoints ?? {}).map(([name, point]) => (
             <div key={name} className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -147,22 +147,22 @@ export default function Admission() {
             </div>
           ))}
         </div>
-        <p className="mt-2 text-xs text-slate-600">
+        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
           Past capacity something is refused; the only question is whether it is chosen or random.
           Background work goes first and interactive requests may overshoot the estimate, because
           the limit is an estimate and being wrong about a waiting user costs more than one queued
           call. Set <span className="readout">criticality</span> on the request; anything
           unrecognised reads as <span className="readout">NORMAL</span>, never as background.
         </p>
-      </Plane>
+      </div>
 
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : providers.length === 0 ? (
-        <Plane className="p-6 text-center text-sm text-slate-500">
+        <div className="text-center text-sm text-slate-500">
           No provider has been observed yet. Send traffic through the gateway and the inferred
           limit for each provider appears here, moving as it learns.
-        </Plane>
+        </div>
       ) : (
         <div className="space-y-2">
           {providers.map((p) => (
@@ -206,7 +206,7 @@ function ProviderCard({ p }: { p: ProviderState }) {
   );
 
   return (
-    <Plane className="space-y-3 p-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="text-sm font-medium text-slate-200">{p.provider}</span>
         <span className="micro">{p.samples} samples</span>
@@ -308,11 +308,11 @@ function ProviderCard({ p }: { p: ProviderState }) {
         <span>peak in flight {p.peakInFlight}</span>
       </div>
 
-      <p className="text-xs text-slate-600">
+      <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
         {congested
           ? `Latest latency is ${(p.lastRttMs / Math.max(1, p.minRttMs)).toFixed(1)}× the best seen, so the limit is coming down — before this provider starts refusing anything.`
           : "Latency is close to the best seen, so there is no queue building at the provider and the limit can grow when the traffic justifies it."}
       </p>
-    </Plane>
+    </div>
   );
 }

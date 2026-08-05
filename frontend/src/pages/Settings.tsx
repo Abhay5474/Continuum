@@ -44,7 +44,7 @@ export default function Settings() {
       <div className="plane mx-auto mt-16 max-w-md p-8 text-center">
         <div className="text-3xl">⚙️</div>
         <h1 className="mt-2 text-lg font-semibold">Account settings</h1>
-        <p className="mt-1 text-sm text-slate-400">Sign in through the Developer Portal first.</p>
+        <p className="mt-1 text-sm text-slate-400 max-w-2xl leading-relaxed">Sign in through the Developer Portal first.</p>
         <a href="/portal" className="mt-4 inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-semibold text-ink">
           Open Developer Portal →
         </a>
@@ -137,7 +137,7 @@ export default function Settings() {
     <div className="mx-auto max-w-3xl space-y-6 animate-fade-up">
       <div>
         <h1 className="text-lg font-semibold tracking-tight text-slate-100">Account Settings</h1>
-        {me && <p className="mt-0.5 text-sm text-slate-500">{me.email} · <span className="font-mono">{me.id}</span></p>}
+        {me && <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">{me.email} · <span className="font-mono">{me.id}</span></p>}
       </div>
 
       {/* API keys */}
@@ -192,7 +192,7 @@ export default function Settings() {
             className="rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
         </div>
         <button onClick={changePassword} disabled={pwBusy || !curPw || !newPw}
-          className="mt-3 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+          className="mt-3 flex items-center gap-2 rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
           {pwBusy && <Spinner />} Update password
         </button>
       </Section>
@@ -203,7 +203,7 @@ export default function Settings() {
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
             className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
           <button onClick={changeEmail} disabled={emailBusy || !email}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+            className="flex items-center gap-2 rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
             {emailBusy && <Spinner />} Save
           </button>
         </div>
@@ -275,7 +275,7 @@ export default function Settings() {
       {/* danger zone */}
       <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-5">
         <div className="text-sm font-semibold text-rose-200">Danger zone</div>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-slate-400 max-w-2xl leading-relaxed">
           Deleting your account permanently removes your keys, credentials, memory, billing and all data (GDPR).
           This cannot be undone. Type <b>DELETE</b> to confirm.
         </p>

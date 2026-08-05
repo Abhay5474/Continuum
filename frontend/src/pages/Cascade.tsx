@@ -265,7 +265,7 @@ export default function Cascade() {
       {/* ---- tiers ---- */}
       <section className="mt-9">
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Tiers</h2>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
           Derived from the active model registry by price — not configured here.
         </p>
         <div className="mt-3">
@@ -627,7 +627,7 @@ function CalibrationCurve({
           );
         })}
       </div>
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-slate-500 max-w-2xl leading-relaxed">
         {calibrated
           ? "Bars show how often a cheap answer at that judge score actually matched the strong model. Amber bars fall below your threshold and would escalate."
           : "Not enough labelled outcomes yet — the raw judge score is being used unchanged. Hollow bars are bins with too few samples to trust."}

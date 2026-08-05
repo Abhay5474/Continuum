@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useOperator } from "../system/OperatorAccess";
-import { Micro, Readout, Plane, StateDot, Trace } from "../system/primitives";
+import { Readout, Plane, StateDot, Trace } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
 import Tabs from "../system/Tabs";
@@ -99,11 +99,11 @@ export default function GatewayDashboard() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight">Gateway</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             One OpenAI-compatible endpoint · routed, retried and failed over before your app sees it
           </p>
         </div>
@@ -120,7 +120,7 @@ export default function GatewayDashboard() {
           <Readout label="Tokens" value={(stats?.totalTokens ?? 0).toLocaleString()} size="sm" />
           <Readout label="Spend" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} size="sm" />
           <div>
-            <Micro>Throughput</Micro>
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Throughput</h2>
             <div className="mt-1"><Trace points={series} state="active" width={110} height={22} /></div>
           </div>
         </div>
@@ -133,17 +133,17 @@ export default function GatewayDashboard() {
       {/* ---- live request flow: the hero ---- */}
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <Micro>Live request flow · newest first</Micro>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Live request flow · newest first</h2>
           <span className="micro">bar length is latency, relative to the slowest recent request</span>
         </div>
 
         {requests.length === 0 ? (
-          <Plane className="mt-2 p-8 text-center">
-            <p className="text-sm text-slate-400">
+          <div className="mt-2 text-center">
+            <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
               No gateway traffic yet. Send a request with one of your API keys below, or point your
               app at <code className="font-mono text-xs text-neon">/api/gateway/chat</code>.
             </p>
-          </Plane>
+          </div>
         ) : (
           <Spotlight className="mt-2 max-h-[420px] overflow-y-auto rounded-lg pr-1">
             <div className="divide-y divide-edge/40">
@@ -220,7 +220,7 @@ export default function GatewayDashboard() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ---- provider health ---- */}
         <section>
-          <Micro>Provider &amp; model health</Micro>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Provider &amp; model health</h2>
           {health.length === 0 ? (
             <Plane className="mt-2 p-5 text-center text-xs text-slate-500">No calls recorded yet.</Plane>
           ) : (
@@ -257,7 +257,7 @@ export default function GatewayDashboard() {
 
           {stats?.providerUsage && Object.keys(stats.providerUsage).length > 0 && (
             <div className="mt-4">
-              <Micro>Usage by provider</Micro>
+              <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Usage by provider</h2>
               <div className="mt-1.5 space-y-1">
                 {Object.entries(stats.providerUsage).map(([p, v]: any) => (
                   <div key={p} className="flex items-baseline justify-between text-[11px]">
@@ -275,7 +275,7 @@ export default function GatewayDashboard() {
         {/* ---- self-healing ledger ---- */}
         <section>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <Micro>Self-healing ledger</Micro>
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Self-healing ledger</h2>
             <button
               onClick={runVerifyScan}
               disabled={verifying}
@@ -356,7 +356,7 @@ export default function GatewayDashboard() {
       {/* ---- model registry ---- */}
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Micro>Model registry &amp; lifecycle</Micro>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Model registry &amp; lifecycle</h2>
           {operator ? (
             <button
               onClick={() => api.opPost("/api/models/discover").then(refresh)}
@@ -427,7 +427,7 @@ export default function GatewayDashboard() {
         {tab === "send" && (<>
       {/* ---- playground ---- */}
       <section>
-        <Micro>Send a request</Micro>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Send a request</h2>
         <p className="mt-1 text-[11px] text-slate-500">
           Paste one of your API keys to send a request through the gateway.{" "}
           <Link to="/portal" className="text-neon hover:underline">Create a key →</Link>
@@ -448,7 +448,7 @@ export default function GatewayDashboard() {
           <button
             onClick={sendChat}
             disabled={!apiKey || sending}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+            className="rounded bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
           >
             {sending ? "Sending…" : "Send"}
           </button>

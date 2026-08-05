@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
 
 /**
@@ -75,7 +75,7 @@ export default function Provenance() {
   const nodes: Node[] = graph?.decisions ?? [];
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-8">
       <PageHeader
         title="Decision Provenance"
         subtitle="Why Continuum did what it did — as data, not as a sentence."
@@ -93,7 +93,7 @@ export default function Provenance() {
         />
       </div>
 
-      <Plane className="space-y-3 p-4">
+      <div className="space-y-3">
         <Switch
           checked={!!status?.enabled}
           busy={busy}
@@ -112,7 +112,7 @@ export default function Provenance() {
           label="Record decisions"
           hint="Off by default. Recording is cheap but not free, and a request path is the wrong place to add writes nobody asked for."
         />
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           Every response already carries a routing reason like{" "}
           <span className="readout">mode=BALANCED · quality 0.55 (repair) · confidence 0.82</span>.
           That is fine for reading one answer and useless for everything else — you cannot
@@ -120,15 +120,15 @@ export default function Provenance() {
           cost. One row per decision, because those questions are aggregations over decisions
           rather than over requests.
         </p>
-      </Plane>
+      </div>
 
       <Degradation />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_1fr]">
-        <Plane className="min-w-0 p-3">
-          <Micro>Recent requests</Micro>
+        <div className="min-w-0">
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Recent requests</h2>
           {requests.length === 0 ? (
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-500 max-w-2xl leading-relaxed">
               Nothing recorded yet. Turn recording on and send a request through the gateway.
             </p>
           ) : (
@@ -148,17 +148,17 @@ export default function Provenance() {
               ))}
             </div>
           )}
-        </Plane>
+        </div>
 
-        <Plane className="min-w-0 p-4">
+        <div className="min-w-0">
           {!graph?.found ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
               Pick a request to see every decision made about it, in order.
             </p>
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <Micro>Decision graph</Micro>
+                <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Decision graph</h2>
                 <span className="readout text-xs text-slate-500">
                   {nodes.length} decisions · {graph.totalLatencyMs}ms · $
                   {Number(graph.totalCost ?? 0).toFixed(6)}
@@ -206,7 +206,7 @@ export default function Provenance() {
                   <pre className="well max-h-72 w-full max-w-full overflow-auto p-3 text-[11px] leading-relaxed text-slate-400">
                     {JSON.stringify(otel, null, 2)}
                   </pre>
-                  <p className="text-xs text-slate-600">
+                  <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
                     Uses the GenAI semantic conventions where they exist —{" "}
                     <span className="readout">gen_ai.request.model</span>,{" "}
                     <span className="readout">gen_ai.usage.cost</span> — so this groups correctly in
@@ -217,7 +217,7 @@ export default function Provenance() {
               )}
             </div>
           )}
-        </Plane>
+        </div>
       </div>
     </section>
   );
@@ -252,7 +252,7 @@ function Degradation() {
   const recent: any[] = status?.recent ?? [];
 
   return (
-    <Plane className="space-y-3 p-4">
+    <div className="space-y-3">
       <Switch
         checked={!!status?.enabled}
         busy={busy}
@@ -279,7 +279,7 @@ function Degradation() {
         <Readout label="Nothing to serve" value={byRung.STATIC ?? 0} size="sm" />
       </div>
 
-      <p className="text-xs text-slate-600">
+      <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
         Every degraded response says which rung it came from — the model reads{" "}
         <span className="readout">degraded/cached</span> or{" "}
         <span className="readout">degraded/static</span> and the reason starts{" "}
@@ -287,7 +287,7 @@ function Degradation() {
         worse than an error, because the caller cannot tell it should retry or warn its user.
         Silently succeeding is the failure mode this feature could most easily become.
       </p>
-      <p className="text-xs text-slate-600">
+      <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
         There is no "cheaper model" rung. Falling back to a smaller model is what the fallback
         chain already does, several times, before this ladder is reached — adding it here would
         present the chain's ordinary work as a degradation event.
@@ -305,6 +305,6 @@ function Degradation() {
           ))}
         </div>
       )}
-    </Plane>
+    </div>
   );
 }

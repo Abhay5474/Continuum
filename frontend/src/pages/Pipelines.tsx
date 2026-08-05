@@ -1214,14 +1214,14 @@ function VerificationVerdict({ v }: { v: Verification }) {
       )}
 
       {(v.covered.length > 0 || v.uncovered.length > 0) && (
-        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500 max-w-2xl">
           {v.covered.length > 0 && <>Addressed: {v.covered.join(", ")}. </>}
           {v.uncovered.length > 0 && <>Not mentioned: {v.uncovered.join(", ")}.</>}
         </p>
       )}
 
       {v.replaced && (
-        <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-600 max-w-2xl">
           The model's answer was discarded and replaced with one that states the findings plainly.
           Your application received the replacement, not the original.
         </p>
@@ -1327,7 +1327,7 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
               rows={2}
               className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 font-mono text-[11px] text-slate-300 outline-none focus:border-[color:var(--accent-edge)]"
             />
-            {file && <p className="mt-1 text-xs text-slate-600">Ignored while a file is attached.</p>}
+            {file && <p className="mt-1 text-xs text-slate-600 max-w-2xl leading-relaxed">Ignored while a file is attached.</p>}
           </label>
           <label className="block">
             <Micro>What your user asked</Micro>
@@ -1405,7 +1405,7 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
                 Trace <span className="readout text-slate-500">{run.traceId}</span> — returned to your
                 application so it can show its own user the same chain.
               </p>
@@ -1460,7 +1460,7 @@ function PolicyVerdict({ policy, compliance }: { policy: Policy; compliance: Com
             <span className="micro opacity-70">measured, {compliance.method}</span>
           </div>
           {compliance.markers.length > 0 && (
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
               Found in the answer: {compliance.markers.map((m) => `"${m}"`).join(", ")}
             </p>
           )}

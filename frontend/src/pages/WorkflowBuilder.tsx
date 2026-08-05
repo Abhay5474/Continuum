@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, portal } from "../api";
-import { Micro, Readout, Plane, StateDot } from "../system/primitives";
+import { Micro, Readout, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
 import { Morph } from "../system/motion";
@@ -208,11 +208,11 @@ export default function WorkflowBuilder() {
   }, [defs]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight">Workflows</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Author a durable graph · crash-safe, retried, exactly-once
           </p>
         </div>
@@ -264,7 +264,7 @@ export default function WorkflowBuilder() {
               </div>
             )}
             {latest.length === 0 ? (
-              <Plane className="p-8 text-center">
+              <div className="text-center">
                 <Micro>No definitions yet</Micro>
                 <p className="mx-auto mt-2 max-w-md text-xs text-slate-500">
                   A definition is a graph of HTTP steps the engine runs durably. Start one in the
@@ -276,7 +276,7 @@ export default function WorkflowBuilder() {
                 >
                   Open the editor
                 </button>
-              </Plane>
+              </div>
             ) : (
               <div className="divide-y divide-edge/40">
                 {latest.map((d) => (
@@ -291,7 +291,7 @@ export default function WorkflowBuilder() {
                     <button onClick={() => load(d.name)}
                       className="rounded border border-edge px-2 py-1 hover:border-aurora/50">Edit</button>
                     <button onClick={() => run(d.name)} disabled={busy || !inputValid}
-                      className="rounded bg-indigo-600 px-2.5 py-1 font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+                      className="rounded bg-[color:var(--accent-strong)] px-2.5 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50">
                       Run
                     </button>
                     <button
@@ -328,7 +328,7 @@ export default function WorkflowBuilder() {
                 <button
                   onClick={publish}
                   disabled={busy || !!parsed.err}
-                  className="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                  className="rounded bg-[color:var(--accent-strong)] px-4 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {busy ? "Publishing…" : "Publish version"}
                 </button>
@@ -417,9 +417,9 @@ export default function WorkflowBuilder() {
         {tab === "runs" && (
           <section>
             {runs.length === 0 ? (
-              <Plane className="p-8 text-center text-xs text-slate-500">
+              <div className="text-center text-xs text-slate-500">
                 No runs yet. Publish a definition and run it.
-              </Plane>
+              </div>
             ) : (
               <div className="divide-y divide-edge/40">
                 <div className="flex items-center gap-x-4 pb-1 text-[10px] uppercase tracking-widest text-slate-600">
