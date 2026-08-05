@@ -117,7 +117,7 @@ export default function Uncertainty() {
       </section>
 
       {/* ---- what it found ---- */}
-      <Plane className="grid gap-6 p-5 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="Measured" value={status?.measured ?? 0} />
         <Readout
           label="Mean confidence"
@@ -136,7 +136,7 @@ export default function Uncertainty() {
           hint="What the resampling cost"
         />
         <Readout label="Added latency" value={status?.extraMs ?? 0} unit="ms" hint="Mean, per measurement" />
-      </Plane>
+      </div>
 
       {/* ---- distribution ---- */}
       {(status?.measured ?? 0) > 0 && (

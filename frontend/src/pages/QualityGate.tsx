@@ -153,7 +153,7 @@ export default function QualityGatePage() {
       </section>
 
       {/* ---- the case for or against enforcing ---- */}
-      <Plane className="grid gap-6 p-5 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="Checked" value={status?.checked ?? 0} />
         <Readout
           label={monitoring ? "Would have acted" : "Acted on"}
@@ -174,7 +174,7 @@ export default function QualityGatePage() {
           unit="ms"
           hint={`$${(status?.extraCost ?? 0).toFixed(5)} spent repairing`}
         />
-      </Plane>
+      </div>
 
       {status && status.checked > 0 && (
         <p className="text-xs text-slate-500">
@@ -459,7 +459,7 @@ function RepairEngine({
       </Plane>
 
       {total > 0 && (
-        <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+        <div className="flex flex-wrap gap-x-9 gap-y-4">
           <Readout label="Attempts" value={total} size="sm" />
           <Readout label="Kept" value={kept} size="sm" state={kept > 0 ? "healthy" : "idle"} />
           <Readout
@@ -475,7 +475,7 @@ function RepairEngine({
             size="sm"
             hint="Summed improvement across every kept attempt."
           />
-        </Plane>
+        </div>
       )}
 
       {attempts.length === 0 ? (

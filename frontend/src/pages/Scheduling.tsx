@@ -122,7 +122,7 @@ export default function Scheduling() {
         subtitle="Admission control answers whether there is room. This answers who gets it."
       />
 
-      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout
           label="Waiting now"
           value={waiting}
@@ -148,7 +148,7 @@ export default function Scheduling() {
           state={missed > 0 ? "degraded" : "idle"}
           hint="Could not have finished in time, so the slot went to something that could."
         />
-      </Plane>
+      </div>
 
       <Plane className="space-y-3 p-4">
         <Switch

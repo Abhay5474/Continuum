@@ -100,7 +100,7 @@ export default function Saga() {
         subtitle="Durable execution guarantees each step runs once. It does not guarantee the set of them is all-or-nothing."
       />
 
-      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="Rollbacks" value={status?.rollbacks ?? 0} size="sm" />
         <Readout
           label="Steps undone"
@@ -121,7 +121,7 @@ export default function Saga() {
           size="sm"
           state={(status?.partialRollbacks ?? 0) > 0 ? "degraded" : "idle"}
         />
-      </Plane>
+      </div>
 
       <Plane className="space-y-3 p-4">
         <Switch

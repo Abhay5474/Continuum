@@ -27,6 +27,11 @@ export function Micro({ children, className = "" }: { children: ReactNode; class
  *
  * <p>{@code aside} holds whatever the page needs at the top right: a toggle, a
  * row of readouts, a control.
+ *
+ * <p>The title is larger and the subtitle capped at a readable measure. A page
+ * title set at the same size as the section headings under it does not open the
+ * page, and a one-line subtitle running the full width of a 1400px console is a
+ * line nobody reaches the end of.
  */
 export function PageHeader({
   title,
@@ -40,8 +45,10 @@ export function PageHeader({
   return (
     <header className="flex flex-wrap items-start gap-x-6 gap-y-3">
       <div className="min-w-0 flex-1">
-        <h1 className="text-lg font-semibold tracking-tight text-slate-100">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">{title}</h1>
+        {subtitle && (
+          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">{subtitle}</p>
+        )}
       </div>
       {aside && <div className="flex flex-wrap items-end gap-x-6 gap-y-3">{aside}</div>}
     </header>
@@ -64,6 +71,13 @@ export function Plane({
  * A telemetry readout: a value with its unit and label. Values are tabular so a
  * changing number doesn't reflow, and re-render is signalled by a settle, not a
  * flash.
+ *
+ * <p>Retuned to sit in the page rather than shout over it. These were set bold
+ * at 24px and appeared six-across at the top of nearly every screen, which made
+ * the loudest thing on any page the band of numbers you had not come for. The
+ * label carries the meaning; the value only has to be findable, and a normal
+ * weight at 21px is findable. Colour is still reserved for state — a number is
+ * tinted when it is telling you something, and plain when it is not.
  */
 export function Readout({
   label,
@@ -80,21 +94,21 @@ export function Readout({
   hint?: string;
   size?: "sm" | "md" | "lg";
 }) {
-  const sizes = { sm: "text-lg", md: "text-2xl", lg: "text-4xl" };
+  const sizes = { sm: "text-[17px]", md: "text-[21px]", lg: "text-[30px]" };
   // A plain number rolls to its new value so a change is visible; anything
   // already formatted (strings, elements) is rendered as given.
   const body = typeof value === "number" ? <CountUp value={value} /> : value;
   return (
-    <div title={hint}>
-      <Micro>{label}</Micro>
+    <div title={hint} className="min-w-0">
+      <Micro className="truncate">{label}</Micro>
       <div className="mt-1 flex items-baseline gap-1">
         <span
-          className={`readout font-semibold ${sizes[size]}`}
+          className={`readout leading-none tracking-tight ${sizes[size]}`}
           style={{ color: state === "idle" ? undefined : STATE[state].ink }}
         >
           {body}
         </span>
-        {unit && <span className="text-xs text-slate-500">{unit}</span>}
+        {unit && <span className="text-[11px] text-slate-500">{unit}</span>}
       </div>
     </div>
   );

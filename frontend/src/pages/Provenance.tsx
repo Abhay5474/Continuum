@@ -81,7 +81,7 @@ export default function Provenance() {
         subtitle="Why Continuum did what it did — as data, not as a sentence."
       />
 
-      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="Requests recorded" value={status?.requests ?? 0} size="sm" />
         <Readout label="Decisions" value={status?.decisions ?? 0} size="sm" />
         <Readout label="Stages seen" value={Object.keys(byStage).length} size="sm" />
@@ -91,7 +91,7 @@ export default function Provenance() {
           size="sm"
           state={status?.enabled ? "active" : "idle"}
         />
-      </Plane>
+      </div>
 
       <Plane className="space-y-3 p-4">
         <Switch

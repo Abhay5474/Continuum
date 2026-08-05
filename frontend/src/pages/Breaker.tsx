@@ -103,7 +103,7 @@ export default function BreakerPage() {
         />
       </Plane>
 
-      <Plane className="grid gap-6 p-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="Watching" value={status?.breakers.length ?? 0} unit="models" />
         <Readout
           label="Diverted"
@@ -117,7 +117,7 @@ export default function BreakerPage() {
           unit="min"
           hint="Before a probe is allowed through"
         />
-      </Plane>
+      </div>
 
       {/* ---- the breakers ---- */}
       <section className="space-y-3">

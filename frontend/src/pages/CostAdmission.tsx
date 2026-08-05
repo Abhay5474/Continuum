@@ -104,7 +104,7 @@ export default function CostAdmission() {
         subtitle="A fifty-step agent carrying twenty thousand tokens is not one request in the way that “hello” is one request."
       />
 
-      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-5">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="Admitted" value={admitted} size="sm" />
         <Readout
           label="Refused"
@@ -132,7 +132,7 @@ export default function CostAdmission() {
           state={outstanding > 0 ? "active" : "idle"}
           hint="Reservations held right now. If this climbs and never falls, they are leaking."
         />
-      </Plane>
+      </div>
 
       <Plane className="space-y-3 p-4">
         <Switch

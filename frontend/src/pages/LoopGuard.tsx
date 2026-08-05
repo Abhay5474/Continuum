@@ -133,7 +133,7 @@ export default function LoopGuard() {
         subtitle="An agent that has lost the thread does not crash — it keeps working, and every step is billable."
       />
 
-      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout
           label="Loops caught"
           value={status?.detected ?? 0}
@@ -154,7 +154,7 @@ export default function LoopGuard() {
           size="sm"
           hint="A → B → A → B. The shape that runs longest before anyone notices."
         />
-      </Plane>
+      </div>
 
       <Plane className="space-y-3 p-4">
         <Switch

@@ -714,7 +714,7 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
         </Plane>
       ) : (
         <>
-          <Plane className="grid gap-6 p-5 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="flex flex-wrap gap-x-9 gap-y-4">
             <Readout label="Decisions" value={comparison.decisions} size="sm" />
             <Readout
               label="Overrode scorer"
@@ -732,7 +732,7 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
               state={delta == null ? "idle" : delta >= 0 ? "healthy" : "critical"}
             />
             <Readout label="Success when agreeing" value={pct(agreed?.successRate)} size="sm" />
-          </Plane>
+          </div>
 
           {delta != null && (comparison.diverged ?? 0) > 0 && (
             <p className={`text-xs ${delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>

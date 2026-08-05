@@ -118,7 +118,7 @@ export default function Counterfactual() {
         subtitle="What would last week's traffic have cost on a different routing policy — answered before you switch, not after."
       />
 
-      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="Requests replayable" value={status?.requestsAvailable ?? 0} size="sm" />
         <Readout
           label="Actual spend"
@@ -127,7 +127,7 @@ export default function Counterfactual() {
           hint="Over the requests available to replay."
         />
         <Readout label="Distinct models" value={armNames.length} size="sm" />
-      </Plane>
+      </div>
 
       <Plane className="space-y-3 p-4">
         <Switch

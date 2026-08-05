@@ -137,7 +137,7 @@ export default function Cascade() {
       {/* ---- savings, next to the numbers that could disprove them ---- */}
       <section className="space-y-3">
         <Micro>Did it work</Micro>
-        <Plane className="grid gap-6 p-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-wrap gap-x-9 gap-y-4">
           <Readout
             label="Saved"
             value={`$${(status?.saved ?? 0).toFixed(4)}`}
@@ -166,7 +166,7 @@ export default function Cascade() {
                 : `of ${status?.auditSamples} audited`
             }
           />
-        </Plane>
+        </div>
 
         {status && status.requests > 0 && (
           <p className="text-xs text-slate-500">

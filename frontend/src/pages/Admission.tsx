@@ -88,7 +88,7 @@ export default function Admission() {
         subtitle="How much a provider will actually take, measured from latency instead of guessed."
       />
 
-      <Plane className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Readout label="In flight" value={inFlight} size="sm" state={inFlight > 0 ? "active" : "idle"} />
         <Readout label="Admitted" value={totalAdmitted} size="sm" />
         <Readout
@@ -104,7 +104,7 @@ export default function Admission() {
           state={totalShed > 0 ? "degraded" : "idle"}
           hint="Refused deliberately, lowest importance first."
         />
-      </Plane>
+      </div>
 
       <Plane className="space-y-3 p-4">
         <Switch

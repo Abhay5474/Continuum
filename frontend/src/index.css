@@ -286,17 +286,20 @@ body {
      Planes are recessed and defined by hairlines rather than floated with
      shadows, so the interface reads as one continuous surface with depth
      instead of a tray of cards. */
+  /* One hairline and a flat fill. The gradient and the inset white highlight
+     that used to be here were doing the job of a card edge — and a page with
+     six of them stacked read as six trays rather than one instrument. Quiet
+     enough now that a plane groups without announcing itself. */
   .plane {
-    @apply rounded-lg border border-edge/70;
-    background:
-      linear-gradient(180deg, rgb(var(--panel) / 0.85), rgb(var(--panel) / 0.6));
-    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.03);
-  }
-  /* A plane that reads as cut *into* the surface — used for readouts/wells. */
-  .well {
     @apply rounded-lg border border-edge/60;
-    background: rgb(var(--ink) / 0.55);
-    box-shadow: inset 0 1px 3px 0 rgb(0 0 0 / 0.35);
+    background: rgb(var(--panel));
+  }
+  /* A plane that reads as cut *into* the surface — used for readouts/wells.
+     On a black page there is nothing darker to recess into, so the well is
+     distinguished by its hairline and by sitting flush with the background. */
+  .well {
+    @apply rounded-lg border border-edge/50;
+    background: rgb(var(--ink));
   }
   /* Fine engineering grid — establishes the spatial field behind the topology. */
   .grid-field {
