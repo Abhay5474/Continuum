@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useOperator } from "../system/OperatorAccess";
-import { Readout, Plane, StateDot, Trace } from "../system/primitives";
+import { Micro, Readout, Plane, StateDot, Trace } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
 import Tabs from "../system/Tabs";
@@ -102,7 +102,7 @@ export default function GatewayDashboard() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Gateway</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight">Gateway</h1>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             One OpenAI-compatible endpoint · routed, retried and failed over before your app sees it
           </p>
@@ -120,7 +120,7 @@ export default function GatewayDashboard() {
           <Readout label="Tokens" value={(stats?.totalTokens ?? 0).toLocaleString()} size="sm" />
           <Readout label="Spend" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} size="sm" />
           <div>
-            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Throughput</h2>
+            <Micro>Throughput</Micro>
             <div className="mt-1"><Trace points={series} state="active" width={110} height={22} /></div>
           </div>
         </div>
@@ -170,7 +170,7 @@ export default function GatewayDashboard() {
                   </span>
 
                   {/* latency bar */}
-                  <span className="relative h-1.5 w-28 shrink-0 overflow-hidden rounded-full bg-ink">
+                  <span className="relative h-1.5 w-28 shrink-0 overflow-hidden rounded-full bg-edge">
                     <span
                       className="absolute inset-y-0 left-0 rounded-full"
                       style={{
@@ -200,7 +200,10 @@ export default function GatewayDashboard() {
                   )}
 
                   <span className="ml-auto flex items-center gap-3 text-slate-500">
-                    <span title="Scored prompt complexity">c{(r.complexity ?? 0).toFixed(2)}</span>
+                    <span title="Scored prompt complexity">
+                      <span className="micro mr-1 inline">cx</span>
+                      <span className="readout">{(r.complexity ?? 0).toFixed(2)}</span>
+                    </span>
                     <span className="readout">{r.tokens} tok</span>
                     <span className="readout">${(r.costUsd ?? 0).toFixed(5)}</span>
                   </span>
@@ -236,7 +239,7 @@ export default function GatewayDashboard() {
                     <span className="font-mono text-slate-300">
                       {h.provider}/{h.modelName}
                     </span>
-                    <span className="relative h-1 w-20 overflow-hidden rounded-full bg-ink">
+                    <span className="relative h-1 w-20 overflow-hidden rounded-full bg-edge">
                       <span className="absolute inset-y-0 left-0 rounded-full"
                         style={{ width: `${score * 100}%`, background: STATE[st].color }} />
                     </span>

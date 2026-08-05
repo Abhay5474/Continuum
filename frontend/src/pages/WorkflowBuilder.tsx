@@ -211,7 +211,7 @@ export default function WorkflowBuilder() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Workflows</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight">Workflows</h1>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Author a durable graph · crash-safe, retried, exactly-once
           </p>

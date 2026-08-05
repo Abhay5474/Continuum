@@ -59,7 +59,7 @@ export default function WorkflowDetailPage() {
           ← Back
         </Link>
         <StatusBadge status={detail.summary.status} />
-        <h1 className="text-lg font-semibold">{detail.summary.workflowType}</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight">{detail.summary.workflowType}</h1>
         <span className="font-mono text-xs text-slate-400">{detail.summary.workflowId}</span>
         {healing?.healed && (
           <>

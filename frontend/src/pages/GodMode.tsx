@@ -168,7 +168,7 @@ export default function GodMode() {
       {/* ---- header + master control ---- */}
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Adaptive Policy</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight">Adaptive Policy</h1>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Self-managing memory · policy proposals gated by digital-twin replay
           </p>
@@ -676,7 +676,7 @@ function PosteriorBar({
         </span>
       </div>
 
-      <div className="relative mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink">
+      <div className="relative mt-1.5 h-2 w-full overflow-hidden rounded-full bg-edge">
         {/* the interval the engine reasons over */}
         <div
           className="absolute inset-y-0 rounded-full transition-all duration-500"
@@ -783,7 +783,7 @@ function SimulationRow({ sim }: { sim: any }) {
 function Bar({ frac, color, caption }: { frac: number; color: string; caption: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-ink">
+      <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-edge">
         <span
           className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500"
           style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%`, background: color }}

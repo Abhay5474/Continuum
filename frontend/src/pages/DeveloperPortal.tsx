@@ -47,7 +47,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
             ⟳
           </span>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-slate-100">Developer Portal</h1>
+            <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Developer Portal</h1>
             <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Your API keys, credentials and analytics.</p>
           </div>
         </div>
@@ -222,7 +222,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
     <div className="space-y-8">
       {/* Billing / Settings / Sign out live in the account menu in the header. */}
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-lg font-semibold tracking-tight text-slate-100">API Keys &amp; Providers</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">API Keys &amp; Providers</h1>
         {me && <span className="text-sm text-slate-400">{me.email} · <span className="font-mono">{me.id}</span></span>}
       </div>
 
@@ -268,7 +268,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* analytics */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="flex flex-wrap gap-x-9 gap-y-4">
         <Stat label="Requests" value={stats?.totalRequests ?? "—"} />
         <Stat label="Success rate" value={stats ? `${Math.round(stats.successRate * 100)}%` : "—"} accent="text-emerald-300" />
         <Stat label="Failures prevented" value={stats?.failuresPrevented ?? "—"} accent="text-indigo-300" />
@@ -277,7 +277,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       </div>
 
       {/* credential vault */}
-      <div className="rounded-lg border border-edge bg-panel p-4">
+      <div>
         <div className="font-medium">Configure Upstream Keys</div>
         <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
           Store your own LLM provider API keys. They are encrypted with AES-256-GCM and decrypted only
@@ -420,7 +420,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       </div>
 
       {/* api keys */}
-      <div className="rounded-lg border border-edge bg-panel p-4">
+      <div>
         <div className="flex items-center">
           <div className="font-medium">Continuum API keys</div>
           <button onClick={issueKey} className="ml-auto rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">Issue new key</button>
@@ -449,7 +449,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       </div>
 
       {/* playground */}
-      <div className="rounded-lg border border-edge bg-panel p-4">
+      <div>
         <div className="font-medium">Sandbox playground</div>
         <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Send a request through your gateway right now — no code required.</p>
         <textarea value={playPrompt} onChange={(e) => setPlayPrompt(e.target.value)}
@@ -490,11 +490,21 @@ function OnboardStep({ n, title, done, children }: { n: number; title: string; d
   );
 }
 
+/**
+ * A number in the page's own type.
+ *
+ * <p>These were five bordered boxes across the top, which is the most reliably
+ * ignored element in any console: the same furniture on every screen, so the
+ * eye learns to skip the band. The label carries the meaning and the value
+ * only has to be findable.
+ */
 function Stat({ label, value, accent }: { label: string; value: any; accent?: string }) {
   return (
-    <div className="rounded-lg border border-edge bg-panel p-4 transition-all hover:border-aurora/30">
-      <div className="text-xs uppercase text-slate-400">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${accent ?? ""}`}>{value}</div>
+    <div className="min-w-0">
+      <div className="micro truncate">{label}</div>
+      <div className={`readout mt-1 text-[21px] leading-none tracking-tight ${accent ?? ""}`}>
+        {value}
+      </div>
     </div>
   );
 }

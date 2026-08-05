@@ -87,7 +87,7 @@ export default function DagCommandCenter() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Verification</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight">Verification</h1>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Claims solved in parallel · verified independently · resolved by Bayesian aggregation
           </p>

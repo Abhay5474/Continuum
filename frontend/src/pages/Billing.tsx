@@ -44,7 +44,7 @@ export default function Billing() {
     return (
       <div className="plane mx-auto mt-16 max-w-md p-8 text-center">
         <div className="text-3xl">💳</div>
-        <h1 className="mt-2 text-lg font-semibold">Billing</h1>
+        <h1 className="mt-2 text-[22px] font-semibold tracking-tight">Billing</h1>
         <p className="mt-1 text-sm text-slate-400 max-w-2xl leading-relaxed">Sign in through the Developer Portal to view your plan and usage.</p>
         <a href="/portal" className="mt-4 inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-semibold text-ink">
           Open Developer Portal →
@@ -70,7 +70,7 @@ export default function Billing() {
   return (
     <div className="space-y-6 animate-fade-up">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight text-slate-100">Billing &amp; Usage</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Billing &amp; Usage</h1>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">Your plan, this month's token usage, and quota.</p>
       </div>
 
@@ -91,7 +91,7 @@ export default function Billing() {
             </div>
           </div>
         </div>
-        <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-ink">
+        <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-edge">
           <div
             className="h-full rounded-full transition-all duration-700"
             style={{ width: `${Math.min(100, pct)}%`, background: `linear-gradient(90deg, hsl(${hue} 80% 55%), hsl(${hue - 20} 80% 55%))` }}

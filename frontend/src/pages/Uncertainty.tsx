@@ -4,6 +4,7 @@ import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ChartFrame, Histogram } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
+import { Segmented } from "../system/hub";
 
 /**
  * Semantic uncertainty.
@@ -18,8 +19,10 @@ import { dateTimeOf } from "../system/time";
  * means k times the tokens and pretending otherwise would be dishonest.
  */
 
+type Mode = "OFF" | "ON_DEMAND" | "ADAPTIVE" | "ALWAYS";
+
 type Status = {
-  mode: "OFF" | "ON_DEMAND" | "ADAPTIVE" | "ALWAYS";
+  mode: Mode;
   samples: number;
   temperature: number;
   lowConfidence: number;
@@ -88,32 +91,39 @@ export default function Uncertainty() {
         subtitle="Asks the same question several times and measures whether the model agrees with itself. Disagreement about meaning — not wording — is what a hallucination looks like from the outside."
       />
 
-      {/* ---- mode ---- */}
-      <section className="space-y-3">
+      {/* ---- mode ----
+          One setting with four positions, not four products. As four bordered
+          cards the choice read as a menu of features and the note under each
+          competed with the other three; as a control with one consequence
+          stated beneath it, only the position you are in has to be read. */}
+      <section>
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">When to measure</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {MODES.map(([value, name, note]) => {
-            const active = status?.mode === value;
-            return (
-              <button
-                key={value}
-                disabled={busy}
-                onClick={() => run(() => portal.uncertainty.configure({ mode: value }), `Mode: ${name}`)}
-                className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
-                  active ? "border-aurora/60 bg-aurora/10" : "border-edge hover:border-aurora/40"
-                }`}
-              >
-                <div className="flex items-center gap-2">
+        <div className="mt-3">
+          <Segmented<Mode>
+            value={status?.mode ?? "OFF"}
+            onChange={(v) =>
+              run(
+                () => portal.uncertainty.configure({ mode: v }),
+                `Mode: ${MODES.find(([m]) => m === v)?.[1] ?? v}`
+              )
+            }
+            options={MODES.map(([value, label]) => ({
+              value,
+              label,
+              badge:
+                status?.mode === value && value !== "OFF" ? (
                   <span
-                    className={`h-2 w-2 shrink-0 rounded-full ${active ? "bg-aurora" : "bg-edge"}`}
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: "var(--accent)" }}
+                    aria-hidden
                   />
-                  <span className="text-sm font-medium text-slate-200">{name}</span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">{note}</p>
-              </button>
-            );
-          })}
+                ) : undefined,
+            }))}
+          />
         </div>
+        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-500">
+          {MODES.find(([m]) => m === (status?.mode ?? "OFF"))?.[2]}
+        </p>
       </section>
 
       {/* ---- what it found ---- */}

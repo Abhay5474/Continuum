@@ -72,7 +72,7 @@ export default function ReplayVerify() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-lg font-semibold tracking-tight">Replay Audit</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight">Replay Audit</h1>
         <p className="mt-0.5 max-w-2xl text-sm text-slate-500">
           Replays a run's decisions against its own recorded history to confirm it would execute
           identically — the property crash recovery depends on. Model outputs are additionally

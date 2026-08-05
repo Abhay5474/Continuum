@@ -127,7 +127,7 @@ export default function ModelRouter() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Routing</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight">Routing</h1>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Scored per request · non-stationary contextual bandit · tail-latency hedging
           </p>
@@ -418,7 +418,7 @@ export default function ModelRouter() {
                       <span className={`w-28 shrink-0 truncate ${chosen ? "text-slate-200" : "text-slate-500"}`}>
                         {s.provider}
                       </span>
-                      <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-ink">
+                      <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-edge">
                         <span
                           className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500"
                           style={{

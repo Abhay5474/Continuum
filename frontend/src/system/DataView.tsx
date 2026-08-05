@@ -172,7 +172,7 @@ function Row({ label, value }: { label: string; value: unknown }) {
         <span className="micro">{label}</span>
         <span className="flex items-center gap-2">
           {ratio !== undefined && (
-            <span className="relative h-1 w-20 overflow-hidden rounded-full bg-ink">
+            <span className="relative h-1 w-20 overflow-hidden rounded-full bg-edge">
               <span
                 className="absolute inset-y-0 left-0 rounded-full"
                 style={{ width: `${ratio * 100}%`, background: STATE.active.color }}

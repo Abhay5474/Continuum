@@ -39,7 +39,7 @@ export default function Autopilot() {
     return (
       <div className="mx-auto max-w-lg rounded-lg border border-edge bg-panel p-6 text-center">
         <div className="text-2xl">🧭</div>
-        <h1 className="mt-2 text-lg font-semibold">Autopilot</h1>
+        <h1 className="mt-2 text-[22px] font-semibold tracking-tight">Autopilot</h1>
         <p className="mt-1 text-sm text-slate-400 max-w-2xl leading-relaxed">
           Sign in on the <a href="/portal" className="text-indigo-400 underline">Developer Portal</a> to
           set up Autopilot for your application.
@@ -179,7 +179,7 @@ export default function Autopilot() {
                   <StatusPill status={c.status} />
                   <span>candidate v-bundle {c.candidateBundleId} @ {c.percentage}%</span>
                 </div>
-                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-ink">
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-edge">
                   <div className="h-full rounded-full bg-indigo-500 transition-all"
                     style={{ width: `${c.percentage}%` }} />
                 </div>

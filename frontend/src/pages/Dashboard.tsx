@@ -89,7 +89,7 @@ export default function Dashboard() {
       {/* This page had no heading at all — reachable from the nav as "Run
           History" and then announcing itself as nothing. */}
       <div>
-        <h1 className="text-lg font-semibold tracking-tight text-slate-100">Run History</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Run History</h1>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
           Every durable run, its event log and its replay
         </p>

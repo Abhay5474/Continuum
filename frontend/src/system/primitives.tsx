@@ -153,7 +153,7 @@ export function Meter({
           <span className="readout text-[10px] text-slate-400">{pct.toFixed(0)}%</span>
         </div>
       )}
-      <div className="w-full overflow-hidden rounded-full bg-ink/80" style={{ height }}>
+      <div className="w-full overflow-hidden rounded-full bg-edge" style={{ height }}>
         <div
           className="h-full rounded-full transition-[width] duration-700 ease-out"
           style={{ width: `${pct}%`, background: STATE[state].color }}

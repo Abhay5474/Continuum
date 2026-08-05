@@ -48,7 +48,7 @@ export default function AcceptInvite() {
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <div className="rounded-xl border border-edge bg-panel p-6">
-        <h1 className="text-lg font-semibold tracking-tight">Join on Continuum</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight">Join on Continuum</h1>
 
         {loadError && (
           <>
