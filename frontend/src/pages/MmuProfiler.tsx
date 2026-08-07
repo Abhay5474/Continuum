@@ -4,6 +4,7 @@ import { Micro, Switch } from "../system/primitives";
 import FeatureToggle from "../system/FeatureToggle";
 import { timeOf, toMillis } from "../system/time";
 import {
+  Explain,
   Bar,
   Dot,
   Empty,
@@ -134,12 +135,17 @@ export default function MmuProfiler() {
           label="Working-set assembly"
           hint="Off by default — eviction is positional, oldest paged out first. With it on, what stays resident is scored against the request being answered now, so an order number stated in message three survives a question asked in message forty."
         />
-        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
-          Scored 0.7 × relevance to the current request + 0.3 × recency. Relevance outweighs recency
-          because recency is only a proxy for it, and when a direct measurement is available the proxy
-          should not outvote it. The measure is lexical, so it will miss a paraphrase sharing no
-          vocabulary — better than position, worse than understanding.
-        </p>
+        <Explain title="How the score works">
+          <p>
+            0.7 × relevance to the current request + 0.3 × recency. Relevance outweighs recency
+            because recency is only a proxy for it, and a proxy should not outvote a direct
+            measurement.
+          </p>
+          <p>
+            The measure is lexical, so it misses a paraphrase sharing no vocabulary — better than
+            position, worse than understanding.
+          </p>
+        </Explain>
       </div>
 
       {!active ? (

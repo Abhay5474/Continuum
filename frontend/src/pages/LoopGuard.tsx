@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { Explain, Segmented } from "../system/hub";
 
 /**
  * Agent loop detection.
@@ -170,33 +171,27 @@ export default function LoopGuard() {
           hint="Off by default. While it is off a runaway agent stops when somebody notices the invoice."
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          {["MONITOR", "HALT"].map((m) => (
-            <button
-              key={m}
-              disabled={busy || !status?.enabled}
-              onClick={() => act(() => portal.loops.configure({ mode: m }), `Mode is now ${m}.`)}
-              className={`rounded-md border px-3 py-1.5 text-xs transition-colors disabled:opacity-40 ${
-                status?.mode === m
-                  ? "border-aurora/60 bg-aurora/10 text-slate-100"
-                  : "border-edge text-slate-400 hover:border-aurora/40"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-          <span className="text-xs text-slate-500">
-            {status?.mode === "HALT"
-              ? "A detected loop stops the run and returns the verdict."
-              : "A detected loop is recorded; the run continues."}
-          </span>
+        {/* One setting with two positions, drawn like every other mode in the
+            console rather than as a pair of chips unique to this page. */}
+        <div className="max-w-md">
+          <Segmented<string>
+            value={status?.mode ?? "MONITOR"}
+            onChange={(m) => act(() => portal.loops.configure({ mode: m }), `Mode is now ${m}.`)}
+            options={[
+              { value: "MONITOR", label: "Monitor" },
+              { value: "HALT", label: "Halt" },
+            ]}
+          />
         </div>
+        <p className="max-w-2xl text-xs leading-relaxed text-slate-500">
+          {status?.mode === "HALT"
+            ? "A detected loop stops the run and returns the verdict."
+            : "A detected loop is recorded; the run continues."}
+        </p>
 
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Start in <span className="readout">MONITOR</span>. It records what it would have stopped
-          without stopping anything, which is the only safe way to find out whether the detector
-          agrees with you about your own agents. A false positive stops an agent that was working,
-          and that is the more expensive mistake.
+        <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+          Start in <span className="readout">MONITOR</span> — it records what it would have stopped
+          without stopping anything. A false positive stops an agent that was working.
         </p>
       </div>
 
@@ -277,21 +272,27 @@ export default function LoopGuard() {
 
       <div>
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What it will not do</h2>
-        <p className="mt-1.5 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Repetition alone never trips it. A loop over twenty files issues twenty similar steps and
-          is not stuck, so the signal is repetition <em>without progress</em>. Arguments count as
-          part of the step: <span className="readout">read file src/a.java</span> and{" "}
-          <span className="readout">read file src/b.java</span> score 1.00 on prose similarity
-          because the vectoriser drops filenames, so a check on wording alone would fire on exactly
-          the case it must not.
+        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
+          Repetition alone never trips it — the signal is repetition <em>without progress</em>. And
+          paraphrase detection is deliberately narrow.
         </p>
-        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Paraphrase detection is deliberately narrow. Measured on this codebase&rsquo;s vectoriser,
-          a genuine reword can score 0.26 while two plainly different steps score 0.67 — the
-          populations overlap and no threshold separates them. The threshold is set high: it catches
-          near-identical rewording and misses the rest.
-        </p>
+        <Explain title="Why both are deliberate">
+          <p>
+            A loop over twenty files issues twenty similar steps and is not stuck. Arguments count
+            as part of the step: <span className="readout">read file src/a.java</span> and{" "}
+            <span className="readout">read file src/b.java</span> score 1.00 on prose similarity
+            because the vectoriser drops filenames, so a check on wording alone would fire on
+            exactly the case it must not.
+          </p>
+          <p>
+            Measured on this codebase&rsquo;s vectoriser, a genuine reword can score 0.26 while two
+            plainly different steps score 0.67 — the populations overlap and no threshold separates
+            them. The threshold is set high: it catches near-identical rewording and misses the rest.
+          </p>
+        </Explain>
       </div>
+
+      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Loops caught</h2>
 
       {status === null ? (
         <SkeletonRows rows={2} />

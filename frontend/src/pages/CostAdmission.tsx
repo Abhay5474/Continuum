@@ -3,6 +3,7 @@ import { portal } from "../api";
 import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { BarChart, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { Explain } from "../system/hub";
 
 /**
  * Cost-aware admission.
@@ -189,13 +190,19 @@ export default function CostAdmission() {
         </div>
 
         <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Both allowances refill continuously, so nobody can save up a minute's worth and spend it
-          in one burst. A request is admitted only when both have room — whichever a caller is
-          nearest to exhausting is the one that limits them, so someone making many tiny calls is
-          bounded by request count and someone making one enormous call is bounded by tokens.
-          Neither can starve the other by choosing a shape.
+          Both refill continuously, and a request needs room in both. Whichever a caller is nearest
+          to exhausting is the one that limits them.
         </p>
+        <Explain>
+          <p>
+            So someone making many tiny calls is bounded by request count and someone making one
+            enormous call is bounded by tokens. Neither can starve the other by choosing a shape,
+            and nobody can save up a minute's worth to spend in one burst.
+          </p>
+        </Explain>
       </div>
+
+      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Per caller</h2>
 
       {status === null ? (
         <SkeletonRows rows={2} />
@@ -272,25 +279,27 @@ export default function CostAdmission() {
 
       <div>
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Reserve, then settle</h2>
-        <p className="mt-1.5 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          A request's real token cost is not known until the response comes back, so admission
-          reserves an estimate — the prompt plus the caller's completion cap, or{" "}
-          <span className="readout">{status?.assumedCompletionTokens ?? 800}</span> tokens when they
-          did not set one — and the true figure is settled afterwards. The estimate is deliberately
-          generous: under-reserving lets a caller through and discovers the cost too late, while
-          over-reserving only makes them wait a moment longer and the excess is returned in full.
+        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
+          Real token cost is unknown until the response returns, so admission reserves an estimate
+          and settles the true figure afterwards.
         </p>
-        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          A reservation whose request died before settling would hold allowance nobody is using, so
-          every one is returned in a finally block and any that is somehow missed expires after{" "}
-          <span className="readout">{status?.reservationTtlSeconds ?? 300}s</span>. The{" "}
-          <span className="readout">in flight</span> count above is how many are currently held —
-          if it climbs and never falls, reservations are leaking.
-        </p>
-        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Held in memory, per instance, like the existing rate limiter — three instances behind a
-          load balancer allow three times the traffic. Stated rather than implied.
-        </p>
+        <Explain>
+          <p>
+            The estimate is the prompt plus the caller's completion cap, or{" "}
+            <span className="readout">{status?.assumedCompletionTokens ?? 800}</span> tokens when
+            they did not set one. Deliberately generous: under-reserving discovers the cost too
+            late, over-reserving only makes them wait, and the excess is returned in full.
+          </p>
+          <p>
+            Reservations are returned in a finally block and any missed one expires after{" "}
+            <span className="readout">{status?.reservationTtlSeconds ?? 300}s</span>. If the in-flight
+            count climbs and never falls, they are leaking.
+          </p>
+          <p>
+            Held in memory, per instance — three instances behind a load balancer allow three times
+            the traffic.
+          </p>
+        </Explain>
       </div>
 
       {callers.length > 0 && (

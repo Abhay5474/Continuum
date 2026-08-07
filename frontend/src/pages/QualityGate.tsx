@@ -4,6 +4,7 @@ import { PageHeader, Switch } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 import {
+  Explain,
   Bar,
   Code,
   Dot,
@@ -243,8 +244,7 @@ export default function QualityGatePage() {
       <section className="mt-10">
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Dimensions</h2>
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-          Which check is doing the work, and which is only noise. A dimension failing almost
-          everything is usually a threshold problem rather than a fleet of bad answers.
+          One failing almost everything is usually a threshold problem, not a fleet of bad answers.
         </p>
         <div className="mt-3">
           <Rail>
@@ -587,13 +587,14 @@ function RepairEngine({
           label="Targeted repair"
           hint="Off by default. With it off the gate does one generic repair pass. With it on, each defect kind gets its own instruction, the answer is re-scored after every attempt, and an attempt that scored lower than what it replaced is thrown away."
         />
-        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
-          A model asked to reconsider will find fault with correct work and degrade it — that is the
-          finding in Huang et al., <em>Large Language Models Cannot Self-Correct Reasoning Yet</em>{" "}
-          (ICLR 2024). Nothing here relies on the model's opinion of its own answer: every attempt is
-          scored by the same external gate, so a repair that did not help is discarded rather than
-          shipped.
-        </p>
+        <Explain title="Why the model never judges its own repair">
+          <p>
+            A model asked to reconsider will find fault with correct work and degrade it — Huang et
+            al., <em>Large Language Models Cannot Self-Correct Reasoning Yet</em> (ICLR 2024). Every
+            attempt here is scored by the same external gate, so a repair that did not help is
+            discarded rather than shipped.
+          </p>
+        </Explain>
       </div>
 
       {total > 0 && (

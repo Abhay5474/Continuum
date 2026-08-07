@@ -3,6 +3,7 @@ import { portal } from "../api";
 import { Switch } from "../system/primitives";
 import { ChartFrame, TargetVsActual } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
+import { Explain } from "../system/hub";
 import { Empty, Facts, Ghost, Hop, KindMark, Rail, Route, Row, RowSkeleton, Stage, Stat, Stats } from "../system/hub";
 
 /**
@@ -198,12 +199,16 @@ export default function CompressionPolicy() {
             </ChartFrame>
             </div>
             <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
-              A region sitting well <em>above</em> its target is one where protected spans dominate —
-              numbers, identifiers, quoted text and code are never dropped, so a demonstration block
-              full of clause numbers cannot reach an aggressive budget. That is the compressor
-              refusing to remove content it was told to keep, and it is the correct outcome. A region
-              below its target would be the real fault: compressing harder than asked.
+              Above target is correct — protected spans stopped it. <em>Below</em> target is the
+              real fault: compressing harder than asked.
             </p>
+            <Explain>
+              <p>
+                Numbers, identifiers, quoted text and code are never dropped, so a demonstration
+                block full of clause numbers cannot reach an aggressive budget. That is the
+                compressor refusing to remove content it was told to keep.
+              </p>
+            </Explain>
           </>
         )}
       </section>
@@ -238,22 +243,27 @@ export default function CompressionPolicy() {
           Where the numbers come from
         </h2>
         <p className="mt-2 text-xs leading-relaxed text-slate-600 max-w-2xl">
-          LLMLingua (Jiang et al., EMNLP 2023) measures that instructions tolerate losing 10–20%,
-          demonstrations 60–80%, and the question 0–10%. Examples are largely redundant with each
-          other — that is what makes them examples — while an instruction is a list of requirements
-          where every clause matters.
+          Budgets come from LLMLingua (Jiang et al., EMNLP 2023).{" "}
+          <b className="text-slate-400">Unsure means gentler, never harsher.</b>
         </p>
-        <p className="mt-2.5 text-xs leading-relaxed text-slate-600 max-w-2xl">
-          Region detection is a heuristic, and the two mistakes are not equally costly: calling an
-          instruction a demonstration throws away most of it and silently changes what the model was
-          asked to do. So a message is only classed as examples on strong evidence — two or more
-          marker lines — and anything unrecognised falls back to the ratio used before this existed.
-          <b className="text-slate-400"> Unsure means gentler, never harsher.</b>
-        </p>
-        <p className="mt-2.5 text-xs leading-relaxed text-slate-600 max-w-2xl">
-          The per-region tallies above are held in memory and reset when the service restarts. The
-          cumulative token savings are stored durably and appear under Prompt Guard.
-        </p>
+        <Explain>
+          <p>
+            That paper measures that instructions tolerate losing 10–20%, demonstrations 60–80%, and
+            the question 0–10%. Examples are largely redundant with each other — that is what makes
+            them examples — while an instruction is a list of requirements where every clause
+            matters.
+          </p>
+          <p>
+            Region detection is a heuristic and the two mistakes are not equally costly: calling an
+            instruction a demonstration throws away most of it. So a message is classed as examples
+            only on strong evidence — two or more marker lines — and anything unrecognised falls
+            back to the ratio used before this existed.
+          </p>
+          <p>
+            Per-region tallies are held in memory and reset on restart. Cumulative savings are
+            stored durably and appear under Prompt Guard.
+          </p>
+        </Explain>
       </section>
 
       {totalIn > 0 && (

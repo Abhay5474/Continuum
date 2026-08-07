@@ -3,6 +3,7 @@ import { portal } from "../api";
 import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
 import { BarChart, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { Explain } from "../system/hub";
 
 /**
  * Congestion-controlled admission.
@@ -119,13 +120,16 @@ export default function Admission() {
           label="Congestion-controlled admission"
           hint="Off by default. While it is off every request goes straight to the provider and overload is the provider's problem — which it solves with 429s."
         />
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-          When on, Continuum holds concurrency at the limit it has inferred, lets a request wait up
-          to {status?.queueMs ?? 250}ms for a slot, and refuses what will not fit — returning{" "}
-          <span className="readout">429</span> with a <span className="readout">Retry-After</span>{" "}
-          immediately rather than blocking. A fast honest refusal is worth more than a slow one:
-          the caller can retry, degrade, or tell its user, none of which it can do while waiting.
+        <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+          A request waits up to {status?.queueMs ?? 250}ms for a slot, then gets{" "}
+          <span className="readout">429</span> with a <span className="readout">Retry-After</span>.
         </p>
+        <Explain>
+          <p>
+            A fast honest refusal is worth more than a slow one: the caller can retry, degrade, or
+            tell its user, none of which it can do while blocked.
+          </p>
+        </Explain>
       </div>
 
       <div>
@@ -147,13 +151,17 @@ export default function Admission() {
             </div>
           ))}
         </div>
-        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Past capacity something is refused; the only question is whether it is chosen or random.
-          Background work goes first and interactive requests may overshoot the estimate, because
-          the limit is an estimate and being wrong about a waiting user costs more than one queued
-          call. Set <span className="readout">criticality</span> on the request; anything
-          unrecognised reads as <span className="readout">NORMAL</span>, never as background.
+        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-600">
+          Set <span className="readout">criticality</span> on the request. Anything unrecognised
+          reads as <span className="readout">NORMAL</span>, never as background.
         </p>
+        <Explain>
+          <p>
+            Past capacity something is refused; the only question is whether it is chosen or random.
+            Background work goes first, and interactive requests may overshoot — the limit is an
+            estimate, and being wrong about a waiting user costs more than one queued call.
+          </p>
+        </Explain>
       </div>
 
       {status === null ? (

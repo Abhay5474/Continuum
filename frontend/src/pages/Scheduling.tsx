@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { Explain } from "../system/hub";
 
 /**
  * Priority and deadline scheduling.
@@ -163,15 +164,21 @@ export default function Scheduling() {
           label="Priority and deadline scheduling"
           hint="Off by default. While it is off a free slot goes to whichever waiting request happened to poll at the right moment."
         />
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Ordering only applies while requests are actually waiting for capacity, so it does nothing
-          until admission control is on and a provider is near its inferred limit. Set{" "}
-          <span className="readout">criticality</span> to choose a band and{" "}
-          <span className="readout">deadlineMs</span> to say how long the result stays useful. A
-          request that cannot meet its deadline even with an immediate start comes back{" "}
-          <span className="readout">422</span> rather than running: spending a slot on a result
-          nobody can use also delays the requests that could still make theirs.
+        <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+          Set <span className="readout">criticality</span> to choose a band and{" "}
+          <span className="readout">deadlineMs</span> to say how long the result stays useful.
         </p>
+        <Explain>
+          <p>
+            Ordering only applies while requests are waiting for capacity, so it does nothing until
+            admission control is on and a provider is near its inferred limit.
+          </p>
+          <p>
+            A request that cannot meet its deadline even with an immediate start comes back{" "}
+            <span className="readout">422</span> rather than running — spending a slot on a result
+            nobody can use also delays the requests that could still make theirs.
+          </p>
+        </Explain>
         <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
           Waiting is aged into the band — every{" "}
           <span className="readout">{status?.agingStepSeconds ?? 120}s</span> queued lifts a task one
@@ -309,13 +316,17 @@ export default function Scheduling() {
 
       <div>
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What this does not do</h2>
-        <p className="mt-1.5 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Each instance orders its own waiters. Across several instances there is no global order,
-          and there deliberately is not one: a shared queue would need a round trip to reach, and at
-          a quarter-second wait that trip costs more than the ordering saves. Nothing is persisted
-          either — a waiter exists only while its request is blocked, so a restart has no queue to
-          lose.
+        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
+          Each instance orders its own waiters. There is no global order across instances, and
+          nothing is persisted.
         </p>
+        <Explain title="Why not">
+          <p>
+            A shared queue needs a round trip to reach, and at a quarter-second wait that trip costs
+            more than the ordering saves. A waiter exists only while its request is blocked, so a
+            restart has no queue to lose.
+          </p>
+        </Explain>
       </div>
 
       {providers.length > 0 && (

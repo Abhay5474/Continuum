@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
+import { Explain } from "../system/hub";
 
 /**
  * Decision provenance.
@@ -112,14 +113,17 @@ export default function Provenance() {
           label="Record decisions"
           hint="Off by default. Recording is cheap but not free, and a request path is the wrong place to add writes nobody asked for."
         />
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Every response already carries a routing reason like{" "}
-          <span className="readout">mode=BALANCED · quality 0.55 (repair) · confidence 0.82</span>.
-          That is fine for reading one answer and useless for everything else — you cannot
-          aggregate it, alert on it, or ask how often the cascade escalated last week and what it
-          cost. One row per decision, because those questions are aggregations over decisions
-          rather than over requests.
+        <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+          One row per decision, so you can aggregate and alert on them.
         </p>
+        <Explain title="Why not the routing reason">
+          <p>
+            Every response already carries one, like{" "}
+            <span className="readout">mode=BALANCED · quality 0.55 (repair) · confidence 0.82</span>.
+            That is fine for reading a single answer and useless for everything else — you cannot
+            ask how often the cascade escalated last week, or what it cost.
+          </p>
+        </Explain>
       </div>
 
       <Degradation />
@@ -279,19 +283,22 @@ function Degradation() {
         <Readout label="Nothing to serve" value={byRung.STATIC ?? 0} size="sm" />
       </div>
 
-      <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-        Every degraded response says which rung it came from — the model reads{" "}
+      <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+        Every degraded response names its rung: the model reads{" "}
         <span className="readout">degraded/cached</span> or{" "}
-        <span className="readout">degraded/static</span> and the reason starts{" "}
-        <span className="readout">DEGRADED</span>. A degraded answer presented as a normal one is
-        worse than an error, because the caller cannot tell it should retry or warn its user.
-        Silently succeeding is the failure mode this feature could most easily become.
+        <span className="readout">degraded/static</span>.
       </p>
-      <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-        There is no "cheaper model" rung. Falling back to a smaller model is what the fallback
-        chain already does, several times, before this ladder is reached — adding it here would
-        present the chain's ordinary work as a degradation event.
-      </p>
+      <Explain>
+        <p>
+          A degraded answer presented as a normal one is worse than an error — the caller cannot
+          tell it should retry or warn its user. Silently succeeding is the failure mode this
+          feature could most easily become.
+        </p>
+        <p>
+          There is no "cheaper model" rung. The fallback chain already does that, several times,
+          before this ladder is reached; adding it here would present ordinary work as degradation.
+        </p>
+      </Explain>
 
       {recent.length > 0 && (
         <div className="space-y-1">

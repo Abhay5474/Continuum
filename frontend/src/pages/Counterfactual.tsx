@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
+import { Explain } from "../system/hub";
 
 /**
  * Counterfactual replay.
@@ -324,18 +325,23 @@ export default function Counterfactual() {
 
       <div>
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Why the answer is split in two</h2>
-        <p className="mt-1.5 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Estimating how a policy you did <em>not</em> run would have performed, from logs of the one
-          you <em>did</em>, is off-policy evaluation. The standard tool is the doubly robust
-          estimator (Dudík, Langford &amp; Li, ICML 2011): a model of each arm's reward, corrected by
-          how likely the logging policy was to take that action.
+        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
+          <b className="text-slate-500">Continuum's routing is deterministic</b>, so the logs contain
+          no evidence about the arms it did not pick. Measured and modelled are never blended.
         </p>
-        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          That correction needs the logging policy to have had some chance of taking the other
-          action. <b className="text-slate-500">Continuum's routing is deterministic</b>, so for any
-          logged request the chosen arm has probability 1 and every other arm has 0. There is no
-          overlap, and no arithmetic recovers information the logs do not contain.
-        </p>
+        <Explain title="The estimator, and why it cannot be used here">
+          <p>
+            Estimating how a policy you did <em>not</em> run would have performed, from logs of the
+            one you <em>did</em>, is off-policy evaluation. The standard tool is the doubly robust
+            estimator (Dudík, Langford &amp; Li, ICML 2011): a model of each arm's reward, corrected
+            by how likely the logging policy was to take that action.
+          </p>
+          <p>
+            That correction needs the logging policy to have had some chance of taking the other
+            action. Here the chosen arm has probability 1 and every other arm has 0. There is no
+            overlap, and no arithmetic recovers information the logs do not contain.
+          </p>
+        </Explain>
         <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
           So the measured share and the modelled share are reported separately and never blended. A
           single number would hide the one thing worth knowing before changing your routing: how

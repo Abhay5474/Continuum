@@ -4,6 +4,7 @@ import { Meter, PageHeader, Switch } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
 import {
   Dot,
+  Explain,
   Empty,
   Ghost,
   Hop,
@@ -156,8 +157,7 @@ export default function Cascade() {
           style={{ borderColor: "var(--state-warning-ink)" }}
         >
           <span style={{ color: "var(--state-warning-ink)" }}>Not available.</span> A cascade needs
-          two active models at different prices. This deployment's registry offers no meaningful
-          price gap, so the cascade declines rather than adding a second call for nothing.
+          two models at different prices; this registry has no meaningful price gap.
         </p>
       )}
 
@@ -188,8 +188,7 @@ export default function Cascade() {
       <section className="mt-9">
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Did it work</h2>
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-          The saving never appears on its own. Beside it are the two numbers that would expose it as
-          a lie: escalations that were not needed, and the ones the judge should have made.
+          Shown with the two numbers that would disprove it.
         </p>
         <div className="mt-4">
           <Stats>
@@ -238,17 +237,17 @@ export default function Cascade() {
           >
             {status.missedEscalations > 0 ? (
               <>
-                On the audited slice the judge accepted {status.missedEscalations} answer
+                The judge accepted {status.missedEscalations} answer
                 {status.missedEscalations === 1 ? "" : "s"} the strong model disagreed with. Raise the
                 threshold.
               </>
             ) : status.auditSamples > 0 ? (
               <>
-                Across {status.auditSamples} audited request{status.auditSamples === 1 ? "" : "s"}, the
-                strong model agreed with every answer the judge accepted.
+                The strong model agreed with every accepted answer, across{" "}
+                {status.auditSamples} audited request{status.auditSamples === 1 ? "" : "s"}.
               </>
             ) : (
-              "Turn up the audit rate to measure the escalations the judge is missing — savings alone cannot tell you."
+              "Turn up the audit rate to measure what the judge is missing."
             )}
           </p>
         )}
@@ -266,7 +265,7 @@ export default function Cascade() {
       <section className="mt-9">
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Tiers</h2>
         <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
-          Derived from the active model registry by price — not configured here.
+          From the model registry, by price.
         </p>
         <div className="mt-3">
           <Rail>
@@ -282,8 +281,7 @@ export default function Cascade() {
           Escalation threshold
         </h2>
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-          How confident the judge must be to let a cheap answer through. The score is calibrated
-          against your own traffic, so this means the same thing as your workload changes.
+          How sure the judge must be to accept a cheap answer.
         </p>
 
         <div className="mt-5 max-w-2xl">
@@ -350,8 +348,7 @@ export default function Cascade() {
               <option value={0.1}>10% of requests</option>
             </select>
             <p className="mt-1.5 max-w-xs text-[11.5px] leading-relaxed text-slate-600">
-              Runs both tiers on a sample to find the escalations the judge missed. Costs a second
-              call on those requests.
+              Runs both tiers on a sample to find missed escalations. Costs a second call on those.
             </p>
           </label>
           <div className="flex items-center gap-3 self-end">
@@ -375,10 +372,8 @@ export default function Cascade() {
             Should the strong model run in parallel instead of afterwards?
           </h2>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-            Speculative execution fires both tiers at once and returns whichever the judge accepts,
-            turning the cascade&rsquo;s latency penalty into a cost penalty. Whether that is a good
-            trade depends entirely on how often this account actually escalates — so the answer is
-            computed from the rate measured above, not from intuition.
+            Firing both tiers at once trades cost for latency. Whether that pays depends on how
+            often you escalate.
           </p>
 
           <div className="mt-4 max-w-xl">
@@ -418,11 +413,13 @@ export default function Cascade() {
           <p className="mt-4 max-w-2xl text-xs leading-relaxed text-slate-500">
             {status.speculation.summary}
           </p>
-          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-600">
-            Whether a millisecond is worth a cent is a product decision, not an arithmetic one. Both
-            numbers are shown rather than collapsed into a single score, because there is no
-            universal exchange rate between latency and money.
-          </p>
+          <Explain title="Why there is no single score">
+            <p>
+              Whether a millisecond is worth a cent is a product decision, not an arithmetic one.
+              There is no universal exchange rate between latency and money, so both numbers are
+              shown rather than collapsed into one.
+            </p>
+          </Explain>
         </section>
       )}
 
@@ -431,7 +428,7 @@ export default function Cascade() {
         <section className="mt-10">
           <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Calibration</h2>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-            Raw judge score against the measured probability that the cheap answer actually sufficed.
+            Judge score against how often the cheap answer actually sufficed.
           </p>
           <div className="mt-4">
             <CalibrationCurve
@@ -629,8 +626,8 @@ function CalibrationCurve({
       </div>
       <p className="mt-3 text-xs text-slate-500 max-w-2xl leading-relaxed">
         {calibrated
-          ? "Bars show how often a cheap answer at that judge score actually matched the strong model. Amber bars fall below your threshold and would escalate."
-          : "Not enough labelled outcomes yet — the raw judge score is being used unchanged. Hollow bars are bins with too few samples to trust."}
+          ? "Amber bars fall below your threshold and would escalate."
+          : "Not enough labelled outcomes yet — the raw score is used unchanged. Hollow bars have too few samples to trust."}
       </p>
     </div>
   );

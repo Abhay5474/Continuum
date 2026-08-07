@@ -930,6 +930,55 @@ export function ProviderLine({
   );
 }
 
+/**
+ * Background detail, available but not shouted.
+ *
+ * <p>These pages had grown essays. Three hundred words on the cascade page,
+ * seventy-word paragraphs on the cost limiter — all of it true, most of it
+ * genuinely useful once, and none of it something you need on the fourth visit.
+ * A console is read in glances, and a screen that opens with two paragraphs
+ * teaches people to skip paragraphs, including the one that mattered.
+ *
+ * <p>So the reasoning lives behind one line of type. Closed by default, open in
+ * one click, and the page above it says only what changes what you would do.
+ */
+export function Explain({
+  title = "How this works",
+  children,
+}: {
+  title?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-5">
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex items-center gap-1.5 text-[11.5px] text-slate-500 transition-colors hover:text-slate-300"
+      >
+        <svg
+          width="9"
+          height="9"
+          viewBox="0 0 9 9"
+          fill="none"
+          aria-hidden
+          className="transition-transform duration-200"
+          style={{ transform: open ? "rotate(90deg)" : "none" }}
+        >
+          <path d="M2.5 1 6.5 4.5 2.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {open ? "Hide" : title}
+      </button>
+      {open && (
+        <div className="mt-2.5 max-w-2xl space-y-2.5 border-l border-edge pl-3.5 text-xs leading-relaxed text-slate-500">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Nothing here yet, said quietly. */
 export function Empty({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (

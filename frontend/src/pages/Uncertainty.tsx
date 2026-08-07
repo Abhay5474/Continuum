@@ -224,12 +224,8 @@ export default function Uncertainty() {
             </select>
           </label>
 
-          <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-            A Beta posterior over the leading answer's share, stopped when P(the leader is not the
-            true majority) falls below the threshold — Adaptive-Consistency (Aggarwal et al., EMNLP
-            2023), which is Wald's sequential test applied to sampling. Three identical answers
-            gives 6.3%, still above a 5% bar; four gives 3.1% and stops. It never stops below two
-            samples and never exceeds the configured budget, so this can only ever cost less.
+          <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+            Never stops below two samples, never exceeds the budget — so it can only ever cost less.
           </p>
           <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
             It cannot shorten a genuinely contested question, and should not — disagreement is

@@ -137,9 +137,7 @@ export default function Saga() {
           hint="Off by default. Rollback issues real calls to real systems, so nobody should discover it by being opted in."
         />
         <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-          The setting is read once, when a run starts, and pinned into that run. Toggling it cannot
-          change how a workflow already in flight replays — a run must finish the way it began.
-          Turning it on therefore affects new runs only.
+          Read once when a run starts and pinned to it, so this affects new runs only.
         </p>
       </div>
 

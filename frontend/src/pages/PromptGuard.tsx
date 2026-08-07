@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, Switch } from "../system/primitives";
+import { Switch } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 import { BeforeAfter, ChartFrame, Donut } from "../system/charts";
 import {
+  Explain,
   Dot,
   Empty,
   Hop,
@@ -398,12 +399,13 @@ function Compression({
             />
           )}
 
-          <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
-            <Micro>What is never touched</Micro>
-            Code blocks, quoted text and anything that looks like an identifier are protected spans:
-            they are left byte-for-byte intact. A compressor that shortened an API key or a stack
-            trace would save tokens and break the request, which is not a trade worth making.
-          </p>
+          <Explain title="What is never touched">
+            <p>
+              Code blocks, quoted text and anything that looks like an identifier are protected
+              spans, left byte-for-byte intact. A compressor that shortened an API key or a stack
+              trace would save tokens and break the request.
+            </p>
+          </Explain>
         </>
       )}
     </div>
