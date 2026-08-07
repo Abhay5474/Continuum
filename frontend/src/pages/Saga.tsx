@@ -102,7 +102,7 @@ export default function Saga() {
         subtitle="Durable execution guarantees each step runs once. It does not guarantee the set of them is all-or-nothing."
       />
 
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
         <Readout label="Rollbacks" value={status?.rollbacks ?? 0} size="sm" />
         <Readout
           label="Steps undone"
@@ -164,7 +164,7 @@ export default function Saga() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : recent.length === 0 ? (
-        <div className="text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
           No rollbacks yet. When a workflow with compensations fails partway, what was undone — and
           what could not be — appears here.
         </div>

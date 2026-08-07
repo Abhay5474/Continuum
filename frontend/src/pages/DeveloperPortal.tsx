@@ -270,7 +270,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* analytics */}
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
         <Stat label="Requests" value={stats?.totalRequests ?? "—"} />
         <Stat label="Success rate" value={stats ? `${Math.round(stats.successRate * 100)}%` : "—"} accent="text-emerald-300" />
         <Stat label="Failures prevented" value={stats?.failuresPrevented ?? "—"} accent="text-indigo-300" />

@@ -125,7 +125,7 @@ export default function Scheduling() {
         subtitle="Admission control answers whether there is room. This answers who gets it."
       />
 
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
         <Readout
           label="Waiting now"
           value={waiting}
@@ -279,7 +279,7 @@ export default function Scheduling() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : providers.length === 0 ? (
-        <div className="text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
           Nothing has queued yet. A request only enters the queue when a provider is at its inferred
           limit, and the wait is bounded at a quarter second — so this stays empty until you are
           genuinely near capacity.

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { portal } from "../api";
 import { PageHeader } from "../system/primitives";
+import { Card, CardHead, Grid, type GlyphName, type Tone } from "../system/hub";
 
 /**
  * Autopilot — beginner-friendly control plane UI. Reuses the developer session
@@ -103,11 +104,11 @@ export default function Autopilot() {
         <>
           {/* mode + autonomy */}
           <div className="grid gap-4 lg:grid-cols-3">
-            <Card title="Objective">
+            <Panel title="Objective">
               <div className="text-2xl font-semibold">{status.mode}</div>
               <div className="text-xs text-slate-400">Optimization goal Autopilot balances for.</div>
-            </Card>
-            <Card title="Autonomy">
+            </Panel>
+            <Panel title="Autonomy">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={status.autoApply}
                   onChange={(e) => act(() => portal.autopilot.setAutoApply(e.target.checked))} />
@@ -116,8 +117,8 @@ export default function Autopilot() {
               <div className="mt-1 text-xs text-slate-400">
                 Off = Autopilot only suggests; you approve each change.
               </div>
-            </Card>
-            <Card title="Safety">
+            </Panel>
+            <Panel title="Safety">
               <div className="flex items-center gap-2 text-sm">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 Every change is verified, canaried, and auto-rolled-back on regression.
@@ -126,12 +127,12 @@ export default function Autopilot() {
                 className="mt-2 rounded-md border border-edge px-3 py-1 text-xs hover:bg-edge">
                 Roll back to previous policy
               </button>
-            </Card>
+            </Panel>
           </div>
 
           {/* current policy */}
           {status.activePolicy && (
-            <Card title="Current policy">
+            <Panel title="Current policy">
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
                 <Kv k="Routing mode" v={status.activePolicy.routingMode} />
                 <Kv k="Provider order" v={(status.activePolicy.providerOrder || []).join(" → ")} />
@@ -144,11 +145,11 @@ export default function Autopilot() {
                 className="mt-3 rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
                 Run optimization now
               </button>
-            </Card>
+            </Panel>
           )}
 
           {/* recommendations */}
-          <Card title="Recommendations">
+          <Panel title="Recommendations">
             {recs.filter((r) => r.status === "PENDING").length === 0 && (
               <div className="text-xs text-slate-500">No pending recommendations. Autopilot is watching your traffic.</div>
             )}
@@ -170,10 +171,10 @@ export default function Autopilot() {
                 </div>
               ))}
             </div>
-          </Card>
+          </Panel>
 
           {/* canary status */}
-          <Card title="Canary rollouts">
+          <Panel title="Canary rollouts">
             {canary.length === 0 && <div className="text-xs text-slate-500">No canary runs yet.</div>}
             {canary.slice(0, 5).map((c) => (
               <div key={c.id} className="mb-2">
@@ -187,11 +188,11 @@ export default function Autopilot() {
                 </div>
               </div>
             ))}
-          </Card>
+          </Panel>
 
           {/* history timeline + rollbacks */}
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card title="Policy history">
+            <Panel title="Policy history">
               <ol className="space-y-1 text-sm">
                 {bundles.map((b) => (
                   <li key={b.id} className="flex items-center gap-2">
@@ -201,8 +202,8 @@ export default function Autopilot() {
                   </li>
                 ))}
               </ol>
-            </Card>
-            <Card title="Decision log">
+            </Panel>
+            <Panel title="Decision log">
               <ol className="space-y-1 text-xs">
                 {decisions.slice(0, 12).map((d) => (
                   <li key={d.id} className="flex gap-2">
@@ -211,17 +212,17 @@ export default function Autopilot() {
                   </li>
                 ))}
               </ol>
-            </Card>
+            </Panel>
           </div>
 
           {rollbacks.length > 0 && (
-            <Card title="Rollback events">
+            <Panel title="Rollback events">
               {rollbacks.slice(0, 5).map((r) => (
                 <div key={r.id} className="text-xs text-slate-400">
                   {r.automatic ? "⚙️ auto" : "👤 manual"} — {r.reason}
                 </div>
               ))}
-            </Card>
+            </Panel>
           )}
         </>
       )}
@@ -230,23 +231,25 @@ export default function Autopilot() {
 }
 
 function Explainer() {
-  const items: [string, string][] = [
-    ["Learns from your traffic", "Which provider and model actually performs best for the requests you send, rather than a static preference."],
-    ["Proves before it promotes", "A change runs on a slice of traffic first and is kept only if it measures better. Otherwise it is rolled back."],
-    ["Spends within your budget", "Hedging and timeouts are tuned against your cost and latency targets, not maximised blindly."],
-    ["Reversible at any point", "Turning it off restores standard behaviour immediately, and every decision it made stays on the record."],
+  const items: [GlyphName, Tone, string, string][] = [
+    ["spark", "accent", "Learns from your traffic", "Which provider and model actually performs best for the requests you send, rather than a static preference."],
+    ["check", "ok", "Proves before it promotes", "A change runs on a slice of traffic first and is kept only if it measures better. Otherwise it is rolled back."],
+    ["coin", "info", "Spends within your budget", "Hedging and timeouts are tuned against your cost and latency targets, not maximised blindly."],
+    ["route", "mute", "Reversible at any point", "Turning it off restores standard behaviour immediately, and every decision it made stays on the record."],
   ];
   return (
     <div>
       <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What optimization does</h2>
-      <dl className="mt-4 grid gap-x-10 gap-y-5 sm:grid-cols-2">
-        {items.map(([title, body]) => (
-          <div key={title} className="border-l border-edge pl-4">
-            <dt className="text-sm font-medium text-slate-200">{title}</dt>
-            <dd className="mt-1 text-xs leading-relaxed text-slate-500">{body}</dd>
-          </div>
-        ))}
-      </dl>
+      <div className="mt-4">
+        <Grid cols={2}>
+          {items.map(([glyph, tone, title, body]) => (
+            <Card key={title}>
+              <CardHead glyph={glyph} tone={tone} title={title} />
+              <p className="mt-2.5 text-xs leading-relaxed text-slate-500">{body}</p>
+            </Card>
+          ))}
+        </Grid>
+      </div>
       <p className="mt-5 border-t border-edge/70 pt-4 text-xs text-slate-500 max-w-2xl leading-relaxed">
         Off by default. While it is off your app behaves exactly as it does today.
       </p>
@@ -339,12 +342,13 @@ function Wizard({ onEnable, onCancel, busy }: {
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+/** A titled panel, on the shared card plane. */
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-edge bg-panel p-4">
+    <Card>
       <div className="mb-2 text-sm font-medium">{title}</div>
       {children}
-    </div>
+    </Card>
   );
 }
 function Kv({ k, v }: { k: string; v: any }) {

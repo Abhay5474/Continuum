@@ -25,7 +25,7 @@ import {
   Split,
   Stat,
   Stats,
-  kindOf, Chip } from "../system/hub";
+  kindOf, Chip, Notice } from "../system/hub";
 import { ErrorState, useToast } from "../components/ui";
 
 /**
@@ -298,15 +298,27 @@ export default function Pipelines() {
       </div>
 
       {ready.length === 0 && (
-        <p className="mt-6 text-[12.5px] leading-relaxed text-slate-500">
-          You need a probed specialist before a pipeline can do anything. A pipeline whose specialist
-          has never answered moves the failure from here, where you are looking at it, to a
-          customer's request, where you are not.{" "}
-          <a href="/specialists" style={{ color: "var(--accent-ink)" }} className="underline underline-offset-2">
-            Register one and probe it
-          </a>
-          .
-        </p>
+        <div className="mt-6">
+          <Notice
+            tone="warn"
+            title="No probed specialist yet"
+            body={
+              <>
+                A pipeline whose specialist has never answered moves the failure from here, where you
+                are looking at it, to a customer's request, where you are not.
+              </>
+            }
+            right={
+              <a
+                href="/specialists"
+                style={{ color: "var(--accent-ink)" }}
+                className="underline underline-offset-2"
+              >
+                Register one and probe it
+              </a>
+            }
+          />
+        </div>
       )}
 
       {/* Before there is anything to list, the split is the wrong shape: the

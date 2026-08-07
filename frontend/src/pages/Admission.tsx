@@ -91,7 +91,7 @@ export default function Admission() {
         subtitle="How much a provider will actually take, measured from latency instead of guessed."
       />
 
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
         <Readout label="In flight" value={inFlight} size="sm" state={inFlight > 0 ? "active" : "idle"} />
         <Readout label="Admitted" value={totalAdmitted} size="sm" />
         <Readout
@@ -169,7 +169,7 @@ export default function Admission() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : providers.length === 0 ? (
-        <div className="text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
           No provider has been observed yet. Send traffic through the gateway and the inferred
           limit for each provider appears here, moving as it learns.
         </div>

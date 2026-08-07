@@ -121,7 +121,7 @@ export default function Counterfactual() {
         subtitle="What would last week's traffic have cost on a different routing policy — answered before you switch, not after."
       />
 
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
         <Readout label="Requests replayable" value={status?.requestsAvailable ?? 0} size="sm" />
         <Readout
           label="Actual spend"
@@ -156,7 +156,7 @@ export default function Counterfactual() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : armNames.length === 0 ? (
-        <div className="text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
           No routed traffic logged yet. Send requests through the gateway and the models they used
           become the candidate policies you can replay against.
         </div>

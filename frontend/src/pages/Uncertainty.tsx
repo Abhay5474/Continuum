@@ -129,7 +129,7 @@ export default function Uncertainty() {
       </section>
 
       {/* ---- what it found ---- */}
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
         <Readout label="Measured" value={status?.measured ?? 0} />
         <Readout
           label="Mean confidence"
@@ -317,7 +317,7 @@ export default function Uncertainty() {
         {rows === null ? (
           <SkeletonRows rows={4} />
         ) : rows.length === 0 ? (
-          <div className="text-center text-sm text-slate-500">
+          <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
             Nothing measured yet. Set a mode above, then send a request through the gateway — or add{" "}
             <code className="text-slate-400">"measureUncertainty": true</code> to a single call.
           </div>

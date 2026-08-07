@@ -105,7 +105,7 @@ export default function BreakerPage() {
         />
       </div>
 
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
         <Readout label="Watching" value={status?.breakers.length ?? 0} unit="models" />
         <Readout
           label="Diverted"
@@ -127,7 +127,7 @@ export default function BreakerPage() {
         {status === null ? (
           <SkeletonRows rows={3} />
         ) : status.breakers.length === 0 ? (
-          <div className="text-center text-sm text-slate-500">
+          <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
             {status.enabled
               ? "No observations yet. Send traffic through the gateway and each model gets a breaker once it has enough history to know what normal looks like."
               : "Arm the breaker to start watching answer quality per model."}
@@ -233,7 +233,7 @@ export default function BreakerPage() {
         {events === null ? (
           <SkeletonRows rows={2} />
         ) : events.length === 0 ? (
-          <div className="text-center text-sm text-slate-500">
+          <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
             Nothing has tripped. Every transition lands here with the evidence that caused it.
           </div>
         ) : (

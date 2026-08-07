@@ -84,7 +84,7 @@ export default function Provenance() {
         subtitle="Why Continuum did what it did — as data, not as a sentence."
       />
 
-      <div className="flex flex-wrap gap-x-9 gap-y-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
         <Readout label="Requests recorded" value={status?.requests ?? 0} size="sm" />
         <Readout label="Decisions" value={status?.decisions ?? 0} size="sm" />
         <Readout label="Stages seen" value={Object.keys(byStage).length} size="sm" />
