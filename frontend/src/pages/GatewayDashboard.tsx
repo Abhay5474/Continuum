@@ -184,7 +184,7 @@ export default function GatewayDashboard() {
                   {r.failoverCount > 0 && (
                     <span
                       className="rounded px-1.5 py-0.5 font-semibold"
-                      style={{ background: `${STATE.warning.color}22`, color: STATE.warning.color }}
+                      style={{ background: `${STATE.warning.color}22`, color: STATE.warning.ink }}
                       title="A provider failed and the engine rerouted before your app saw anything"
                     >
                       {r.failoverCount} failover{r.failoverCount > 1 ? "s" : ""} absorbed
@@ -193,7 +193,7 @@ export default function GatewayDashboard() {
                   {!r.success && (
                     <span
                       className="rounded px-1.5 py-0.5 font-semibold"
-                      style={{ background: `${STATE.critical.color}22`, color: STATE.critical.color }}
+                      style={{ background: `${STATE.critical.color}22`, color: STATE.critical.ink }}
                     >
                       failed
                     </span>
@@ -247,7 +247,7 @@ export default function GatewayDashboard() {
                       {h.calls} calls · {h.failures} fail · {avg}ms
                     </span>
                     {h.lastError && (
-                      <div className="w-full truncate pl-4 text-[10px]" style={{ color: STATE.critical.color }}
+                      <div className="w-full truncate pl-4 text-[10px]" style={{ color: STATE.critical.ink }}
                         title={h.lastError}>
                         {h.lastError}
                       </div>
@@ -305,7 +305,7 @@ export default function GatewayDashboard() {
             {(healing?.recentResolutions ?? []).map((r: any, i: number) => (
               <div key={i} className="flex flex-wrap items-center gap-2 rounded px-2 py-1.5 text-[10px] hover:bg-edge/40">
                 <StateDot state="active" size={5} />
-                <span style={{ color: STATE.active.color }}>{r.resolutionType}</span>
+                <span style={{ color: STATE.active.ink }}>{r.resolutionType}</span>
                 <span className="font-mono text-slate-400">{r.workflowId}</span>
                 <span className="text-slate-600">
                   seq {r.codeSequence} → {r.historySequence ?? "∅"}
@@ -325,7 +325,7 @@ export default function GatewayDashboard() {
           {verifyOut && (
             <Plane inset className="mt-3 p-3 text-[11px]">
               {verifyOut.error ? (
-                <span style={{ color: STATE.critical.color }}>{verifyOut.error}</span>
+                <span style={{ color: STATE.critical.ink }}>{verifyOut.error}</span>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-2">

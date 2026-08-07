@@ -76,6 +76,25 @@
   --series-mute: #3d4658;
   --chart-grid: rgba(255, 255, 255, 0.07);
   --chart-surface: #000000;
+
+  /* Text colours for inline styles, where a utility class cannot reach.
+     Several components pick a colour in JavaScript — an inactive threshold
+     label, a disconnected provider's initials — and a hard-coded slate value
+     there bypasses every light-mode remap below it. The audit found those at
+     2.56:1 and 4.27:1 on paper. */
+  --text-2: rgb(148 163 184);
+  /* Matched to the lifted slate-500 above: rgb(100 116 139) is 3.97:1 on black
+     and this is what clears the bar. */
+  --text-3: rgb(112 128 151);
+  /* The label that sits on a filled accent button. It is not a fixed white:
+     --accent-strong is a *light* blue on the dark theme and a mid coral on the
+     light one, so a single hard-coded label colour cannot serve both. White on
+     the dark accent measured 2.6:1 across eleven buttons. */
+  --accent-on: #080b11;
+  /* The usage meter runs green to red by hue. Lightness has to move with the
+     surface or the green end is 1.5:1 on paper. */
+  --usage-l: 60%;
+  --usage-fill-l: 55%;
   color-scheme: dark;
 }
 
@@ -143,6 +162,11 @@
   --series-mute: #cbd5e1;
   --chart-grid: rgba(15, 23, 42, 0.08);
   --chart-surface: #ffffff;
+  --text-2: rgb(51 65 85);
+  --text-3: rgb(71 85 105);
+  --accent-on: #ffffff;
+  --usage-l: 28%;
+  --usage-fill-l: 45%;
   color-scheme: light;
 }
 
@@ -207,18 +231,48 @@ body {
    paper they are pastel-on-white and unreadable — the same failure as the slate
    remaps above, one layer over, and the audit found 25 of them. The -700 shades
    carry the same meaning at the same hue with the contrast the light surface
-   needs. */
-:root[data-theme="light"] .text-emerald-300 { color: rgb(4 120 87); }
-:root[data-theme="light"] .text-rose-300 { color: rgb(190 18 60); }
-:root[data-theme="light"] .text-amber-300 { color: rgb(180 83 9); }
-:root[data-theme="light"] .text-indigo-300 { color: rgb(67 56 202); }
+   needs.
+
+   Every shade the codebase uses is listed, and every one is paired with an
+   attribute selector for its alpha variants. That pairing is the whole point:
+   `text-amber-400/90` compiles to a *different* class from `text-amber-400`, so
+   a remap of the bare utility silently misses it. The audit measured exactly
+   that — a "no second tier available" warning on the cascade page sitting at
+   1.59:1 while the unmodified amber beside it had been fixed months earlier. */
+:root[data-theme="light"] .text-emerald-200,
+:root[data-theme="light"] .text-emerald-300,
+:root[data-theme="light"] .text-emerald-400,
+:root[data-theme="light"] [class*="text-emerald-300/"],
+:root[data-theme="light"] [class*="text-emerald-400/"] { color: rgb(4 120 87); }
+
+:root[data-theme="light"] .text-rose-200,
+:root[data-theme="light"] .text-rose-300,
+:root[data-theme="light"] .text-rose-400,
+:root[data-theme="light"] [class*="text-rose-300/"],
+:root[data-theme="light"] [class*="text-rose-400/"] { color: rgb(190 18 60); }
+
+:root[data-theme="light"] .text-amber-200,
+:root[data-theme="light"] .text-amber-300,
+:root[data-theme="light"] .text-amber-400,
+:root[data-theme="light"] [class*="text-amber-300/"],
+:root[data-theme="light"] [class*="text-amber-400/"] { color: rgb(180 83 9); }
+
+:root[data-theme="light"] .text-indigo-100,
+:root[data-theme="light"] .text-indigo-200,
+:root[data-theme="light"] .text-indigo-300,
+:root[data-theme="light"] .text-indigo-400,
+:root[data-theme="light"] [class*="text-indigo-300/"] { color: rgb(67 56 202); }
+
 :root[data-theme="light"] .text-sky-300 { color: rgb(3 105 161); }
 :root[data-theme="light"] .text-orange-300 { color: rgb(194 65 12); }
-/* The -400 shades sit on the same surfaces and fail for the same reason. */
-:root[data-theme="light"] .text-emerald-400 { color: rgb(4 120 87); }
-:root[data-theme="light"] .text-rose-400 { color: rgb(190 18 60); }
-:root[data-theme="light"] .text-amber-400 { color: rgb(180 83 9); }
-:root[data-theme="light"] .text-indigo-400 { color: rgb(67 56 202); }
+
+/* The two brand hues, used as text. Both were built to sit on instrument black
+   and neither was ever remapped: neon measured 2.34:1 on paper, across twelve
+   places on the docs page alone. As text they become the accent's text step,
+   which is contrast-checked for exactly this surface. */
+:root[data-theme="light"] .text-neon,
+:root[data-theme="light"] .text-aurora,
+:root[data-theme="light"] [class*="text-neon/"] { color: var(--accent-ink); }
 
 /* Secondary and tertiary text on the dark theme, lifted to meet WCAG AA.
    Measured across all 26 console routes: Tailwind's slate-500 lands at 4.21:1
@@ -250,7 +304,13 @@ body {
    — so a button that is transparent until hovered was given white text on white
    paper and disappeared. The Revoke control on the API-keys page measured 1:1,
    which is invisible, not merely low contrast. A plain utility is always
-   preceded by a space or starts the attribute; a variant is preceded by a colon. */
+   preceded by a space or starts the attribute; a variant is preceded by a colon.
+
+   The accent form was added after the indigo buttons became coral. It was
+   missed at the time and the audit caught it: twelve filled buttons across the
+   portal, settings, pipelines and replay pages were drawing near-black text on
+   coral at 3.92:1, because the remap above turned their white label dark and
+   nothing here exempted them. White on --accent-strong measures 4.55:1. */
 :root[data-theme="light"] [class*=" bg-indigo-"] .text-white,
 :root[data-theme="light"] [class^="bg-indigo-"] .text-white,
 :root[data-theme="light"] [class*=" bg-rose-"] .text-white,
@@ -263,6 +323,36 @@ body {
 :root[data-theme="light"] button[class^="bg-emerald-"],
 :root[data-theme="light"] a[class*=" bg-indigo-"],
 :root[data-theme="light"] a[class^="bg-indigo-"] {
+  color: rgb(255 255 255);
+}
+
+/* …except the accent buttons, whose label follows the accent rather than being
+   white in both themes: --accent-strong is a light blue on black and a mid
+   coral on paper, and no single label colour serves both.
+
+   Written once per theme rather than unscoped, because the .text-white remap
+   above is (0,3,0) — a pseudo-class, an attribute and a class — and an
+   unscoped `button[class*=…]` at (0,1,1) loses to it. That is exactly what
+   happened on the first attempt: the audit came back with the same eleven
+   buttons at 3.92:1 that the rule was written to fix. */
+:root[data-theme="light"] button[class*="bg-[color:var(--accent-strong)]"],
+:root[data-theme="light"] a[class*="bg-[color:var(--accent-strong)]"],
+:root[data-theme="light"] [class*="bg-[color:var(--accent-strong)]"] .text-white,
+:root:not([data-theme="light"]) button[class*="bg-[color:var(--accent-strong)]"],
+:root:not([data-theme="light"]) a[class*="bg-[color:var(--accent-strong)]"],
+:root:not([data-theme="light"]) [class*="bg-[color:var(--accent-strong)]"] .text-white {
+  color: var(--accent-on);
+}
+
+/* The brand gradient, as a button.
+   `from-aurora to-neon` ends on a pale blue that white text cannot sit on —
+   measured at roughly 2.2:1 where the gradient finishes. On paper it becomes
+   the solid accent, which is the same colour every other filled button now
+   wears and which carries white at 4.55:1. Dark keeps the gradient: it ends on
+   a mid blue and the label there is near-black. */
+:root[data-theme="light"] [class*="bg-gradient-to-"].from-aurora {
+  background-image: none;
+  background-color: var(--accent-strong);
   color: rgb(255 255 255);
 }
 

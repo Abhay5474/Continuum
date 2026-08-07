@@ -447,7 +447,7 @@ export function Donut({
                 x={size / 2}
                 y={size / 2 + 15}
                 textAnchor="middle"
-                style={{ fill: "rgb(100 116 139)", fontSize: 10, letterSpacing: "0.08em" }}
+                style={{ fill: "var(--text-3)", fontSize: 10, letterSpacing: "0.08em" }}
               >
                 {centerLabel.toUpperCase()}
               </text>

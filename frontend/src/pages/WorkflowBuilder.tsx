@@ -235,7 +235,7 @@ export default function WorkflowBuilder() {
           className="rounded border px-3 py-2 text-[11px]"
           style={{
             borderColor: error ? `${STATE.critical.color}55` : `${STATE.healthy.color}55`,
-            color: error ? STATE.critical.color : STATE.healthy.color,
+            color: error ? STATE.critical.ink : STATE.healthy.ink,
           }}
         >
           {error ?? note}
@@ -250,7 +250,7 @@ export default function WorkflowBuilder() {
               <div className="mb-3">
                 <div className="flex items-baseline justify-between">
                   <Micro>Run input</Micro>
-                  <span className="text-[10px]" style={{ color: inputValid ? STATE.healthy.color : STATE.critical.color }}>
+                  <span className="text-[10px]" style={{ color: inputValid ? STATE.healthy.ink : STATE.critical.ink }}>
                     {inputValid ? "reachable as ${input.…}" : "invalid JSON"}
                   </span>
                 </div>
@@ -301,7 +301,7 @@ export default function WorkflowBuilder() {
                         }
                       }}
                       className="rounded border px-2 py-1"
-                      style={{ borderColor: `${STATE.critical.color}44`, color: STATE.critical.color }}
+                      style={{ borderColor: `${STATE.critical.color}44`, color: STATE.critical.ink }}
                     >
                       Delete
                     </button>
@@ -336,7 +336,7 @@ export default function WorkflowBuilder() {
 
               <div className="mt-2 flex items-baseline justify-between">
                 <Micro>Definition</Micro>
-                <span className="text-[10px]" style={{ color: parsed.err ? STATE.critical.color : STATE.healthy.color }}>
+                <span className="text-[10px]" style={{ color: parsed.err ? STATE.critical.ink : STATE.healthy.ink }}>
                   {parsed.err ? `invalid JSON — ${parsed.err}` : "valid JSON"}
                 </span>
               </div>
@@ -357,7 +357,7 @@ export default function WorkflowBuilder() {
                 </p>
                 {layers.error ? (
                   <div className="mt-2 rounded border px-2 py-1.5 text-[11px]"
-                    style={{ borderColor: `${STATE.critical.color}55`, color: STATE.critical.color }}>
+                    style={{ borderColor: `${STATE.critical.color}55`, color: STATE.critical.ink }}>
                     {layers.error}
                   </div>
                 ) : (
@@ -464,8 +464,8 @@ export default function WorkflowBuilder() {
                             className="rounded border px-1.5 py-0.5 text-[10px]"
                             style={
                               s.outcome === "skipped"
-                                ? { borderColor: "rgb(var(--edge))", color: STATE.idle.color }
-                                : { borderColor: `${STATE.healthy.color}44`, color: STATE.healthy.color }
+                                ? { borderColor: "rgb(var(--edge))", color: STATE.idle.ink }
+                                : { borderColor: `${STATE.healthy.color}44`, color: STATE.healthy.ink }
                             }
                           >
                             {s.id}
@@ -475,13 +475,13 @@ export default function WorkflowBuilder() {
                         {f?.callback && (
                           <span
                             className="rounded border px-1.5 py-0.5 text-[10px]"
-                            style={{ borderColor: `${STATE.active.color}44`, color: STATE.active.color }}
+                            style={{ borderColor: `${STATE.active.color}44`, color: STATE.active.ink }}
                           >
                             callback delivered
                           </span>
                         )}
                         {f?.error && (
-                          <span className="truncate" style={{ color: STATE.critical.color }}>
+                          <span className="truncate" style={{ color: STATE.critical.ink }}>
                             {f.error.replace(/^Activity '[^']+' failed permanently: /, "")}
                           </span>
                         )}

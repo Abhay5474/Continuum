@@ -256,7 +256,7 @@ export default function ModelRouter() {
                         <Meter value={share} state="active" height={3} />
                       </td>
                       <Td>{(p.calls ?? 0).toLocaleString()}</Td>
-                      <Td style={{ color: success >= 0.99 ? STATE.healthy.color : success >= 0.9 ? STATE.warning.color : STATE.critical.color }}>
+                      <Td style={{ color: success >= 0.99 ? STATE.healthy.ink : success >= 0.9 ? STATE.warning.ink : STATE.critical.ink }}>
                         {(success * 100).toFixed(1)}%
                       </Td>
                       <Td>{avgLat}ms</Td>
@@ -439,7 +439,7 @@ export default function ModelRouter() {
           </div>
         )}
         {probe?.error && (
-          <p className="mt-2 text-[11px]" style={{ color: STATE.critical.color }}>
+          <p className="mt-2 text-[11px]" style={{ color: STATE.critical.ink }}>
             {probe.error}
           </p>
         )}
@@ -653,7 +653,7 @@ function LatencyRail({ m }: { m: any }) {
         {/* the hedge trigger */}
         <div className="absolute inset-y-0" style={{ left: pct(trigger) }}>
           <div className="h-full w-px" style={{ background: STATE.healthy.color }} />
-          <span className="absolute bottom-0 left-1 text-[9px]" style={{ color: STATE.healthy.color }}>
+          <span className="absolute bottom-0 left-1 text-[9px]" style={{ color: STATE.healthy.ink }}>
             trigger
           </span>
         </div>

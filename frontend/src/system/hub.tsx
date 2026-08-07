@@ -452,8 +452,12 @@ export function Primary({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      style={{ background: "var(--accent-strong)" }}
-      className="rounded-md px-3 py-1.5 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+      // Colour stated here, not left to the utility. The light theme remaps
+      // .text-white to near-black so it survives on paper, and exempts filled
+      // buttons by matching their background *class* — which this button does
+      // not have, because it sets its background inline. It measured 3.92:1.
+      style={{ background: "var(--accent-strong)", color: "var(--accent-on)" }}
+      className="rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
     >
       {children}
     </button>
@@ -629,7 +633,7 @@ export function Stage({
             />
           )}
           {sub && (
-            <span className="truncate text-[10.5px]" style={{ color: tone ?? "rgb(100 116 139)" }}>
+            <span className="truncate text-[10.5px]" style={{ color: tone ?? "var(--text-3)" }}>
               {sub}
             </span>
           )}
@@ -908,7 +912,7 @@ export function ProviderLine({
         className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[11px] font-semibold"
         style={{
           background: connected ? "var(--accent-wash)" : "rgba(120,130,150,0.10)",
-          color: connected ? "var(--accent-ink)" : "rgb(100 116 139)",
+          color: connected ? "var(--accent-ink)" : "var(--text-3)",
         }}
         aria-hidden
       >

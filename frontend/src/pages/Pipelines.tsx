@@ -783,7 +783,7 @@ function NewPipeline({
                       style={
                         idx >= 0
                           ? { background: "var(--accent-strong)", color: "#fff" }
-                          : { background: "rgb(var(--edge))", color: "rgb(100 116 139)" }
+                          : { background: "rgb(var(--edge))", color: "var(--text-3)" }
                       }
                     >
                       {idx >= 0 ? idx + 1 : "·"}

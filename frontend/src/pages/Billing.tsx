@@ -84,7 +84,7 @@ export default function Billing() {
           <div className="ml-auto text-right">
             <div className="text-xs text-slate-500">This month</div>
             <div className="text-sm">
-              <span className="font-semibold" style={{ color: `hsl(${hue} 80% 60%)` }}>
+              <span className="font-semibold" style={{ color: `hsl(${hue} 80% var(--usage-l))` }}>
                 {Number(data?.tokensUsed ?? 0).toLocaleString()}
               </span>{" "}
               / {Number(data?.monthlyTokenQuota ?? 0).toLocaleString()} tokens
@@ -94,7 +94,7 @@ export default function Billing() {
         <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-edge">
           <div
             className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${Math.min(100, pct)}%`, background: `linear-gradient(90deg, hsl(${hue} 80% 55%), hsl(${hue - 20} 80% 55%))` }}
+            style={{ width: `${Math.min(100, pct)}%`, background: `linear-gradient(90deg, hsl(${hue} 80% var(--usage-fill-l)), hsl(${hue - 20} 80% var(--usage-fill-l)))` }}
           />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-slate-400">
@@ -126,7 +126,12 @@ export default function Billing() {
             >
               <div className="flex items-center justify-between">
                 <div className="text-sm font-bold">{p.id}</div>
-                {current && <span className="rounded-full bg-aurora/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">Current</span>}
+                {current && <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                    style={{ background: "var(--accent-wash)", color: "var(--accent-ink)" }}
+                  >
+                    Current
+                  </span>}
               </div>
               <div className="mt-2 text-2xl font-bold">
                 ${p.monthlyPriceUsd}

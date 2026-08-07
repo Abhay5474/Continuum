@@ -156,7 +156,11 @@ function Row({ label, value }: { label: string; value: unknown }) {
           className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
           style={{
             background: value ? `${STATE.healthy.color}22` : "rgb(var(--edge))",
-            color: value ? STATE.healthy.ink : "#8593AB",
+            // A theme token, not a fixed grey. #8593AB was picked against
+            // instrument black and measured 2.48:1 on paper.
+            // --text-2, not --text-3: this sits on the edge-coloured chip
+            // rather than on the page, and the dimmer step measured 3.91:1 there.
+            color: value ? STATE.healthy.ink : "var(--text-2)",
           }}
         >
           {value ? "yes" : "no"}

@@ -245,7 +245,7 @@ export default function SemanticCache() {
                   <div className="flex items-baseline gap-2">
                     <span
                       className="text-[13px] font-medium"
-                      style={{ color: active ? "var(--accent-ink)" : "rgb(148 163 184)" }}
+                      style={{ color: active ? "var(--accent-ink)" : "var(--text-2)" }}
                     >
                       {name}
                     </span>

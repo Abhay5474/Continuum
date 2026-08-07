@@ -179,7 +179,7 @@ export default function GodMode() {
           className="flex items-center gap-2.5 rounded border px-4 py-2 text-sm transition-colors disabled:opacity-50"
           style={{
             borderColor: enabled ? `${STATE.healthy.color}66` : "rgb(var(--edge))",
-            color: enabled ? STATE.healthy.color : undefined,
+            color: enabled ? STATE.healthy.ink : undefined,
           }}
         >
           <StateDot state={enabled ? "healthy" : "idle"} />
@@ -491,7 +491,7 @@ export default function GodMode() {
                     }
                   }}
                   className="rounded border px-3 py-1.5 text-xs transition-colors"
-                  style={{ borderColor: `${STATE.critical.color}55`, color: STATE.critical.color }}
+                  style={{ borderColor: `${STATE.critical.color}55`, color: STATE.critical.ink }}
                 >
                   Wipe memory
                 </button>
@@ -624,7 +624,7 @@ function Cascade({ mem, quotas, last }: { mem: any; quotas: any; last: any | nul
                 {transitions[i].n != null && (
                   <span
                     className="readout text-[10px] font-semibold"
-                    style={{ color: transitions[i].n! > 0 ? STATE.healthy.color : "#5A6478" }}
+                    style={{ color: transitions[i].n! > 0 ? STATE.healthy.ink : "#5A6478" }}
                   >
                     {transitions[i].n}
                   </span>
@@ -667,7 +667,7 @@ function PosteriorBar({
         <span className="text-[11px] font-medium text-slate-300">{label}</span>
         {chosen && (
           <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold"
-            style={{ background: `${STATE.active.color}22`, color: STATE.active.color }}>
+            style={{ background: `${STATE.active.color}22`, color: STATE.active.ink }}>
             next
           </span>
         )}
@@ -766,7 +766,7 @@ function SimulationRow({ sim }: { sim: any }) {
                 <span
                   className="readout w-14 text-right"
                   style={{
-                    color: !changed ? "#5A6478" : better ? STATE.healthy.color : STATE.critical.color,
+                    color: !changed ? "#5A6478" : better ? STATE.healthy.ink : STATE.critical.ink,
                   }}
                 >
                   {!changed ? "—" : `${better ? "better" : "worse"}`}

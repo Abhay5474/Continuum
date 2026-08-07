@@ -306,7 +306,7 @@ export default function ContextTransformers() {
                   onClick={() => setBudget(b.key)}
                   title={b.hint}
                   className="relative text-[12px] transition-colors"
-                  style={{ color: on ? "var(--accent-ink)" : "rgb(100 116 139)" }}
+                  style={{ color: on ? "var(--accent-ink)" : "var(--text-3)" }}
                 >
                   {b.label}
                   <span
@@ -437,7 +437,7 @@ export default function ContextTransformers() {
                             ? "var(--state-healthy-ink)"
                             : grew
                               ? "var(--state-warning-ink)"
-                              : "rgb(100 116 139)",
+                              : "var(--text-3)",
                         }}
                       >
                         {h.saved === 0

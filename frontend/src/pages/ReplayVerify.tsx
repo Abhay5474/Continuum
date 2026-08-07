@@ -126,7 +126,7 @@ export default function ReplayVerify() {
       {error && (
         <div
           className="rounded border px-3 py-2 text-[11px]"
-          style={{ borderColor: `${STATE.critical.color}55`, color: STATE.critical.color }}
+          style={{ borderColor: `${STATE.critical.color}55`, color: STATE.critical.ink }}
         >
           {error}
         </div>
