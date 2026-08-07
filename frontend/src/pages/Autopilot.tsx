@@ -68,6 +68,8 @@ export default function Autopilot() {
       {/* The nav calls this Optimization; the page called itself Autopilot with
           an emoji in the heading. One name, no emoji. */}
       <PageHeader
+        glyph="spark"
+        tone="accent"
         title="Optimization"
         subtitle="Learns the best routing from your own traffic, and only changes what it can prove is better"
         aside={

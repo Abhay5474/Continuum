@@ -75,7 +75,7 @@
   /* The emphasis form: one series in colour, the rest in this. */
   --series-mute: #3d4658;
   --chart-grid: rgba(255, 255, 255, 0.07);
-  --chart-surface: #000000;
+  --chart-surface: #10131a;  /* the card, which is what charts now sit on */
 
   /* Text colours for inline styles, where a utility class cannot reach.
      Several components pick a colour in JavaScript — an inactive threshold
@@ -85,7 +85,7 @@
   --text-2: rgb(148 163 184);
   /* Matched to the lifted slate-500 above: rgb(100 116 139) is 3.97:1 on black
      and this is what clears the bar. */
-  --text-3: rgb(112 128 151);
+  --text-3: rgb(122 137 159);
   /* The label that sits on a filled accent button. It is not a fixed white:
      --accent-strong is a *light* blue on the dark theme and a mid coral on the
      light one, so a single hard-coded label colour cannot serve both. White on
@@ -95,11 +95,32 @@
      surface or the green end is 1.5:1 on paper. */
   --usage-l: 60%;
   --usage-fill-l: 55%;
+
+  /* ---- card surfaces ------------------------------------------------------
+     A card has to be *found* before it can be read, and there are only two
+     ways to find it: a step in luminance or a shadow. On instrument black the
+     step works — the card lifts a little out of the page and the border
+     finishes the edge. On paper there is no lighter shade than the card, so
+     the page steps down instead and the shadow does the lifting. */
+  --card: 16 19 26;             /* #10131a — one step above the page */
+  --card-edge: 33 39 51;
+  --card-shadow: none;
+  --card-hover: 20 24 33;
+
+  /* Tone washes. A status colour used as a background has to be a wash, not
+     the ink: the ink is chosen to be read *against* the surface, so filling a
+     region with it leaves the label nowhere to go. Each wash is its own tone's
+     ink at low alpha, which keeps the pair legible in both themes. */
+  --wash-ok: rgba(52, 211, 153, 0.13);
+  --wash-warn: rgba(245, 181, 68, 0.13);
+  --wash-bad: rgba(244, 86, 110, 0.13);
+  --wash-info: rgba(107, 161, 247, 0.13);
+  --wash-mute: rgba(148, 163, 184, 0.10);
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --ink: 255 255 255;    /* white */
+  --ink: 246 248 251;    /* near-white; the cards on top of it are pure white */
   /* Panels are a hair *below* the page rather than above it. On a white
      background there is no lighter shade left to raise them into, so a plane
      reads as recessed — which is what a plane was always meant to be. */
@@ -132,7 +153,7 @@
   --accent: #F04E3E;
   --accent-rgb: 240 78 62;
   --accent-strong: #D93B2B;
-  --accent-ink: #C7301F;
+  --accent-ink: #B92C1B;
   --accent-wash: rgba(240, 78, 62, 0.08);
   --accent-edge: rgba(240, 78, 62, 0.28);
 
@@ -167,6 +188,20 @@
   --accent-on: #ffffff;
   --usage-l: 28%;
   --usage-fill-l: 45%;
+
+  /* White cards, and the page steps *down* to let them lift. #F6F8FB is two
+     percent off white — it reads as a white theme, and it is the difference
+     between a card and a rectangle drawn on nothing. */
+  --card: 255 255 255;
+  --card-edge: 226 232 240;
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --card-hover: 252 253 255;
+
+  --wash-ok: rgba(4, 120, 87, 0.10);
+  --wash-warn: rgba(180, 83, 9, 0.10);
+  --wash-bad: rgba(190, 18, 60, 0.09);
+  --wash-info: rgba(29, 78, 216, 0.09);
+  --wash-mute: rgba(71, 85, 105, 0.07);
   color-scheme: light;
 }
 
@@ -226,7 +261,7 @@ body {
 :root[data-theme="light"] .text-slate-300 { color: rgb(30 41 59); }
 :root[data-theme="light"] .text-slate-400 { color: rgb(51 65 85); }
 :root[data-theme="light"] .text-slate-500 { color: rgb(71 85 105); }
-:root[data-theme="light"] .text-slate-600 { color: rgb(100 116 139); }
+:root[data-theme="light"] .text-slate-600 { color: rgb(93 108 130); }
 /* Status colours. The -300 shades are chosen to glow on instrument black; on
    paper they are pastel-on-white and unreadable — the same failure as the slate
    remaps above, one layer over, and the audit found 25 of them. The -700 shades
@@ -243,7 +278,7 @@ body {
 :root[data-theme="light"] .text-emerald-300,
 :root[data-theme="light"] .text-emerald-400,
 :root[data-theme="light"] [class*="text-emerald-300/"],
-:root[data-theme="light"] [class*="text-emerald-400/"] { color: rgb(4 120 87); }
+:root[data-theme="light"] [class*="text-emerald-400/"] { color: rgb(3 100 72); }
 
 :root[data-theme="light"] .text-rose-200,
 :root[data-theme="light"] .text-rose-300,
@@ -286,10 +321,10 @@ body {
    contrast would trade one legibility problem for another. Scoped with :not so
    the light remap above still wins on its own theme. */
 :root:not([data-theme="light"]) .text-slate-500 { color: rgb(112 128 151); }
-:root:not([data-theme="light"]) .text-slate-600 { color: rgb(114 128 149); }
+:root:not([data-theme="light"]) .text-slate-600 { color: rgb(120 135 157); }
 /* slate-700 is used for separators and glyphs between values; on black it
    measured 1.94:1, which is decoration pretending to be text. */
-:root:not([data-theme="light"]) .text-slate-700 { color: rgb(108 122 143); }
+:root:not([data-theme="light"]) .text-slate-700 { color: rgb(116 130 152); }
 /* .micro composes text-slate-500, so it is carried by the rule above. */
 /* Hover states that brighten toward white must darken instead. */
 :root[data-theme="light"] .hover\:text-white:hover { color: rgb(2 6 23); }
@@ -385,9 +420,13 @@ body {
      that used to be here were doing the job of a card edge — and a page with
      six of them stacked read as six trays rather than one instrument. Quiet
      enough now that a plane groups without announcing itself. */
+  /* The card plane. Every `Plane` in the app is one of these, so the card
+     treatment reaches pages that were never individually rewritten. */
   .plane {
-    @apply rounded-lg border border-edge/60;
-    background: rgb(var(--panel));
+    @apply rounded-xl border;
+    border-color: rgb(var(--card-edge));
+    background: rgb(var(--card));
+    box-shadow: var(--card-shadow);
   }
   /* A plane that reads as cut *into* the surface — used for readouts/wells.
      On a black page there is nothing darker to recess into, so the well is

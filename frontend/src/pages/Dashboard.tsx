@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { Chip } from "../system/hub";
 import type { CostReport, Meta, Stats, WorkflowSummary } from "../types";
 import StatusBadge from "../components/StatusBadge";
 import { SkeletonCards, SkeletonRows, EmptyState, ErrorState, Spinner, useToast, CodeBlock } from "../components/ui";
@@ -89,7 +90,10 @@ export default function Dashboard() {
       {/* This page had no heading at all — reachable from the nav as "Run
           History" and then announcing itself as nothing. */}
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Run History</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="list" tone="accent" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Run History</h1>
+        </div>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
           Every durable run, its event log and its replay
         </p>

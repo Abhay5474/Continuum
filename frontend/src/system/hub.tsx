@@ -228,15 +228,273 @@ export function KindMark({ kind, size = 34 }: { kind: Kind; size?: number }) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Tone
+ * ------------------------------------------------------------------ */
+
+/**
+ * The six meanings a colour is allowed to carry in this console.
+ *
+ * <p>Everything below takes a tone rather than a colour, so "this is a failure"
+ * is written once and rendered consistently — as ink on a label, as a wash
+ * behind a pill, as the rail down the side of a notice. The pairs are defined
+ * per theme in {@code index.css}: the ink is chosen to be read against the
+ * surface, and the wash is the same ink at low alpha so the two stay legible
+ * together on both instrument black and paper.
+ */
+export type Tone = "ok" | "warn" | "bad" | "info" | "accent" | "mute";
+
+const TONE_INK: Record<Tone, string> = {
+  ok: "var(--state-healthy-ink)",
+  warn: "var(--state-warning-ink)",
+  bad: "var(--state-critical-ink)",
+  info: "var(--state-active-ink)",
+  accent: "var(--accent-ink)",
+  mute: "var(--text-3)",
+};
+
+const TONE_WASH: Record<Tone, string> = {
+  ok: "var(--wash-ok)",
+  warn: "var(--wash-warn)",
+  bad: "var(--wash-bad)",
+  info: "var(--wash-info)",
+  accent: "var(--accent-wash)",
+  mute: "var(--wash-mute)",
+};
+
+export function toneInk(t: Tone = "mute") {
+  return TONE_INK[t];
+}
+export function toneWash(t: Tone = "mute") {
+  return TONE_WASH[t];
+}
+
+/* ------------------------------------------------------------------ *
+ * Glyphs
+ * ------------------------------------------------------------------ */
+
+/**
+ * The small line icons that head a card.
+ *
+ * <p>Drawn rather than imported: fourteen shapes at one weight is a smaller
+ * thing to own than an icon package, and it guarantees they share a stroke and
+ * a grid. They are decoration — every one sits next to the words it stands for,
+ * so none of them has to be guessed.
+ */
+export type GlyphName =
+  | "activity"
+  | "shield"
+  | "cache"
+  | "route"
+  | "chip"
+  | "clock"
+  | "coin"
+  | "spark"
+  | "layers"
+  | "flow"
+  | "check"
+  | "alert"
+  | "gauge"
+  | "list";
+
+const GLYPHS: Record<GlyphName, ReactNode> = {
+  activity: <path d="M1 8h3l2.5-6 3 12L12.5 8H15" />,
+  shield: <path d="M8 1.5 2.5 4v4c0 3 2.3 5.4 5.5 6.5C11.2 13.4 13.5 11 13.5 8V4L8 1.5Z" />,
+  cache: (
+    <>
+      <ellipse cx="8" cy="3.5" rx="5.5" ry="2" />
+      <path d="M2.5 3.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9" />
+      <path d="M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2" />
+    </>
+  ),
+  route: (
+    <>
+      <circle cx="3" cy="3.5" r="1.8" />
+      <circle cx="13" cy="12.5" r="1.8" />
+      <path d="M4.8 3.5H9a2.5 2.5 0 0 1 0 5H7a2.5 2.5 0 0 0 0 5h4.2" />
+    </>
+  ),
+  chip: (
+    <>
+      <rect x="4" y="4" width="8" height="8" rx="1.5" />
+      <path d="M6.5 1.5v2.5M9.5 1.5v2.5M6.5 12v2.5M9.5 12v2.5M1.5 6.5H4M1.5 9.5H4M12 6.5h2.5M12 9.5h2.5" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="8" cy="8" r="6.3" />
+      <path d="M8 4.3V8l2.6 1.6" />
+    </>
+  ),
+  coin: (
+    <>
+      <circle cx="8" cy="8" r="6.3" />
+      <path d="M10 5.6H7.2a1.6 1.6 0 0 0 0 3.2h1.6a1.6 1.6 0 0 1 0 3.2H6M8 4.2v1.4M8 10.4v1.4" />
+    </>
+  ),
+  spark: <path d="M8.8 1.5 3 9.2h4L7.2 14.5 13 6.8H9L8.8 1.5Z" />,
+  layers: (
+    <>
+      <path d="M8 1.6 1.7 5 8 8.4 14.3 5 8 1.6Z" />
+      <path d="M1.7 8.5 8 11.9l6.3-3.4" />
+    </>
+  ),
+  flow: (
+    <>
+      <rect x="1.4" y="5.6" width="4" height="4.8" rx="1" />
+      <rect x="10.6" y="5.6" width="4" height="4.8" rx="1" />
+      <path d="M5.4 8h5.2M9 6.3 10.8 8 9 9.7" />
+    </>
+  ),
+  check: (
+    <>
+      <circle cx="8" cy="8" r="6.3" />
+      <path d="m5.2 8.2 2 2 3.6-4" />
+    </>
+  ),
+  alert: (
+    <>
+      <path d="M8 2.2 1.6 13.4h12.8L8 2.2Z" />
+      <path d="M8 6.4v3M8 11.3v.1" />
+    </>
+  ),
+  gauge: (
+    <>
+      <path d="M2 11.5a6.5 6.5 0 1 1 12 0" />
+      <path d="M8 11.5 11 6.8" />
+    </>
+  ),
+  list: <path d="M2 4h12M2 8h12M2 12h8" />,
+};
+
+/** A glyph in a tinted rounded tile — the mark that heads a card. */
+export function Chip({
+  glyph,
+  tone = "info",
+  size = 30,
+}: {
+  glyph: GlyphName;
+  tone?: Tone;
+  size?: number;
+}) {
+  return (
+    <span
+      aria-hidden
+      className="grid shrink-0 place-items-center rounded-[9px]"
+      style={{ width: size, height: size, background: toneWash(tone), color: toneInk(tone) }}
+    >
+      <svg
+        width={size * 0.55}
+        height={size * 0.55}
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {GLYPHS[glyph]}
+      </svg>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * Structure
  * ------------------------------------------------------------------ */
 
 /**
+ * The card plane.
+ *
+ * <p>One rounded, bordered surface holding one idea. The rule that keeps a page
+ * of these from turning into a marketplace grid is not "avoid cards" — it is
+ * that a card must contain something worth finding: a number, a chart, a list.
+ * A card whose entire contents is a row of badges is the failure mode; a card
+ * with a headline figure and the shape of its history under it is the reason
+ * the form exists.
+ */
+export function Card({
+  children,
+  className = "",
+  pad = true,
+  onClick,
+  selected = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  pad?: boolean;
+  onClick?: () => void;
+  selected?: boolean;
+}) {
+  const interactive = !!onClick;
+  return (
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (interactive && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick!();
+        }
+      }}
+      className={`relative rounded-xl border bg-card shadow-card transition-colors duration-200 ${
+        pad ? "p-4" : ""
+      } ${interactive ? "cursor-pointer hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}
+      style={{ borderColor: selected ? "var(--accent-edge)" : "rgb(var(--card-edge))" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A card's header: mark, title, one line of purpose, and whatever acts on it.
+ *
+ * <p>The subtitle is one line by contract. It is where the sentence that used to
+ * be a paragraph goes.
+ */
+export function CardHead({
+  glyph,
+  tone = "info",
+  title,
+  sub,
+  right,
+}: {
+  glyph?: GlyphName;
+  tone?: Tone;
+  title: ReactNode;
+  sub?: ReactNode;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      {glyph && <Chip glyph={glyph} tone={tone} />}
+      <div className="min-w-0 flex-1">
+        <h3 className="truncate text-[13.5px] font-semibold tracking-tight text-slate-100">
+          {title}
+        </h3>
+        {sub && <p className="mt-0.5 truncate text-[11.5px] text-slate-500">{sub}</p>}
+      </div>
+      {right && <div className="flex shrink-0 items-center gap-2">{right}</div>}
+    </div>
+  );
+}
+
+/** A responsive run of cards. Two up by default, three or four when asked. */
+export function Grid({ cols = 2, children }: { cols?: 2 | 3 | 4; children: ReactNode }) {
+  const at = {
+    2: "sm:grid-cols-2",
+    3: "sm:grid-cols-2 lg:grid-cols-3",
+    4: "sm:grid-cols-2 lg:grid-cols-4",
+  }[cols];
+  return <div className={`grid grid-cols-1 gap-3 ${at}`}>{children}</div>;
+}
+
+/**
  * A section, separated by type and space rather than by a box.
  *
- * <p>Every section having its own bordered panel is what makes a page read as a
- * database dump: the border says "these things are the same kind of thing" and
- * when every section has one, nothing is ranked.
+ * <p>The heading sits on the page, above the cards, rather than inside a frame
+ * of its own — so the page has one level of nesting, not two.
  */
 export function Section({
   title,
@@ -268,9 +526,16 @@ export function Section({
   );
 }
 
-/** Rows, hairline-separated. The container has no border of its own. */
+/** Rows, hairline-separated, on the card plane. */
 export function Rail({ children }: { children: ReactNode }) {
-  return <div className="divide-y divide-edge/50 border-y border-edge/50">{children}</div>;
+  return (
+    <div
+      className="overflow-hidden rounded-xl border bg-card shadow-card"
+      style={{ borderColor: "rgb(var(--card-edge))" }}
+    >
+      <div className="divide-y divide-edge/60">{children}</div>
+    </div>
+  );
 }
 
 /**
@@ -982,7 +1247,10 @@ export function Explain({
 /** Nothing here yet, said quietly. */
 export function Empty({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (
-    <div className="px-3 py-10 text-center">
+    <div
+      className="rounded-xl border border-dashed px-3 py-10 text-center"
+      style={{ borderColor: "rgb(var(--card-edge))" }}
+    >
       <p className="text-[13px] text-slate-400">{title}</p>
       {hint && <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-600">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -1063,12 +1331,95 @@ export function Segmented<T extends string>({
 }
 
 /**
- * A number stated in type rather than framed in a box.
+ * A word about a state, in its own colour, on its own tint.
  *
- * <p>Four bordered stat cards across the top of a page is the most reliably
- * ignored element in any console: it is the same furniture on every screen, so
- * the eye learns to skip the whole band. A run of label-over-value in the page's
- * own type is read, because it looks like the page rather than like a widget.
+ * <p>The rule that keeps pills from becoming badge soup: a pill is for a
+ * <em>state</em> — live, failed, degraded, cached — never for a category. A
+ * category is what the mark and the words are for.
+ */
+export function Pill({
+  tone = "mute",
+  dot = false,
+  children,
+}: {
+  tone?: Tone;
+  dot?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-[3px] text-[10.5px] font-medium"
+      style={{ background: toneWash(tone), color: toneInk(tone) }}
+    >
+      {dot && (
+        <span
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ background: "currentColor" }}
+          aria-hidden
+        />
+      )}
+      {children}
+    </span>
+  );
+}
+
+/**
+ * The shape of a number's recent history, drawn small.
+ *
+ * <p>A figure on its own answers "what is it"; the same figure with its last
+ * dozen readings under it answers "and is that normal", which is the question
+ * anyone opening a console actually has. No axes: at this size a scale would be
+ * unreadable, and the sparkline is deliberately making a claim about shape
+ * rather than about value.
+ */
+export function Spark({
+  points,
+  tone = "info",
+  height = 34,
+}: {
+  points: number[];
+  tone?: Tone;
+  height?: number;
+}) {
+  if (points.length < 2) return <div style={{ height }} aria-hidden />;
+  const w = 100;
+  const lo = Math.min(...points);
+  const hi = Math.max(...points);
+  const span = hi - lo || 1;
+  const y = (v: number) => 2 + (1 - (v - lo) / span) * (height - 4);
+  const x = (i: number) => (i / (points.length - 1)) * w;
+  const line = points.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(2)} ${y(v).toFixed(2)}`).join(" ");
+  const id = `sp${tone}${points.length}${Math.round(lo)}${Math.round(hi)}`;
+  const colour = toneInk(tone);
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${height}`}
+      preserveAspectRatio="none"
+      width="100%"
+      height={height}
+      aria-hidden
+      className="block"
+    >
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={colour} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={colour} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${line} L${w} ${height} L0 ${height} Z`} fill={`url(#${id})`} />
+      <path d={line} fill="none" stroke={colour} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+/**
+ * A number, its mark, its history and its direction — one card.
+ *
+ * <p>This is the console's headline unit. The earlier objection to stat cards
+ * stands and is answered here: the reason a band of four bordered figures gets
+ * skipped is that it carries a label and a number and nothing else, so there is
+ * nothing in it to look at twice. A tinted mark makes it findable, the sparkline
+ * gives the figure a shape, and the delta says whether to care.
  */
 export function Stat({
   label,
@@ -1076,38 +1427,155 @@ export function Stat({
   unit,
   tone,
   hint,
+  glyph,
+  series,
+  delta,
+  deltaNote,
 }: {
   label: string;
   value: ReactNode;
   unit?: string;
-  tone?: "ok" | "warn" | "bad" | "accent";
+  tone?: Tone;
   hint?: string;
+  glyph?: GlyphName;
+  /** Recent readings, oldest first. Drawn as a sparkline across the card foot. */
+  series?: number[];
+  /** Signed change. Positive draws up, negative down; the colour comes from
+      {@code tone} rather than the sign, because up is not always good. */
+  delta?: number;
+  deltaNote?: string;
 }) {
-  const colour = tone
-    ? {
-        ok: "var(--state-healthy-ink)",
-        warn: "var(--state-warning-ink)",
-        bad: "var(--state-critical-ink)",
-        accent: "var(--accent-ink)",
-      }[tone]
-    : undefined;
+  const colour = tone ? toneInk(tone) : undefined;
   return (
-    <div title={hint} className="min-w-0">
-      <div className="micro truncate">{label}</div>
-      <div
-        className="readout mt-1 text-[19px] leading-none tracking-tight text-slate-100"
-        style={colour ? { color: colour } : undefined}
-      >
-        {value}
-        {unit && <span className="ml-1 text-[11px] text-slate-500">{unit}</span>}
+    <Card className="flex min-w-0 flex-col" pad={false}>
+      <div className="flex items-start gap-3 p-4 pb-3">
+        <div className="min-w-0 flex-1">
+          <div className="micro truncate" title={hint}>
+            {label}
+          </div>
+          <div
+            className="readout mt-1.5 text-[24px] leading-none tracking-tight text-slate-100"
+            style={colour ? { color: colour } : undefined}
+          >
+            {value}
+            {unit && <span className="ml-1 text-[12px] text-slate-500">{unit}</span>}
+          </div>
+        </div>
+        {glyph && <Chip glyph={glyph} tone={tone ?? "info"} />}
       </div>
-    </div>
+      {series && series.length > 1 && (
+        <div className="-mt-1">
+          <Spark points={series} tone={tone ?? "info"} />
+        </div>
+      )}
+      {delta !== undefined && (
+        <div className="flex items-baseline gap-1.5 px-4 pb-3 pt-2 text-[11px]">
+          <span style={{ color: toneInk(delta >= 0 ? "ok" : "bad") }}>
+            {delta >= 0 ? "↗" : "↘"} {delta >= 0 ? "+" : ""}
+            {delta}%
+          </span>
+          {deltaNote && <span className="truncate text-slate-500">{deltaNote}</span>}
+        </div>
+      )}
+    </Card>
   );
 }
 
-/** A run of {@link Stat}s, spaced rather than boxed. */
-export function Stats({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap gap-x-9 gap-y-4">{children}</div>;
+/** A run of {@link Stat} cards. */
+export function Stats({ children, cols = 4 }: { children: ReactNode; cols?: 2 | 3 | 4 }) {
+  return <Grid cols={cols}>{children}</Grid>;
+}
+
+/**
+ * A labelled bar with its own caption — the rollout form.
+ *
+ * <p>Name on the left, state on the right, the bar under both, and the figure
+ * at the end of the bar rather than in a column somewhere else.
+ */
+export function Progress({
+  label,
+  sub,
+  fraction,
+  tone = "info",
+  status,
+  caption,
+}: {
+  label: ReactNode;
+  sub?: ReactNode;
+  fraction: number;
+  tone?: Tone;
+  status?: ReactNode;
+  caption?: ReactNode;
+}) {
+  const pct = Math.min(1, Math.max(0, fraction)) * 100;
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[12.5px] font-medium text-slate-100">{label}</div>
+          {sub && <div className="mt-0.5 truncate text-[11px] text-slate-500">{sub}</div>}
+        </div>
+        {status}
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-edge">
+        <div
+          className="h-full rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: pct === 0 ? 0 : `max(3px, ${pct}%)`, background: toneInk(tone) }}
+        />
+      </div>
+      <div className="mt-1.5 text-right text-[10.5px] text-slate-500">
+        {caption ?? `${Math.round(pct)}% complete`}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Something that happened and may need attention.
+ *
+ * <p>A rail down the leading edge in the tone's colour, and the faintest wash
+ * behind it. The rail is what lets a column of these be triaged without reading
+ * any of them — the shape of the column tells you how bad the day is.
+ */
+export function Notice({
+  tone = "info",
+  title,
+  meta,
+  body,
+  right,
+}: {
+  tone?: Tone;
+  title: ReactNode;
+  meta?: ReactNode;
+  body?: ReactNode;
+  right?: ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-xl border border-l-[3px] p-3.5 shadow-card"
+      style={{
+        background: toneWash(tone),
+        borderColor: "rgb(var(--card-edge))",
+        borderLeftColor: toneInk(tone),
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span style={{ color: toneInk(tone) }} aria-hidden className="grid place-items-center">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                {GLYPHS[tone === "ok" ? "check" : tone === "bad" || tone === "warn" ? "alert" : "activity"]}
+              </svg>
+            </span>
+            <span className="truncate text-[12.5px] font-semibold text-slate-100">{title}</span>
+          </div>
+          {meta && <div className="mt-1 text-[11px] leading-relaxed text-slate-500">{meta}</div>}
+        </div>
+        {right && <div className="shrink-0 text-[11px]">{right}</div>}
+      </div>
+      {body && <p className="mt-2 text-[12px] leading-relaxed text-slate-400">{body}</p>}
+    </div>
+  );
 }
 
 /**

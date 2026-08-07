@@ -116,7 +116,7 @@ export default function App() {
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-30 border-b border-edge/70 bg-ink/85 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-card-edge bg-card/90 backdrop-blur-md">
         <div ref={navRef} className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5">
           <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-lg font-bold text-ink">
@@ -223,7 +223,7 @@ export default function App() {
 
         {/* mobile menu */}
         {mobileOpen && (
-          <nav className="max-h-[70vh] overflow-y-auto border-t border-edge/60 bg-panel/95 px-4 py-3 lg:hidden">
+          <nav className="max-h-[70vh] overflow-y-auto border-t border-card-edge bg-card/95 px-4 py-3 lg:hidden">
             <MobileLink to="/dashboard" label="Command Centre" />
             {GROUPS.map((g) => (
               <div key={g.label} className="mt-3">

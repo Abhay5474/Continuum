@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import { Chip } from "../system/hub";
 import { Readout, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
@@ -72,7 +73,10 @@ export default function ReplayVerify() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-[22px] font-semibold tracking-tight">Replay Audit</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="check" tone="accent" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight">Replay Audit</h1>
+        </div>
         <p className="mt-0.5 max-w-2xl text-sm text-slate-500">
           Replays a run's decisions against its own recorded history to confirm it would execute
           identically — the property crash recovery depends on. Model outputs are additionally

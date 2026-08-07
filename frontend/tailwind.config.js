@@ -18,8 +18,14 @@ export default {
         // states, dots — follows the theme rather than staying blue on white.
         aurora: "rgb(var(--accent-rgb) / <alpha-value>)",
         neon: "#7DA9FF",
+        // The card plane and its edge. Separate from `panel`/`edge` because a
+        // card is not a recess: on paper it is *above* the page, and it needs a
+        // border that is visible against white rather than against black.
+        card: "rgb(var(--card) / <alpha-value>)",
+        "card-edge": "rgb(var(--card-edge) / <alpha-value>)",
       },
       boxShadow: {
+        card: "var(--card-shadow)",
         // Soft, subtle elevation — no neon halos.
         glow: "0 8px 30px -16px rgba(76, 139, 245, 0.5)",
         "glow-cyan": "0 8px 30px -16px rgba(125, 169, 255, 0.42)",

@@ -96,6 +96,8 @@ export default function Saga() {
   return (
     <section className="space-y-8">
       <PageHeader
+        glyph="flow"
+        tone="accent"
         title="Saga Compensation"
         subtitle="Durable execution guarantees each step runs once. It does not guarantee the set of them is all-or-nothing."
       />

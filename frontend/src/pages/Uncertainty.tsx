@@ -87,6 +87,8 @@ export default function Uncertainty() {
   return (
     <div className="space-y-8">
       <PageHeader
+        glyph="gauge"
+        tone="warn"
         title="Answer Confidence"
         subtitle="Asks the same question several times and measures whether the model agrees with itself. Disagreement about meaning — not wording — is what a hallucination looks like from the outside."
       />

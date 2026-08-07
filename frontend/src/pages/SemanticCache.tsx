@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Switch } from "../system/primitives";
+import { PageHeader, Switch } from "../system/primitives";
 import { ChartFrame, Donut } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 import {
   Bar,
+  Card,
   Empty,
   Facts,
   Ghost,
@@ -14,6 +15,7 @@ import {
   Rail,
   Route,
   Row,
+  Pill,
   RowSkeleton,
   Stage,
   Stat,
@@ -131,13 +133,17 @@ export default function SemanticCache() {
 
   return (
     <div className="page-enter">
-      <header>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Semantic Cache</h1>
-        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
-          Answers a repeated question from a previous answer instead of paying a provider for it
-          again. Scoped to your account, and off by default.
-        </p>
-      </header>
+      <PageHeader
+        glyph="cache"
+        tone={on ? "ok" : "mute"}
+        title="Semantic Cache"
+        badge={
+          <Pill tone={on ? "ok" : "mute"} dot>
+            {on ? "Live" : "Off"}
+          </Pill>
+        }
+        subtitle="Answers a repeated question from a previous answer instead of paying a provider for it again. Scoped to your account, and off by default."
+      />
 
       {/* Where the cache sits. It is the one stage on the path that can end a
           request early, and that is worth drawing rather than describing. */}
@@ -186,18 +192,21 @@ export default function SemanticCache() {
         <Stats>
           <Stat
             label="Tokens saved"
+            glyph="spark"
             value={status?.tokensSaved ?? 0}
             tone={status?.tokensSaved ? "ok" : undefined}
             hint="Tokens that were never sent to a provider because a stored answer matched."
           />
           <Stat
             label="Cost avoided"
+            glyph="coin"
             value={money(status?.costSaved ?? 0)}
             hint="What the cached calls originally cost."
           />
-          <Stat label="Entries held" value={status?.entries ?? 0} />
+          <Stat label="Entries held" glyph="layers" value={status?.entries ?? 0} />
           <Stat
             label="Answered from cache"
+            glyph="check"
             value={status?.hits ?? 0}
             tone={status?.hits ? "ok" : undefined}
           />
@@ -214,7 +223,8 @@ export default function SemanticCache() {
         {/* A scale, not three products. The three named points sit on it, so
             picking one is visibly picking a position between two costs rather
             than choosing between unrelated options. */}
-        <div className="mt-5 max-w-2xl">
+        <Card className="mt-4">
+        <div className="max-w-2xl">
           <div className="flex items-baseline justify-between text-[11px]">
             <span className="text-slate-500">more hits, some of them wrong</span>
             <span className="text-slate-500">fewer hits, none of them wrong</span>
@@ -263,7 +273,7 @@ export default function SemanticCache() {
           </div>
         </div>
 
-        <div className="mt-7 flex flex-wrap items-end gap-x-8 gap-y-4">
+        <div className="mt-7 flex flex-wrap items-end gap-x-8 gap-y-4 border-t border-edge/60 pt-5">
           <label className="min-w-0">
             <span className="micro">Entry lifetime</span>
             <select
@@ -291,6 +301,7 @@ export default function SemanticCache() {
             </Ghost>
           </div>
         </div>
+        </Card>
       </section>
 
       <section className="mt-10">

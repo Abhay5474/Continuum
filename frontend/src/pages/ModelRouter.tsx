@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import { Chip } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { Readout, Plane, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
@@ -127,7 +128,10 @@ export default function ModelRouter() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[22px] font-semibold tracking-tight">Routing</h1>
+          <div className="flex items-center gap-2.5">
+            <Chip glyph="route" tone="accent" size={34} />
+            <h1 className="text-[22px] font-semibold tracking-tight">Routing</h1>
+          </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Scored per request · non-stationary contextual bandit · tail-latency hedging
           </p>
@@ -223,7 +227,7 @@ export default function ModelRouter() {
       {ranked.length > 0 && (
         <section>
           <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Providers</h2>
-          <div className="mt-2 overflow-x-auto">
+          <div className="mt-2 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-edge/60 text-left">
@@ -746,7 +750,7 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
             </p>
           )}
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
             <table className="w-full min-w-[560px] text-xs">
               <thead>
                 <tr className="border-b border-edge/60 text-left">

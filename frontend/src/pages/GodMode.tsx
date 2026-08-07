@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
+import { Chip } from "../system/hub";
 import { Micro, Readout, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
@@ -168,7 +169,10 @@ export default function GodMode() {
       {/* ---- header + master control ---- */}
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[22px] font-semibold tracking-tight">Adaptive Policy</h1>
+          <div className="flex items-center gap-2.5">
+            <Chip glyph="spark" tone="accent" size={34} />
+            <h1 className="text-[22px] font-semibold tracking-tight">Adaptive Policy</h1>
+          </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Self-managing memory · policy proposals gated by digital-twin replay
           </p>

@@ -87,6 +87,8 @@ export default function BreakerPage() {
   return (
     <div className="space-y-8">
       <PageHeader
+        glyph="shield"
+        tone="warn"
         title="Semantic Breaker"
         subtitle="Trips a model out of rotation when its answers get worse — not when it errors. Off by default."
       />

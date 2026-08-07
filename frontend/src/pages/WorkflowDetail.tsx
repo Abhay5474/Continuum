@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
+import { Chip } from "../system/hub";
 import type { WorkflowDetail } from "../types";
 import StatusBadge from "../components/StatusBadge";
 import DataView from "../system/DataView";
@@ -59,7 +60,10 @@ export default function WorkflowDetailPage() {
           ← Back
         </Link>
         <StatusBadge status={detail.summary.status} />
-        <h1 className="text-[22px] font-semibold tracking-tight">{detail.summary.workflowType}</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="flow" tone="accent" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight">{detail.summary.workflowType}</h1>
+        </div>
         <span className="font-mono text-xs text-slate-400">{detail.summary.workflowId}</span>
         {healing?.healed && (
           <>

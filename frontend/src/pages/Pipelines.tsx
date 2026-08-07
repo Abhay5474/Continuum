@@ -25,8 +25,7 @@ import {
   Split,
   Stat,
   Stats,
-  kindOf,
-} from "../system/hub";
+  kindOf, Chip } from "../system/hub";
 import { ErrorState, useToast } from "../components/ui";
 
 /**
@@ -269,7 +268,10 @@ export default function Pipelines() {
   return (
     <section className="page-enter">
       <header>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Pipelines</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="flow" tone="accent" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Pipelines</h1>
+        </div>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
           Your application sends an input and a question, and gets an answer back. It never learns a
           specialist was involved, which one, or who hosts it.

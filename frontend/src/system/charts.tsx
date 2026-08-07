@@ -1,6 +1,5 @@
 import { useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Micro } from "./primitives";
 
 /**
  * Chart primitives.
@@ -195,9 +194,12 @@ export function ChartFrame({
 }) {
   const [table, setTable] = useState(false);
   return (
-    <div className="space-y-2">
+    <div
+      className="space-y-2 rounded-xl border bg-card p-4 shadow-card"
+      style={{ borderColor: "rgb(var(--card-edge))" }}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Micro>{title}</Micro>
+        <h3 className="text-[12.5px] font-semibold tracking-tight text-slate-100">{title}</h3>
         <div className="flex items-center gap-2">
           {aside}
           <button

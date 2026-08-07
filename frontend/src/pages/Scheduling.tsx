@@ -119,6 +119,8 @@ export default function Scheduling() {
   return (
     <section className="space-y-8">
       <PageHeader
+        glyph="clock"
+        tone="info"
         title="Priority & Deadlines"
         subtitle="Admission control answers whether there is room. This answers who gets it."
       />
@@ -194,7 +196,7 @@ export default function Scheduling() {
           so the rules can be checked before they are trusted with real traffic.
         </p>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
           <table className="w-full min-w-[520px] text-xs">
             <thead>
               <tr className="text-left">

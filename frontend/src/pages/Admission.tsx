@@ -85,6 +85,8 @@ export default function Admission() {
   return (
     <section className="space-y-8">
       <PageHeader
+        glyph="gauge"
+        tone="info"
         title="Admission Control"
         subtitle="How much a provider will actually take, measured from latency instead of guessed."
       />

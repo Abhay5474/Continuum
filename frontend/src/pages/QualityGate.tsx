@@ -141,6 +141,8 @@ export default function QualityGatePage() {
   return (
     <div className="page-enter">
       <PageHeader
+        glyph="check"
+        tone="ok"
         title="Quality Gate"
         subtitle="Checks a finished answer against the request that asked for it. Off by default; the gate can rewrite an answer, so it has to earn that first."
       />
@@ -277,7 +279,7 @@ export default function QualityGatePage() {
       {/* ---- settings ---- */}
       <section className="mt-10">
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Limits</h2>
-        <div className="mt-4 flex flex-wrap items-start gap-x-8 gap-y-5">
+        <div className="plane mt-4 flex flex-wrap items-start gap-x-8 gap-y-5 p-4">
           <Pick
             label="Act below"
             value={status?.threshold ?? 0.6}

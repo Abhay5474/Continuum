@@ -101,6 +101,8 @@ export default function CostAdmission() {
   return (
     <section className="space-y-8">
       <PageHeader
+        glyph="coin"
+        tone="info"
         title="Cost-Aware Limits"
         subtitle="A fifty-step agent carrying twenty thousand tokens is not one request in the way that “hello” is one request."
       />

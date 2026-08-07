@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { STATE, type StateKey } from "./tokens";
 import { CountUp } from "./motion";
+import { Chip, type GlyphName, type Tone } from "./hub";
 
 /**
  * Instrument primitives.
@@ -37,15 +38,31 @@ export function PageHeader({
   title,
   subtitle,
   aside,
+  glyph,
+  tone = "accent",
+  badge,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   aside?: ReactNode;
+  /** The page's mark, in a tinted tile — the same one its cards use. */
+  glyph?: GlyphName;
+  tone?: Tone;
+  /** A count or state that belongs to the whole page, beside the title. */
+  badge?: ReactNode;
 }) {
   return (
     <header className="flex flex-wrap items-start gap-x-6 gap-y-3">
+      {glyph && (
+        <div className="mt-0.5">
+          <Chip glyph={glyph} tone={tone} size={36} />
+        </div>
+      )}
       <div className="min-w-0 flex-1">
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">{title}</h1>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">{title}</h1>
+          {badge}
+        </div>
         {subtitle && (
           <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">{subtitle}</p>
         )}
@@ -264,8 +281,11 @@ export function Switch({
   onUnlock?: () => void;
 }) {
   const disabled = busy || locked !== undefined;
+  // On the card plane rather than loose on the page. A toggle that turns a
+  // feature on for the whole account is the most consequential control on most
+  // of these screens, and floating it in the margin made it read like a caption.
   return (
-    <div className="flex min-w-0 items-start gap-3">
+    <div className="plane flex min-w-0 items-start gap-3 p-4">
       <button
         type="button"
         role="switch"

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { Chip } from "../system/hub";
 
 const FAILURE_TYPES = [
   "HALLUCINATION",
@@ -49,7 +50,10 @@ export default function AiChaosLab() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Model Failures</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="alert" tone="bad" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Model Failures</h1>
+        </div>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
           Inject AI-native failures — hallucinations, schema/tool corruption, prompt injection, context
           truncation, memory corruption, provider drift — then measure whether workflows survive.

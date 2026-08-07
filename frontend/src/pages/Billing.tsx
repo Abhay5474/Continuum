@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { portal } from "../api";
+import { Chip } from "../system/hub";
 import { SkeletonRows, ErrorState, useToast, Spinner } from "../components/ui";
 
 /**
@@ -70,7 +71,10 @@ export default function Billing() {
   return (
     <div className="space-y-6 animate-fade-up">
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Billing &amp; Usage</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="coin" tone="accent" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Billing &amp; Usage</h1>
+        </div>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">Your plan, this month's token usage, and quota.</p>
       </div>
 

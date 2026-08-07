@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { Chip, Stat, Stats } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
-import { Micro, Readout, Plane, StateDot, Trace } from "../system/primitives";
+import { Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
 import Tabs from "../system/Tabs";
@@ -93,6 +94,19 @@ export default function GatewayDashboard() {
     api.opPost(`/api/models/${id}/status?status=${status}`).then(refresh);
 
   const successRate = stats?.successRate ?? 1;
+
+  /** Arrivals per poll, not the running total — a cumulative line only ever
+      goes up, which makes every sparkline of it the same shape. */
+  const arrivals = useMemo(
+    () => series.slice(1).map((v, i) => Math.max(0, v - series[i])),
+    [series]
+  );
+  /** Oldest first, because a sparkline reads left to right and the feed is
+      newest first. */
+  const latencies = useMemo(
+    () => requests.map((r) => r.latencyMs ?? 0).reverse(),
+    [requests]
+  );
   const maxLatency = useMemo(
     () => Math.max(...requests.map((r) => r.latencyMs ?? 0), 1),
     [requests]
@@ -102,29 +116,66 @@ export default function GatewayDashboard() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[22px] font-semibold tracking-tight">Gateway</h1>
+          <div className="flex items-center gap-2.5">
+            <Chip glyph="route" tone="accent" size={34} />
+            <h1 className="text-[22px] font-semibold tracking-tight">Gateway</h1>
+          </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             One OpenAI-compatible endpoint · routed, retried and failed over before your app sees it
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-          <Readout label="Requests" value={(stats?.totalRequests ?? 0).toLocaleString()} size="sm"
-            state={(stats?.totalRequests ?? 0) > 0 ? "active" : "idle"} />
-          <Readout label="Success" value={(successRate * 100).toFixed(1)} unit="%" size="sm"
-            state={successRate >= 0.99 ? "healthy" : successRate >= 0.9 ? "warning" : "critical"} />
-          <Readout label="Absorbed failures" value={stats?.failuresPrevented ?? 0} size="sm"
-            state={(stats?.failuresPrevented ?? 0) > 0 ? "healthy" : "idle"}
-            hint="Provider failures the engine handled before your app saw them" />
-          <Readout label="Reached your app" value={stats?.developerVisibleFailures ?? 0} size="sm"
-            state={(stats?.developerVisibleFailures ?? 0) > 0 ? "critical" : "healthy"} />
-          <Readout label="Tokens" value={(stats?.totalTokens ?? 0).toLocaleString()} size="sm" />
-          <Readout label="Spend" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} size="sm" />
-          <div>
-            <Micro>Throughput</Micro>
-            <div className="mt-1"><Trace points={series} state="active" width={110} height={22} /></div>
-          </div>
-        </div>
       </header>
+
+      {/* The band a gateway page exists for. Each figure carries its own recent
+          shape, so "97 requests" is also "and they arrived like this" — the
+          second question anyone asks, answered without a click. */}
+      <Stats cols={4}>
+        <Stat
+          label="Requests"
+          glyph="activity"
+          tone={(stats?.totalRequests ?? 0) > 0 ? "info" : "mute"}
+          value={(stats?.totalRequests ?? 0).toLocaleString()}
+          series={arrivals}
+        />
+        <Stat
+          label="Success"
+          glyph="check"
+          unit="%"
+          tone={successRate >= 0.99 ? "ok" : successRate >= 0.9 ? "warn" : "bad"}
+          value={(successRate * 100).toFixed(1)}
+        />
+        <Stat
+          label="Absorbed failures"
+          glyph="shield"
+          tone={(stats?.failuresPrevented ?? 0) > 0 ? "ok" : "mute"}
+          value={stats?.failuresPrevented ?? 0}
+          hint="Provider failures the engine handled before your app saw them"
+        />
+        <Stat
+          label="Reached your app"
+          glyph="alert"
+          tone={(stats?.developerVisibleFailures ?? 0) > 0 ? "bad" : "ok"}
+          value={stats?.developerVisibleFailures ?? 0}
+          hint="Failures your application had to deal with itself"
+        />
+        <Stat
+          label="Latency"
+          glyph="clock"
+          unit="ms"
+          tone="info"
+          value={latencies.length ? Math.round(latencies[latencies.length - 1]) : "—"}
+          series={latencies}
+          hint="The most recent request, over the shape of the last forty"
+        />
+        <Stat label="Tokens" glyph="layers" value={(stats?.totalTokens ?? 0).toLocaleString()} />
+        <Stat label="Spend" glyph="coin" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} />
+        <Stat
+          label="Models available"
+          glyph="chip"
+          tone={models.length ? "ok" : "mute"}
+          value={models.length}
+        />
+      </Stats>
 
       <Tabs items={GW_TABS} tab={tab} setTab={setTab} />
 
@@ -145,7 +196,7 @@ export default function GatewayDashboard() {
             </p>
           </div>
         ) : (
-          <Spotlight className="mt-2 max-h-[420px] overflow-y-auto rounded-lg pr-1">
+          <Spotlight className="plane mt-2 max-h-[420px] overflow-y-auto px-3">
             <div className="divide-y divide-edge/40">
             {requests.map((r) => {
               const st: StateKey = !r.success ? "critical" : r.failoverCount > 0 ? "warning" : "healthy";
@@ -376,7 +427,7 @@ export default function GatewayDashboard() {
             </button>
           )}
         </div>
-        <div className="mt-2 overflow-x-auto">
+        <div className="mt-2 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-edge/60 text-left">

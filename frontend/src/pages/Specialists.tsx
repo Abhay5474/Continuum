@@ -286,6 +286,8 @@ export default function Specialists() {
   return (
     <div className="mx-auto max-w-5xl pb-24">
       <PageHeader
+        glyph="layers"
+        tone="accent"
         title="Specialists"
         subtitle="A purpose-built model runs before the language model, and hands it evidence instead of a raw file"
       />

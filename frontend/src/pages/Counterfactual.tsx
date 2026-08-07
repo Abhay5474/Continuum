@@ -115,6 +115,8 @@ export default function Counterfactual() {
   return (
     <section className="space-y-8">
       <PageHeader
+        glyph="spark"
+        tone="accent"
         title="Counterfactual Replay"
         subtitle="What would last week's traffic have cost on a different routing policy — answered before you switch, not after."
       />

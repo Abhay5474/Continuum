@@ -130,6 +130,8 @@ export default function LoopGuard() {
   return (
     <section className="space-y-8">
       <PageHeader
+        glyph="shield"
+        tone="ok"
         title="Loop Detection"
         subtitle="An agent that has lost the thread does not crash — it keeps working, and every step is billable."
       />

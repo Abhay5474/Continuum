@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { Chip } from "../system/hub";
 
 const TIERS = ["WORKING", "EPISODIC", "LONG_TERM", "ARCHIVED"];
 
@@ -29,7 +30,13 @@ export default function Memory() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Memory</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="layers" tone="accent" size={34} />
+          <div className="flex items-center gap-2.5">
+            <Chip glyph="layers" tone="accent" size={34} />
+            <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Memory</h1>
+          </div>
+        </div>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
           Hierarchical memory (working → episodic → long-term → archived) stored outside the context
           window. Retrieval ranks by relevance, recency and salience; compression summarizes cold memories.

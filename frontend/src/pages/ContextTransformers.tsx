@@ -20,8 +20,7 @@ import {
   Stage,
   Stat,
   Stats,
-  kindOf,
-} from "../system/hub";
+  kindOf, Chip } from "../system/hub";
 
 /**
  * The context layer.
@@ -204,9 +203,12 @@ export default function ContextTransformers() {
   return (
     <div className="page-enter">
       <header>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="layers" tone="accent" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">
           Context Transformers
         </h1>
+        </div>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
           Application data into a canonical form a model can reason over — deterministic, in process,
           with no model involved.

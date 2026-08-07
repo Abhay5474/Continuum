@@ -78,6 +78,8 @@ export default function Provenance() {
   return (
     <section className="space-y-8">
       <PageHeader
+        glyph="list"
+        tone="info"
         title="Decision Provenance"
         subtitle="Why Continuum did what it did — as data, not as a sentence."
       />

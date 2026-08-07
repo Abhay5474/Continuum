@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, portal } from "../api";
+import { Chip } from "../system/hub";
 import { Micro, Readout, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
@@ -211,7 +212,10 @@ export default function WorkflowBuilder() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[22px] font-semibold tracking-tight">Workflows</h1>
+          <div className="flex items-center gap-2.5">
+            <Chip glyph="flow" tone="accent" size={34} />
+            <h1 className="text-[22px] font-semibold tracking-tight">Workflows</h1>
+          </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Author a durable graph · crash-safe, retried, exactly-once
           </p>

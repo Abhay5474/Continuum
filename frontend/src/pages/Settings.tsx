@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { portal } from "../api";
+import { Chip } from "../system/hub";
 import { useToast, Spinner, CopyButton } from "../components/ui";
 import { dateTimeOf, dateOf } from "../system/time";
 
@@ -136,7 +137,10 @@ export default function Settings() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 animate-fade-up">
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Account Settings</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="chip" tone="accent" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Account Settings</h1>
+        </div>
         {me && <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">{me.email} · <span className="font-mono">{me.id}</span></p>}
       </div>
 
@@ -156,7 +160,7 @@ export default function Settings() {
             <CopyButton text={newKey} />
           </div>
         )}
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
           <table className="w-full text-sm">
             <thead className="text-xs text-slate-500">
               <tr className="text-left"><th className="py-1">Name</th><th>Prefix</th><th>Last used</th><th>Status</th><th></th></tr>

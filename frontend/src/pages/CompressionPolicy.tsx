@@ -3,7 +3,7 @@ import { portal } from "../api";
 import { Switch } from "../system/primitives";
 import { ChartFrame, TargetVsActual } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
-import { Explain } from "../system/hub";
+import { Explain, Chip } from "../system/hub";
 import { Empty, Facts, Ghost, Hop, KindMark, Rail, Route, Row, RowSkeleton, Stage, Stat, Stats } from "../system/hub";
 
 /**
@@ -90,7 +90,10 @@ export default function CompressionPolicy() {
   return (
     <section className="page-enter">
       <header>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Compression Budget</h1>
+        <div className="flex items-center gap-2.5">
+          <Chip glyph="gauge" tone="accent" size={34} />
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Compression Budget</h1>
+        </div>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
           One ratio for the whole prompt is the wrong shape — instructions, examples and the question
           do not carry information at the same density.

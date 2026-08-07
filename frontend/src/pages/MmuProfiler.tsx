@@ -18,8 +18,7 @@ import {
   SidePanel,
   Stage,
   Stat,
-  Stats,
-} from "../system/hub";
+  Stats, Chip } from "../system/hub";
 
 /**
  * Context MMU — the memory space.
@@ -94,7 +93,10 @@ export default function MmuProfiler() {
     <div className="page-enter">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Context Optimizer</h1>
+          <div className="flex items-center gap-2.5">
+            <Chip glyph="chip" tone="accent" size={34} />
+            <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Context Optimizer</h1>
+          </div>
           <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
             The working set stays resident inside the model's window. Everything else pages out to a
             semantic stub and faults back in when it is referenced.

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, portal } from "../api";
+import { Chip } from "../system/hub";
 import { Micro, Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
@@ -87,7 +88,10 @@ export default function DagCommandCenter() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[22px] font-semibold tracking-tight">Verification</h1>
+          <div className="flex items-center gap-2.5">
+            <Chip glyph="check" tone="accent" size={34} />
+            <h1 className="text-[22px] font-semibold tracking-tight">Verification</h1>
+          </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Claims solved in parallel · verified independently · resolved by Bayesian aggregation
           </p>

@@ -118,6 +118,8 @@ export default function Cascade() {
   return (
     <div className="page-enter">
       <PageHeader
+        glyph="route"
+        tone="accent"
         title="Model Cascade"
         subtitle="Answer with the cheap model, check the answer, and pay for the expensive one only when the check fails."
       />

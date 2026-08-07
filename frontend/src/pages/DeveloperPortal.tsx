@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
+import { Chip } from "../system/hub";
 import { useToast, Spinner, CopyButton, CodeBlock } from "../components/ui";
 import DataView from "../system/DataView";
 
@@ -221,7 +222,8 @@ function Portal({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="space-y-8">
       {/* Billing / Settings / Sign out live in the account menu in the header. */}
-      <div className="flex flex-wrap items-baseline gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <Chip glyph="chip" tone="accent" size={34} />
         <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">API Keys &amp; Providers</h1>
         {me && <span className="text-sm text-slate-400">{me.email} · <span className="font-mono">{me.id}</span></span>}
       </div>
@@ -283,7 +285,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           Store your own LLM provider API keys. They are encrypted with AES-256-GCM and decrypted only
           in-memory at request execution. Secrets are write-only — never displayed after saving.
         </p>
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
         <table className="w-full min-w-[420px] text-sm">
           <thead className="text-xs text-slate-400">
             <tr className="text-left"><th className="py-2">Provider</th><th>API Key (write-only)</th><th>Status</th><th>Actions</th></tr>
