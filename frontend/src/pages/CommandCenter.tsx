@@ -1,11 +1,56 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ContinuumCore from "../system/ContinuumCore";
 import { useTelemetry } from "../system/useTelemetry";
-import { Micro, Readout, StateDot, Trace, Meter } from "../system/primitives";
+import { Micro, StateDot, Trace, Meter } from "../system/primitives";
 import { STATE } from "../system/tokens";
+import {
+  Allocation,
+  BarList,
+  Card,
+  CardHead,
+  Event,
+  Feed,
+  Pill,
+  Stat,
+  Stats,
+  type Slice,
+} from "../system/hub";
 import type { Subsystem } from "../system/ContinuumCore";
 import type { Telemetry } from "../system/useTelemetry";
+
+/** A system state, as one of the six tones the pills and feed rows understand. */
+const EVENT_TONE: Record<string, "ok" | "warn" | "bad" | "info" | "mute"> = {
+  healthy: "ok",
+  active: "info",
+  warning: "warn",
+  degraded: "warn",
+  critical: "bad",
+  idle: "mute",
+  offline: "mute",
+};
+
+/** Counter series → per-poll arrivals. A cumulative line is the same shape every time. */
+function deltas(series: number[]): number[] {
+  return series.slice(1).map((v, i) => Math.max(0, v - series[i]));
+}
+
+/**
+ * Percentage change between the last quarter of a window and the one before it.
+ *
+ * <p>Not last-sample-versus-first: a single poll is noise, and a delta drawn
+ * from noise is worse than no delta at all. Returns undefined until there is
+ * enough of a window to say anything.
+ */
+function trend(series: number[]): number | undefined {
+  if (series.length < 8) return undefined;
+  const q = Math.max(2, Math.floor(series.length / 4));
+  const mean = (a: number[]) => a.reduce((n, v) => n + v, 0) / (a.length || 1);
+  const now = mean(series.slice(-q));
+  const before = mean(series.slice(-2 * q, -q));
+  if (before === 0) return now === 0 ? 0 : undefined;
+  return Math.round(((now - before) / before) * 100);
+}
 
 /**
  * AI Systems Command Centre.
@@ -28,6 +73,47 @@ export default function CommandCenter() {
   // when no individual subsystem has degraded yet.
   const reasons = attention.length + (t.experimentActive ? 1 : 0);
 
+  const arrivals = useMemo(() => deltas(t.series.requests), [t.series.requests]);
+  const reqTrend = useMemo(() => trend(arrivals), [arrivals]);
+
+  /** Installed subsystems grouped by what they are currently doing. */
+  const healthSlices = useMemo<Slice[]>(() => {
+    const count = (...keys: string[]) =>
+      installed.filter((s) => keys.includes(s.state)).length;
+    return [
+      { key: "active", label: "Carrying traffic", value: count("active"), tone: "violet" },
+      { key: "healthy", label: "Healthy, idle path", value: count("healthy"), tone: "green" },
+      { key: "idle", label: "Not in use", value: count("idle"), tone: "mute" },
+      {
+        key: "attention",
+        label: "Needing attention",
+        value: count("warning", "degraded", "critical"),
+        tone: "red",
+      },
+    ].filter((s) => s.value > 0) as Slice[];
+  }, [installed]);
+
+  const healthyPct = installed.length
+    ? Math.round(((installed.length - attention.length) / installed.length) * 100)
+    : 100;
+
+  /** Only what is actually moving — a list of thirteen zero-length bars is noise. */
+  const activity = useMemo(
+    () =>
+      installed
+        .filter((s) => s.flow > 0.002)
+        .sort((a, b) => b.flow - a.flow)
+        .slice(0, 6)
+        .map((s, i) => ({
+          key: s.id,
+          label: s.name,
+          note: `${Math.round(s.flow * 100)}% of display scale`,
+          fraction: s.flow,
+          tone: (["violet", "blue", "cyan", "green", "amber", "orange"] as const)[i],
+        })),
+    [installed]
+  );
+
   return (
     <div className="relative -mx-4 -mt-6 lg:min-h-[calc(100vh-56px)]">
       {/* The spatial field the whole console sits on. */}
@@ -39,40 +125,150 @@ export default function CommandCenter() {
             named, so the heading exists — it just is not drawn twice. */}
         <h1 className="sr-only">Command Centre</h1>
         {/* ---- system header: the one-line state of the world ---- */}
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-3 border-b border-edge/60 pb-4">
-          <div>
-            <Micro>System state</Micro>
-            <div className="mt-1 flex items-center gap-2">
-              <StateDot state={t.coreState} size={10} />
-              <span
-                className="text-xl font-semibold tracking-tight"
-                style={{ color: STATE[t.coreState].ink }}
-              >
-                {STATE[t.coreState].label}
-              </span>
-              <span className="text-xs text-slate-500">
-                {installed.length} subsystems ·{" "}
-                {reasons === 0 ? "all nominal" : `${reasons} needing attention`}
-              </span>
-            </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-center gap-2.5">
+            <StateDot state={t.coreState} size={10} />
+            <span
+              className="text-[21px] font-semibold tracking-tight"
+              style={{ color: STATE[t.coreState].ink }}
+            >
+              {STATE[t.coreState].label}
+            </span>
           </div>
+          <Pill tone={reasons === 0 ? "ok" : "warn"} dot>
+            {reasons === 0 ? "All nominal" : `${reasons} needing attention`}
+          </Pill>
+          <span className="text-xs text-slate-500">
+            {installed.length} subsystems · polled every four seconds
+          </span>
+          <Link
+            to="/gateway"
+            className="ml-auto rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-opacity hover:opacity-90"
+            style={{ background: "var(--accent-strong)", color: "var(--accent-on)" }}
+          >
+            Open the gateway
+          </Link>
+        </div>
 
-          <div className="ml-auto flex flex-wrap items-end gap-x-8 gap-y-3">
-            <Readout label="Requests" value={t.headline.requests.toLocaleString()} size="sm"
-              state={t.headline.requests > 0 ? "active" : "idle"} />
-            <Readout label="Success" value={(t.headline.successRate * 100).toFixed(1)} unit="%" size="sm"
-              state={t.headline.successRate >= 0.99 ? "healthy" : t.headline.successRate >= 0.9 ? "warning" : "critical"} />
-            <Readout label="Absorbed failures" value={t.headline.failoversPrevented} size="sm"
-              state={t.headline.failoversPrevented > 0 ? "healthy" : "idle"} />
-            <Readout label="Tokens" value={t.headline.tokens.toLocaleString()} size="sm" />
-            <Readout label="Spend" value={`$${t.headline.costUsd.toFixed(5)}`} size="sm" />
-            <div>
-              <Micro>Throughput</Micro>
-              <div className="mt-1">
-                <Trace points={t.series.requests} state="active" width={110} height={22} />
-              </div>
+        {/* ---- the headline band ----------------------------------------
+            Eight figures, each with its own mark and — where there is a real
+            series behind it — its own shape. The hue is identity: spend is
+            always amber, throughput always violet, so the band is scanned by
+            colour before it is read. */}
+        <div className="mt-5">
+          <Stats cols={4}>
+            <Stat
+              label="Requests"
+              glyph="activity"
+              tone="violet"
+              value={t.headline.requests.toLocaleString()}
+              series={arrivals}
+              delta={reqTrend}
+              deltaNote="vs the previous window"
+            />
+            <Stat
+              label="Success"
+              glyph="check"
+              unit="%"
+              tone="green"
+              value={(t.headline.successRate * 100).toFixed(1)}
+              series={t.series.success}
+            />
+            <Stat
+              label="Absorbed failures"
+              glyph="shield"
+              tone="blue"
+              value={t.headline.failoversPrevented}
+              hint="Provider failures the engine handled before your app saw them"
+            />
+            <Stat
+              label="Spend"
+              glyph="coin"
+              tone="amber"
+              value={`$${t.headline.costUsd.toFixed(5)}`}
+            />
+            <Stat label="Tokens" glyph="layers" tone="cyan" value={t.headline.tokens.toLocaleString()} />
+            <Stat label="Running" glyph="flow" tone="orange" value={t.headline.running} />
+            <Stat label="Completed" glyph="check" tone="green" value={t.headline.completed} />
+            <Stat
+              label="Failed"
+              glyph="alert"
+              tone={t.headline.failed > 0 ? "red" : "mute"}
+              value={t.headline.failed}
+            />
+          </Stats>
+        </div>
+
+        {/* ---- the three panels: what the fleet is made of, what it is
+            doing, and what just happened ---- */}
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <Card>
+            <CardHead
+              glyph="layers"
+              tone="violet"
+              title="Subsystem health"
+              sub={`${installed.length} installed of ${t.subsystems.length} in the architecture`}
+            />
+            <div className="mt-4">
+              <Allocation
+                slices={healthSlices}
+                centre={`${healthyPct}%`}
+                centreLabel="nominal"
+                unit="subsystems"
+              />
             </div>
-          </div>
+          </Card>
+
+          <Card>
+            <CardHead
+              glyph="gauge"
+              tone="cyan"
+              title="Path activity"
+              sub="Traffic on each subsystem's own path, this poll"
+            />
+            <div className="mt-4">
+              {activity.length > 0 ? (
+                <BarList items={activity} />
+              ) : (
+                <p className="text-xs text-slate-500">
+                  Nothing is moving. Send a request through the gateway and the bars fill in.
+                </p>
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <CardHead
+              glyph="alert"
+              tone="orange"
+              title="System events"
+              sub="Newest first"
+              right={
+                <Pill tone="ok" dot>
+                  Live
+                </Pill>
+              }
+            />
+            <div className="mt-3">
+              {t.events.length > 0 ? (
+                <Feed>
+                  {t.events.map((e, i) => (
+                    <Event
+                      key={i}
+                      tone={EVENT_TONE[e.kind] ?? "info"}
+                      title={e.text}
+                      badge={STATE[e.kind]?.label}
+                    />
+                  ))}
+                </Feed>
+              ) : (
+                <p className="px-1 text-xs text-slate-500">
+                  Nothing has happened worth reporting. Degradations, failovers and chaos
+                  experiments appear here as they occur.
+                </p>
+              )}
+            </div>
+          </Card>
         </div>
 
         {/* ---- the topology and its instrument rails ---- */}
@@ -106,14 +302,25 @@ export default function CommandCenter() {
               <CoreInspector t={t} onClose={() => setSelected(null)} />
             ) : (
               <>
-                <section>
-                  <Micro>Subsystems</Micro>
-                  <div className="mt-2 space-y-px">
+                {/* The rail is the topology's index: every node in the field,
+                    in a list you can actually read the names in. The runtime
+                    counters and the event feed used to live here too and are
+                    now in the band above, so this says one thing. */}
+                <Card pad={false}>
+                  <div className="px-4 pt-4">
+                    <CardHead
+                      glyph="list"
+                      tone="blue"
+                      title="Subsystems"
+                      sub="Pick one to focus the whole screen on it"
+                    />
+                  </div>
+                  <div className="mt-3 pb-2">
                     {t.subsystems.map((s) => (
                       <button
                         key={s.id}
                         onClick={() => setSelected(s.id)}
-                        className="flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left transition-colors hover:bg-edge/40"
+                        className="flex w-full items-center gap-2.5 px-4 py-1.5 text-left transition-colors hover:bg-slate-500/[0.055]"
                       >
                         <StateDot state={s.installed ? s.state : "offline"} />
                         <span className={`text-xs ${s.installed ? "text-slate-300" : "text-slate-600"}`}>
@@ -126,41 +333,24 @@ export default function CommandCenter() {
                       </button>
                     ))}
                   </div>
-                </section>
-
-                <section>
-                  <Micro>Runtime</Micro>
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    <Readout label="Running" value={t.headline.running} size="sm"
-                      state={t.headline.running > 0 ? "active" : "idle"} />
-                    <Readout label="Done" value={t.headline.completed} size="sm"
-                      state={t.headline.completed > 0 ? "healthy" : "idle"} />
-                    <Readout label="Failed" value={t.headline.failed} size="sm"
-                      state={t.headline.failed > 0 ? "critical" : "idle"} />
-                  </div>
-                </section>
-
-                <section>
-                  <Micro>Recent system events</Micro>
-                  <div className="mt-2 space-y-1.5">
-                    {t.events.map((e, i) => (
-                      <div key={i} className="flex items-start gap-2 text-[11px] leading-relaxed">
-                        <span className="mt-1"><StateDot state={e.kind} size={6} /></span>
-                        <span className="text-slate-400">{e.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+                </Card>
 
                 {t.workflows.length > 0 && (
-                  <section>
-                    <Micro>Active workflows</Micro>
-                    <div className="mt-2 space-y-px">
+                  <Card pad={false}>
+                    <div className="px-4 pt-4">
+                      <CardHead
+                        glyph="flow"
+                        tone="orange"
+                        title="Active workflows"
+                        sub={`${t.workflows.length} in flight`}
+                      />
+                    </div>
+                    <div className="mt-3 pb-2">
                       {t.workflows.slice(0, 6).map((w: any) => (
                         <Link
                           key={w.workflowId}
                           to={`/workflows/${w.workflowId}`}
-                          className="flex items-center gap-2 rounded px-2 py-1 transition-colors hover:bg-edge/40"
+                          className="flex items-center gap-2 px-4 py-1.5 transition-colors hover:bg-slate-500/[0.055]"
                         >
                           <StateDot
                             state={w.status === "FAILED" ? "critical" : w.status === "RUNNING" ? "active" : "healthy"}
@@ -173,7 +363,7 @@ export default function CommandCenter() {
                         </Link>
                       ))}
                     </div>
-                  </section>
+                  </Card>
                 )}
               </>
             )}
@@ -188,7 +378,7 @@ export default function CommandCenter() {
 function Inspector({ sel, onClose }: { sel: Subsystem; onClose: () => void }) {
   const color = STATE[sel.installed ? sel.state : "offline"].color;
   return (
-    <div className="settle space-y-4">
+    <Card className="settle space-y-4">
       <div className="flex items-start gap-2">
         <div>
           <Micro>Subsystem</Micro>
@@ -235,14 +425,14 @@ function Inspector({ sel, onClose }: { sel: Subsystem; onClose: () => void }) {
           )}
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
 /** The core itself: the aggregate view. */
 function CoreInspector({ t, onClose }: { t: Telemetry; onClose: () => void }) {
   return (
-    <div className="settle space-y-4">
+    <Card className="settle space-y-4">
       <div className="flex items-start">
         <div>
           <Micro>Continuum Core</Micro>
@@ -268,6 +458,6 @@ function CoreInspector({ t, onClose }: { t: Telemetry; onClose: () => void }) {
           <Trace points={t.series.success} state="healthy" width={280} height={44} />
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

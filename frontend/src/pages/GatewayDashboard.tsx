@@ -133,7 +133,7 @@ export default function GatewayDashboard() {
         <Stat
           label="Requests"
           glyph="activity"
-          tone={(stats?.totalRequests ?? 0) > 0 ? "info" : "mute"}
+          tone="violet"
           value={(stats?.totalRequests ?? 0).toLocaleString()}
           series={arrivals}
         />
@@ -147,7 +147,7 @@ export default function GatewayDashboard() {
         <Stat
           label="Absorbed failures"
           glyph="shield"
-          tone={(stats?.failuresPrevented ?? 0) > 0 ? "ok" : "mute"}
+          tone="blue"
           value={stats?.failuresPrevented ?? 0}
           hint="Provider failures the engine handled before your app saw them"
         />
@@ -162,17 +162,17 @@ export default function GatewayDashboard() {
           label="Latency"
           glyph="clock"
           unit="ms"
-          tone="info"
+          tone="cyan"
           value={latencies.length ? Math.round(latencies[latencies.length - 1]) : "—"}
           series={latencies}
           hint="The most recent request, over the shape of the last forty"
         />
-        <Stat label="Tokens" glyph="layers" value={(stats?.totalTokens ?? 0).toLocaleString()} />
-        <Stat label="Spend" glyph="coin" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} />
+        <Stat label="Tokens" glyph="layers" tone="amber" value={(stats?.totalTokens ?? 0).toLocaleString()} />
+        <Stat label="Spend" glyph="coin" tone="orange" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} />
         <Stat
           label="Models available"
           glyph="chip"
-          tone={models.length ? "ok" : "mute"}
+          tone="green"
           value={models.length}
         />
       </Stats>

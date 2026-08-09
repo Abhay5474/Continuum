@@ -116,6 +116,20 @@
   --wash-bad: rgba(244, 86, 110, 0.13);
   --wash-info: rgba(107, 161, 247, 0.13);
   --wash-mute: rgba(148, 163, 184, 0.10);
+
+  /* ---- card hues ----------------------------------------------------------
+     Eight, for the mark on a card and the line drawn inside it. This channel is
+     identity, not state: two cards in different hues are two different things
+     and neither of them is worse. State keeps the five colours above, so a red
+     mark never appears as decoration and a critical badge is never lost in it. */
+  --hue-violet-ink: #A78BFA;   --hue-violet-wash: rgba(167, 139, 250, 0.15);
+  --hue-blue-ink:   #7CB0F8;   --hue-blue-wash:   rgba(124, 176, 248, 0.15);
+  --hue-cyan-ink:   #5CCFD8;   --hue-cyan-wash:   rgba( 92, 207, 216, 0.15);
+  --hue-green-ink:  #4ADE9B;   --hue-green-wash:  rgba( 74, 222, 155, 0.15);
+  --hue-amber-ink:  #F3C04A;   --hue-amber-wash:  rgba(243, 192,  74, 0.15);
+  --hue-orange-ink: #FB9A5B;   --hue-orange-wash: rgba(251, 154,  91, 0.15);
+  --hue-red-ink:    #F87F8F;   --hue-red-wash:    rgba(248, 127, 143, 0.15);
+  --hue-pink-ink:   #EF87C6;   --hue-pink-wash:   rgba(239, 135, 198, 0.15);
   color-scheme: dark;
 }
 
@@ -135,7 +149,7 @@
   --state-idle-ink: #4B5563;
   --state-healthy-ink: #047857;
   --state-active-ink: #1D4ED8;
-  --state-warning-ink: #B45309;
+  --state-warning-ink: #8F4708;  /* darker than the text-only need: it also sits on its own 10% wash */
   --state-degraded-ink: #C2410C;
   --state-critical-ink: #BE123C;
   --state-offline-ink: #6B7280;
@@ -202,6 +216,17 @@
   --wash-bad: rgba(190, 18, 60, 0.09);
   --wash-info: rgba(29, 78, 216, 0.09);
   --wash-mute: rgba(71, 85, 105, 0.07);
+
+  /* The same eight, stepped for paper. Each measured at 4.5:1 or better on a
+     white card, and each still distinguishable from its neighbours. */
+  --hue-violet-ink: #6D3FD4;   --hue-violet-wash: rgba(109,  63, 212, 0.10);
+  --hue-blue-ink:   #1D64C8;   --hue-blue-wash:   rgba( 29, 100, 200, 0.10);
+  --hue-cyan-ink:   #0E7490;   --hue-cyan-wash:   rgba( 14, 116, 144, 0.10);
+  --hue-green-ink:  #047857;   --hue-green-wash:  rgba(  4, 120,  87, 0.10);
+  --hue-amber-ink:  #A25A05;   --hue-amber-wash:  rgba(162,  90,   5, 0.10);
+  --hue-orange-ink: #B4460D;   --hue-orange-wash: rgba(180,  70,  13, 0.10);
+  --hue-red-ink:    #BE123C;   --hue-red-wash:    rgba(190,  18,  60, 0.09);
+  --hue-pink-ink:   #A81F72;   --hue-pink-wash:   rgba(168,  31, 114, 0.10);
   color-scheme: light;
 }
 
