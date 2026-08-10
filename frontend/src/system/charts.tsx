@@ -195,20 +195,38 @@ export function ChartFrame({
   const [table, setTable] = useState(false);
   return (
     <div
-      className="space-y-2 rounded-xl border bg-card p-4 shadow-card"
-      style={{ borderColor: "rgb(var(--card-edge))" }}
+      className="space-y-3 border bg-card p-4 shadow-card"
+      style={{ borderRadius: "var(--r-lg)", borderColor: "rgb(var(--card-edge))" }}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-[12.5px] font-semibold tracking-tight text-slate-100">{title}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[13px] font-semibold tracking-tight text-slate-100">{title}</h3>
         <div className="flex items-center gap-2">
           {aside}
-          <button
-            onClick={() => setTable(!table)}
-            className="text-[10px] uppercase tracking-wide text-slate-600 transition-colors hover:text-slate-300"
-            aria-pressed={table}
+          {/* Two states, both visible. A single button that reads "table" and
+              silently becomes "chart" makes you click it to find out what it
+              does; a pair shows which view you are in. */}
+          <div
+            className="flex items-center gap-0.5 rounded-[var(--r-md)] p-0.5"
+            style={{ background: "var(--wash-mute)" }}
+            role="group"
+            aria-label="View"
           >
-            {table ? "chart" : "table"}
-          </button>
+            {([false, true] as const).map((wantTable) => (
+              <button
+                key={String(wantTable)}
+                onClick={() => setTable(wantTable)}
+                aria-pressed={table === wantTable}
+                className="rounded-[5px] px-1.5 py-[3px] text-[10px] font-medium uppercase tracking-wide transition-colors duration-150"
+                style={
+                  table === wantTable
+                    ? { background: "rgb(var(--card))", color: "rgb(var(--topo-text))" }
+                    : { color: "var(--text-2)" }
+                }
+              >
+                {wantTable ? "Table" : "Chart"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {caption && <p className="text-xs text-slate-600">{caption}</p>}
@@ -697,9 +715,29 @@ export function SeriesChart({
   const x = (i: number) => (i / (len - 1)) * width;
   const y = (v: number) => height - ((v - min) / span) * height;
 
+  // Four ticks including both ends. A gridline with no number on it says "there
+  // is a scale" without saying what it is, which is the most common way a chart
+  // in a console manages to be decorative.
+  const ticks = [1, 0.75, 0.5, 0.25, 0].map((f) => ({ f, v: min + span * f }));
+
   return (
     <div className="space-y-2">
-      <div className="relative">
+      {/* The axis gutter is HTML, not SVG text: the plot is drawn with
+          preserveAspectRatio="none" so anything inside it is stretched, and
+          stretched type is the tell that a chart was scaled rather than laid
+          out. */}
+      <div className="relative pl-10">
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-9" aria-hidden>
+          {ticks.map(({ f, v }) => (
+            <span
+              key={f}
+              className="readout absolute right-0 -translate-y-1/2 text-[10px] text-slate-500"
+              style={{ top: `${(1 - f) * 100}%` }}
+            >
+              {format(v)}
+            </span>
+          ))}
+        </div>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full"
@@ -712,14 +750,15 @@ export function SeriesChart({
             setHover(Math.max(0, Math.min(len - 1, Math.round(frac * (len - 1)))));
           }}
         >
-          {/* Recessive hairline grid — solid, never dashed. */}
-          {[0.25, 0.5, 0.75].map((g) => (
+          {/* Recessive hairline grid — solid, never dashed, and on the same
+              rows as the axis numbers so a value can be read off the line. */}
+          {ticks.map(({ f }) => (
             <line
-              key={g}
+              key={f}
               x1={0}
               x2={width}
-              y1={height * g}
-              y2={height * g}
+              y1={height * (1 - f)}
+              y2={height * (1 - f)}
               stroke={GRID}
               strokeWidth={1}
               vectorEffect="non-scaling-stroke"
@@ -791,10 +830,14 @@ export function SeriesChart({
 
         {hover !== null && (
           <div
-            className="pointer-events-none absolute top-0 z-10 rounded-md border border-edge bg-panel/95 px-2 py-1.5 text-[11px] shadow-lg backdrop-blur"
+            className="pointer-events-none absolute top-0 z-10 space-y-0.5 border px-2.5 py-2 text-[11px]"
             style={{
               left: `${(hover / (len - 1)) * 100}%`,
               transform: hover > len / 2 ? "translateX(-105%)" : "translateX(5%)",
+              borderRadius: "var(--r-md)",
+              borderColor: "rgb(var(--card-edge))",
+              background: "rgb(var(--card))",
+              boxShadow: "0 4px 6px -2px rgba(0,0,0,.14), 0 10px 22px -6px rgba(0,0,0,.3)",
             }}
             role="status"
             aria-live="polite"

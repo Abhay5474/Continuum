@@ -92,14 +92,31 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/5 px-6 py-10 text-center animate-fade-up">
-      <div className="mb-2 text-2xl">⚠️</div>
-      <div className="text-sm font-semibold text-rose-200">Something went wrong</div>
-      <div className="mt-1 max-w-md break-words text-xs text-rose-300/80">{message}</div>
+    <div
+      className="flex flex-col items-center justify-center border px-6 py-12 text-center animate-fade-up"
+      style={{
+        borderRadius: "var(--r-lg)",
+        borderColor: "rgb(var(--card-edge))",
+        background: "rgb(var(--card))",
+      }}
+    >
+      <span
+        aria-hidden
+        className="grid h-10 w-10 place-items-center rounded-[var(--r-lg)]"
+        style={{ background: "var(--wash-bad)", color: "var(--state-critical-ink)" }}
+      >
+        <svg width="19" height="19" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 2.2 1.6 13.4h12.8L8 2.2Z" /><path d="M8 6.4v3M8 11.3v.1" />
+        </svg>
+      </span>
+      <div className="mt-3 text-[13px] font-semibold text-slate-100">Something went wrong</div>
+      <div className="mt-1.5 max-w-md break-words text-xs leading-relaxed text-slate-500">{message}</div>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="mt-4 rounded-lg border border-rose-400/40 px-4 py-1.5 text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/10"
+          style={{ height: "var(--h-md)", borderRadius: "var(--r-md)", borderColor: "rgb(var(--card-edge))" }}
+          className="mt-4 inline-flex items-center gap-1.5 border px-3 text-[12.5px] font-medium text-slate-200 transition-colors duration-150 hover:border-slate-500/60 hover:bg-[color:rgb(var(--card-hover))]"
         >
           ↻ Retry
         </button>
@@ -205,16 +222,45 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-2 rounded-lg border px-3 py-2 text-sm shadow-glow-sm backdrop-blur animate-fade-up ${
-              t.kind === "success"
-                ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                : t.kind === "error"
-                ? "border-rose-400/40 bg-rose-500/10 text-rose-200"
-                : "border-aurora/40 bg-aurora/10 text-indigo-100"
-            }`}
+            role="status"
+            className="pointer-events-auto flex items-start gap-2.5 border border-l-[3px] px-3 py-2.5 text-[12.5px] animate-fade-up"
+            style={{
+              borderRadius: "var(--r-lg)",
+              borderColor: "rgb(var(--card-edge))",
+              borderLeftColor:
+                t.kind === "success"
+                  ? "var(--state-healthy-ink)"
+                  : t.kind === "error"
+                    ? "var(--state-critical-ink)"
+                    : "var(--accent)",
+              background: "rgb(var(--card))",
+              boxShadow: "0 4px 6px -2px rgba(0,0,0,.14), 0 12px 26px -8px rgba(0,0,0,.32)",
+            }}
           >
-            <span>{t.kind === "success" ? "✓" : t.kind === "error" ? "⚠" : "ℹ"}</span>
-            <span className="flex-1">{t.message}</span>
+            <span
+              aria-hidden
+              className="mt-[1px] shrink-0"
+              style={{
+                color:
+                  t.kind === "success"
+                    ? "var(--state-healthy-ink)"
+                    : t.kind === "error"
+                      ? "var(--state-critical-ink)"
+                      : "var(--accent-ink)",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                   strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                {t.kind === "success" ? (
+                  <><circle cx="8" cy="8" r="6.3" /><path d="m5.2 8.2 2 2 3.6-4" /></>
+                ) : t.kind === "error" ? (
+                  <><path d="M8 2.2 1.6 13.4h12.8L8 2.2Z" /><path d="M8 6.4v3M8 11.3v.1" /></>
+                ) : (
+                  <><circle cx="8" cy="8" r="6.3" /><path d="M8 7.4v4M8 4.7v.1" /></>
+                )}
+              </svg>
+            </span>
+            <span className="flex-1 leading-relaxed text-slate-200">{t.message}</span>
           </div>
         ))}
       </div>
