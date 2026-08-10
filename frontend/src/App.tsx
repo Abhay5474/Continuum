@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { portal } from "./api";
 import { ThemeToggle } from "./components/ui";
 import { useOperator } from "./system/OperatorAccess";
+import { GuideButton } from "./system/guide";
+import { guideFor } from "./system/guides";
 
 /**
  * Console shell.
@@ -113,11 +115,12 @@ export default function App() {
   };
 
   const groupActive = (g: Group) => g.items.some((i) => location.pathname.startsWith(i.to));
+  const guide = guideFor(location.pathname);
 
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-30 border-b border-card-edge bg-card/90 backdrop-blur-md">
-        <div ref={navRef} className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5">
+        <div ref={navRef} className="mx-auto flex max-w-[1200px] items-center gap-2 px-5 py-2.5">
           <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">
             <span
               className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px]"
@@ -159,6 +162,10 @@ export default function App() {
 
           {/* right side */}
           <div className="ml-auto flex items-center gap-1.5">
+            {/* The guide for whatever page you are on. Living in the bar rather
+                than on each page means a feature cannot ship without one being
+                noticed as missing, and it is always in the same place. */}
+            {guide && <GuideButton guide={guide} guideKey={location.pathname} />}
             <Link
               to="/docs"
               className="hidden rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:text-slate-200 lg:block"
@@ -233,7 +240,7 @@ export default function App() {
 
         {/* mobile menu */}
         {mobileOpen && (
-          <nav className="max-h-[70vh] overflow-y-auto border-t border-card-edge bg-card/95 px-4 py-3 lg:hidden">
+          <nav className="mx-auto max-h-[70vh] max-w-[1200px] overflow-y-auto border-t border-card-edge bg-card/95 px-5 py-3 lg:hidden">
             <MobileLink to="/dashboard" label="Command Centre" />
             {GROUPS.map((g) => (
               <div key={g.label} className="mt-3">
@@ -275,7 +282,7 @@ export default function App() {
           forgot it would be the only one that snapped in, and that
           inconsistency reads as a bug rather than as restraint. Short and
           small — 260ms and 6px is "it arrived", not "watch this". */}
-      <main key={location.pathname} className="page-enter mx-auto max-w-[1440px] px-5 pb-16 pt-6">
+      <main key={location.pathname} className="page-enter mx-auto max-w-[1200px] px-5 pb-16 pt-6">
         <Outlet />
       </main>
     </div>

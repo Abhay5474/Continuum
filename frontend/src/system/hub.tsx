@@ -463,12 +463,22 @@ export function Card({
   pad = true,
   onClick,
   selected = false,
+  guide,
 }: {
   children: ReactNode;
   className?: string;
   pad?: boolean;
   onClick?: () => void;
   selected?: boolean;
+  /**
+   * Names this card as a target for the feature guide's spotlight.
+   *
+   * <p>An explicit prop rather than accepting a spread, because TypeScript does
+   * not excess-property-check hyphenated JSX attributes: a `data-guide` written
+   * straight onto a component compiles cleanly, is silently dropped, and the
+   * guide then highlights nothing with no error reported anywhere.
+   */
+  guide?: string;
 }) {
   const interactive = !!onClick;
   return (
@@ -482,6 +492,7 @@ export function Card({
           onClick!();
         }
       }}
+      data-guide={guide}
       className={`relative border bg-card shadow-card transition-[background-color,border-color] duration-150 ${
         pad ? "p-4" : ""
       } ${interactive ? "cursor-pointer hover:border-slate-500/40 hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}

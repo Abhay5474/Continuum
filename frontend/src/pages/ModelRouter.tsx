@@ -225,7 +225,7 @@ export default function ModelRouter() {
       {/* ---- provider table ---- */}
       {ranked.length > 0 && (
         <section>
-          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Providers</h2>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200" data-guide="router-providers">Providers</h2>
           <div className="mt-2">
             <Table
               minWidth={760}

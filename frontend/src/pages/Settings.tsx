@@ -161,7 +161,7 @@ export default function Settings() {
             <CopyButton text={newKey} />
           </div>
         )}
-        <div className="mt-3">
+        <div className="mt-3" data-guide="settings-keys">
           <Table
             minWidth={520}
             head={

@@ -293,7 +293,7 @@ export default function Specialists() {
         subtitle="A purpose-built model runs before the language model, and hands it evidence instead of a raw file"
       />
 
-      <div className="mt-6">
+      <div className="mt-6" data-guide="specialists-search">
         <CommandBar
           value={q}
           onChange={setQ}

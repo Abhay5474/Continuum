@@ -130,6 +130,7 @@ export default function GatewayDashboard() {
       {/* The band a gateway page exists for. Each figure carries its own recent
           shape, so "97 requests" is also "and they arrived like this" — the
           second question anyone asks, answered without a click. */}
+      <div data-guide="gateway-stats">
       <Stats cols={4}>
         <Stat
           label="Requests"
@@ -177,8 +178,11 @@ export default function GatewayDashboard() {
           value={models.length}
         />
       </Stats>
+      </div>
 
+      <div data-guide="gateway-tabs">
       <Tabs items={GW_TABS} tab={tab} setTab={setTab} />
+      </div>
 
       <Morph k={tab}>
         {tab === "flow" && (<>
@@ -197,6 +201,7 @@ export default function GatewayDashboard() {
             </p>
           </div>
         ) : (
+          <div data-guide="gateway-flow">
           <Spotlight className="plane mt-2 max-h-[420px] overflow-y-auto px-3">
             <div className="divide-y divide-edge/40">
             {requests.map((r) => {
@@ -268,6 +273,7 @@ export default function GatewayDashboard() {
             })}
             </div>
           </Spotlight>
+          </div>
         )}
       </section>
         </>)}

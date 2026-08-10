@@ -115,17 +115,17 @@ export default function CommandCenter() {
   );
 
   return (
-    <div className="relative -mx-4 -mt-6 lg:min-h-[calc(100vh-56px)]">
+    <div className="relative -mx-5 -mt-6 lg:min-h-[calc(100vh-56px)]">
       {/* The spatial field the whole console sits on. */}
       <div className="pointer-events-none absolute inset-0 grid-field opacity-70" />
 
-      <div className="relative px-4 pt-5">
+      <div className="relative px-5 pt-5">
         {/* The visual heading here is the state readout below, which is the
             right call for an instrument. A screen reader still needs the page
             named, so the heading exists — it just is not drawn twice. */}
         <h1 className="sr-only">Command Centre</h1>
         {/* ---- system header: the one-line state of the world ---- */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-guide="cc-state">
           <div className="flex items-center gap-2.5">
             <StateDot state={t.coreState} size={10} />
             <span
@@ -155,7 +155,7 @@ export default function CommandCenter() {
             series behind it — its own shape. The hue is identity: spend is
             always amber, throughput always violet, so the band is scanned by
             colour before it is read. */}
-        <div className="mt-5">
+        <div className="mt-5" data-guide="cc-stats">
           <Stats cols={4}>
             <Stat
               label="Requests"
@@ -201,7 +201,7 @@ export default function CommandCenter() {
 
         {/* ---- the three panels: what the fleet is made of, what it is
             doing, and what just happened ---- */}
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        <div className="mt-4 grid gap-3 lg:grid-cols-3" data-guide="cc-panels">
           <Card>
             <CardHead
               glyph="layers"
@@ -272,7 +272,7 @@ export default function CommandCenter() {
         </div>
 
         {/* ---- the topology and its instrument rails ---- */}
-        <div className="grid gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_320px]" data-guide="cc-topology">
           <div className="relative flex flex-col justify-center py-2 lg:min-h-[68vh] lg:py-0">
             {t.loading ? (
               <div className="flex h-[52vh] items-center justify-center">

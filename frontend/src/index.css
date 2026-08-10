@@ -153,7 +153,7 @@
   --topo-label: 71 85 105;
   --topo-label-off: 148 163 184;
   --state-idle-ink: #4B5563;
-  --state-healthy-ink: #047857;
+  --state-healthy-ink: #036B4C;  /* also sits on its own wash inside a pill */
   --state-active-ink: #1D4ED8;
   --state-warning-ink: #8F4708;  /* darker than the text-only need: it also sits on its own 10% wash */
   --state-degraded-ink: #C2410C;

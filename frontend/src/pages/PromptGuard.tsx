@@ -126,7 +126,7 @@ export default function PromptGuard() {
         </p>
       </header>
 
-      <div className="mt-6">
+      <div className="mt-6" data-guide="guard-route">
         <Route>
           <Stage label="your prompt" sub="as your app sent it" />
           <Hop />

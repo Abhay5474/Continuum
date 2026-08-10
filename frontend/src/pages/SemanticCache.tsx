@@ -164,7 +164,7 @@ export default function SemanticCache() {
         </Route>
       </div>
 
-      <div className="mt-7">
+      <div className="mt-7" data-guide="cache-toggle">
         <Switch
           label="Semantic cache"
           hint="Matches incoming prompts against your recent answers by meaning. A hit never crosses accounts or models."
@@ -190,6 +190,7 @@ export default function SemanticCache() {
           </ChartFrame>
         </div>
 
+        <div data-guide="cache-stats">
         <Stats>
           <Stat
             label="Tokens saved"
@@ -212,6 +213,7 @@ export default function SemanticCache() {
             tone={status?.hits ? "ok" : undefined}
           />
         </Stats>
+        </div>
       </div>
 
       <section className="mt-10">
@@ -224,7 +226,7 @@ export default function SemanticCache() {
         {/* A scale, not three products. The three named points sit on it, so
             picking one is visibly picking a position between two costs rather
             than choosing between unrelated options. */}
-        <Card className="mt-4">
+        <Card className="mt-4" guide="cache-threshold">
         <div className="max-w-2xl">
           <div className="flex items-baseline justify-between text-[11px]">
             <span className="text-slate-500">more hits, some of them wrong</span>
@@ -274,7 +276,7 @@ export default function SemanticCache() {
           </div>
         </div>
 
-        <div className="mt-7 flex flex-wrap items-end gap-x-8 gap-y-4 border-t border-edge/60 pt-5">
+        <div className="mt-7 flex flex-wrap items-end gap-x-8 gap-y-4 border-t border-edge/60 pt-5" data-guide="cache-lifetime">
           <label className="min-w-0">
             <span className="micro">Entry lifetime</span>
             <Select

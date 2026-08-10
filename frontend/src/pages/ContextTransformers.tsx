@@ -271,7 +271,7 @@ export default function ContextTransformers() {
       />
 
       {capabilities.length > 0 && (
-        <section className="mt-8">
+        <section className="mt-8" data-guide="context-kinds">
           <h2 className="flex items-baseline gap-2 text-[13px] font-semibold tracking-tight text-slate-200">
             What it recognises
             <span className="readout text-[11px] font-normal text-slate-600">{capabilities.length}</span>
@@ -297,7 +297,7 @@ export default function ContextTransformers() {
       {/* Input */}
       <section className="mt-9">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Give it something</h2>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200" data-guide="context-playground">Give it something</h2>
           <div className="flex items-center gap-4">
             <span className="micro">render at</span>
             {BUDGETS.map((b) => {
@@ -493,7 +493,7 @@ function Reaches({
   onToggle: (next: boolean) => void;
 }) {
   return (
-    <section className="mt-8">
+    <section className="mt-8" data-guide="context-reach">
       <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
         Where this reaches a model
       </h2>
