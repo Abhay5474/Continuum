@@ -61,8 +61,8 @@ export default function WorkflowDetailPage() {
         </Link>
         <StatusBadge status={detail.summary.status} />
         <div className="flex items-center gap-2.5">
-          <Chip glyph="flow" tone="accent" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight">{detail.summary.workflowType}</h1>
+          <Chip glyph="flow" tone="accent" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em]">{detail.summary.workflowType}</h1>
         </div>
         <span className="font-mono text-xs text-slate-400">{detail.summary.workflowId}</span>
         {healing?.healed && (

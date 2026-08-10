@@ -1,5 +1,4 @@
 import { useRef, useLayoutEffect, useState } from "react";
-import { STATE } from "./tokens";
 
 /**
  * Section switcher.
@@ -30,26 +29,36 @@ export default function Tabs<T extends string>({
   }, [tab, items]);
 
   return (
-    <div className="flex flex-wrap items-end justify-between gap-2 border-b border-edge/60">
+    <div
+      className="flex flex-wrap items-end justify-between gap-2 border-b"
+      style={{ borderColor: "rgb(var(--card-edge))" }}
+      role="tablist"
+    >
       <div ref={wrap} className="relative flex flex-wrap">
         {items.map(([k, label]) => (
           <button
             key={k}
             data-tab={k}
+            role="tab"
+            aria-selected={tab === k}
             onClick={() => setTab(k)}
-            className="px-3 py-2 text-xs font-medium transition-colors"
-            style={{ color: tab === k ? "rgb(var(--topo-text))" : undefined }}
+            // Inactive tabs are muted rather than absent, and lift on hover —
+            // a tab strip where only the active item is visible reads as a
+            // heading with some grey text after it.
+            className={`px-3 pb-2.5 pt-2 text-[12.5px] font-medium transition-colors duration-150 ${
+              tab === k ? "text-slate-100" : "text-slate-500 hover:text-slate-300"
+            }`}
           >
             {label}
           </button>
         ))}
         <span
           aria-hidden
-          className="absolute -bottom-px h-0.5 rounded-full"
+          className="absolute -bottom-px h-[2px] rounded-full"
           style={{
             left: bar.left,
             width: bar.width,
-            background: STATE.active.color,
+            background: "var(--accent)",
             transition: "left 320ms cubic-bezier(0.22,1,0.36,1), width 320ms cubic-bezier(0.22,1,0.36,1)",
           }}
         />

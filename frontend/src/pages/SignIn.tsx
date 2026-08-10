@@ -90,7 +90,7 @@ export default function SignIn() {
                     required
                     autoComplete="name"
                     placeholder="Ada Lovelace"
-                    className="w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-aurora/60"
+                    className="w-full field"
                   />
                 </Field>
               )}
@@ -102,7 +102,7 @@ export default function SignIn() {
                   required
                   autoComplete="email"
                   placeholder="you@company.com"
-                  className="w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-aurora/60"
+                  className="w-full field"
                 />
               </Field>
               <Field label="Password">
@@ -113,7 +113,7 @@ export default function SignIn() {
                   required
                   autoComplete={mode === "signup" ? "new-password" : "current-password"}
                   placeholder={mode === "signup" ? "At least 6 characters" : "••••••••"}
-                  className="w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-aurora/60"
+                  className="w-full field"
                 />
               </Field>
 

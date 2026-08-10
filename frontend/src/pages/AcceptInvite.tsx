@@ -48,7 +48,7 @@ export default function AcceptInvite() {
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <div className="rounded-xl border border-edge bg-panel p-6">
-        <h1 className="text-[22px] font-semibold tracking-tight">Join on Continuum</h1>
+        <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Join on Continuum</h1>
 
         {loadError && (
           <>
@@ -74,7 +74,7 @@ export default function AcceptInvite() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={invite.email}
-                className="mt-1 w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60"
+                className="mt-1 w-full field"
               />
             </label>
 
@@ -85,7 +85,7 @@ export default function AcceptInvite() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && password.length >= 6 && accept()}
-                className="mt-1 w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60"
+                className="mt-1 w-full field"
               />
               <span className="mt-1 block text-[10px] text-slate-600">At least 6 characters.</span>
             </label>

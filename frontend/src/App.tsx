@@ -119,10 +119,20 @@ export default function App() {
       <header className="sticky top-0 z-30 border-b border-card-edge bg-card/90 backdrop-blur-md">
         <div ref={navRef} className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5">
           <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-lg font-bold text-ink">
-              ⟳
+            <span
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px]"
+              style={{ background: "var(--accent-strong)", color: "var(--accent-on)" }}
+              aria-hidden
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                   strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.15" />
+                <path d="M13.7 1.9v3.4h-3.4" />
+              </svg>
             </span>
-            <span className="hidden text-base font-bold tracking-tight sm:block">Continuum</span>
+            <span className="hidden text-[14.5px] font-semibold tracking-tight text-slate-100 sm:block">
+              Continuum
+            </span>
           </Link>
 
           {/* primary nav */}
@@ -265,7 +275,7 @@ export default function App() {
           forgot it would be the only one that snapped in, and that
           inconsistency reads as a bug rather than as restraint. Short and
           small — 260ms and 6px is "it arrived", not "watch this". */}
-      <main key={location.pathname} className="page-enter mx-auto max-w-7xl px-4 py-6">
+      <main key={location.pathname} className="page-enter mx-auto max-w-[1440px] px-5 pb-16 pt-6">
         <Outlet />
       </main>
     </div>
@@ -273,8 +283,10 @@ export default function App() {
 }
 
 function topLink(isActive: boolean) {
-  return `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-    isActive ? "bg-edge/60 text-slate-100" : "text-slate-400 hover:bg-edge/40 hover:text-slate-200"
+  return `rounded-[var(--r-md)] px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-150 ${
+    isActive
+      ? "bg-slate-500/[0.13] text-slate-100"
+      : "text-slate-400 hover:bg-slate-500/[0.08] hover:text-slate-200"
   }`;
 }
 
@@ -303,16 +315,19 @@ function Menu({
 }) {
   return (
     <div
-      className={`absolute top-full z-40 mt-1.5 w-72 rounded-xl border border-edge bg-panel p-1.5 shadow-xl ${
+      className={`absolute top-full z-40 mt-1.5 w-72 rounded-[var(--r-lg)] border border-card-edge bg-card p-1.5 ${
         align === "right" ? "right-0" : "left-0"
       }`}
+      style={{ boxShadow: "0 4px 6px -2px rgba(0,0,0,.12), 0 12px 28px -6px rgba(0,0,0,.28)" }}
     >
       {items.map((i) => (
         <NavLink
           key={i.to}
           to={i.to}
           className={({ isActive }) =>
-            `block rounded-lg px-3 py-2 transition-colors ${isActive ? "bg-edge/70" : "hover:bg-edge/50"}`
+            `block rounded-[var(--r-md)] px-3 py-2 transition-colors duration-150 ${
+              isActive ? "bg-slate-500/[0.13]" : "hover:bg-slate-500/[0.08]"
+            }`
           }
         >
           <div className="text-sm font-medium text-slate-200">{i.label}</div>

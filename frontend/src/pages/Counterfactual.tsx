@@ -3,6 +3,7 @@ import { portal } from "../api";
 import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Explain } from "../system/hub";
+import { Select } from "../system/controls";
 
 /**
  * Counterfactual replay.
@@ -183,15 +184,14 @@ export default function Counterfactual() {
           {mode === "always" ? (
             <label className="block text-xs text-slate-500">
               <span className="micro block">model</span>
-              <select
+              <Select
                 value={arm}
                 onChange={(e) => setArm(e.target.value)}
-                className="mt-1 rounded border border-edge bg-ink/60 px-2 py-1 text-sm text-slate-200 outline-none focus:border-aurora/50"
               >
                 {armNames.map((a) => (
                   <option key={a}>{a}</option>
                 ))}
-              </select>
+              </Select>
             </label>
           ) : (
             <div className="flex flex-wrap items-end gap-3">
@@ -204,32 +204,30 @@ export default function Counterfactual() {
                   step={0.05}
                   value={at}
                   onChange={(e) => setAt(Number(e.target.value))}
-                  className="mt-1 w-20 rounded border border-edge bg-ink/60 px-2 py-1 text-sm text-slate-200 outline-none focus:border-aurora/50"
+                  className="mt-1 w-20 field"
                 />
               </label>
               <label className="text-xs text-slate-500">
                 <span className="micro block">use</span>
-                <select
+                <Select
                   value={below}
                   onChange={(e) => setBelow(e.target.value)}
-                  className="mt-1 rounded border border-edge bg-ink/60 px-2 py-1 text-sm text-slate-200 outline-none focus:border-aurora/50"
                 >
                   {armNames.map((a) => (
                     <option key={a}>{a}</option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label className="text-xs text-slate-500">
                 <span className="micro block">otherwise</span>
-                <select
+                <Select
                   value={above}
                   onChange={(e) => setAbove(e.target.value)}
-                  className="mt-1 rounded border border-edge bg-ink/60 px-2 py-1 text-sm text-slate-200 outline-none focus:border-aurora/50"
                 >
                   {armNames.map((a) => (
                     <option key={a}>{a}</option>
                   ))}
-                </select>
+                </Select>
               </label>
             </div>
           )}

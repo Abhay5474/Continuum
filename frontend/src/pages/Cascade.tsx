@@ -17,6 +17,7 @@ import {
   Stat,
   Stats,
 } from "../system/hub";
+import { Select } from "../system/controls";
 
 /**
  * Verify-then-Escalate.
@@ -336,19 +337,18 @@ export default function Cascade() {
         <div className="mt-7 flex flex-wrap items-start gap-x-8 gap-y-4">
           <label className="min-w-0">
             <span className="micro">Audit rate</span>
-            <select
+            <Select
               value={status?.auditRate ?? 0.05}
               disabled={busy}
               onChange={(e) =>
                 run(() => portal.cascade.configure({ auditRate: Number(e.target.value) }), "Audit rate updated")
               }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-[13px] text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
             >
               <option value={0}>Off — no miss measurement</option>
               <option value={0.02}>2% of requests</option>
               <option value={0.05}>5% of requests</option>
               <option value={0.1}>10% of requests</option>
-            </select>
+            </Select>
             <p className="mt-1.5 max-w-xs text-[11.5px] leading-relaxed text-slate-600">
               Runs both tiers on a sample to find missed escalations. Costs a second call on those.
             </p>

@@ -117,8 +117,8 @@ export default function PromptGuard() {
     <div className="page-enter">
       <header>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="shield" tone="ok" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Prompt Guard</h1>
+          <Chip glyph="shield" tone="ok" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Prompt Guard</h1>
         </div>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
           What happens to a prompt between your request and the provider. Both controls are

@@ -48,7 +48,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
             ⟳
           </span>
           <div>
-            <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Developer Portal</h1>
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Developer Portal</h1>
             <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Your API keys, credentials and analytics.</p>
           </div>
         </div>
@@ -70,14 +70,14 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
 
         {mode === "signup" && (
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name"
-            className="mt-4 w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+            className="mt-4 w-full field" />
         )}
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          className="mt-3 w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+          className="mt-3 w-full field" />
         <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password"
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          className="mt-3 w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+          className="mt-3 w-full field" />
         <button
           onClick={submit}
           disabled={busy}
@@ -223,8 +223,8 @@ function Portal({ onLogout }: { onLogout: () => void }) {
     <div className="space-y-8">
       {/* Billing / Settings / Sign out live in the account menu in the header. */}
       <div className="flex flex-wrap items-center gap-3">
-        <Chip glyph="chip" tone="accent" size={34} />
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">API Keys &amp; Providers</h1>
+        <Chip glyph="chip" tone="accent" size={28} />
+        <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">API Keys &amp; Providers</h1>
         {me && <span className="text-sm text-slate-400">{me.email} · <span className="font-mono">{me.id}</span></span>}
       </div>
 
@@ -301,7 +301,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
                     <input type="password" value={secretInputs[p] ?? ""}
                       onChange={(e) => setSecretInputs({ ...secretInputs, [p]: e.target.value })}
                       placeholder={isSet ? "•••••••••• (saved)" : "(unconfigured)"}
-                      className="w-56 rounded-md border border-edge bg-ink px-2 py-1 text-xs" />
+                      className="w-56 field" />
                   </td>
                   <td className="py-2 text-xs">
                     {vs?.checking ? <span className="text-slate-400">checking…</span>
@@ -455,7 +455,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
         <div className="font-medium">Sandbox playground</div>
         <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Send a request through your gateway right now — no code required.</p>
         <textarea value={playPrompt} onChange={(e) => setPlayPrompt(e.target.value)}
-          className="mt-2 h-16 w-full rounded-md border border-edge bg-ink p-2 text-sm outline-none focus:border-aurora/60" />
+          className="mt-2 h-16 w-full field" />
         <button
           onClick={runPlay}
           disabled={playBusy}

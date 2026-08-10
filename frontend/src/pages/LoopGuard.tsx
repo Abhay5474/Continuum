@@ -225,7 +225,7 @@ export default function LoopGuard() {
           onChange={(e) => setDraft(e.target.value)}
           rows={6}
           spellCheck={false}
-          className="w-full rounded-md border border-edge bg-ink/60 p-2.5 font-mono text-xs text-slate-200 outline-none focus:border-aurora/50"
+          className="w-full font-mono field"
         />
 
         <div className="flex flex-wrap items-center gap-3">

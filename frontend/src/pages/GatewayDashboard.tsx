@@ -9,6 +9,7 @@ import DataView from "../system/DataView";
 import Tabs from "../system/Tabs";
 import { Morph, Spotlight } from "../system/motion";
 import { timeOf } from "../system/time";
+import { Select, Table, TH, TR, TD } from "../system/controls";
 
 /**
  * Gateway — live request flow.
@@ -117,8 +118,8 @@ export default function GatewayDashboard() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <Chip glyph="route" tone="accent" size={34} />
-            <h1 className="text-[22px] font-semibold tracking-tight">Gateway</h1>
+            <Chip glyph="route" tone="accent" size={28} />
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Gateway</h1>
           </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             One OpenAI-compatible endpoint · routed, retried and failed over before your app sees it
@@ -427,53 +428,50 @@ export default function GatewayDashboard() {
             </button>
           )}
         </div>
-        <div className="mt-2 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-edge/60 text-left">
-                <th className="py-2"><span className="micro">Provider</span></th>
-                <th className="py-2"><span className="micro">Model</span></th>
-                <th className="py-2"><span className="micro">Status</span></th>
-                <th className="py-2 text-right"><span className="micro">Context</span></th>
-                <th className="py-2 text-right"><span className="micro">Lifecycle</span></th>
+        <div className="mt-2">
+          <Table
+            minWidth={620}
+            head={
+              <tr>
+                <TH>Provider</TH>
+                <TH>Model</TH>
+                <TH>Status</TH>
+                <TH align="right">Context</TH>
+                <TH align="right" width={170}>Lifecycle</TH>
               </tr>
-            </thead>
-            <tbody>
+            }
+          >
               {models.map((m) => (
-                <tr key={m.id} className="border-b border-edge/40">
-                  <td className="py-2 text-slate-300">{m.provider}</td>
-                  <td className="py-2 font-mono text-[11px] text-slate-400">{m.modelName}</td>
-                  <td className="py-2">
+                <TR key={m.id}>
+                  <TD className="font-medium text-slate-200">{m.provider}</TD>
+                  <TD muted className="font-mono">{m.modelName}</TD>
+                  <TD>
                     <span className="flex items-center gap-1.5">
                       <StateDot state={m.status === "ACTIVE" ? "healthy" : "idle"} size={5} />
                       <span className="text-slate-400">{m.status}</span>
                     </span>
-                  </td>
-                  <td className="readout py-2 text-right text-slate-400">
-                    {(m.contextWindow ?? 0).toLocaleString()}
-                  </td>
-                  <td className="py-2 text-right">
-                    <select
+                  </TD>
+                  <TD numeric>{(m.contextWindow ?? 0).toLocaleString()}</TD>
+                  <TD align="right">
+                    <Select
                       value={m.status}
                       onChange={(e) => setStatus(m.id, e.target.value)}
                       disabled={!operator}
                       title={operator ? undefined : "Shared model catalogue — unlock operator access to change it"}
-                      className="rounded border border-edge bg-ink px-2 py-1 text-[11px] text-slate-300 outline-none focus:border-aurora/60 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {["DISCOVERED", "TESTING", "ACTIVE", "DEPRECATED", "REMOVED"].map((s) => (
                         <option key={s}>{s}</option>
                       ))}
-                    </select>
-                  </td>
-                </tr>
+                    </Select>
+                  </TD>
+                </TR>
               ))}
               {models.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-3 text-[11px] text-slate-500">no models registered</td>
-                </tr>
+                <TR>
+                  <TD muted className="py-4">No models registered.</TD>
+                </TR>
               )}
-            </tbody>
-          </table>
+          </Table>
         </div>
       </section>
 
@@ -492,12 +490,12 @@ export default function GatewayDashboard() {
             onChange={(e) => setApiKey(e.target.value)}
             type="password"
             placeholder="cnt_live_…"
-            className="rounded border border-edge bg-ink px-3 py-2 font-mono text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-aurora/60"
+            className="font-mono field"
           />
           <input
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="rounded border border-edge bg-ink px-3 py-2 text-sm text-slate-100 outline-none focus:border-aurora/60"
+            className="field"
           />
           <button
             onClick={sendChat}

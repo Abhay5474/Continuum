@@ -51,23 +51,23 @@ export function PageHeader({
   /** A count or state that belongs to the whole page, beside the title. */
   badge?: ReactNode;
 }) {
+  // The mark sits on the title's own line rather than beside the whole block,
+  // so the subtitle starts at the page's left margin like every other line of
+  // body text. Indenting it under the icon put one paragraph per page on a
+  // different measure from all the others.
   return (
-    <header className="flex flex-wrap items-start gap-x-6 gap-y-3">
-      {glyph && (
-        <div className="mt-0.5">
-          <Chip glyph={glyph} tone={tone} size={36} />
-        </div>
-      )}
+    <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 pb-1">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">{title}</h1>
+          {glyph && <Chip glyph={glyph} tone={tone} size={28} />}
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">{title}</h1>
           {badge}
         </div>
         {subtitle && (
-          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">{subtitle}</p>
+          <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-slate-500">{subtitle}</p>
         )}
       </div>
-      {aside && <div className="flex flex-wrap items-end gap-x-6 gap-y-3">{aside}</div>}
+      {aside && <div className="flex flex-wrap items-center gap-x-5 gap-y-3">{aside}</div>}
     </header>
   );
 }

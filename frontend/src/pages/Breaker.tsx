@@ -3,6 +3,7 @@ import { portal } from "../api";
 import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
+import { Select } from "../system/controls";
 
 /**
  * Semantic circuit breaker.
@@ -154,68 +155,64 @@ export default function BreakerPage() {
         <div className="flex flex-wrap items-end gap-6">
           <label>
             <span className="micro">Warm-up</span>
-            <select
+            <Select
               value={status?.warmup ?? 30}
               disabled={busy}
               onChange={(e) => run(() => portal.breaker.configure({ warmup: Number(e.target.value) }), "Warm-up updated")}
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
             >
               {[10, 30, 60, 120].map((n) => (
                 <option key={n} value={n}>
                   {n} answers
                 </option>
               ))}
-            </select>
+            </Select>
             <p className="mt-1 max-w-[14rem] text-xs text-slate-600">
               Observations before a baseline is trusted. Nothing can trip before this.
             </p>
           </label>
           <label>
             <span className="micro">Noise floor</span>
-            <select
+            <Select
               value={status?.slack ?? 0.05}
               disabled={busy}
               onChange={(e) => run(() => portal.breaker.configure({ slack: Number(e.target.value) }), "Noise floor updated")}
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
             >
               {[0.02, 0.05, 0.1, 0.15].map((n) => (
                 <option key={n} value={n}>
                   {n.toFixed(2)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             <span className="micro">Trip at</span>
-            <select
+            <Select
               value={status?.threshold ?? 0.75}
               disabled={busy}
               onChange={(e) => run(() => portal.breaker.configure({ threshold: Number(e.target.value) }), "Threshold updated")}
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
             >
               {[0.4, 0.75, 1.5, 3.0].map((n) => (
                 <option key={n} value={n}>
                   {n.toFixed(2)} {n <= 0.4 ? "— eager" : n >= 1.5 ? "— patient" : ""}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             <span className="micro">Cooldown</span>
-            <select
+            <Select
               value={status?.cooldownSeconds ?? 300}
               disabled={busy}
               onChange={(e) =>
                 run(() => portal.breaker.configure({ cooldownSeconds: Number(e.target.value) }), "Cooldown updated")
               }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
             >
               {[60, 300, 900, 3600].map((n) => (
                 <option key={n} value={n}>
                   {n < 3600 ? `${n / 60} min` : "1 hour"}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <button
             disabled={busy || (status?.breakers.length ?? 0) === 0}

@@ -204,8 +204,8 @@ export default function ContextTransformers() {
     <div className="page-enter">
       <header>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="layers" tone="accent" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">
+          <Chip glyph="layers" tone="accent" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">
           Context Transformers
         </h1>
         </div>
@@ -331,7 +331,7 @@ export default function ContextTransformers() {
             <input
               ref={fileInput}
               type="file"
-              className="hidden"
+              className="hidden field"
               onChange={(e) => {
                 setFile(e.target.files?.[0] ?? null);
                 setPasted("");

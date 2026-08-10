@@ -159,7 +159,7 @@ export default function CostAdmission() {
               min={1}
               value={reqs ?? ""}
               onChange={(e) => setReqs(Number(e.target.value))}
-              className="mt-1 w-28 rounded border border-edge bg-ink/60 px-2 py-1 text-sm text-slate-200 outline-none focus:border-aurora/50"
+              className="mt-1 w-28 field"
             />
           </label>
           <label className="text-xs text-slate-500">
@@ -170,7 +170,7 @@ export default function CostAdmission() {
               step={1000}
               value={toks ?? ""}
               onChange={(e) => setToks(Number(e.target.value))}
-              className="mt-1 w-32 rounded border border-edge bg-ink/60 px-2 py-1 text-sm text-slate-200 outline-none focus:border-aurora/50"
+              className="mt-1 w-32 field"
             />
           </label>
           <button

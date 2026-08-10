@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Micro, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Explain } from "../system/hub";
+import { Select, Table, TH, TR, TD } from "../system/controls";
 
 /**
  * Priority and deadline scheduling.
@@ -196,53 +197,50 @@ export default function Scheduling() {
           so the rules can be checked before they are trusted with real traffic.
         </p>
 
-        <div className="overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
-          <table className="w-full min-w-[520px] text-xs">
-            <thead>
-              <tr className="text-left">
-                <th className="pb-1 pr-3 font-normal"><Micro>task</Micro></th>
-                <th className="pb-1 pr-3 font-normal"><Micro>priority</Micro></th>
-                <th className="pb-1 pr-3 font-normal"><Micro>waited (s)</Micro></th>
-                <th className="pb-1 pr-3 font-normal"><Micro>deadline (s)</Micro></th>
-                <th className="pb-1 font-normal"><Micro>takes (s)</Micro></th>
-              </tr>
-            </thead>
-            <tbody>
+        <Table
+          minWidth={520}
+          head={
+            <tr>
+              <TH>Task</TH>
+              <TH width={150}>Priority</TH>
+              <TH>Waited (s)</TH>
+              <TH>Deadline (s)</TH>
+              <TH>Takes (s)</TH>
+            </tr>
+          }
+        >
               {rows.map((r, i) => (
-                <tr key={r.id}>
-                  <td className="py-1 pr-3 font-mono text-slate-300">{r.id}</td>
-                  <td className="py-1 pr-3">
-                    <select
+                <TR key={r.id}>
+                  <TD className="font-mono">{r.id}</TD>
+                  <TD>
+                    <Select
                       value={r.priority}
                       onChange={(e) => patch(i, { priority: e.target.value })}
-                      className="rounded border border-edge bg-ink/60 px-1.5 py-0.5 text-slate-300 outline-none focus:border-aurora/50"
                     >
                       <option>BATCH</option>
                       <option>NORMAL</option>
                       <option>INTERACTIVE</option>
-                    </select>
-                  </td>
-                  <td className="py-1 pr-3">
+                    </Select>
+                  </TD>
+                  <TD>
                     <Num value={r.waitedSeconds} onChange={(v) => patch(i, { waitedSeconds: v ?? 0 })} />
-                  </td>
-                  <td className="py-1 pr-3">
+                  </TD>
+                  <TD>
                     <Num
                       value={r.deadlineSeconds}
                       placeholder="none"
                       onChange={(v) => patch(i, { deadlineSeconds: v })}
                     />
-                  </td>
-                  <td className="py-1">
+                  </TD>
+                  <TD>
                     <Num
                       value={r.estimateSeconds}
                       onChange={(v) => patch(i, { estimateSeconds: v ?? 0 })}
                     />
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
-        </div>
+        </Table>
 
         <button
           disabled={busy}
@@ -360,7 +358,7 @@ function Num({
       value={value ?? ""}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-      className="w-20 rounded border border-edge bg-ink/60 px-1.5 py-0.5 text-slate-300 outline-none focus:border-aurora/50"
+      className="w-20 field"
     />
   );
 }

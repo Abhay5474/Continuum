@@ -26,6 +26,7 @@ import {
   Stat,
   Stats,
   kindOf, Chip, Notice } from "../system/hub";
+import { Select } from "../system/controls";
 import { ErrorState, useToast } from "../components/ui";
 
 /**
@@ -269,8 +270,8 @@ export default function Pipelines() {
     <section className="page-enter">
       <header>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="flow" tone="accent" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Pipelines</h1>
+          <Chip glyph="flow" tone="accent" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Pipelines</h1>
         </div>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
           Your application sends an input and a question, and gets an answer back. It never learns a
@@ -740,7 +741,7 @@ function NewPipeline({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="animal-triage"
-          className="w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
+          className="w-full focus:border-[color:var(--accent-edge)] field"
         />
         <p className="mt-1 text-[11.5px] text-slate-600">
           This goes in the URL your application calls, so letters, digits, hyphen and underscore only.
@@ -748,16 +749,15 @@ function NewPipeline({
       </Field>
 
       <Field label="Input your app sends">
-        <select
+        <Select
           value={inputKind}
           onChange={(e) => setInputKind(e.target.value)}
-          className="w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
         >
           <option value="image">Image</option>
           <option value="text">Text</option>
           <option value="json">Data</option>
           <option value="audio">Audio</option>
-        </select>
+        </Select>
       </Field>
 
       <Field label="What it does">
@@ -765,7 +765,7 @@ function NewPipeline({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Photo of an injured animal in, first-aid advice out"
-          className="w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
+          className="w-full focus:border-[color:var(--accent-edge)] field"
         />
       </Field>
 
@@ -775,7 +775,7 @@ function NewPipeline({
           onChange={(e) => setSystemPrompt(e.target.value)}
           rows={4}
           placeholder="You are advising a member of the public on immediate first aid for an injured animal. Be brief and practical. Always say when a vet is needed."
-          className="w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
+          className="w-full focus:border-[color:var(--accent-edge)] field"
         />
         <p className="mt-1 text-[11.5px] leading-relaxed text-slate-600">
           Sent with every call, so your application does not have to repeat it. The findings and the
@@ -882,7 +882,7 @@ function RoutingControls({
                 <div className="grid gap-3 pb-2 sm:grid-cols-2">
                   <label className="block">
                     <Micro>Runs when</Micro>
-                    <select
+                    <Select
                       value={s.when}
                       disabled={busy}
                       onChange={(e) =>
@@ -892,7 +892,6 @@ function RoutingControls({
                             CONDITIONS.find((c) => c.value === e.target.value)?.needsPattern ?? null,
                         })
                       }
-                      className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 text-[12.5px] text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
                     >
                       {CONDITIONS.map((c) => (
                         <option
@@ -908,7 +907,7 @@ function RoutingControls({
                             : ""}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
 
                   {meta.needsPattern && (
@@ -919,7 +918,7 @@ function RoutingControls({
                         disabled={busy}
                         placeholder={meta.needsPattern}
                         onChange={(e) => setStep(i, { pattern: e.target.value })}
-                        className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 font-mono text-[12.5px] text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
+                        className="mt-1 w-full font-mono text-[12.5px] focus:border-[color:var(--accent-edge)] field"
                       />
                     </label>
                   )}
@@ -1309,7 +1308,7 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
               Upload a file
               <input
                 type="file"
-                className="hidden"
+                className="hidden field"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
             </label>
@@ -1339,7 +1338,7 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
               onChange={(e) => setPayload(e.target.value)}
               disabled={!!file}
               rows={2}
-              className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 font-mono text-[11px] text-slate-300 outline-none focus:border-[color:var(--accent-edge)]"
+              className="mt-1 w-full font-mono text-[11px] focus:border-[color:var(--accent-edge)] field"
             />
             {file && <p className="mt-1 text-xs text-slate-600 max-w-2xl leading-relaxed">Ignored while a file is attached.</p>}
           </label>
@@ -1348,7 +1347,7 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
             <input
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              className="mt-1 w-full rounded-md border border-edge bg-ink/60 px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
+              className="mt-1 w-full focus:border-[color:var(--accent-edge)] field"
             />
           </label>
         </div>

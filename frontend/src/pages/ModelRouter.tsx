@@ -6,6 +6,7 @@ import { Readout, Plane, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
 import { Morph } from "../system/motion";
+import { Select, Table, TH, TR, TD, Tag } from "../system/controls";
 
 /**
  * Routing — the provider network.
@@ -129,8 +130,8 @@ export default function ModelRouter() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <Chip glyph="route" tone="accent" size={34} />
-            <h1 className="text-[22px] font-semibold tracking-tight">Routing</h1>
+            <Chip glyph="route" tone="accent" size={28} />
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Routing</h1>
           </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Scored per request · non-stationary contextual bandit · tail-latency hedging
@@ -151,31 +152,29 @@ export default function ModelRouter() {
           </div>
           <div>
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Strategy</h2>
-            <select
+            <Select
               value={routing?.configuredStrategy ?? "HEURISTIC"}
               onChange={(e) => api.opPost(`/api/routing/strategy?strategy=${e.target.value}`).then(refresh)}
               disabled={!operator}
               title={operator ? undefined : "Engine-wide setting — unlock operator access to change it"}
-              className="mt-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-aurora/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {STRATEGIES.map(([v, label]) => (
                 <option key={v} value={v}>{label}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Objective</h2>
-            <select
+            <Select
               value={routing?.mode ?? "BALANCED"}
               onChange={(e) => api.opPost(`/api/routing/mode?mode=${e.target.value}`).then(refresh)}
               disabled={!operator}
               title={operator ? undefined : "Engine-wide setting — unlock operator access to change it"}
-              className="mt-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-aurora/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {MODES.map((m) => (
                 <option key={m}>{m}</option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
       </header>
@@ -227,21 +226,22 @@ export default function ModelRouter() {
       {ranked.length > 0 && (
         <section>
           <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Providers</h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-edge/60 text-left">
-                  <Th>Provider</Th>
-                  <Th>Share</Th>
-                  <Th right>Calls</Th>
-                  <Th right>Success</Th>
-                  <Th right>Avg latency</Th>
-                  <Th right>Tokens</Th>
-                  <Th right>Cost</Th>
-                  <Th right>Health</Th>
+          <div className="mt-2">
+            <Table
+              minWidth={760}
+              head={
+                <tr>
+                  <TH>Provider</TH>
+                  <TH width={140}>Share</TH>
+                  <TH align="right">Calls</TH>
+                  <TH align="right">Success</TH>
+                  <TH align="right">Avg latency</TH>
+                  <TH align="right">Tokens</TH>
+                  <TH align="right">Cost</TH>
+                  <TH align="right">Health</TH>
                 </tr>
-              </thead>
-              <tbody>
+              }
+            >
                 {ranked.map((p) => {
                   const st = providerState(p);
                   const share = totalCalls ? (p.calls ?? 0) / totalCalls : 0;
@@ -249,36 +249,37 @@ export default function ModelRouter() {
                   const avgLat = p.calls ? Math.round((p.totalLatencyMs ?? 0) / p.calls) : 0;
                   const h = healthByProvider.get(p.provider);
                   return (
-                    <tr key={p.provider} className="border-b border-edge/40">
-                      <td className="py-2">
+                    <TR key={p.provider}>
+                      <TD>
                         <span className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-sm" style={{ background: colorOf.get(p.provider) }} />
-                          <span className="text-slate-200">{p.provider}</span>
+                          <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: colorOf.get(p.provider) }} />
+                          <span className="font-medium text-slate-200">{p.provider}</span>
                         </span>
-                      </td>
-                      <td className="w-32 py-2 pr-4">
+                      </TD>
+                      <TD>
                         <Meter value={share} state="active" height={3} />
-                      </td>
-                      <Td>{(p.calls ?? 0).toLocaleString()}</Td>
-                      <Td style={{ color: success >= 0.99 ? STATE.healthy.ink : success >= 0.9 ? STATE.warning.ink : STATE.critical.ink }}>
-                        {(success * 100).toFixed(1)}%
-                      </Td>
-                      <Td>{avgLat}ms</Td>
-                      <Td>{((p.promptTokens ?? 0) + (p.completionTokens ?? 0)).toLocaleString()}</Td>
-                      <Td>${(p.totalCostUsd ?? 0).toFixed(5)}</Td>
-                      <td className="py-2 text-right">
+                      </TD>
+                      <TD numeric>{(p.calls ?? 0).toLocaleString()}</TD>
+                      <TD numeric>
+                        <span style={{ color: success >= 0.99 ? STATE.healthy.ink : success >= 0.9 ? STATE.warning.ink : STATE.critical.ink }}>
+                          {(success * 100).toFixed(1)}%
+                        </span>
+                      </TD>
+                      <TD numeric>{avgLat}ms</TD>
+                      <TD numeric>{((p.promptTokens ?? 0) + (p.completionTokens ?? 0)).toLocaleString()}</TD>
+                      <TD numeric>${(p.totalCostUsd ?? 0).toFixed(5)}</TD>
+                      <TD numeric>
                         <span className="inline-flex items-center gap-1.5" title={h?.lastError ?? undefined}>
                           <StateDot state={st} size={6} />
-                          <span className="readout" style={{ color: STATE[st].ink }}>
+                          <span style={{ color: STATE[st].ink }}>
                             {h ? `${(h.score * 100).toFixed(0)}%` : "—"}
                           </span>
                         </span>
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   );
                 })}
-              </tbody>
-            </table>
+            </Table>
           </div>
         </section>
       )}
@@ -378,7 +379,7 @@ export default function ModelRouter() {
           <input
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="min-w-0 flex-1 rounded border border-edge bg-ink px-3 py-2 text-sm text-slate-100 outline-none focus:border-aurora/60"
+            className="min-w-0 flex-1 field"
           />
           <button
             onClick={runProbe}
@@ -670,13 +671,6 @@ function LatencyRail({ m }: { m: any }) {
   );
 }
 
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
-  return <th className={`py-2 font-medium ${right ? "text-right" : ""}`}><span className="micro">{children}</span></th>;
-}
-function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <td className="readout py-2 text-right text-slate-300" style={style}>{children}</td>;
-}
-
 /**
  * What learned routing actually did.
  *
@@ -750,37 +744,39 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
             </p>
           )}
 
-          <div className="overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
-            <table className="w-full min-w-[560px] text-xs">
-              <thead>
-                <tr className="border-b border-edge/60 text-left">
-                  {["Context", "Scorer wanted", "Actually ran", "Outcome", "Latency", "Cost"].map((h) => (
-                    <th key={h} className="px-3 py-2"><span className="micro">{h}</span></th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((r) => (
-                  <tr key={r.id} className="border-b border-edge/30 last:border-0">
-                    <td className="px-3 py-1.5 text-slate-500">{r.context}</td>
-                    <td className="px-3 py-1.5 text-slate-500">{r.baseline ?? "—"}</td>
-                    <td className="px-3 py-1.5">
-                      <span className={r.diverged ? "font-medium text-neon" : "text-slate-300"}>
-                        {r.chosen}
-                      </span>
-                      {r.diverged && <span className="ml-1.5 text-[10px] text-neon/70">override</span>}
-                      {r.explored && <span className="ml-1.5 text-[10px] text-amber-400/80">explore</span>}
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <StateDot state={r.success ? "healthy" : "critical"} size={5} />
-                    </td>
-                    <td className="readout px-3 py-1.5 text-slate-400">{r.latencyMs}ms</td>
-                    <td className="readout px-3 py-1.5 text-slate-500">${(r.cost ?? 0).toFixed(5)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table
+            minWidth={560}
+            maxHeight={420}
+            head={
+              <tr>
+                <TH>Context</TH>
+                <TH>Scorer wanted</TH>
+                <TH>Actually ran</TH>
+                <TH>Outcome</TH>
+                <TH align="right">Latency</TH>
+                <TH align="right">Cost</TH>
+              </tr>
+            }
+          >
+            {recent.map((r) => (
+              <TR key={r.id}>
+                <TD muted>{r.context}</TD>
+                <TD muted>{r.baseline ?? "—"}</TD>
+                <TD>
+                  <span className={r.diverged ? "font-medium text-neon" : "text-slate-300"}>
+                    {r.chosen}
+                  </span>
+                  {r.diverged && <span className="ml-1.5"><Tag tone="accent">override</Tag></span>}
+                  {r.explored && <span className="ml-1.5"><Tag tone="amber">explore</Tag></span>}
+                </TD>
+                <TD>
+                  <StateDot state={r.success ? "healthy" : "critical"} size={5} />
+                </TD>
+                <TD numeric>{r.latencyMs}ms</TD>
+                <TD numeric muted>${(r.cost ?? 0).toFixed(5)}</TD>
+              </TR>
+            ))}
+          </Table>
         </>
       )}
     </section>

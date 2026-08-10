@@ -5,6 +5,7 @@ import { Chip } from "../system/hub";
 import type { CostReport, Meta, Stats, WorkflowSummary } from "../types";
 import StatusBadge from "../components/StatusBadge";
 import { SkeletonCards, SkeletonRows, EmptyState, ErrorState, Spinner, useToast, CodeBlock } from "../components/ui";
+import { Select } from "../system/controls";
 
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
@@ -91,8 +92,8 @@ export default function Dashboard() {
           History" and then announcing itself as nothing. */}
       <div>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="list" tone="accent" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Run History</h1>
+          <Chip glyph="list" tone="accent" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Run History</h1>
         </div>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
           Every durable run, its event log and its replay
@@ -154,22 +155,21 @@ export default function Dashboard() {
           <div className="rounded-lg border border-edge bg-panel p-4">
             <div className="font-medium">Start a workflow</div>
             <label className="mt-3 block text-xs text-slate-400">Type</label>
-            <select
+            <Select
               value={type}
               onChange={(e) => setType(e.target.value)}
-              className="mt-1 w-full rounded-md border border-edge bg-ink px-3 py-2 text-sm"
             >
               {(meta?.workflowTypes ?? ["CustomerAnalysis", "DurableDemo"]).map((t) => (
                 <option key={t}>{t}</option>
               ))}
-            </select>
+            </Select>
             <label className="mt-3 block text-xs text-slate-400">
               {type === "CustomerAnalysis" ? "Customer ID" : "Name"}
             </label>
             <input
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
-              className="mt-1 w-full rounded-md border border-edge bg-ink px-3 py-2 text-sm"
+              className="mt-1 w-full field"
             />
             <button
               onClick={start}

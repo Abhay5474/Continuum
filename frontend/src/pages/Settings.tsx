@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { portal } from "../api";
-import { Chip } from "../system/hub";
+import { Chip, Ghost, Pill } from "../system/hub";
+import { Table, TH, TR, TD } from "../system/controls";
 import { useToast, Spinner, CopyButton } from "../components/ui";
 import { dateTimeOf, dateOf } from "../system/time";
 
@@ -138,8 +139,8 @@ export default function Settings() {
     <div className="mx-auto max-w-3xl space-y-6 animate-fade-up">
       <div>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="chip" tone="accent" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Account Settings</h1>
+          <Chip glyph="chip" tone="accent" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Account Settings</h1>
         </div>
         {me && <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">{me.email} · <span className="font-mono">{me.id}</span></p>}
       </div>
@@ -148,7 +149,7 @@ export default function Settings() {
       <Section title="API keys" subtitle="Name a key so you remember what it's for. Keys are shown once.">
         <div className="flex flex-wrap gap-2">
           <input value={keyLabel} onChange={(e) => setKeyLabel(e.target.value)} placeholder="Key name (e.g. production)"
-            className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+            className="min-w-0 flex-1 field" />
           <button onClick={issueKey} className="rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-semibold text-ink">
             Create key
           </button>
@@ -160,30 +161,46 @@ export default function Settings() {
             <CopyButton text={newKey} />
           </div>
         )}
-        <div className="mt-3 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
-          <table className="w-full text-sm">
-            <thead className="text-xs text-slate-500">
-              <tr className="text-left"><th className="py-1">Name</th><th>Prefix</th><th>Last used</th><th>Status</th><th></th></tr>
-            </thead>
-            <tbody>
-              {keys.map((k) => (
-                <tr key={k.id} className="border-t border-edge/50 text-xs">
-                  <td className="py-2">{k.label || <span className="text-slate-600">unnamed</span>}</td>
-                  <td className="font-mono">{k.prefix}…</td>
-                  <td className="text-slate-400">{k.lastUsedAt ? dateTimeOf(k.lastUsedAt) : "never"}</td>
-                  <td className={k.active ? "text-emerald-300" : "text-rose-300"}>{k.active ? "active" : "revoked"}</td>
-                  <td className="text-right">
-                    {k.active && (
-                      <button onClick={() => revokeKey(k.id)} className="rounded border border-edge px-2 py-0.5 text-rose-300 hover:bg-rose-500/10">
-                        Revoke
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {keys.length === 0 && <tr><td colSpan={5} className="py-3 text-xs text-slate-500">no keys yet</td></tr>}
-            </tbody>
-          </table>
+        <div className="mt-3">
+          <Table
+            minWidth={520}
+            head={
+              <tr>
+                <TH>Name</TH>
+                <TH>Prefix</TH>
+                <TH>Last used</TH>
+                <TH>Status</TH>
+                <TH align="right" width={90} />
+              </tr>
+            }
+          >
+            {keys.map((k) => (
+              <TR key={k.id}>
+                <TD>{k.label || <span className="text-slate-500">unnamed</span>}</TD>
+                <TD className="font-mono">{k.prefix}…</TD>
+                <TD muted>{k.lastUsedAt ? dateTimeOf(k.lastUsedAt) : "never"}</TD>
+                <TD>
+                  <Pill tone={k.active ? "ok" : "bad"} dot>
+                    {k.active ? "Active" : "Revoked"}
+                  </Pill>
+                </TD>
+                <TD align="right">
+                  {k.active && (
+                    <Ghost tone="danger" onClick={() => revokeKey(k.id)}>
+                      Revoke
+                    </Ghost>
+                  )}
+                </TD>
+              </TR>
+            ))}
+            {keys.length === 0 && (
+              <TR>
+                <TD muted className="py-4">
+                  No keys yet.
+                </TD>
+              </TR>
+            )}
+          </Table>
         </div>
       </Section>
 
@@ -191,9 +208,9 @@ export default function Settings() {
       <Section title="Change password">
         <div className="grid gap-2 sm:grid-cols-2">
           <input type="password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder="Current password"
-            className="rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+            className="field" />
           <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password (min 6)"
-            className="rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+            className="field" />
         </div>
         <button onClick={changePassword} disabled={pwBusy || !curPw || !newPw}
           className="mt-3 flex items-center gap-2 rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
@@ -205,7 +222,7 @@ export default function Settings() {
       <Section title="Change email">
         <div className="flex flex-wrap gap-2">
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
-            className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+            className="min-w-0 flex-1 field" />
           <button onClick={changeEmail} disabled={emailBusy || !email}
             className="flex items-center gap-2 rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
             {emailBusy && <Spinner />} Save
@@ -231,7 +248,7 @@ export default function Settings() {
         )}
         <div className="flex flex-wrap gap-2">
           <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="teammate@example.com"
-            className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none focus:border-aurora/60" />
+            className="min-w-0 flex-1 field" />
           <button onClick={sendInvite} disabled={!inviteEmail}
             className="rounded-lg border border-edge px-4 py-2 text-sm hover:border-aurora/50 disabled:opacity-50">
             Invite
@@ -285,7 +302,7 @@ export default function Settings() {
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <input value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="DELETE"
-            className="w-40 rounded-lg border border-rose-500/30 bg-ink px-3 py-2 text-sm outline-none focus:border-rose-400/60" />
+            className="w-40 border-rose-500/30 field" />
           <button onClick={deleteAccount} disabled={confirmDelete !== "DELETE"}
             className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-40">
             Delete my account &amp; data

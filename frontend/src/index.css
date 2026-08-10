@@ -102,10 +102,16 @@
      step works — the card lifts a little out of the page and the border
      finishes the edge. On paper there is no lighter shade than the card, so
      the page steps down instead and the shadow does the lifting. */
-  --card: 16 19 26;             /* #10131a — one step above the page */
-  --card-edge: 33 39 51;
-  --card-shadow: none;
-  --card-hover: 20 24 33;
+  --card: 17 20 27;             /* #11141b — one step above the page */
+  --card-edge: 36 42 55;
+  /* Even on black a card gets a shadow. Not to float it — to stop the border
+     being the only thing separating it from the page, which is what makes an
+     interface read as wireframe rather than product. */
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --card-hover: 21 25 34;
+  /* The hairline *inside* a card: header dividers, table rules. A card's own
+     border is darker than its internal rules, never the same weight. */
+  --card-rule: 30 35 46;
 
   /* Tone washes. A status colour used as a background has to be a wash, not
      the ink: the ink is chosen to be read *against* the surface, so filling a
@@ -208,8 +214,12 @@
      between a card and a rectangle drawn on nothing. */
   --card: 255 255 255;
   --card-edge: 226 232 240;
-  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
+  /* Two layers: a tight contact shadow that anchors the card to the page, and a
+     wider soft one that gives it height. One layer alone reads as either a
+     sticker or a smudge. */
+  --card-shadow: 0 1px 1px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.06);
   --card-hover: 252 253 255;
+  --card-rule: 235 239 245;
 
   --wash-ok: rgba(4, 120, 87, 0.10);
   --wash-warn: rgba(180, 83, 9, 0.10);
@@ -228,6 +238,71 @@
   --hue-red-ink:    #BE123C;   --hue-red-wash:    rgba(190,  18,  60, 0.09);
   --hue-pink-ink:   #A81F72;   --hue-pink-wash:   rgba(168,  31, 114, 0.10);
   color-scheme: light;
+}
+
+
+
+/* ---- the text field -------------------------------------------------------
+   Forty-six inputs across the console each carried their own hand-written
+   border, padding and focus colour, which is why no two forms lined up. The
+   geometry is stated once here and the codemod left every input's *layout*
+   classes (flex-1, w-full) alone — those are the caller's business, the box is
+   not. Matches the `Input` component exactly, on the same tokens. */
+.field {
+  height: var(--h-lg);
+  border-radius: var(--r-md);
+  border: 1px solid rgb(var(--card-edge));
+  background: rgb(var(--card));
+  padding-left: 11px;
+  padding-right: 11px;
+  font-size: 13px;
+  color: rgb(226 232 240);
+  outline: none;
+  transition: border-color 150ms;
+}
+:root[data-theme="light"] .field { color: rgb(15 23 42); }
+.field:hover:not(:disabled) { border-color: rgb(100 116 139 / 0.5); }
+.field:focus { border-color: var(--accent-edge); }
+.field:disabled { opacity: 0.5; cursor: not-allowed; }
+/* A textarea is a field that grows, so it opts out of the fixed height. */
+textarea.field { height: auto; padding-top: 8px; padding-bottom: 8px; line-height: 1.55; }
+
+/* ---- control geometry ----------------------------------------------------
+   One scale, so a button, a select and an input standing next to each other
+   line up on both edges. This is most of the difference between an interface
+   that looks assembled and one that looks drawn: the eye reads a 30px control
+   beside a 33px control as a mistake long before it can say why. */
+:root {
+  --h-sm: 26px;
+  --h-md: 30px;
+  --h-lg: 36px;
+  --r-sm: 5px;
+  --r-md: 7px;
+  --r-lg: 10px;
+  --r-xl: 12px;
+  /* Every focusable thing gets the same ring, drawn outside the control so it
+     never changes the layout when it appears. */
+  --ring: 0 0 0 2px rgb(var(--ink)), 0 0 0 4px var(--accent-edge);
+}
+
+/* Keyboard focus only. A mouse user clicking a button should not be given a
+   ring they did not ask for, and a keyboard user must never lose one. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--r-md);
+}
+
+/* Native selects ship with a platform chevron that cannot be styled and does
+   not match anything else on the page. Ours is drawn as a background image so
+   the element stays a real <select> — keyboard behaviour, mobile pickers and
+   screen-reader semantics all come free, and none of them survive a div. */
+.control-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  padding-right: 26px;
 }
 
 /* A selected chip or tab. The literal utility pair used before —
@@ -410,10 +485,19 @@ body {
    the solid accent, which is the same colour every other filled button now
    wears and which carries white at 4.55:1. Dark keeps the gradient: it ends on
    a mid blue and the label there is near-black. */
-:root[data-theme="light"] [class*="bg-gradient-to-"].from-aurora {
+/* The brand gradient, as a button.
+
+   It is now flat in *both* themes. The light-mode case was a contrast fix —
+   `from-aurora to-neon` ends on a pale blue that white text cannot sit on,
+   measured at roughly 2.2:1. Dark mode cleared contrast but failed a different
+   test: a two-colour gradient fill is the single most dating detail a console
+   can carry, and it was the only element on the page not drawn from the accent
+   token. One accent, one fill, one label colour. */
+[class*="bg-gradient-to-"].from-aurora {
   background-image: none;
   background-color: var(--accent-strong);
-  color: rgb(255 255 255);
+  color: var(--accent-on);
+  border-radius: var(--r-md);
 }
 
 /* Placeholders need a mid grey in both themes. */

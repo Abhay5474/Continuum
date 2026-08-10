@@ -25,6 +25,7 @@ import {
   SidePanel,
   kindOf,
 } from "../system/hub";
+import { Select } from "../system/controls";
 
 /**
  * Specialists — one workspace, not a directory.
@@ -765,7 +766,7 @@ function DetailPanel({
 
         {reusable.length > 0 && (
           <FormRow label="Credential">
-            <select
+            <Select
               value={reuse}
               onChange={(ev) => setReuse(ev.target.value === "" ? "" : Number(ev.target.value))}
               className={INPUT_CLASS}
@@ -776,7 +777,7 @@ function DetailPanel({
                   Reuse “{c.name}”
                 </option>
               ))}
-            </select>
+            </Select>
           </FormRow>
         )}
 

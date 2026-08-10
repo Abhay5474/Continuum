@@ -5,6 +5,7 @@ import { Chip } from "../system/hub";
 import { Micro, Readout, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
+import { Select } from "../system/controls";
 
 /**
  * Adaptive Policy — the autonomous memory and policy engine.
@@ -170,8 +171,8 @@ export default function GodMode() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <Chip glyph="spark" tone="accent" size={34} />
-            <h1 className="text-[22px] font-semibold tracking-tight">Adaptive Policy</h1>
+            <Chip glyph="spark" tone="accent" size={28} />
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Adaptive Policy</h1>
           </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Self-managing memory · policy proposals gated by digital-twin replay
@@ -365,17 +366,16 @@ export default function GodMode() {
             <div className="mt-3 flex flex-wrap items-end gap-2">
               <div>
                 <Micro>Scenario</Micro>
-                <select
+                <Select
                   value={scenario}
                   onChange={(e) => setScenario(e.target.value)}
-                  className="mt-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-aurora/60"
                 >
                   {SCENARIOS.map((s) => (
                     <option key={s.key} value={s.key}>
                       {s.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <span className="pb-2 text-[10px] text-slate-500">
                 {SCENARIOS.find((s) => s.key === scenario)?.desc}
@@ -440,7 +440,7 @@ export default function GodMode() {
                     value={ingestText}
                     onChange={(e) => setIngestText(e.target.value)}
                     placeholder="text to remember"
-                    className="min-w-0 flex-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-aurora/60"
+                    className="min-w-0 flex-1 field"
                   />
                   <button
                     disabled={!ingestText}
@@ -464,7 +464,7 @@ export default function GodMode() {
                     value={retrieveQ}
                     onChange={(e) => setRetrieveQ(e.target.value)}
                     placeholder="query the memory"
-                    className="min-w-0 flex-1 rounded border border-edge bg-ink px-2 py-1.5 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-aurora/60"
+                    className="min-w-0 flex-1 field"
                   />
                   <button
                     disabled={!retrieveQ}

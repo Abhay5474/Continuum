@@ -286,7 +286,7 @@ function Wizard({ onEnable, onCancel, busy }: {
           <div className="text-sm text-slate-300">Tell us about your app. No code needed.</div>
           <label className="block text-xs text-slate-400">Application name</label>
           <input value={appName} onChange={(e) => setAppName(e.target.value)}
-            className="w-full rounded-md border border-edge bg-ink px-3 py-2 text-sm" />
+            className="w-full field" />
           <label className="block text-xs text-slate-400">What matters most?</label>
           <div className="flex flex-wrap gap-2">
             {["BALANCED", "LOW_COST", "LOW_LATENCY", "HIGH_QUALITY", "SAFETY_FIRST"].map((m) => (

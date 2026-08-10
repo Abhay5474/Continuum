@@ -213,8 +213,8 @@ export default function WorkflowBuilder() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <Chip glyph="flow" tone="accent" size={34} />
-            <h1 className="text-[22px] font-semibold tracking-tight">Workflows</h1>
+            <Chip glyph="flow" tone="accent" size={28} />
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Workflows</h1>
           </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Author a durable graph · crash-safe, retried, exactly-once
@@ -262,7 +262,7 @@ export default function WorkflowBuilder() {
                   value={runInput}
                   onChange={(e) => setRunInput(e.target.value)}
                   spellCheck={false}
-                  className="mt-1 h-14 w-full rounded border bg-ink p-2 font-mono text-[11px] text-slate-200 outline-none focus:border-aurora/60"
+                  className="mt-1 h-14 w-full font-mono text-[11px] field"
                   style={{ borderColor: inputValid ? "rgb(var(--edge))" : `${STATE.critical.color}55` }}
                 />
               </div>
@@ -326,7 +326,7 @@ export default function WorkflowBuilder() {
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="mt-1 w-full rounded border border-edge bg-ink px-2 py-1.5 font-mono text-xs text-slate-100 outline-none focus:border-aurora/60"
+                    className="mt-1 w-full font-mono field"
                   />
                 </div>
                 <button
@@ -348,7 +348,7 @@ export default function WorkflowBuilder() {
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
                 spellCheck={false}
-                className="mt-1 h-[460px] w-full rounded border bg-ink p-3 font-mono text-[11px] leading-relaxed text-slate-200 outline-none"
+                className="mt-1 h-[460px] w-full font-mono text-[11px] leading-relaxed field"
                 style={{ borderColor: parsed.err ? `${STATE.critical.color}55` : "rgb(var(--edge))" }}
               />
             </div>

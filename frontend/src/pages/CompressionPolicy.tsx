@@ -91,8 +91,8 @@ export default function CompressionPolicy() {
     <section className="page-enter">
       <header>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="gauge" tone="accent" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Compression Budget</h1>
+          <Chip glyph="gauge" tone="accent" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Compression Budget</h1>
         </div>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
           One ratio for the whole prompt is the wrong shape — instructions, examples and the question

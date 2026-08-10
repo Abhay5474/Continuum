@@ -482,10 +482,13 @@ export function Card({
           onClick!();
         }
       }}
-      className={`relative rounded-xl border bg-card shadow-card transition-colors duration-200 ${
+      className={`relative border bg-card shadow-card transition-[background-color,border-color] duration-150 ${
         pad ? "p-4" : ""
-      } ${interactive ? "cursor-pointer hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}
-      style={{ borderColor: selected ? "var(--accent-edge)" : "rgb(var(--card-edge))" }}
+      } ${interactive ? "cursor-pointer hover:border-slate-500/40 hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}
+      style={{
+        borderRadius: "var(--r-lg)",
+        borderColor: selected ? "var(--accent-edge)" : "rgb(var(--card-edge))",
+      }}
     >
       {children}
     </div>
@@ -504,21 +507,29 @@ export function CardHead({
   title,
   sub,
   right,
+  /** Draws the rule that separates head from body. On for anything with a list
+      or a table under it; off for a single figure, where a rule would be
+      dividing a card into two halves that are not two things. */
+  divided = false,
 }: {
   glyph?: GlyphName;
   tone?: Tone;
   title: ReactNode;
   sub?: ReactNode;
   right?: ReactNode;
+  divided?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-3">
+    <div
+      className={`flex items-start gap-3 ${divided ? "border-b pb-3" : ""}`}
+      style={divided ? { borderColor: "rgb(var(--card-rule))" } : undefined}
+    >
       {glyph && <Chip glyph={glyph} tone={tone} />}
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-[13.5px] font-semibold tracking-tight text-slate-100">
+        <h3 className="truncate text-[13px] font-semibold tracking-tight text-slate-100">
           {title}
         </h3>
-        {sub && <p className="mt-0.5 truncate text-[11.5px] text-slate-500">{sub}</p>}
+        {sub && <p className="mt-0.5 truncate text-[11.5px] leading-relaxed text-slate-500">{sub}</p>}
       </div>
       {right && <div className="flex shrink-0 items-center gap-2">{right}</div>}
     </div>
@@ -575,10 +586,10 @@ export function Section({
 export function Rail({ children }: { children: ReactNode }) {
   return (
     <div
-      className="overflow-hidden rounded-xl border bg-card shadow-card"
-      style={{ borderColor: "rgb(var(--card-edge))" }}
+      className="overflow-hidden border bg-card shadow-card"
+      style={{ borderRadius: "var(--r-lg)", borderColor: "rgb(var(--card-edge))" }}
     >
-      <div className="divide-y divide-edge/60">{children}</div>
+      <div className="divide-y divide-[color:rgb(var(--card-rule))]">{children}</div>
     </div>
   );
 }
@@ -723,12 +734,9 @@ export function Ghost({
   title?: string;
   tone?: "default" | "accent" | "danger";
 }) {
-  const tint =
-    tone === "accent"
-      ? { color: "var(--accent-ink)", borderColor: "var(--accent-edge)" }
-      : tone === "danger"
-        ? { color: "var(--state-critical-ink)" }
-        : undefined;
+  // Geometry from the shared control tokens rather than from padding, so a
+  // Ghost standing next to a Primary or a Select is exactly the same height
+  // without any call site knowing what that height is.
   return (
     <button
       onClick={(e) => {
@@ -737,8 +745,20 @@ export function Ghost({
       }}
       disabled={disabled}
       title={title}
-      style={tint}
-      className="rounded-md border border-edge/70 px-2 py-1 text-[11.5px] text-slate-400 transition-colors hover:border-slate-500/50 hover:text-slate-100 disabled:opacity-40"
+      style={{
+        height: "var(--h-sm)",
+        borderRadius: "var(--r-md)",
+        borderColor: tone === "accent" ? "var(--accent-edge)" : "rgb(var(--card-edge))",
+        color:
+          tone === "accent"
+            ? "var(--accent-ink)"
+            : tone === "danger"
+              ? "var(--state-critical-ink)"
+              : undefined,
+      }}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap border px-2 text-[11.5px] font-medium transition-[background-color,border-color,color] duration-150 hover:border-slate-500/60 hover:bg-[color:rgb(var(--card-hover))] disabled:cursor-not-allowed disabled:opacity-45 ${
+        tone === "default" ? "text-slate-400 hover:text-slate-100" : ""
+      }`}
     >
       {children}
     </button>
@@ -766,8 +786,13 @@ export function Primary({
       // .text-white to near-black so it survives on paper, and exempts filled
       // buttons by matching their background *class* — which this button does
       // not have, because it sets its background inline. It measured 3.92:1.
-      style={{ background: "var(--accent-strong)", color: "var(--accent-on)" }}
-      className="rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+      style={{
+        background: "var(--accent-strong)",
+        color: "var(--accent-on)",
+        height: "var(--h-md)",
+        borderRadius: "var(--r-md)",
+      }}
+      className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-3 text-[12.5px] font-medium transition-[filter,opacity] duration-150 hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-45"
     >
       {children}
     </button>
@@ -1290,14 +1315,36 @@ export function Explain({
 }
 
 /** Nothing here yet, said quietly. */
-export function Empty({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
+export function Empty({
+  title,
+  hint,
+  action,
+  glyph = "layers",
+}: {
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+  glyph?: GlyphName;
+}) {
   return (
     <div
-      className="rounded-xl border border-dashed px-3 py-10 text-center"
-      style={{ borderColor: "rgb(var(--card-edge))" }}
+      className="flex flex-col items-center border border-dashed px-4 py-12 text-center"
+      style={{ borderRadius: "var(--r-lg)", borderColor: "rgb(var(--card-edge))" }}
     >
-      <p className="text-[13px] text-slate-400">{title}</p>
-      {hint && <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-600">{hint}</p>}
+      {/* A mark first. An empty state that opens with a sentence reads as an
+          error message; one that opens with a symbol reads as a state. */}
+      <span
+        aria-hidden
+        className="grid h-9 w-9 place-items-center rounded-[var(--r-lg)]"
+        style={{ background: "var(--wash-mute)", color: "var(--text-3)" }}
+      >
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+          {GLYPHS[glyph]}
+        </svg>
+      </span>
+      <p className="mt-3 text-[13px] font-medium text-slate-200">{title}</p>
+      {hint && <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-slate-500">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

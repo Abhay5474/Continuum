@@ -21,6 +21,7 @@ import {
   Stat,
   Stats,
 } from "../system/hub";
+import { Select } from "../system/controls";
 
 /**
  * Semantic cache.
@@ -276,20 +277,19 @@ export default function SemanticCache() {
         <div className="mt-7 flex flex-wrap items-end gap-x-8 gap-y-4 border-t border-edge/60 pt-5">
           <label className="min-w-0">
             <span className="micro">Entry lifetime</span>
-            <select
+            <Select
               value={status?.ttlSeconds ?? 86400}
               disabled={busy}
               onChange={(e) =>
                 run(() => portal.cache.configure({ ttlSeconds: Number(e.target.value) }), "Lifetime updated")
               }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-[13px] text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
             >
               {TTLS.map(([v, label]) => (
                 <option key={v} value={v}>
                   {label}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-500">{status?.entries ?? 0} stored</span>

@@ -22,8 +22,8 @@ export default function ChaosPanel() {
     <div className="max-w-3xl space-y-6">
       <div>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="alert" tone="bad" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Fault Injection</h1>
+          <Chip glyph="alert" tone="bad" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Fault Injection</h1>
         </div>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
           Inject faults at runtime, then start workflows and watch the runtime recover. The

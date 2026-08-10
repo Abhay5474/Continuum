@@ -24,6 +24,7 @@ import {
   Stat,
   Stats,
 } from "../system/hub";
+import { Select } from "../system/controls";
 
 /**
  * Response quality gate.
@@ -404,18 +405,17 @@ function Pick({
   return (
     <label className="block">
       <span className="micro">{label}</span>
-      <select
+      <Select
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-[13px] text-slate-200 outline-none focus:border-[color:var(--accent-edge)]"
       >
         {options.map(([v, l]) => (
           <option key={v} value={v}>
             {l}
           </option>
         ))}
-      </select>
+      </Select>
       {note && <p className="mt-1.5 max-w-[17rem] text-[11.5px] leading-relaxed text-slate-600">{note}</p>}
     </label>
   );

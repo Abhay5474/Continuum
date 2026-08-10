@@ -89,8 +89,8 @@ export default function DagCommandCenter() {
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <Chip glyph="check" tone="accent" size={34} />
-            <h1 className="text-[22px] font-semibold tracking-tight">Verification</h1>
+            <Chip glyph="check" tone="accent" size={28} />
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Verification</h1>
           </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Claims solved in parallel · verified independently · resolved by Bayesian aggregation

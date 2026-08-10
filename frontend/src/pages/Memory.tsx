@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import { Chip } from "../system/hub";
+import { Select } from "../system/controls";
 
 const TIERS = ["WORKING", "EPISODIC", "LONG_TERM", "ARCHIVED"];
 
@@ -31,10 +32,10 @@ export default function Memory() {
     <div className="space-y-8">
       <div>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="layers" tone="accent" size={34} />
+          <Chip glyph="layers" tone="accent" size={28} />
           <div className="flex items-center gap-2.5">
-            <Chip glyph="layers" tone="accent" size={34} />
-            <h1 className="text-[22px] font-semibold tracking-tight text-slate-100">Memory</h1>
+            <Chip glyph="layers" tone="accent" size={28} />
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Memory</h1>
           </div>
         </div>
         <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
@@ -48,7 +49,7 @@ export default function Memory() {
         <input
           value={scope}
           onChange={(e) => setScope(e.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-edge bg-ink px-3 py-1.5 text-sm font-mono sm:flex-none"
+          className="min-w-0 flex-1 font-mono sm:flex-none field"
         />
         <button onClick={list} className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge">
           Load
@@ -65,18 +66,17 @@ export default function Memory() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="memory content…"
-            className="mt-2 h-20 w-full rounded-md border border-edge bg-ink p-2 text-sm"
+            className="mt-2 h-20 w-full field"
           />
           <div className="mt-2 flex gap-2">
-            <select
+            <Select
               value={tier}
               onChange={(e) => setTier(e.target.value)}
-              className="rounded-md border border-edge bg-ink px-3 py-1.5 text-sm"
             >
               {TIERS.map((t) => (
                 <option key={t}>{t}</option>
               ))}
-            </select>
+            </Select>
             <button onClick={store} className="rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
               Store
             </button>
@@ -90,7 +90,7 @@ export default function Memory() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="query…"
-              className="flex-1 rounded-md border border-edge bg-ink px-3 py-1.5 text-sm"
+              className="flex-1 field"
             />
             <button onClick={retrieve} className="rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
               Retrieve

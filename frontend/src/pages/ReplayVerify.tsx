@@ -74,8 +74,8 @@ export default function ReplayVerify() {
     <div className="space-y-8">
       <header>
         <div className="flex items-center gap-2.5">
-          <Chip glyph="check" tone="accent" size={34} />
-          <h1 className="text-[22px] font-semibold tracking-tight">Replay Audit</h1>
+          <Chip glyph="check" tone="accent" size={28} />
+          <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Replay Audit</h1>
         </div>
         <p className="mt-0.5 max-w-2xl text-sm text-slate-500">
           Replays a run's decisions against its own recorded history to confirm it would execute
@@ -89,7 +89,7 @@ export default function ReplayVerify() {
           value={workflowId}
           onChange={(e) => setWorkflowId(e.target.value)}
           placeholder="workflow id"
-          className="min-w-0 flex-1 rounded border border-edge bg-ink px-3 py-2 font-mono text-xs text-slate-200 outline-none focus:border-aurora/60"
+          className="min-w-0 flex-1 font-mono field"
         />
         <button
           onClick={() => run(workflowId)}

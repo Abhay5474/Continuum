@@ -5,6 +5,7 @@ import { ChartFrame, Histogram } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 import { Segmented } from "../system/hub";
+import { Select } from "../system/controls";
 
 /**
  * Semantic uncertainty.
@@ -207,7 +208,7 @@ export default function Uncertainty() {
 
           <label className="block max-w-sm">
             <span className="micro">Stop when the chance of being overturned is below</span>
-            <select
+            <Select
               value={status?.overturnThreshold ?? 0.05}
               disabled={busy || !status?.adaptiveEnabled}
               onChange={(e) =>
@@ -216,14 +217,13 @@ export default function Uncertainty() {
                   "Threshold updated"
                 )
               }
-              className="mt-1 block w-full rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200 disabled:opacity-40"
             >
               {[0.01, 0.02, 0.05, 0.1, 0.2].map((n) => (
                 <option key={n} value={n}>
                   {(n * 100).toFixed(0)}% — {n <= 0.02 ? "cautious, more samples" : n >= 0.1 ? "eager, fewer samples" : "balanced"}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
 
           <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
@@ -245,41 +245,39 @@ export default function Uncertainty() {
         <div className="flex flex-wrap items-start gap-6">
           <label>
             <span className="micro">Samples</span>
-            <select
+            <Select
               value={status?.samples ?? 3}
               disabled={busy}
               onChange={(e) =>
                 run(() => portal.uncertainty.configure({ samples: Number(e.target.value) }), "Sample count updated")
               }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
             >
               {[2, 3, 4, 5, 7].map((n) => (
                 <option key={n} value={n}>
                   {n} — {n}× tokens
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             <span className="micro">Temperature</span>
-            <select
+            <Select
               value={status?.temperature ?? 0.7}
               disabled={busy}
               onChange={(e) =>
                 run(() => portal.uncertainty.configure({ temperature: Number(e.target.value) }), "Temperature updated")
               }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
             >
               {[0.3, 0.5, 0.7, 1.0].map((t) => (
                 <option key={t} value={t}>
                   {t.toFixed(1)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             <span className="micro">Flag below</span>
-            <select
+            <Select
               value={status?.lowConfidence ?? 0.5}
               disabled={busy}
               onChange={(e) =>
@@ -288,14 +286,13 @@ export default function Uncertainty() {
                   "Threshold updated"
                 )
               }
-              className="mt-1 block rounded-md border border-edge bg-ink/60 px-3 py-1.5 text-sm text-slate-200"
             >
               {[0.3, 0.5, 0.7, 0.9].map((t) => (
                 <option key={t} value={t}>
                   {t.toFixed(1)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <button
             disabled={busy || !status?.measured}
