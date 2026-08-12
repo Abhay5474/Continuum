@@ -56,11 +56,32 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+  metrics:
+    tags:
+      # Every series carries the application name, so a shared Prometheus can
+      # tell two deployments apart without relying on the scrape job's labels.
+      application: continuum
+    # Latency is the number this product is judged on, and an average hides
+    # exactly the tail that matters. Published as a histogram so percentiles can
+    # be aggregated across instances rather than averaged, which is the mistake
+    # that makes a fleet-wide p99 meaningless.
+    #
+    # This block belongs under `management.metrics`; one level higher it binds
+    # to nothing and is silently ignored, which is how it first shipped.
+    distribution:
+      percentiles-histogram:
+        continuum.gateway.request: true
+        continuum.gateway.overhead: true
+      percentiles:
+        continuum.gateway.request: 0.5, 0.95, 0.99
+        continuum.gateway.overhead: 0.5, 0.95, 0.99
+      slo:
+        continuum.gateway.request: 100ms, 250ms, 500ms, 1s, 2s, 5s, 10s
 
 server:
   port: ${PORT:8080}

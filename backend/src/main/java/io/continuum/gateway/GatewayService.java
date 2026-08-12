@@ -76,6 +76,7 @@ public class GatewayService {
     private final io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit;
     // V8 prompt compression + firewall (additive; pass-through unless opted in).
     private final io.continuum.compression.PromptCompressionService compression;
+    private final io.continuum.observability.GatewayMetrics metrics;
     private final io.continuum.firewall.PromptFirewallService firewall;
     // The context layer on the chat path (opt-in, OFF by default). Pipelines
     // have always transformed a recognised payload; this is the same thing for
@@ -126,6 +127,7 @@ public class GatewayService {
                           io.continuum.mmu.ContextMMU contextMmu,
                           io.continuum.autopilot.engine.ContextualBanditEngine contextualBandit,
                           io.continuum.compression.PromptCompressionService compression,
+                          io.continuum.observability.GatewayMetrics metrics,
                           io.continuum.firewall.PromptFirewallService firewall,
                           io.continuum.context.PromptContextService promptContext,
                           io.continuum.billing.BillingService billing,
@@ -161,6 +163,7 @@ public class GatewayService {
         this.contextMmu = contextMmu;
         this.contextualBandit = contextualBandit;
         this.compression = compression;
+        this.metrics = metrics;
         this.firewall = firewall;
         this.promptContext = promptContext;
         this.billing = billing;
@@ -269,6 +272,7 @@ public class GatewayService {
         String cacheKey = lastUserContent(canonical);
         if (semanticCache.enabledFor(developerId)) {
             var hit = semanticCache.lookup(developerId, cacheKey, req.model());
+            metrics.cache(hit.isPresent());
             if (hit.isPresent()) {
                 var h = hit.get();
                 long cachedMs = (System.nanoTime() - started) / 1_000_000;
@@ -464,6 +468,13 @@ public class GatewayService {
                             reason, List.of(), cost, totalMs));
                     prov.commit();
                 }
+                // Published before the log write, so a slow database cannot make
+                // the latency metric report its own contention as provider time.
+                metrics.request(c.provider(), resp.model(), true, totalMs);
+                metrics.overhead(c.provider(), totalMs, attemptMs);
+                metrics.tokens(c.provider(), resp.promptTokens(), resp.completionTokens());
+                metrics.cost(c.provider(), cost);
+
                 var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
                         resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers));
                 labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
@@ -511,6 +522,7 @@ public class GatewayService {
                     slot.dropped();
                 }
                 health.recordFailure(c.provider(), c.model(), attemptMs, e.getMessage());
+                metrics.failover(c.provider(), e.getClass().getSimpleName());
                 recordBandit(complexity, c.provider(), false, attemptMs, 0);
                 routingStrategy.record(developerId, routingDecision, complexity,
                         c.provider(), false, attemptMs, 0);
@@ -531,6 +543,8 @@ public class GatewayService {
             }
         }
         long totalMs = (System.nanoTime() - started) / 1_000_000;
+        metrics.request("none", req.model(), false, totalMs);
+        metrics.visibleFailure("all_providers_failed");
         var failLog = logFailure(developerId, req, complexity, mode);
         labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
 
