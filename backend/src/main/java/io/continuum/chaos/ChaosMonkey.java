@@ -80,6 +80,39 @@ public class ChaosMonkey {
         profile(developerId).primaryProviderDown.set(down);
     }
 
+    /**
+     * How often a provider call fails, for this profile.
+     *
+     * <p>Distinct from {@code primaryProviderDown}, which is all-or-nothing. The
+     * failure a reliability layer is actually judged on is intermittent — a
+     * provider that fails three calls in ten, not one that is cleanly gone — and
+     * an all-or-nothing switch cannot produce it.
+     */
+    public void setProviderFailureRate(String developerId, double rate) {
+        profile(developerId).providerFailureRate = clamp(rate);
+    }
+
+    /**
+     * Whether this provider call should fail, for whoever this thread serves.
+     *
+     * <p>Deterministic rather than random: at rate r the nth call fails iff
+     * {@code floor((n+1)r) > floor(nr)}, which yields exactly {@code floor(Nr)}
+     * failures in N calls, evenly spaced. A benchmark built on a random draw
+     * reports a different number every run and cannot be used to argue that
+     * anything improved.
+     */
+    public boolean shouldFailProviderCall() {
+        Faults tenant = current();
+        Faults f = (tenant != null && tenant.providerFailureRate > 0) ? tenant
+                : (global.providerFailureRate > 0 ? global : null);
+        if (f == null) {
+            return false;
+        }
+        double rate = f.providerFailureRate;
+        long n = f.providerCalls.getAndIncrement();
+        return (long) Math.floor((n + 1) * rate) > (long) Math.floor(n * rate);
+    }
+
     public void setActivityFailureRate(String developerId, double rate) {
         profile(developerId).activityFailureRate = clamp(rate);
     }
@@ -100,7 +133,8 @@ public class ChaosMonkey {
     public ChaosState state(String developerId) {
         Faults f = profile(developerId);
         return new ChaosState(f.activityFailureRate, f.sinkFailureRate, f.primaryProviderDown.get(),
-                f.activityLatencyMs, f.crashAfterActivities.get(), developerId == null ? "engine" : "account");
+                f.activityLatencyMs, f.crashAfterActivities.get(), developerId == null ? "engine" : "account",
+                f.providerFailureRate);
     }
 
     public void reset(String developerId) {
@@ -137,6 +171,9 @@ public class ChaosMonkey {
     private static final class Faults {
         volatile double activityFailureRate = 0.0;
         volatile double sinkFailureRate = 0.0;
+        volatile double providerFailureRate = 0.0;
+        /** Call counter, so the deterministic schedule above has an index. */
+        final java.util.concurrent.atomic.AtomicLong providerCalls = new java.util.concurrent.atomic.AtomicLong();
         final AtomicBoolean primaryProviderDown = new AtomicBoolean(false);
         volatile long activityLatencyMs = 0;
         final AtomicInteger crashAfterActivities = new AtomicInteger(0);
@@ -148,6 +185,8 @@ public class ChaosMonkey {
         void reset() {
             activityFailureRate = 0;
             sinkFailureRate = 0;
+            providerFailureRate = 0;
+            providerCalls.set(0);
             primaryProviderDown.set(false);
             activityLatencyMs = 0;
             crashAfterActivities.set(0);
@@ -155,7 +194,15 @@ public class ChaosMonkey {
     }
 
     public record ChaosState(double activityFailureRate, double sinkFailureRate, boolean primaryProviderDown,
-                             long activityLatencyMs, int crashAfterActivities, String scope) {
+                             long activityLatencyMs, int crashAfterActivities, String scope,
+                             double providerFailureRate) {
+    }
+
+    /** A provider failure that was armed on purpose, distinguishable in a log. */
+    public static final class SimulatedProviderFailure extends RuntimeException {
+        public SimulatedProviderFailure(String message) {
+            super(message);
+        }
     }
 
     /** Marker error so simulated crashes are distinguishable in logs/tests. */

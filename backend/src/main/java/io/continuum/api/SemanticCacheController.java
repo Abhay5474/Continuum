@@ -3,6 +3,7 @@ package io.continuum.api;
 import io.continuum.cache.SemanticCacheService;
 import io.continuum.portal.PortalAuthFilter;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,9 +35,24 @@ public class SemanticCacheController {
         return cache.status(dev(req));
     }
 
+    /**
+     * Turns the cache on or off.
+     *
+     * <p>Only "enable" and "disable" are accepted. It used to read anything that
+     * was not "enable" as a disable and answer 200, so {@code POST /cache/clear}
+     * — a plausible guess, and the wrong verb for clearing — silently turned the
+     * cache off and told the caller it had succeeded. A path typo must not be
+     * able to disable a feature.
+     */
     @PostMapping("/{action}")
-    public Map<String, Object> toggle(HttpServletRequest req, @PathVariable String action) {
-        return cache.setEnabled(dev(req), "enable".equalsIgnoreCase(action));
+    public ResponseEntity<Map<String, Object>> toggle(HttpServletRequest req, @PathVariable String action) {
+        boolean enable = "enable".equalsIgnoreCase(action);
+        if (!enable && !"disable".equalsIgnoreCase(action)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "unknown_action",
+                    "message", "Expected 'enable' or 'disable'. To empty the cache, DELETE this resource."));
+        }
+        return ResponseEntity.ok(cache.setEnabled(dev(req), enable));
     }
 
     @PutMapping("/settings")

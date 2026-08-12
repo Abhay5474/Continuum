@@ -1,0 +1,39 @@
+{
+  "workload": {
+    "requests": 100,
+    "distinct": 10,
+    "repeat_ratio": 0.45,
+    "seed": 7,
+    "injected_failure_rate": 0.25
+  },
+  "arms": [
+    {
+      "arm": "cache off",
+      "requests": 100,
+      "served": 100,
+      "rate_limited": 0,
+      "visible_failures": 0,
+      "failovers_absorbed": 33,
+      "tokens": 3266,
+      "spend_usd": 0.00011474,
+      "p50_ms": 41.8,
+      "p95_ms": 66.0,
+      "p99_ms": 203.4
+    },
+    {
+      "arm": "cache on",
+      "requests": 100,
+      "served": 100,
+      "rate_limited": 3,
+      "visible_failures": 0,
+      "failovers_absorbed": 3,
+      "tokens": 328,
+      "spend_usd": 1.152e-05,
+      "p50_ms": 11.3,
+      "p95_ms": 34.0,
+      "p99_ms": 46.1
+    }
+  ],
+  "tokens_saved": 2938,
+  "tokens_saved_pct": 90.0
+}

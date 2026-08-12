@@ -45,6 +45,20 @@ public class ChaosController {
         return chaos.state(s);
     }
 
+    /**
+     * Arm an intermittent provider failure.
+     *
+     * <p>The failure mode this product exists for. `provider-down` proves the
+     * cleanly-gone case; this proves the far more common one, where a provider
+     * answers most calls and drops the rest.
+     */
+    @PostMapping("/provider-failure-rate")
+    public ChaosMonkey.ChaosState providerFailureRate(@RequestParam double rate, HttpServletRequest req) {
+        String s = scope(req);
+        chaos.setProviderFailureRate(s, rate);
+        return chaos.state(s);
+    }
+
     @PostMapping("/activity-failure-rate")
     public ChaosMonkey.ChaosState activityFailureRate(@RequestParam double rate, HttpServletRequest req) {
         String s = scope(req);

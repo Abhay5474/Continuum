@@ -1,5 +1,6 @@
 package io.continuum.provider.mock;
 
+import io.continuum.chaos.ChaosMonkey;
 import io.continuum.provider.LlmProvider;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.LlmResponse;
@@ -21,6 +22,21 @@ import java.util.List;
  */
 @Component
 public class MockProvider implements LlmProvider {
+
+    /**
+     * Optional so the provider stays constructible in a plain unit test, where
+     * there is no Spring context and no chaos to consult.
+     */
+    private final ChaosMonkey chaos;
+
+    public MockProvider() {
+        this(null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public MockProvider(ChaosMonkey chaos) {
+        this.chaos = chaos;
+    }
 
     /**
      * Artificial service time, in milliseconds.
@@ -118,6 +134,13 @@ public class MockProvider implements LlmProvider {
     public LlmResponse complete(LlmRequest request) {
         if (unavailable) {
             throw new IllegalStateException("mock provider is marked unavailable");
+        }
+        // A real provider fails intermittently, and a mock that never does makes
+        // failover untestable — which is the one behaviour this product is most
+        // often judged on. Armed through the chaos API, off unless asked for.
+        if (chaos != null && chaos.shouldFailProviderCall()) {
+            throw new ChaosMonkey.SimulatedProviderFailure(
+                    "mock provider: injected failure (chaos)");
         }
         String lastUser = request.messages().stream()
                 .filter(m -> m.role() == Role.USER)
