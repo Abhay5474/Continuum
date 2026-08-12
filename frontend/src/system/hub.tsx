@@ -1333,7 +1333,8 @@ export function Empty({
   glyph = "layers",
 }: {
   title: string;
-  hint?: string;
+  /** Prose, or a fragment when it needs a code span. */
+  hint?: ReactNode;
   action?: ReactNode;
   glyph?: GlyphName;
 }) {

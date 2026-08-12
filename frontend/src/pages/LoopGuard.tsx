@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain, Segmented } from "../system/hub";
+import { Explain, Segmented, Empty } from "../system/hub";
 
 /**
  * Agent loop detection.
@@ -299,10 +299,7 @@ export default function LoopGuard() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : events.length === 0 ? (
-        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-          Nothing caught yet. Loops found in your agents — or by the inspector above — appear here
-          with the steps they are accusing.
-        </div>
+        <Empty title={"Nothing caught yet"} hint={"Loops found in your agents — or by the inspector above — appear here with the steps they are accusing."} />
       ) : (
         <div className="space-y-2">
           {events.map((e, i) => (

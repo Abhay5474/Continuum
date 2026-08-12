@@ -4,7 +4,7 @@ import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ChartFrame, Histogram } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
-import { Segmented } from "../system/hub";
+import { Segmented, Empty } from "../system/hub";
 import { Select } from "../system/controls";
 
 /**
@@ -314,10 +314,7 @@ export default function Uncertainty() {
         {rows === null ? (
           <SkeletonRows rows={4} />
         ) : rows.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-            Nothing measured yet. Set a mode above, then send a request through the gateway — or add{" "}
-            <code className="text-slate-400">"measureUncertainty": true</code> to a single call.
-          </div>
+          <Empty title={"Nothing measured yet"} hint={<>Set a mode above, then send a request through the gateway — or add{" "} <code className="text-slate-400">"measureUncertainty": true</code> to a single call.</>} />
         ) : (
           <div className="space-y-2">
             {rows.map((r) => (

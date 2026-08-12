@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain } from "../system/hub";
+import { Explain, Empty } from "../system/hub";
 import { Select } from "../system/controls";
 
 /**
@@ -157,10 +157,7 @@ export default function Counterfactual() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : armNames.length === 0 ? (
-        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-          No routed traffic logged yet. Send requests through the gateway and the models they used
-          become the candidate policies you can replay against.
-        </div>
+        <Empty title={"No routed traffic logged yet"} hint={"Send requests through the gateway and the models they used become the candidate policies you can replay against."} />
       ) : (
         <div className="space-y-3">
           <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Candidate policy</h2>

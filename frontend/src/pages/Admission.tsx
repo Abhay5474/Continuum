@@ -3,7 +3,7 @@ import { portal } from "../api";
 import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
 import { BarChart, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain } from "../system/hub";
+import { Explain, Empty } from "../system/hub";
 
 /**
  * Congestion-controlled admission.
@@ -169,10 +169,7 @@ export default function Admission() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : providers.length === 0 ? (
-        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-          No provider has been observed yet. Send traffic through the gateway and the inferred
-          limit for each provider appears here, moving as it learns.
-        </div>
+        <Empty title={"No provider has been observed yet"} hint={"Send traffic through the gateway and the inferred limit for each provider appears here, moving as it learns."} />
       ) : (
         <div className="space-y-2">
           {providers.map((p) => (

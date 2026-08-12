@@ -3,7 +3,7 @@ import { portal } from "../api";
 import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { BarChart, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain } from "../system/hub";
+import { Explain, Empty } from "../system/hub";
 
 /**
  * Cost-aware admission.
@@ -209,10 +209,7 @@ export default function CostAdmission() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : callers.length === 0 ? (
-        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-          No traffic yet. Once requests arrive, each caller's consumption of both allowances appears
-          here.
-        </div>
+        <Empty title={"No traffic yet"} hint={"Once requests arrive, each caller's consumption of both allowances appears here."} />
       ) : (
         <div className="space-y-4">
           {/* Across callers, before the per-caller detail. One caller usually

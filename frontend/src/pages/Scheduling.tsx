@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain } from "../system/hub";
+import { Explain, Empty } from "../system/hub";
 import { Select, Table, TH, TR, TD } from "../system/controls";
 
 /**
@@ -277,11 +277,7 @@ export default function Scheduling() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : providers.length === 0 ? (
-        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-          Nothing has queued yet. A request only enters the queue when a provider is at its inferred
-          limit, and the wait is bounded at a quarter second — so this stays empty until you are
-          genuinely near capacity.
-        </div>
+        <Empty title={"Nothing has queued yet"} hint={"A request only enters the queue when a provider is at its inferred limit, and the wait is bounded at a quarter second — so this stays empty until you are genuinely near capacity."} />
       ) : (
         <div className="space-y-2">
           {providers.map((p) => (

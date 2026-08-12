@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
+import { Empty } from "../system/hub";
 import { PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 
@@ -164,10 +165,7 @@ export default function Saga() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : recent.length === 0 ? (
-        <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-          No rollbacks yet. When a workflow with compensations fails partway, what was undone — and
-          what could not be — appears here.
-        </div>
+        <Empty title={"No rollbacks yet"} hint={"When a workflow with compensations fails partway, what was undone — and what could not be — appears here."} />
       ) : (
         <div className="space-y-2">
           {recent.map((r, i) => (

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
+import { Empty } from "../system/hub";
 import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
@@ -128,11 +129,14 @@ export default function BreakerPage() {
         {status === null ? (
           <SkeletonRows rows={3} />
         ) : status.breakers.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-            {status.enabled
-              ? "No observations yet. Send traffic through the gateway and each model gets a breaker once it has enough history to know what normal looks like."
-              : "Arm the breaker to start watching answer quality per model."}
-          </div>
+          <Empty
+            title={status.enabled ? "No observations yet" : "The breaker is not armed"}
+            hint={
+              status.enabled
+                ? "Send traffic through the gateway. Each model gets a breaker once it has enough history to know what normal looks like."
+                : "Arm it above to start watching answer quality per model."
+            }
+          />
         ) : (
           <div className="space-y-3">
             {status.breakers.map((b) => (
@@ -152,7 +156,7 @@ export default function BreakerPage() {
       {/* ---- settings ---- */}
       <section className="space-y-3">
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Sensitivity</h2>
-        <div className="flex flex-wrap items-end gap-6">
+        <div className="plane flex flex-wrap items-end gap-6 p-4">
           <label>
             <span className="micro">Warm-up</span>
             <Select
@@ -230,9 +234,7 @@ export default function BreakerPage() {
         {events === null ? (
           <SkeletonRows rows={2} />
         ) : events.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-3 py-10 text-center text-sm text-slate-500" style={{ borderColor: "rgb(var(--card-edge))" }}>
-            Nothing has tripped. Every transition lands here with the evidence that caused it.
-          </div>
+          <Empty title={"Nothing has tripped"} hint={"Every transition lands here with the evidence that caused it."} />
         ) : (
           <div className="divide-y divide-edge/40">
             {events.map((e) => (

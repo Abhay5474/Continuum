@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
-import { Chip } from "../system/hub";
+import { Card, CardHead, Empty, Primary } from "../system/hub";
+import { PageHeader } from "../system/primitives";
 import { Select } from "../system/controls";
 
 const TIERS = ["WORKING", "EPISODIC", "LONG_TERM", "ARCHIVED"];
@@ -30,22 +31,14 @@ export default function Memory() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <div className="flex items-center gap-2.5">
-          <Chip glyph="layers" tone="accent" size={28} />
-          <div className="flex items-center gap-2.5">
-            <Chip glyph="layers" tone="accent" size={28} />
-            <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Memory</h1>
-          </div>
-        </div>
-        <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
-          Hierarchical memory (working → episodic → long-term → archived) stored outside the context
-          window. Retrieval ranks by relevance, recency and salience; compression summarizes cold memories.
-        </p>
-      </div>
+      <PageHeader
+        glyph="layers"
+        title="Memory"
+        subtitle="Working, episodic, long-term and archived — held outside the context window and retrieved by relevance, recency and salience."
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-slate-400">scope</span>
+      <div className="plane flex flex-wrap items-center gap-2 p-4">
+        <span className="micro">Scope</span>
         <input
           value={scope}
           onChange={(e) => setScope(e.target.value)}
@@ -60,8 +53,9 @@ export default function Memory() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-edge bg-panel p-4">
-          <div className="font-medium">Store memory</div>
+        <Card>
+          <CardHead glyph="layers" tone="violet" title="Store memory"
+                    sub="Write one memory into a tier" />
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -77,14 +71,13 @@ export default function Memory() {
                 <option key={t}>{t}</option>
               ))}
             </Select>
-            <button onClick={store} className="rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
-              Store
-            </button>
+            <Primary onClick={store}>Store</Primary>
           </div>
-        </div>
+        </Card>
 
-        <div className="rounded-lg border border-edge bg-panel p-4">
-          <div className="font-medium">Retrieve (relevance-ranked)</div>
+        <Card>
+          <CardHead glyph="spark" tone="cyan" title="Retrieve"
+                    sub="Ranked by relevance, recency and salience together" />
           <div className="mt-2 flex gap-2">
             <input
               value={query}
@@ -92,9 +85,7 @@ export default function Memory() {
               placeholder="query…"
               className="flex-1 field"
             />
-            <button onClick={retrieve} className="rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
-              Retrieve
-            </button>
+            <Primary onClick={retrieve}>Retrieve</Primary>
           </div>
           <div className="mt-3 space-y-1">
             {retrieved.map((m) => (
@@ -104,11 +95,14 @@ export default function Memory() {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div className="rounded-lg border border-edge bg-panel">
-        <div className="border-b border-edge px-4 py-2 font-medium">All memories ({entries.length})</div>
+      <Card pad={false}>
+        <div className="px-4 pt-4">
+          <CardHead glyph="list" tone="blue" title="All memories"
+                    sub={`${entries.length} in this scope`} divided />
+        </div>
         <div className="divide-y divide-edge text-sm">
           {entries.map((e) => (
             <div key={e.id} className="flex items-center gap-3 px-4 py-2">
@@ -118,9 +112,16 @@ export default function Memory() {
               <span className="flex-1 truncate">{e.content}</span>
             </div>
           ))}
-          {entries.length === 0 && <div className="px-4 py-3 text-xs text-slate-500">no memories — load a scope</div>}
+          {entries.length === 0 && (
+            <div className="px-4 pb-4">
+              <Empty
+                title="Nothing stored in this scope"
+                hint="Load a scope above, or store a memory to see it appear here."
+              />
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
