@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
-import { Chip } from "../system/hub";
+import { Empty, Primary, Chip } from "../system/hub";
 import { Micro, Readout, StateDot, Meter } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
@@ -193,13 +193,19 @@ export default function GodMode() {
       </header>
 
       {!enabled ? (
-        <div className="text-center">
-          <Micro>Off by default</Micro>
-          <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">
-            Nothing is retained while off. Enabling records gateway exchanges into your account's
-            memory tiers only — wipe at any time.
-          </p>
-        </div>
+        // The off state is most of what anyone sees on this page, so it gets the
+        // same treatment as any other empty state rather than a centred
+        // paragraph floating on the page.
+        <Empty
+          glyph="spark"
+          title="The policy engine is off"
+          hint="Nothing is retained while it is off. Enabling it records gateway exchanges into your account's memory tiers only, and you can wipe them at any time."
+          action={
+            <Primary onClick={toggle} disabled={busy}>
+              Turn it on
+            </Primary>
+          }
+        />
       ) : (
         <>
           <Tabs tab={tab} setTab={setTab} />

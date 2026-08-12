@@ -280,7 +280,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
       {/* credential vault */}
       <div>
-        <div className="font-medium">Configure Upstream Keys</div>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Configure upstream keys</h2>
         <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
           Store your own LLM provider API keys. They are encrypted with AES-256-GCM and decrypted only
           in-memory at request execution. Secrets are write-only — never displayed after saving.
@@ -328,7 +328,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={me?.useOwnKeysPrimary ?? true} onChange={(e) => toggle(e.target.checked)} className="mt-1" />
             <span>
-              <span className="font-medium">Use my provider API keys as primary</span>
+              <span className="text-[13px] font-medium text-slate-200">Use my provider API keys as primary</span>
               <span className="block text-xs text-slate-400">
                 When checked, the gateway routes through your own keys and gracefully falls back to the
                 platform (or mock) if they fail or are rate-limited. When unchecked, requests run on the
@@ -343,7 +343,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       <div className={`rounded-lg border bg-panel p-4 transition-all ${v6Enabled ? "border-neon/50 shadow-glow-cyan" : "border-edge"}`}>
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <div className="font-medium">
+            <div className="text-[13px] font-semibold tracking-tight text-slate-200">
               Verification Engine <span className="text-xs text-slate-500">(Consensus DAG)</span>
               {v6Enabled && <span className="ml-2 rounded bg-neon/15 px-2 py-0.5 text-[10px] font-bold text-neon">ACTIVE</span>}
             </div>
@@ -400,7 +400,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       <div className={`rounded-lg border bg-panel p-4 transition-all ${v7Enabled ? "border-aurora/50 shadow-glow" : "border-edge"}`}>
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <div className="font-medium">
+            <div className="text-[13px] font-semibold tracking-tight text-slate-200">
               Context Optimizer Virtualization <span className="text-xs text-slate-500">(Paging MMU)</span>
               {v7Enabled && <span className="ml-2 rounded bg-aurora/15 px-2 py-0.5 text-[10px] font-bold text-indigo-300">ACTIVE</span>}
             </div>
@@ -424,8 +424,9 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       {/* api keys */}
       <div>
         <div className="flex items-center">
-          <div className="font-medium">Continuum API keys</div>
-          <button onClick={issueKey} className="ml-auto rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">Issue new key</button>
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Continuum API keys</h2>
+          <button onClick={issueKey} style={{ height: "var(--h-md)", borderRadius: "var(--r-md)", borderColor: "rgb(var(--card-edge))" }}
+            className="ml-auto inline-flex items-center border px-3 text-[12.5px] font-medium text-slate-200 transition-colors hover:border-slate-500/60 hover:bg-[color:rgb(var(--card-hover))]">Issue new key</button>
         </div>
         {newKey && (
           <div className="mt-2 flex items-center gap-2 rounded bg-ink p-2">
@@ -452,7 +453,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
       {/* playground */}
       <div>
-        <div className="font-medium">Sandbox playground</div>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Sandbox playground</h2>
         <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Send a request through your gateway right now — no code required.</p>
         <textarea value={playPrompt} onChange={(e) => setPlayPrompt(e.target.value)}
           className="mt-2 h-16 w-full field" />
