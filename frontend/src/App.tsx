@@ -5,6 +5,8 @@ import { ThemeToggle } from "./components/ui";
 import { useOperator } from "./system/OperatorAccess";
 import { GuideButton } from "./system/guide";
 import { guideFor } from "./system/guides";
+import { FEATURES } from "./system/features";
+import FeatureTabs from "./system/FeatureTabs";
 
 /**
  * Console shell.
@@ -13,64 +15,39 @@ import { guideFor } from "./system/guides";
  * top-level links overflowed onto a second row and gave no sense of hierarchy.
  * Features are now organised by what they do, with account actions in a menu.
  */
-type Item = { to: string; label: string; desc: string };
+type Item = { to: string; label: string; desc: string; views?: string[] };
 type Group = { label: string; items: Item[] };
 
 const GROUPS: Group[] = [
-  {
-    label: "Traffic",
-    items: [
-      { to: "/workflows", label: "Workflows", desc: "Author, publish and run durable graphs" },
-      { to: "/workflows/console", label: "Run History", desc: "Every run, its event log and replay" },
-      { to: "/gateway", label: "Gateway", desc: "Live requests, providers and failover" },
-      { to: "/router", label: "Routing", desc: "Model selection and tail-latency hedging" },
-      { to: "/admission", label: "Admission Control", desc: "Infer provider capacity, queue and shed deliberately" },
-      { to: "/scheduling", label: "Priority & Deadlines", desc: "Who gets the next free slot, and who is too late to use it" },
-      { to: "/cost-limits", label: "Cost-Aware Limits", desc: "Rate-limit by tokens consumed, not requests counted" },
-      { to: "/cascade", label: "Model Cascade", desc: "Cheap model first, escalate only when needed" },
-    ],
-  },
-  {
-    // Everything that acts on a prompt on its way to a model: what is stripped
-    // from it, whether it needs to be sent at all, and what context travels with
-    // it. Memory and the context optimizer used to sit under "Intelligence"
-    // beside the learning features, which put four unrelated things in one menu.
-    label: "Prompt",
-    items: [
-      { to: "/pipelines", label: "Pipelines", desc: "Input in, answer out — the endpoint your app calls" },
-      { to: "/specialists", label: "Specialists", desc: "Call a smaller model before the big one" },
-      { to: "/guard", label: "Prompt Guard", desc: "PII redaction, injection blocking, compression" },
-      { to: "/cache", label: "Semantic Cache", desc: "Reuse answers to equivalent questions" },
-      { to: "/context", label: "Context Transformers", desc: "Turn spreadsheets, logs and email into context a model can reason over" },
-      { to: "/compression", label: "Compression Budget", desc: "Compress each part of a prompt by what it can spare" },
-      { to: "/mmu", label: "Context Optimizer", desc: "Context virtualization and paging" },
-      { to: "/memory", label: "Memory", desc: "Long-context memory tiers" },
-    ],
-  },
-  {
-    label: "Reliability",
-    items: [
-      { to: "/quality", label: "Quality Gate", desc: "Check the answer against the request" },
-      { to: "/loops", label: "Loop Detection", desc: "Spot an agent going round in circles" },
-      { to: "/saga", label: "Compensation", desc: "Undo what completed when a workflow fails partway" },
-      { to: "/breaker", label: "Semantic Breaker", desc: "Trip a model when its answers degrade" },
-      { to: "/confidence", label: "Answer Confidence", desc: "Does the model agree with itself" },
-      { to: "/dag", label: "Verification", desc: "Consensus traces and evidence" },
-      { to: "/provenance", label: "Decision Provenance", desc: "Why each answer happened, as data" },
-      { to: "/counterfactual", label: "Counterfactual Replay", desc: "What a different routing policy would have cost" },
-      { to: "/replay", label: "Replay Audit", desc: "Deterministic replay and divergence healing" },
-      { to: "/chaos", label: "Fault Injection", desc: "Infrastructure failure drills" },
-      { to: "/ai-chaos", label: "Model Failures", desc: "Hallucination and degradation drills" },
-    ],
-  },
-  {
-    label: "Intelligence",
-    items: [
-      { to: "/autopilot", label: "Optimization", desc: "Adaptive routing, canary and rollback" },
-      { to: "/godmode", label: "Adaptive Policy", desc: "Autonomous memory and policy engine" },
-    ],
-  },
+  { label: "Traffic", items: featureItems(["Workflows", "Gateway", "Routing", "Traffic Control", "Model Cascade"]) },
+  { label: "Prompt", items: featureItems(["Pipelines", "Specialists", "Prompt Guard", "Context", "Semantic Cache"]) },
+  { label: "Reliability", items: featureItems(["Answer Assurance", "Loop Detection", "Decision Provenance", "Chaos Lab"]) },
+  { label: "Intelligence", items: featureItems(["Adaptive Policy"]) },
 ];
+
+/**
+ * The menu entries for a set of features, in the order named.
+ *
+ * <p>Built from the same registry the tab strip uses, so a feature cannot appear
+ * in the navigation under one name and in its own tabs under another — which is
+ * exactly what happened while thirty routes each maintained their own label.
+ */
+function featureItems(names: string[]): Item[] {
+  return names.flatMap((name) => {
+    const f = FEATURES.find((x) => x.name === name);
+    if (!f) {
+      return [];
+    }
+    return [{
+      to: f.views[0].to,
+      label: f.name,
+      desc: f.desc,
+      // Named so the menu can show what is inside a merged feature without
+      // making the reader open it to find out.
+      views: f.views.length > 1 ? f.views.map((v) => v.label) : undefined,
+    }];
+  });
+}
 
 const ACCOUNT: Item[] = [
   { to: "/portal", label: "API Keys & Providers", desc: "Issue keys, connect provider credentials" },
@@ -283,6 +260,7 @@ export default function App() {
           inconsistency reads as a bug rather than as restraint. Short and
           small — 260ms and 6px is "it arrived", not "watch this". */}
       <main key={location.pathname} className="page-enter mx-auto max-w-[1200px] px-5 pb-16 pt-6">
+        <FeatureTabs />
         <Outlet />
       </main>
     </div>
@@ -337,8 +315,13 @@ function Menu({
             }`
           }
         >
-          <div className="text-sm font-medium text-slate-200">{i.label}</div>
-          <div className="text-xs text-slate-500">{i.desc}</div>
+          <div className="text-[13px] font-medium text-slate-200">{i.label}</div>
+          <div className="text-[11.5px] leading-relaxed text-slate-500">{i.desc}</div>
+          {/* What a merged feature is made of. Naming the parts here is the
+              difference between "we combined three things" and "we hid two". */}
+          {i.views && (
+            <div className="mt-1 text-[11px] text-slate-600">{i.views.join(" · ")}</div>
+          )}
         </NavLink>
       ))}
       {footer && <div className="mt-1 border-t border-edge/60 pt-1">{footer}</div>}
