@@ -26,7 +26,16 @@ public class DeveloperGatewayController {
         this.gateway = gateway;
     }
 
-    @PostMapping({"/api/gateway/chat", "/v1/chat/completions"})
+    /**
+     * Continuum's own shape, for the console.
+     *
+     * <p>{@code /v1/chat/completions} used to be aliased here and is not any
+     * more: it now belongs to {@code OpenAiCompatController}, which answers in
+     * the format the path promises. Two controllers claiming one path is an
+     * ambiguous-mapping 500 on every request, so this alias could not simply be
+     * left in place beside the new one.
+     */
+    @PostMapping("/api/gateway/chat")
     public ResponseEntity<?> chat(@RequestBody GatewayDtos.ChatRequest request, HttpServletRequest http) {
         DeveloperEntity developer = (DeveloperEntity) http.getAttribute(ApiKeyAuthenticationFilter.DEVELOPER_ATTRIBUTE);
         if (developer == null) {

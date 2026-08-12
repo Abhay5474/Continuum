@@ -412,8 +412,10 @@ public class GatewayService {
         int failovers = 0;
         RuntimeException lastError = null;
         for (ModelFallbackPolicy.ModelCandidate c : chain) {
-            LlmRequest perModel = new LlmRequest(c.model(), canonical.messages(),
-                    canonical.maxTokens(), canonical.temperature());
+            // withModel, not a fresh four-argument request: rebuilding it that way
+            // silently dropped the caller's tools and response_format, so a
+            // tool-calling client got prose back and could not tell why.
+            LlmRequest perModel = canonical.withModel(c.model());
             Map<String, String> keys = devKeys.containsKey(c.provider())
                     ? Map.of(c.provider(), devKeys.get(c.provider())) : null;
             long attemptStart = System.nanoTime();
@@ -432,9 +434,9 @@ public class GatewayService {
                     final Map<String, String> faultKeys = keys;
                     final String provider = c.provider();
                     final String model = c.model();
+                    // Still the caller's request, so it keeps their tools.
                     resp = mmuSession.interceptFaults(resp, r -> router.complete(
-                            new LlmRequest(model, r.messages(), r.maxTokens(), r.temperature()),
-                            List.of(provider), faultKeys));
+                            r.withModel(model), List.of(provider), faultKeys));
                     mmuSession.finish(resp);
                 }
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
@@ -486,10 +488,18 @@ public class GatewayService {
 
                 // Gate first, then measure: there is no point measuring the
                 // confidence of an answer that is about to be replaced.
+                // The model's tool calls and its token split travel with the
+                // answer. Both were being dropped here: a caller whose model
+                // asked to call a function got a 200 with empty prose, which is
+                // indistinguishable from the model having refused.
+                GatewayDtos.ChatResponse answered =
+                        new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
+                                totalMs, tokens, cost, failovers, reason)
+                                .withCompletion(toToolCallRefs(resp.toolCalls()),
+                                        resp.promptTokens(), resp.completionTokens());
+
                 return withUncertainty(
-                        withQualityGate(
-                                new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
-                                        totalMs, tokens, cost, failovers, reason),
+                        withQualityGate(answered,
                                 developerId, canonical, c.provider(), c.model(), devKeys, complexity),
                         developerId, req, canonical, c.provider(), c.model(), devKeys, false);
             } catch (Exception e) {
@@ -1152,6 +1162,50 @@ public class GatewayService {
     }
 
 
+
+    /**
+     * The provider's tool calls, in the gateway's own shape.
+     *
+     * <p>Null for the ordinary prose answer, so downstream can branch on "the
+     * model asked for a tool" without inspecting an empty list.
+     */
+    private static java.util.List<GatewayDtos.ToolCallRef> toToolCallRefs(
+            java.util.List<io.continuum.provider.model.ToolCall> calls) {
+        if (calls == null || calls.isEmpty()) {
+            return null;
+        }
+        java.util.List<GatewayDtos.ToolCallRef> out = new java.util.ArrayList<>();
+        for (io.continuum.provider.model.ToolCall c : calls) {
+            out.add(new GatewayDtos.ToolCallRef(c.id(), c.name(), c.argumentsJson()));
+        }
+        return out;
+    }
+
+    /**
+     * The models a caller may name on {@code /v1/models}.
+     *
+     * <p>Exposed from here rather than from the router so the OpenAI surface has
+     * one dependency instead of two, and so "what can I ask for" always matches
+     * what routing would actually accept.
+     */
+    public java.util.List<String> routableModelNames() {
+        try {
+            return router.availableChain();
+        } catch (RuntimeException e) {
+            log.debug("Model listing unavailable: {}", e.getMessage());
+            return java.util.List.of();
+        }
+    }
+
+    /*
+     * On the other `new LlmRequest(...)` sites in this class: the judge, the
+     * repair pass, the cascade tiers and the probe all send prompts Continuum
+     * wrote, about the caller's answer. They deliberately do NOT inherit the
+     * caller's tools or response_format — a judge offered `get_weather` may call
+     * it instead of scoring, and a scorer forced into json_object returns a
+     * verdict in the caller's schema rather than its own. Dropping them there is
+     * the correct behaviour, not the same bug as line 415 was.
+     */
 
     private String routingReason(double complexity, RoutingMode mode, ModelFallbackPolicy.ModelCandidate c, int failovers) {
         String basis = complexity >= 0.5 ? "high complexity → stronger model" : "low complexity → cheaper model";

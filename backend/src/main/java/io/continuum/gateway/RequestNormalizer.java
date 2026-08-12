@@ -21,7 +21,12 @@ public class RequestNormalizer {
         List<Message> messages = new ArrayList<>();
         if (req.messages() != null) {
             for (GatewayDtos.Message m : req.messages()) {
-                messages.add(new Message(parseRole(m.role()), m.content(), null));
+                messages.add(new Message(
+                        parseRole(m.role()),
+                        m.content(),
+                        toToolCalls(m.toolCalls()),
+                        toImages(m.images()),
+                        m.toolCallId()));
             }
         }
         if (messages.isEmpty()) {
@@ -32,7 +37,53 @@ public class RequestNormalizer {
                 || req.model().equalsIgnoreCase("auto")) ? null : req.model();
         int maxTokens = req.maxTokens() != null ? req.maxTokens() : 512;
         double temperature = req.temperature() != null ? req.temperature() : 0.2;
-        return new LlmRequest(requestedModel, messages, maxTokens, temperature);
+        return new LlmRequest(requestedModel, messages, maxTokens, temperature,
+                toTools(req.tools()), req.toolChoice(), toFormat(req.responseFormat()));
+    }
+
+    private static List<io.continuum.provider.model.ToolSpec> toTools(List<GatewayDtos.ToolRef> tools) {
+        if (tools == null || tools.isEmpty()) {
+            return null;
+        }
+        List<io.continuum.provider.model.ToolSpec> out = new ArrayList<>();
+        for (GatewayDtos.ToolRef t : tools) {
+            if (t != null && t.name() != null) {
+                out.add(new io.continuum.provider.model.ToolSpec(t.name(), t.description(), t.parameters()));
+            }
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    private static List<io.continuum.provider.model.ImagePart> toImages(List<GatewayDtos.ImageRef> images) {
+        if (images == null || images.isEmpty()) {
+            return null;
+        }
+        List<io.continuum.provider.model.ImagePart> out = new ArrayList<>();
+        for (GatewayDtos.ImageRef i : images) {
+            if (i != null && i.url() != null) {
+                out.add(new io.continuum.provider.model.ImagePart(i.url(), i.detail()));
+            }
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    private static List<io.continuum.provider.model.ToolCall> toToolCalls(List<GatewayDtos.ToolCallRef> calls) {
+        if (calls == null || calls.isEmpty()) {
+            return null;
+        }
+        List<io.continuum.provider.model.ToolCall> out = new ArrayList<>();
+        for (GatewayDtos.ToolCallRef c : calls) {
+            if (c != null) {
+                out.add(new io.continuum.provider.model.ToolCall(c.id(), c.name(), c.argumentsJson()));
+            }
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    private static io.continuum.provider.model.ResponseFormat toFormat(GatewayDtos.ResponseFormatRef f) {
+        return f == null || f.type() == null
+                ? null
+                : new io.continuum.provider.model.ResponseFormat(f.type(), f.schema());
     }
 
     private Role parseRole(String role) {

@@ -4,7 +4,10 @@ import io.continuum.provider.LlmProvider;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.LlmResponse;
 import io.continuum.provider.model.Message;
+import io.continuum.provider.model.ResponseFormat;
 import io.continuum.provider.model.Role;
+import io.continuum.provider.model.ToolCall;
+import io.continuum.provider.model.ToolSpec;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -127,11 +130,105 @@ public class MockProvider implements LlmProvider {
         serve();
         String model = request.model() == null ? "mock-small" : request.model();
         boolean large = model.contains("large");
-        String content = "[mock-llm] " + (large ? elaborate(lastUser) : summarize(lastUser));
+
         int promptTokens = request.messages().stream()
                 .mapToInt(m -> m.content() == null ? 0 : m.content().length() / 4).sum();
+
+        // ---- tool calling -------------------------------------------------
+        // A provider that accepts `tools` and never calls one leaves the whole
+        // tool path untested: the request plumbing looks fine and the response
+        // plumbing has never once carried a call. So the mock answers a tool
+        // offer the way a real model does — with a call rather than prose —
+        // unless the caller explicitly said not to.
+        if (request.hasTools() && !"none".equalsIgnoreCase(String.valueOf(request.toolChoice()))) {
+            ToolSpec picked = pickTool(request);
+            if (picked != null) {
+                ToolCall call = new ToolCall("call_mock_1", picked.name(), argumentsFor(picked, lastUser));
+                return new LlmResponse(null, List.of(call), promptTokens, 6, name(), model, "tool_calls");
+            }
+        }
+
+        // ---- images -------------------------------------------------------
+        // Named in the answer so a caller can tell the parts actually arrived
+        // rather than being silently dropped on the way through.
+        long images = request.messages().stream()
+                .filter(Message::hasImages)
+                .mapToLong(m -> m.images().size())
+                .sum();
+
+        String body = large ? elaborate(lastUser) : summarize(lastUser);
+        if (images > 0) {
+            body = body + " Received " + images + (images == 1 ? " image." : " images.");
+        }
+
+        // ---- response_format ----------------------------------------------
+        // A caller who asked for a JSON object and got prose has been lied to
+        // by the gateway, not by the model.
+        String content;
+        if (request.responseFormat() != null && request.responseFormat().isJson()) {
+            content = "{\"assessment\":\"LOW RISK\",\"confidence\":0.82,\"echo\":"
+                    + quote(lastUser) + "}";
+        } else {
+            content = "[mock-llm] " + body;
+        }
+
         int completionTokens = content.length() / 4;
         return new LlmResponse(content, List.of(), promptTokens, completionTokens, name(), model, "stop");
+    }
+
+    /** The named function when tool_choice names one, otherwise the first offered. */
+    private ToolSpec pickTool(LlmRequest request) {
+        String choice = request.toolChoice();
+        if (choice != null && !"auto".equalsIgnoreCase(choice) && !"required".equalsIgnoreCase(choice)) {
+            for (ToolSpec t : request.tools()) {
+                if (t.name().equals(choice)) {
+                    return t;
+                }
+            }
+        }
+        return request.tools().isEmpty() ? null : request.tools().get(0);
+    }
+
+    /**
+     * Arguments that satisfy the tool's own schema where it declares string
+     * properties, so a caller parsing them against their schema gets something
+     * valid rather than a fixed stub that fails their validator.
+     */
+    @SuppressWarnings("unchecked")
+    private String argumentsFor(ToolSpec tool, String userText) {
+        StringBuilder json = new StringBuilder("{");
+        Object props = tool.parameters() == null ? null : tool.parameters().get("properties");
+        if (props instanceof java.util.Map<?, ?> map) {
+            boolean first = true;
+            for (java.util.Map.Entry<?, ?> e : map.entrySet()) {
+                String key = String.valueOf(e.getKey());
+                String type = "string";
+                if (e.getValue() instanceof java.util.Map<?, ?> spec && spec.get("type") != null) {
+                    type = String.valueOf(spec.get("type"));
+                }
+                if (!first) {
+                    json.append(',');
+                }
+                first = false;
+                json.append(quote(key)).append(':');
+                switch (type) {
+                    case "number", "integer" -> json.append('1');
+                    case "boolean" -> json.append("true");
+                    case "array" -> json.append("[]");
+                    case "object" -> json.append("{}");
+                    default -> json.append(quote(userText == null ? "" : userText.strip()));
+                }
+            }
+        }
+        return json.append('}').toString();
+    }
+
+    private static String quote(String s) {
+        if (s == null) {
+            return "\"\"";
+        }
+        return '"' + s.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", " ").replace("\r", " ") + '"';
     }
 
     /** The large model's answer: the same assessment, worked through. */
