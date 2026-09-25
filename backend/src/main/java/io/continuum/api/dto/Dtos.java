@@ -15,8 +15,13 @@ public final class Dtos {
     public record StartWorkflowResponse(String workflowId, String status) {
     }
 
+    /**
+     * @param cancelled a FAILED run that was stopped on request rather than one
+     *                  that broke — so lists can say so instead of raising an alarm
+     */
     public record WorkflowSummary(String workflowId, String workflowType, String status,
-                                  long currentSequence, Instant createdAt, Instant updatedAt) {
+                                  long currentSequence, Instant createdAt, Instant updatedAt,
+                                  boolean cancelled) {
     }
 
     public record EventView(long sequenceNumber, String eventType, Object payload, Instant createdAt) {
@@ -42,7 +47,8 @@ public final class Dtos {
     }
 
     public record StatsView(long total, long running, long completed, long failed,
-                            int outboxDeliveries, List<String> duplicateDeliveries) {
+                            int outboxDeliveries, List<String> duplicateDeliveries,
+                            /** Of {@code failed}, how many were stopped on request. */ long cancelled) {
     }
 
     public record MetaView(List<String> workflowTypes, List<String> providerFailoverChain) {

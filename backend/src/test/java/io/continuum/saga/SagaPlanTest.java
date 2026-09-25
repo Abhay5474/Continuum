@@ -119,4 +119,15 @@ class SagaPlanTest {
         assertThat(plan.uncompensated()).containsExactly("charge");
         assertThat(plan.complete()).isFalse();
     }
+
+    @Test
+    @DisplayName("A wait step changed nothing outside the run, so it is neither undone nor a gap")
+    void waitsAreNotGaps() {
+        WorkflowSpec s = spec("charge*", "pause");
+        s.getSteps().get(1).setType(WorkflowSpec.Kind.WAIT);
+        var plan = SagaPlan.forFailure(s, List.of("charge", "pause"), "ship");
+        assertThat(ids(plan)).containsExactly("charge");
+        assertThat(plan.uncompensated()).isEmpty();
+        assertThat(plan.complete()).isTrue();
+    }
 }

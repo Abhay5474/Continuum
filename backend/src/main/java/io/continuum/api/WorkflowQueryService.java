@@ -46,6 +46,9 @@ public class WorkflowQueryService {
                 .map(this::toSummary).getContent();
     }
 
+    /** How {@code WorkflowEngine#cancel} words the reason; what marks a cancel. */
+    public static final String CANCELLED_PREFIX = "Cancelled:";
+
     /** A workflow's owner, type and status, without its history. */
     @Transactional(readOnly = true)
     public java.util.Optional<Existing> find(String workflowId) {
@@ -56,12 +59,18 @@ public class WorkflowQueryService {
     public record Existing(String ownerId, String workflowType, String status) {
     }
 
+    /** The input exactly as the run was started with it, for a rerun. */
+    @Transactional(readOnly = true)
+    public String rawInput(String workflowId) {
+        return instances.findById(workflowId).map(WorkflowInstanceEntity::getInput)
+                .orElseThrow(io.continuum.portal.RequestScope.NotFoundException::new);
+    }
+
     /** The owning developer of a workflow, for authorization checks. */
     @Transactional(readOnly = true)
     public String ownerOf(String workflowId) {
         return instances.findById(workflowId)
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        org.springframework.http.HttpStatus.NOT_FOUND, "No such workflow: " + workflowId))
+                .orElseThrow(io.continuum.portal.RequestScope.NotFoundException::new)
                 .getDeveloperId();
     }
 
@@ -113,7 +122,9 @@ public class WorkflowQueryService {
 
     private WorkflowSummary toSummary(WorkflowInstanceEntity i) {
         return new WorkflowSummary(i.getWorkflowId(), i.getWorkflowType(), i.getStatus().name(),
-                i.getCurrentSequence(), i.getCreatedAt(), i.getUpdatedAt());
+                i.getCurrentSequence(), i.getCreatedAt(), i.getUpdatedAt(),
+                i.getStatus() == io.continuum.persistence.entity.WorkflowStatus.FAILED
+                        && i.getError() != null && i.getError().startsWith(CANCELLED_PREFIX));
     }
 
     private Object parse(String jsonStr) {

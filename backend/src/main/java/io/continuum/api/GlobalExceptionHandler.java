@@ -46,6 +46,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body(e.getMessage(), 409));
     }
 
+    @ExceptionHandler(io.continuum.portal.RequestScope.NotFoundException.class)
+    public ResponseEntity<Map<String, Object>> notFound(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body(e.getMessage(), 404));
+    }
+
     /** Cross-tenant read attempt: the record exists but belongs to someone else. */
     @ExceptionHandler(io.continuum.portal.RequestScope.ForbiddenException.class)
     public ResponseEntity<Map<String, Object>> forbidden(io.continuum.portal.RequestScope.ForbiddenException e) {

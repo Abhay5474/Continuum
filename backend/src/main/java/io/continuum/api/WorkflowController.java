@@ -21,11 +21,14 @@ public class WorkflowController {
     private final WorkflowEngine engine;
     private final WorkflowQueryService query;
     private final Json json;
+    private final io.continuum.declarative.CancellationRollback rollback;
 
-    public WorkflowController(WorkflowEngine engine, WorkflowQueryService query, Json json) {
+    public WorkflowController(WorkflowEngine engine, WorkflowQueryService query, Json json,
+                              io.continuum.declarative.CancellationRollback rollback) {
         this.engine = engine;
         this.query = query;
         this.json = json;
+        this.rollback = rollback;
     }
 
     /**
@@ -94,17 +97,51 @@ public class WorkflowController {
     /**
      * Stops a running workflow. Safe to repeat: a finished workflow is left as
      * it ended, and the answer says how that was.
+     *
+     * <p>A declarative run started with saga rollback on is also undone: a
+     * rollback run is started beside it and its id returned, so the caller can
+     * follow it. Without this, stopping a run halfway left whatever its
+     * completed steps had done — a reservation held, a card charged — in place.
      */
     @PostMapping("/{id}/cancel")
-    public StartWorkflowResponse cancel(@PathVariable String id,
-                                        @RequestBody(required = false) java.util.Map<String, String> body,
-                                        HttpServletRequest http) {
+    public java.util.Map<String, Object> cancel(@PathVariable String id,
+                                                @RequestBody(required = false) java.util.Map<String, String> body,
+                                                HttpServletRequest http) {
         RequestScope.requireOwner(http, query.ownerOf(id));
         String reason = body == null ? null : body.get("reason");
         if (reason != null && reason.length() > 500) {
             reason = reason.substring(0, 500);
         }
-        return new StartWorkflowResponse(id, engine.cancel(id, reason).name());
+        String before = query.find(id).map(WorkflowQueryService.Existing::status).orElse(null);
+        String after = engine.cancel(id, reason).name();
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("workflowId", id);
+        out.put("status", after);
+        if ("RUNNING".equals(before)) {
+            rollback.afterCancel(id, reason == null ? "cancelled" : reason)
+                    .ifPresent(r -> out.put("rollbackWorkflowId", r));
+        }
+        return out;
+    }
+
+    /**
+     * Starts a new run with the same type and input as an earlier one — the
+     * "try again" after a failure or a cancel. The earlier run is untouched; the
+     * new one is ordinary and unrelated in the engine, and says where it came
+     * from only in the response. A declarative run reruns the spec version it
+     * pinned, not whatever the definition says now.
+     */
+    @PostMapping("/{id}/rerun")
+    public java.util.Map<String, Object> rerun(@PathVariable String id, HttpServletRequest http) {
+        RequestScope.requireOwner(http, query.ownerOf(id));
+        WorkflowDetail source = query.detail(id);
+        if ("RUNNING".equals(source.summary().status())) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                    "This run is still going. Stop it first, or wait for it to finish.");
+        }
+        String owner = query.ownerOf(id);
+        String started = engine.startWorkflow(source.summary().workflowType(), query.rawInput(id), null, owner);
+        return java.util.Map.of("workflowId", started, "status", "RUNNING", "rerunOf", id);
     }
 
     @GetMapping("/{id}/events")

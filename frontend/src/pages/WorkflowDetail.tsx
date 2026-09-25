@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Chip } from "../system/hub";
 import type { WorkflowDetail } from "../types";
@@ -46,7 +46,11 @@ export default function WorkflowDetailPage() {
         setErr(null);
         setStale(false);
         api.get<any>(`/api/gateway/healing/workflow/${id}`).then((h) => alive && setHealing(h)).catch(() => {});
-        if (d.summary.status !== "RUNNING") return; // settled: nothing more will happen
+        // Settled once the run has ended and nothing it started is still moving:
+        // a step that was executing when the run was cancelled finishes later,
+        // and stopping at the run's end left it showing RUNNING forever.
+        const moving = d.activities.some((a) => a.status === "RUNNING" || a.status === "PENDING");
+        if (d.summary.status !== "RUNNING" && !moving) return;
       } catch (e: any) {
         if (!alive) return;
         if (e?.status === 404 || e?.name === "ForbiddenError") {
@@ -68,14 +72,45 @@ export default function WorkflowDetailPage() {
     };
   }, [id]);
 
+  // The two halves of a cancelled saga point at each other: the cancelled run
+  // links to the run that undid it, the rollback back to what it undid.
+  const [rollbackId, setRollbackId] = useState<string | null>(null);
+  const cancelledSaga = detail?.summary.workflowType === "Declarative" && isCancelled(detail?.error);
+  useEffect(() => {
+    setRollbackId(null);
+    if (!id || !cancelledSaga) return;
+    api.workflow(`${id}:rollback`).then(() => setRollbackId(`${id}:rollback`)).catch(() => {});
+  }, [id, cancelledSaga]);
+  const rolledBack: string | null =
+    detail?.summary.workflowType === "DeclarativeRollback" ? (detail.input as any)?.cancelledWorkflowId ?? null : null;
+
+  const nav = useNavigate();
+  const [rerunning, setRerunning] = useState(false);
+  const rerun = async () => {
+    if (!id || rerunning) return;
+    setRerunning(true);
+    try {
+      const r = await api.post<{ workflowId: string }>(`/api/workflows/${id}/rerun`);
+      toast("Started again with the same input", "success");
+      nav(`/workflows/${r.workflowId}`);
+    } catch (e: any) {
+      toast(`Could not start it again: ${e?.body?.error ?? e?.message ?? "request failed"}`, "error");
+    } finally {
+      setRerunning(false);
+    }
+  };
+
   const cancel = async () => {
     if (!id || cancelling) return;
     if (!window.confirm("Stop this workflow? Steps already done stay done; anything waiting to run will not run.")) return;
     setCancelling(true);
     try {
-      await api.post(`/api/workflows/${id}/cancel`, { reason: "stopped from the console" });
+      const r = await api.post<{ rollbackWorkflowId?: string }>(`/api/workflows/${id}/cancel`, {
+        reason: "stopped from the console",
+      });
       setDetail(await api.workflow(id));
-      toast("Workflow stopped", "success");
+      if (r.rollbackWorkflowId) setRollbackId(r.rollbackWorkflowId);
+      toast(r.rollbackWorkflowId ? "Stopped — undoing the steps it completed" : "Workflow stopped", "success");
     } catch (e: any) {
       toast(`Could not stop the workflow: ${e?.body?.error ?? e?.message ?? "request failed"}`, "error");
     } finally {
@@ -116,7 +151,7 @@ export default function WorkflowDetailPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Link to="/dashboard" className="text-sm text-slate-400 hover:text-slate-200">
           ← Back
         </Link>
@@ -133,8 +168,14 @@ export default function WorkflowDetailPage() {
         )}
         {!finished && (
           <Button variant="danger" size="sm" busy={cancelling} onClick={cancel} className="ml-auto"
-            title="Stops the run. Finished steps stay finished; waiting steps are withdrawn.">
+            title="Stops the run. Waiting steps are withdrawn; with saga rollback on, completed steps are undone.">
             Stop workflow
+          </Button>
+        )}
+        {finished && (
+          <Button size="sm" busy={rerunning} onClick={rerun} className="ml-auto"
+            title="Starts a new run with the same input. This one is kept as it is.">
+            Run again
           </Button>
         )}
         {healing?.healed && (
@@ -148,6 +189,29 @@ export default function WorkflowDetailPage() {
           </>
         )}
       </div>
+
+      {(rollbackId || rolledBack) && (
+        <div className="-mt-4 flex items-center gap-2 text-[12.5px] text-slate-400">
+          <span aria-hidden>↺</span>
+          {rollbackId ? (
+            <>
+              Its completed steps are being undone in{" "}
+              <Link className="font-medium text-[color:var(--accent-ink)] hover:underline" to={`/workflows/${rollbackId}`}>
+                the rollback run
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              Undoes the steps completed by{" "}
+              <Link className="font-mono text-[color:var(--accent-ink)] hover:underline" to={`/workflows/${rolledBack}`}>
+                {rolledBack}
+              </Link>
+              , which was cancelled.
+            </>
+          )}
+        </div>
+      )}
 
       {healing?.healed && (
         <div className="rounded-lg border border-indigo-500/40 bg-panel p-4 transition-colors duration-300">
@@ -373,7 +437,10 @@ function humanEvent(t: string, payload?: any): string {
 function stepOf(p: any): string | null {
   const authored: unknown = p?.input?.idempotencyKey ?? p?.input?.stepId;
   if (typeof authored === "string" && authored) {
-    return authored.includes(":") ? authored.slice(authored.lastIndexOf(":") + 1) : authored;
+    const step = authored.includes(":") ? authored.slice(authored.lastIndexOf(":") + 1) : authored;
+    // A compensation is signed <workflowId>:compensate:<step>; naming it by the
+    // step alone made a rollback's timeline read as if it re-ran the step.
+    return authored.includes(":compensate:") ? `undo ${step}` : step;
   }
   return null;
 }

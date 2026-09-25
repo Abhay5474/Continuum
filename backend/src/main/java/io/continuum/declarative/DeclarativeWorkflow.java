@@ -169,52 +169,8 @@ public class DeclarativeWorkflow implements Workflow {
         String failedAt = failedLayer.stream().map(WorkflowSpec.Step::getId)
                 .collect(java.util.stream.Collectors.joining(", "));
 
-        SagaPlan.Plan plan = SagaPlan.forFailure(spec, completed, failedAt);
-        if (plan.compensations().isEmpty() && plan.uncompensated().isEmpty()) {
-            return;
-        }
-
-        List<String> undone = new ArrayList<>();
-        List<String> stranded = new ArrayList<>(plan.uncompensated());
-        for (SagaPlan.Compensation c : plan.compensations()) {
-            WorkflowSpec.Call call = c.call();
-            Map<String, String> headers = new LinkedHashMap<>();
-            call.getHeaders().forEach((k, v) ->
-                    headers.put(k, String.valueOf(Templates.resolve(v, scope))));
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("compensating", c.stepId());
-            body.put("workflowId", ctx.workflowId());
-            body.put("reason", failure.getMessage());
-            Object authored = Templates.resolve(call.getBody(), scope);
-            if (authored instanceof Map<?, ?> m) {
-                m.forEach((k, v) -> body.put(String.valueOf(k), v));
-            }
-            try {
-                ctx.executeActivity(HttpStepActivity.TYPE,
-                        new HttpStepActivity.Input(
-                                String.valueOf(Templates.resolve(call.getUrl(), scope)),
-                                call.getMethod(), headers, body, 30,
-                                ctx.workflowId() + ":compensate:" + c.stepId()),
-                        ActivityOptions.defaults().maxAttempts(3).timeoutSeconds(30),
-                        Map.class);
-                undone.add(c.stepId());
-            } catch (ActivityFailedException e) {
-                // Its effect is still out there and now nothing else will remove
-                // it. That belongs in the stranded list, not in a log line.
-                stranded.add(c.stepId() + " (compensation failed)");
-            }
-        }
-
-        boolean complete = stranded.isEmpty();
-        String summary = complete
-                ? undone.size() + " step" + (undone.size() == 1 ? "" : "s") + " rolled back."
-                : undone.size() + " rolled back; " + stranded.size()
-                        + " could not be and their effects remain.";
-        ctx.executeActivity(SagaRecordActivity.TYPE,
-                new SagaRecordActivity.Input(run.developerId(), ctx.workflowId(), run.definition(),
-                        failedAt, undone, stranded, complete, summary),
-                ActivityOptions.defaults().maxAttempts(3).timeoutSeconds(20),
-                Map.class);
+        Compensator.run(ctx, ctx.workflowId(), run.developerId(), run.definition(), spec, scope,
+                completed, failedAt, failure.getMessage(), List.of());
     }
 
     /**

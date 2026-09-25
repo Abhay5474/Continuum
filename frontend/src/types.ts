@@ -5,6 +5,8 @@ export interface WorkflowSummary {
   currentSequence: number;
   createdAt: string;
   updatedAt: string;
+  /** FAILED because someone stopped it, not because it broke. */
+  cancelled?: boolean;
 }
 
 export interface EventView {
@@ -52,6 +54,8 @@ export interface Stats {
   running: number;
   completed: number;
   failed: number;
+  /** Of `failed`, how many were stopped on request. */
+  cancelled?: number;
   outboxDeliveries: number;
   duplicateDeliveries: string[];
 }

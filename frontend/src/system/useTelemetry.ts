@@ -120,7 +120,8 @@ export function useTelemetry(pollMs = 4000): Telemetry {
 
       // ---- runtime ----
       const running = stats?.running ?? 0;
-      const failed = stats?.failed ?? 0;
+      // A run someone stopped on purpose is not a fault to warn about.
+      const failed = Math.max(0, (stats?.failed ?? 0) - (stats?.cancelled ?? 0));
       const completed = stats?.completed ?? 0;
       const runtimeState: StateKey = failed > 0 ? "warning" : running > 0 ? "active" : "healthy";
 

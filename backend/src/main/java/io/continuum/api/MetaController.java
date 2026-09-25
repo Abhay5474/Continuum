@@ -69,18 +69,21 @@ public class MetaController {
     @GetMapping("/stats")
     public StatsView stats(HttpServletRequest http) {
         String dev = RequestScope.developerId(http);
-        long running, completed, failed;
+        long running, completed, failed, cancelled;
+        String prefix = io.continuum.api.WorkflowQueryService.CANCELLED_PREFIX;
         if (dev == null) {
             running = instances.countByStatus(WorkflowStatus.RUNNING);
             completed = instances.countByStatus(WorkflowStatus.COMPLETED);
             failed = instances.countByStatus(WorkflowStatus.FAILED);
+            cancelled = instances.countByStatusAndErrorStartingWith(WorkflowStatus.FAILED, prefix);
         } else {
             running = instances.countByDeveloperIdAndStatus(dev, WorkflowStatus.RUNNING);
             completed = instances.countByDeveloperIdAndStatus(dev, WorkflowStatus.COMPLETED);
             failed = instances.countByDeveloperIdAndStatus(dev, WorkflowStatus.FAILED);
+            cancelled = instances.countByDeveloperIdAndStatusAndErrorStartingWith(dev, WorkflowStatus.FAILED, prefix);
         }
         return new StatsView(running + completed + failed, running, completed, failed,
-                deliveries.totalDeliveries(), deliveries.duplicates());
+                deliveries.totalDeliveries(), deliveries.duplicates(), cancelled);
     }
 
     @GetMapping("/costs")

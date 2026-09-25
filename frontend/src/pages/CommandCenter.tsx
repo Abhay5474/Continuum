@@ -354,7 +354,7 @@ export default function CommandCenter() {
                           className="flex items-center gap-2 px-4 py-1.5 hover:bg-slate-500/[0.055]"
                         >
                           <StateDot
-                            state={w.status === "FAILED" ? "critical" : w.status === "RUNNING" ? "active" : "healthy"}
+                            state={w.cancelled ? "idle" : w.status === "FAILED" ? "critical" : w.status === "RUNNING" ? "active" : "healthy"}
                             size={6}
                           />
                           <span className="truncate text-[11px] text-slate-400">{w.workflowType}</span>

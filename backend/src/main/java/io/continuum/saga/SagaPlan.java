@@ -96,6 +96,11 @@ public final class SagaPlan {
                 gaps.add(id);
                 continue;
             }
+            if (step.getType() == WorkflowSpec.Kind.WAIT) {
+                // A timer changed nothing outside this run, so there is nothing
+                // to undo — listing it as "effects remain" was a false alarm.
+                continue;
+            }
             if (step.getCompensate() == null || step.getCompensate().getUrl() == null
                     || step.getCompensate().getUrl().isBlank()) {
                 gaps.add(id);

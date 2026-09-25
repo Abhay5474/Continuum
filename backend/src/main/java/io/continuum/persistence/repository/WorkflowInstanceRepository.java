@@ -33,4 +33,8 @@ public interface WorkflowInstanceRepository extends JpaRepository<WorkflowInstan
     long countByStatus(WorkflowStatus status);
 
     long countByDeveloperIdAndStatus(String developerId, WorkflowStatus status);
+
+    long countByStatusAndErrorStartingWith(WorkflowStatus status, String prefix);
+
+    long countByDeveloperIdAndStatusAndErrorStartingWith(String developerId, WorkflowStatus status, String prefix);
 }

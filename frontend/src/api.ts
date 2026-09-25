@@ -725,8 +725,18 @@ export const portal = {
   setPlan: (plan: string) => portalHttp<any>("/api/portal/developer/billing/plan", "PUT", { plan }),
 
   // --- Account & settings ---
-  changePassword: (currentPassword: string, newPassword: string) =>
-    portalHttp<any>("/api/portal/developer/account/password", "POST", { currentPassword, newPassword }),
+  /** Ends every other session; this device carries on with the fresh one returned. */
+  async changePassword(currentPassword: string, newPassword: string) {
+    const r = await portalHttp<any>("/api/portal/developer/account/password", "POST", { currentPassword, newPassword });
+    if (r?.sessionToken) portal.setSession(r.sessionToken);
+    return r;
+  },
+  /** "Sign out everywhere else": every session except a fresh one for this device ends. */
+  async signOutElsewhere() {
+    const r = await portalHttp<any>("/api/portal/developer/account/sessions/revoke", "POST");
+    if (r?.sessionToken) portal.setSession(r.sessionToken);
+    return r;
+  },
   changeEmail: (email: string) => portalHttp<any>("/api/portal/developer/account/email", "PUT", { email }),
   deleteAccount: () => portalHttp<any>("/api/portal/developer/account", "DELETE"),
   invites: () => portalHttp<any[]>("/api/portal/developer/account/invites", "GET"),

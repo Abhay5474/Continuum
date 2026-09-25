@@ -225,8 +225,8 @@ export default function WorkflowBuilder() {
             state={latest.length > 0 ? "healthy" : "idle"} />
           <Readout label="Runs" value={runs.length} size="sm"
             state={runs.length > 0 ? "active" : "idle"} />
-          <Readout label="Failed" value={runs.filter((r) => r.status === "FAILED").length} size="sm"
-            state={runs.some((r) => r.status === "FAILED") ? "critical" : "idle"} />
+          <Readout label="Failed" value={runs.filter((r) => r.status === "FAILED" && !r.cancelled).length} size="sm"
+            state={runs.some((r) => r.status === "FAILED" && !r.cancelled) ? "critical" : "idle"} />
           <Readout label="Median run" value={medianDuration} size="sm"
             state={medianDuration === "—" ? "idle" : "healthy"} />
         </div>
@@ -436,7 +436,7 @@ export default function WorkflowBuilder() {
                 </div>
                 {runs.map((r: any) => {
                   const st: StateKey =
-                    r.status === "FAILED" ? "critical" : r.status === "RUNNING" ? "active" : "healthy";
+                    r.cancelled ? "idle" : r.status === "FAILED" ? "critical" : r.status === "RUNNING" ? "active" : "healthy";
                   const f = facts[r.workflowId];
                   return (
                     <Link
