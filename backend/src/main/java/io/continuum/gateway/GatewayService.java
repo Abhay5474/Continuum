@@ -254,6 +254,36 @@ public class GatewayService {
         }
     }
 
+    /**
+     * Records a context stage in the trail — only when it changed the prompt,
+     * so an untouched request does not carry five "nothing happened" lines —
+     * with the token count before and after: what the stage cost or saved.
+     */
+    private static void contextStep(io.continuum.provenance.ProvenanceService.Recording prov,
+                                    io.continuum.provenance.Decision.Stage stage, String choice,
+                                    LlmRequest before, LlmRequest after, String what) {
+        if (prov == null || before == after || before == null || after == null
+                || java.util.Objects.equals(before.messages(), after.messages())) {
+            return;
+        }
+        int in = tokensOf(before);
+        int out = tokensOf(after);
+        int d = Math.abs(in - out);
+        String delta = in == out ? "same size"
+                : d + (out < in ? " fewer" : " more") + (d == 1 ? " token" : " tokens");
+        prov.add(stage, choice, what + " (" + in + " → " + out + " tokens, " + delta + ")");
+    }
+
+    private static int tokensOf(LlmRequest r) {
+        int n = 0;
+        if (r.messages() != null) {
+            for (var m : r.messages()) {
+                n += io.continuum.compression.PromptCompressor.estimateTokens(m.content());
+            }
+        }
+        return n;
+    }
+
     /** Tokens the caller sent us, before Continuum shrinks anything. */
     private static int promptTokensOf(GatewayDtos.ChatRequest req) {
         if (req == null || req.messages() == null) {
@@ -285,10 +315,20 @@ public class GatewayService {
         }
         long started = System.nanoTime();
         LlmRequest canonical = normalizer.normalize(req);
+        // Provenance: null unless the tenant turned it on. Opened here, before
+        // anything touches the prompt, so the trail says what happened to the
+        // context — redacted, transformed, paged, compressed, served from
+        // cache — and not only which model answered. Those stages always ran;
+        // the trail used to start after them.
+        io.continuum.provenance.ProvenanceService.Recording prov = provenance.start(developerId);
+        LlmRequest before = canonical;
         // V8 Prompt Firewall (opt-in, OFF by default): redact PII and block
         // prompt-injection BEFORE anything else touches the prompt. Pass-through
         // when off. A blocked request throws (mapped to a clean 4xx upstream).
         canonical = firewall.guardInbound(developerId, canonical);
+        contextStep(prov, io.continuum.provenance.Decision.Stage.FIREWALL, "redacted", before, canonical,
+                "sensitive content was masked before any other stage saw the prompt");
+        before = canonical;
 
         // The context layer (opt-in, OFF by default): a spreadsheet, log or
         // email thread pasted into a message becomes its canonical form before
@@ -302,6 +342,8 @@ public class GatewayService {
         // the key is taken from the text below, which is now the canonical
         // form rather than whatever formatting each of them happened to use.
         canonical = promptContext.maybeTransform(developerId, canonical);
+        contextStep(prov, io.continuum.provenance.Decision.Stage.CONTEXT, "transformed", before, canonical,
+                "a pasted table, log or thread was rewritten into its canonical form");
 
         // Semantic cache (opt-in, OFF by default): if this question has already
         // been answered, return that answer instead of paying a provider for it
@@ -312,13 +354,23 @@ public class GatewayService {
         if (semanticCache.enabledFor(developerId)) {
             var hit = semanticCache.lookup(developerId, cacheKey, req.model());
             metrics.cache(hit.isPresent());
+            if (prov != null) {
+                prov.add(io.continuum.provenance.Decision.Stage.CACHE, hit.isPresent() ? "hit" : "miss",
+                        hit.map(h -> String.format("%s match, similarity %.2f — no provider was called",
+                                h.exact() ? "exact" : "near", h.similarity()))
+                                .orElse("no earlier answer close enough; the request goes to a model"));
+            }
             if (hit.isPresent()) {
                 var h = hit.get();
                 long cachedMs = (System.nanoTime() - started) / 1_000_000;
+                if (prov != null) {
+                    prov.commit();
+                }
                 // Logged like any other request, with zero cost, so usage and
                 // spend reporting stay truthful about what the cache avoided.
                 logged(new GatewayRequestLogEntity(developerId, req.model(), h.provider(),
-                        h.model(), 0, "semantic-cache", cachedMs, 0, 0, true, 0));
+                        h.model(), 0, "semantic-cache", cachedMs, 0, 0, true, 0)
+                        .withTraceId(prov == null ? null : prov.requestId()));
                 return new GatewayDtos.ChatResponse(h.response(), h.provider(), h.model(),
                         cachedMs, 0, 0, 0,
                         String.format("served from semantic cache (%s match, similarity %.2f)",
@@ -332,12 +384,18 @@ public class GatewayService {
         // open() returns null unless the developer enabled it — null ⇒ the full
         // prompt array below is exactly what it always was.
         io.continuum.mmu.ContextMMU.MmuSession mmuSession = contextMmu.open(developerId, canonical);
+        before = canonical;
         if (mmuSession != null) {
             canonical = mmuSession.request();
+            contextStep(prov, io.continuum.provenance.Decision.Stage.CONTEXT, "paged", before, canonical,
+                    "older turns were paged out to semantic stubs and fault back in if referenced");
         }
+        before = canonical;
         // V8 Prompt Compression (opt-in, OFF by default): shrink context tokens.
         // Pass-through when off; runs after paging so it compresses the final context.
         canonical = compression.maybeCompress(developerId, canonical);
+        contextStep(prov, io.continuum.provenance.Decision.Stage.CONTEXT, "compressed", before, canonical,
+                "low-information tokens were dropped from the final context");
         double complexity = complexityEstimator.estimate(canonical).complexity();
         boolean requireVision = Boolean.TRUE.equals(req.requireVision());
         RoutingMode mode = parseMode(req.routingMode());
@@ -438,7 +496,6 @@ public class GatewayService {
 
         // Provenance: the same facts the routing reason concatenates, as data.
         // Null unless the tenant turned it on.
-        io.continuum.provenance.ProvenanceService.Recording prov = provenance.start(developerId);
         if (prov != null) {
             prov.add(io.continuum.provenance.Decision.Stage.COMPLEXITY,
                     String.format("%.2f", complexity),
