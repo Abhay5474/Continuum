@@ -64,4 +64,40 @@ class PortalSessionServiceTest {
         assertTrue(new PortalSessionService("sess-key", "a-private-master").verify(viaSession).isPresent());
         assertTrue(new PortalSessionService("sess-key", "a-private-master").verify(viaMaster).isEmpty());
     }
+
+    /**
+     * A session ends early when the account moves its cut-off forward — the
+     * password changed, or "sign out everywhere else" — or when the account is
+     * gone. A session issued at the cut-off, the one handed back to the device
+     * that asked, survives it.
+     */
+    @Test
+    void revokedSessionsAreRefused() {
+        var repo = org.mockito.Mockito.mock(io.continuum.persistence.repository.DeveloperAuthRepository.class);
+        var row = new io.continuum.persistence.entity.DeveloperAuthEntity("dev_1", "hash");
+        org.mockito.Mockito.when(repo.findById("dev_1")).thenReturn(java.util.Optional.of(row));
+        org.mockito.Mockito.when(repo.findById("gone")).thenReturn(java.util.Optional.empty());
+        var revocations = new SessionRevocations(repo);
+        PortalSessionService s = new PortalSessionService("k");
+        s.setRevocations(revocations);
+
+        String before = s.issue("dev_1", PortalSessionService.Role.DEVELOPER);
+        assertTrue(s.verify(before).isPresent());
+
+        java.time.Instant cutoff = revocations.revokeAll("dev_1");
+        assertTrue(s.verify(before).isEmpty(), "issued before the cut-off");
+        assertTrue(s.verify(s.issue("dev_1", PortalSessionService.Role.DEVELOPER, cutoff)).isPresent(),
+                "the replacement issued at the cut-off");
+
+        // A second revocation straight after the first ends the first one's
+        // replacement, even inside the same second.
+        String replacement = s.issue("dev_1", PortalSessionService.Role.DEVELOPER, cutoff);
+        java.time.Instant second = revocations.revokeAll("dev_1");
+        assertTrue(second.isAfter(cutoff));
+        assertTrue(s.verify(replacement).isEmpty(), "replacement from the earlier revocation");
+
+        assertTrue(s.verify(s.issue("gone", PortalSessionService.Role.DEVELOPER)).isEmpty(), "deleted account");
+        assertTrue(s.verify(s.issue("operator", PortalSessionService.Role.OPERATOR)).isPresent(),
+                "operators are not tied to a developer row");
+    }
 }

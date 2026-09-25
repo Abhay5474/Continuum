@@ -42,7 +42,7 @@ public class DagTraceController {
         if (run instanceof DagRunEntity r) {
             RequestScope.requireOwner(req, r.getDeveloperId());
         } else if (!RequestScope.isOperator(req)) {
-            throw new RequestScope.ForbiddenException();
+            throw new RequestScope.NotFoundException();
         }
         return trace;
     }

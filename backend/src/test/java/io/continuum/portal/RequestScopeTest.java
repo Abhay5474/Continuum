@@ -54,14 +54,14 @@ class RequestScopeTest {
     @Test
     void developerMayNotReadAnotherTenantsRecord() {
         assertThatThrownBy(() -> RequestScope.requireOwner(asDeveloper("dev_a"), "dev_b"))
-                .isInstanceOf(RequestScope.ForbiddenException.class);
+                .isInstanceOf(RequestScope.NotFoundException.class);
     }
 
     @Test
     void developerMayNotReadAnUnownedSystemRecord() {
         // A null owner is a system/legacy row — operator-only, never tenant-readable.
         assertThatThrownBy(() -> RequestScope.requireOwner(asDeveloper("dev_a"), null))
-                .isInstanceOf(RequestScope.ForbiddenException.class);
+                .isInstanceOf(RequestScope.NotFoundException.class);
     }
 
     @Test
@@ -73,6 +73,6 @@ class RequestScopeTest {
     @Test
     void anonymousMayNotReadAnything() {
         assertThatThrownBy(() -> RequestScope.requireOwner(new MockHttpServletRequest(), "dev_a"))
-                .isInstanceOf(RequestScope.ForbiddenException.class);
+                .isInstanceOf(RequestScope.NotFoundException.class);
     }
 }

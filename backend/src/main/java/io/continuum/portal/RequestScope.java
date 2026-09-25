@@ -53,7 +53,17 @@ public final class RequestScope {
         }
         String caller = developerId(request);
         if (caller == null || ownerId == null || !caller.equals(ownerId)) {
-            throw new ForbiddenException();
+            // Answered exactly as a record that does not exist, so an id cannot
+            // be probed for; and "belongs to another account" was wrong anyway
+            // for the far commoner case of a mistyped or stale link.
+            throw new NotFoundException();
+        }
+    }
+
+    /** A tenant-owned record the caller cannot see — missing, or someone else's. */
+    public static class NotFoundException extends RuntimeException {
+        public NotFoundException() {
+            super("Not found in this account.");
         }
     }
 

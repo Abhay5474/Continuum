@@ -73,8 +73,25 @@ public class PortalSessionService {
         return Base64.getEncoder().encodeToString(random);
     }
 
+    /** Ended-early sessions; absent in unit tests that only exercise signing. */
+    private SessionRevocations revocations;
+
+    @Autowired(required = false)
+    void setRevocations(SessionRevocations revocations) {
+        this.revocations = revocations;
+    }
+
     public String issue(String subject, Role role) {
-        long expiry = Instant.now().getEpochSecond() + DEFAULT_TTL_SECONDS;
+        return issue(subject, role, Instant.now());
+    }
+
+    /**
+     * A session counted as issued at {@code issuedAt}. The issue time is not in
+     * the token; it is its expiry less the fixed lifetime, which is what lets
+     * revocation work without changing the token format.
+     */
+    public String issue(String subject, Role role, Instant issuedAt) {
+        long expiry = issuedAt.getEpochSecond() + DEFAULT_TTL_SECONDS;
         String payload = role.name() + ":" + subject + ":" + expiry;
         String p = b64(payload.getBytes(StandardCharsets.UTF_8));
         return p + "." + b64(hmac(p));
@@ -107,7 +124,12 @@ public class PortalSessionService {
         if (Instant.now().getEpochSecond() > expiry) {
             return Optional.empty(); // expired
         }
-        return Optional.of(new Session(f[1], Role.valueOf(f[0]), expiry));
+        Role role = Role.valueOf(f[0]);
+        if (role == Role.DEVELOPER && revocations != null
+                && revocations.revoked(f[1], expiry - DEFAULT_TTL_SECONDS)) {
+            return Optional.empty(); // signed out everywhere, password changed, or account deleted
+        }
+        return Optional.of(new Session(f[1], role, expiry));
     }
 
     private byte[] hmac(String data) {

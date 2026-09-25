@@ -19,20 +19,38 @@ public class AccountController {
 
     private final AccountService account;
     private final PortalSessionService sessions;
+    private final io.continuum.portal.SessionRevocations revocations;
 
-    public AccountController(AccountService account, PortalSessionService sessions) {
+    public AccountController(AccountService account, PortalSessionService sessions,
+                             io.continuum.portal.SessionRevocations revocations) {
         this.account = account;
         this.sessions = sessions;
+        this.revocations = revocations;
     }
 
     private String dev(HttpServletRequest req) {
         return (String) req.getAttribute(PortalAuthFilter.DEVELOPER_ID_ATTRIBUTE);
     }
 
+    /**
+     * Changes the password and ends every other session. The caller gets a fresh
+     * session in the response, so the device that made the change stays signed in.
+     */
     @PostMapping("/password")
     public Map<String, Object> changePassword(HttpServletRequest req, @RequestBody PasswordRequest body) {
         account.changePassword(dev(req), body.currentPassword(), body.newPassword());
-        return Map.of("ok", true);
+        return Map.of("ok", true, "sessionToken", renew(dev(req)), "otherSessionsEnded", true);
+    }
+
+    /** "Sign out everywhere else": every session but a fresh one for this device ends. */
+    @PostMapping("/sessions/revoke")
+    public Map<String, Object> signOutElsewhere(HttpServletRequest req) {
+        return Map.of("ok", true, "sessionToken", renew(dev(req)));
+    }
+
+    private String renew(String developerId) {
+        java.time.Instant cutoff = revocations.revokeAll(developerId);
+        return sessions.issue(developerId, io.continuum.portal.PortalSessionService.Role.DEVELOPER, cutoff);
     }
 
     @PutMapping("/email")
@@ -44,6 +62,7 @@ public class AccountController {
     @DeleteMapping
     public Map<String, Object> deleteAccount(HttpServletRequest req) {
         account.deleteAccount(dev(req));
+        revocations.forget(dev(req)); // its sessions end with it
         return Map.of("ok", true, "deleted", true);
     }
 

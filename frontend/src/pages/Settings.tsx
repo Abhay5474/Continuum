@@ -58,11 +58,21 @@ export default function Settings() {
     setPwBusy(true);
     try {
       await portal.changePassword(curPw, newPw);
-      toast("Password updated ✓", "success");
+      toast("Password updated. You have been signed out everywhere else.", "success");
       setCurPw(""); setNewPw("");
     } catch (e: any) {
       toast(e?.message ?? "Could not change password", "error");
     } finally { setPwBusy(false); }
+  };
+  const [elsewhereBusy, setElsewhereBusy] = useState(false);
+  const signOutElsewhere = async () => {
+    setElsewhereBusy(true);
+    try {
+      await portal.signOutElsewhere();
+      toast("Signed out of every other browser and device", "success");
+    } catch (e: any) {
+      toast(e?.message ?? "Could not sign out other sessions", "error");
+    } finally { setElsewhereBusy(false); }
   };
   const changeEmail = async () => {
     setEmailBusy(true);
@@ -208,13 +218,26 @@ export default function Settings() {
       <Section title="Change password">
         <div className="grid gap-2 sm:grid-cols-2">
           <input type="password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder="Current password"
-            className="field" />
+            aria-label="Current password" autoComplete="current-password" className="field" />
           <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password (min 6)"
-            className="field" />
+            aria-label="New password" autoComplete="new-password" minLength={6} className="field" />
         </div>
         <button onClick={changePassword} disabled={pwBusy || !curPw || !newPw}
           className="mt-3 flex items-center gap-2 rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
           {pwBusy && <Spinner />} Update password
+        </button>
+        <p className="mt-2 text-xs text-slate-500">Changing it signs you out everywhere else — useful if you think it leaked.</p>
+      </Section>
+
+      {/* sessions */}
+      <Section title="Sessions">
+        <p className="text-sm text-slate-400">
+          Signed in on a shared or lost computer? End every session except this one. Each one lasts up to twelve hours
+          otherwise.
+        </p>
+        <button onClick={signOutElsewhere} disabled={elsewhereBusy}
+          className="mt-3 flex items-center gap-2 rounded-lg border border-edge px-4 py-2 text-sm font-medium text-slate-200 hover:border-slate-500/60 disabled:opacity-50">
+          {elsewhereBusy && <Spinner />} Sign out everywhere else
         </button>
       </Section>
 
@@ -222,7 +245,7 @@ export default function Settings() {
       <Section title="Change email">
         <div className="flex flex-wrap gap-2">
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
-            className="min-w-0 flex-1 field" />
+            aria-label="New email" type="email" autoComplete="email" className="min-w-0 flex-1 field" />
           <button onClick={changeEmail} disabled={emailBusy || !email}
             className="flex items-center gap-2 rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
             {emailBusy && <Spinner />} Save

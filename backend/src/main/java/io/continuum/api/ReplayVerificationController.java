@@ -44,7 +44,7 @@ public class ReplayVerificationController {
                 .map(w -> w.getDeveloperId())
                 // A workflow that does not exist and one belonging to someone else
                 // answer identically, so this cannot be used to probe for ids.
-                .orElseThrow(RequestScope.ForbiddenException::new);
+                .orElseThrow(RequestScope.NotFoundException::new);
         RequestScope.requireOwner(req, owner);
     }
 

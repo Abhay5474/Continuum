@@ -19,6 +19,18 @@ public class DeveloperAuthEntity {
     @Column(name = "password_hash", nullable = false, length = 256)
     private String passwordHash;
 
+    /** Sessions issued before this are refused; null means none have been revoked. */
+    @Column(name = "sessions_valid_after")
+    private java.time.Instant sessionsValidAfter;
+
+    public java.time.Instant getSessionsValidAfter() {
+        return sessionsValidAfter;
+    }
+
+    public void setSessionsValidAfter(java.time.Instant sessionsValidAfter) {
+        this.sessionsValidAfter = sessionsValidAfter;
+    }
+
     /**
      * When true (default), the gateway prefers this developer's own provider keys
      * and falls back to the platform/mock only if they fail. When false, requests

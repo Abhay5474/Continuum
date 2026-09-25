@@ -71,6 +71,8 @@ public class AccountService {
         a.setPasswordHash(passwordHasher.hash(newPassword));
         auth.save(a);
         log.info("Password changed for developer {}", developerId);
+        // A password change is often a response to a leak, so it ends every
+        // other session too; the controller hands this device a fresh one.
     }
 
     @Transactional
@@ -197,9 +199,9 @@ public class AccountService {
     @Transactional
     public void revokeInvite(String developerId, long inviteId) {
         TeamInviteEntity invite = invites.findById(inviteId)
-                .orElseThrow(() -> new IllegalArgumentException("No such invite"));
+                .orElseThrow(RequestScope.NotFoundException::new);
         if (!invite.getDeveloperId().equals(developerId)) {
-            throw new RequestScope.ForbiddenException();
+            throw new RequestScope.NotFoundException();
         }
         invite.setRevoked(true);
         invites.save(invite);

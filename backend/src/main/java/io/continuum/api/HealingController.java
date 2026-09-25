@@ -37,7 +37,7 @@ public class HealingController {
     private void requireOwnership(HttpServletRequest req, String workflowId) {
         String owner = instances.findById(workflowId)
                 .map(w -> w.getDeveloperId())
-                .orElseThrow(RequestScope.ForbiddenException::new);
+                .orElseThrow(RequestScope.NotFoundException::new);
         RequestScope.requireOwner(req, owner);
     }
 
