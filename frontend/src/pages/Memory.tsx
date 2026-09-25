@@ -34,7 +34,7 @@ export default function Memory() {
       <PageHeader
         glyph="layers"
         title="Memory"
-        subtitle="Working, episodic, long-term and archived — held outside the context window and retrieved by relevance, recency and salience."
+        subtitle="Four memory tiers, retrieved by relevance"
       />
 
       <div className="plane flex flex-wrap items-center gap-2 p-4">
@@ -119,7 +119,7 @@ export default function Memory() {
             <div className="px-4 pb-4">
               <Empty
                 title="Nothing stored in this scope"
-                hint="Load a scope above, or store a memory to see it appear here."
+                hint="Load a scope or store a memory."
               />
             </div>
           )}

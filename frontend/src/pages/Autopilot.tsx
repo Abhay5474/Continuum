@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { PageHeader } from "../system/primitives";
+import { PageHeader, Note } from "../system/primitives";
 import { Card, CardHead, Grid, type GlyphName, type Tone } from "../system/hub";
 
 /**
@@ -41,10 +41,10 @@ export default function Autopilot() {
       <div className="mx-auto max-w-lg rounded-lg border border-edge bg-panel p-6 text-center">
         <div className="text-2xl">🧭</div>
         <h1 className="mt-2 text-[22px] font-semibold tracking-tight">Autopilot</h1>
-        <p className="mt-1 text-sm text-slate-400 max-w-2xl leading-relaxed">
+        <Note className="mt-1">
           Sign in on the <a href="/portal" className="text-indigo-400 underline">Developer Portal</a> to
           set up Autopilot for your application.
-        </p>
+        </Note>
       </div>
     );
   }
@@ -72,7 +72,7 @@ export default function Autopilot() {
         glyph="spark"
         tone="accent"
         title="Optimization"
-        subtitle="Learns the best routing from your own traffic, and only changes what it can prove is better"
+        subtitle="Routing tuned from your traffic, proven before kept"
         aside={
           <div className="flex items-center gap-3">
           <span className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
@@ -231,28 +231,30 @@ export default function Autopilot() {
 }
 
 function Explainer() {
-  const items: [GlyphName, Tone, string, string][] = [
-    ["spark", "accent", "Learns from your traffic", "Which provider and model actually performs best for the requests you send, rather than a static preference."],
-    ["check", "ok", "Proves before it promotes", "A change runs on a slice of traffic first and is kept only if it measures better. Otherwise it is rolled back."],
-    ["coin", "info", "Spends within your budget", "Hedging and timeouts are tuned against your cost and latency targets, not maximised blindly."],
-    ["route", "mute", "Reversible at any point", "Turning it off restores standard behaviour immediately, and every decision it made stays on the record."],
+  const items: [GlyphName, Tone, string, string, string][] = [
+    ["spark", "accent", "Learns from your traffic", "Which provider and model actually performs best for the requests you send, rather than a static preference.", "best model per request"],
+    ["check", "ok", "Proves before it promotes", "A change runs on a slice of traffic first and is kept only if it measures better. Otherwise it is rolled back.", "canary first, kept if better"],
+    ["coin", "info", "Spends within your budget", "Hedging and timeouts are tuned against your cost and latency targets, not maximised blindly.", "within cost and latency targets"],
+    ["route", "mute", "Reversible at any point", "Turning it off restores standard behaviour immediately, and every decision it made stays on the record.", "one switch back, full record"],
   ];
   return (
     <div>
       <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What optimization does</h2>
       <div className="mt-4">
         <Grid cols={2}>
-          {items.map(([glyph, tone, title, body]) => (
-            <Card key={title}>
-              <CardHead glyph={glyph} tone={tone} title={title} />
-              <p className="mt-2.5 text-xs leading-relaxed text-slate-500">{body}</p>
-            </Card>
+          {/* Four tiles, a phrase each. The sentence behind each is on hover. */}
+          {items.map(([glyph, tone, title, body, short]) => (
+            <div key={title} data-tip={body}>
+              <Card>
+                <CardHead glyph={glyph} tone={tone} title={title} sub={short} />
+              </Card>
+            </div>
           ))}
         </Grid>
       </div>
-      <p className="mt-5 border-t border-edge/70 pt-4 text-xs text-slate-500 max-w-2xl leading-relaxed">
+      <Note className="mt-5">
         Off by default. While it is off your app behaves exactly as it does today.
-      </p>
+      </Note>
     </div>
   );
 }

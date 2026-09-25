@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { STATE, type StateKey } from "./tokens";
 import { motion, projectedRest, rubberband, useDrag, useSpring, useSpringPaint } from "./physics";
 import { CountUp } from "./motion";
@@ -35,6 +35,82 @@ export function Micro({ children, className = "" }: { children: ReactNode; class
  * page, and a one-line subtitle running the full width of a 1400px console is a
  * line nobody reaches the end of.
  */
+/**
+ * An explanation, one hover or focus away.
+ *
+ * <p>The console used to print these as paragraphs under every control — "Off
+ * by default. Rollback issues real calls to real systems, so…" — which put a
+ * wall of grey sentences between the reader and the numbers. The sentence is
+ * still there for whoever wants it; it no longer stands in the way of whoever
+ * does not. The guide carries the longer story.
+ */
+export function InfoTip({ text, className = "" }: { text: string; className?: string }) {
+  return (
+    <button
+      type="button"
+      data-tip={text}
+      aria-label={text}
+      data-no-press
+      onClick={(e) => e.stopPropagation()}
+      className={`ml-0.5 inline-grid h-4 w-4 shrink-0 place-items-center rounded-full align-middle text-slate-500 transition-colors hover:bg-slate-500/10 hover:text-slate-300 focus:outline-none focus-visible:shadow-[var(--ring)] ${className}`}
+    >
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
+           strokeLinecap="round" aria-hidden>
+        <circle cx="8" cy="8" r="6.2" />
+        <path d="M8 7.3v3.6M8 5.2v.1" />
+      </svg>
+    </button>
+  );
+}
+
+/**
+ * A side remark: one quiet line, the rest a click away.
+ *
+ * <p>What used to be a grey paragraph under a control. Collapsed it is a single
+ * truncated line behind an ⓘ — enough to know a remark is there and what it is
+ * about; the full text is on hover, and a click unfolds it in place. So a page
+ * scans as controls and figures, and the explanation is still one gesture off
+ * for whoever needs it.
+ */
+export function Note({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const [full, setFull] = useState<string | undefined>(undefined);
+  useEffect(() => setFull(ref.current?.textContent ?? undefined), [children]);
+  return (
+    <p className={`flex max-w-md items-start gap-1.5 text-[11.5px] text-slate-500 ${className}`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={open ? "Hide note" : "Show note"}
+        onClick={() => setOpen((o) => !o)}
+        data-no-press
+        className="mt-[1px] grid h-4 w-4 shrink-0 place-items-center rounded-full text-slate-500 hover:bg-slate-500/10 hover:text-slate-300 focus:outline-none focus-visible:shadow-[var(--ring)]"
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
+             strokeLinecap="round" aria-hidden>
+          <circle cx="8" cy="8" r="6.2" />
+          <path d="M8 7.3v3.6M8 5.2v.1" />
+        </svg>
+      </button>
+      <span
+        ref={ref}
+        onClick={() => setOpen(true)}
+        title={open ? undefined : full}
+        className={open ? "leading-relaxed" : "min-w-0 cursor-pointer truncate"}
+      >
+        {children}
+      </span>
+    </p>
+  );
+}
+
+/** The first sentence of a string: what a subtitle can afford to say. */
+export function firstSentence(text: string): string {
+  const m = text.match(/^.+?[.!?](?=\s|$)/);
+  return (m ? m[0] : text).trim();
+}
+
 export function PageHeader({
   title,
   subtitle,
@@ -64,8 +140,14 @@ export function PageHeader({
           <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">{title}</h1>
           {badge}
         </div>
+        {/* One line: what the page is for. Anything longer is the guide's. */}
         {subtitle && (
-          <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-slate-500">{subtitle}</p>
+          <p
+            className="mt-1 max-w-2xl truncate text-[13px] text-slate-500"
+            title={typeof subtitle === "string" ? subtitle : undefined}
+          >
+            {typeof subtitle === "string" ? firstSentence(subtitle) : subtitle}
+          </p>
         )}
       </div>
       {aside && <div className="flex flex-wrap items-center gap-x-5 gap-y-3">{aside}</div>}
@@ -286,13 +368,14 @@ export function Switch({
   // feature on for the whole account is the most consequential control on most
   // of these screens, and floating it in the margin made it read like a caption.
   return (
-    <div className="plane flex min-w-0 items-start gap-3 p-4">
+    <div className="plane flex min-w-0 items-center gap-3 px-4 py-3">
       <SwitchThumb checked={checked} disabled={disabled} label={label} onChange={onChange} />
       <div className="min-w-0">
-        <div className="text-sm font-medium text-slate-200">{label}</div>
-        {/* Capped, because a hint set to the full width of a 1400px console is
-            a line length nobody reads to the end of. */}
-        {hint && <p className="mt-0.5 max-w-2xl text-xs leading-relaxed text-slate-500">{hint}</p>}
+        <div className="flex items-center gap-1.5 text-sm font-medium text-slate-200">
+          {label}
+          {/* The switch says whether; the tip says why. */}
+          {hint && <InfoTip text={hint} />}
+        </div>
         {locked && (
           <p className="mt-1 text-xs text-amber-400/90">
             {locked}

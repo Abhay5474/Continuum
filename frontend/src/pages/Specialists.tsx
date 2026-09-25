@@ -24,6 +24,7 @@ import {
   Section,
   SidePanel,
   kindOf,
+  Pill,
 } from "../system/hub";
 import { Select } from "../system/controls";
 
@@ -290,7 +291,7 @@ export default function Specialists() {
         glyph="layers"
         tone="accent"
         title="Specialists"
-        subtitle="A purpose-built model runs before the language model, and hands it evidence instead of a raw file"
+        subtitle="Purpose-built models that turn files into evidence"
       />
 
       <div className="mt-6" data-guide="specialists-search">
@@ -317,7 +318,7 @@ export default function Specialists() {
           ) : matchedInstalled.length === 0 ? (
             <Empty
               title="Nothing running yet"
-              hint="Search above for a capability — reading a scan, transcribing a recording, detecting objects — and add it with your own provider key."
+              hint="Search for a capability and add it with your key."
             />
           ) : (
             <Rail>
@@ -421,47 +422,46 @@ export default function Specialists() {
                     <span className="readout text-[10.5px] text-slate-700">{rows.length}</span>
                   </div>
                 )}
-                <Rail>
-          {rows.map((e) => {
-              const kind = kindOf(e.toolKind || e.toolKindLabel);
-              const reason = matchReason(e, q);
-              const live = e.tags?.includes("live");
-              const free = e.tags?.includes("free");
-              return (
-                <Row
-                  key={e.id}
-                  selected={sel?.kind === "catalogue" && sel.id === e.id}
-                  onClick={() => setSel({ kind: "catalogue", id: e.id })}
-                  mark={<KindMark kind={kind} />}
-                  title={e.title}
-                  status={
-                    live ? (
-                      <Dot tone="busy" label="live from provider" />
-                    ) : free ? (
-                      <Dot tone="ok" label="free tier" />
-                    ) : undefined
-                  }
-                  subtitle={`${INPUT_LABEL[e.inputKind] ?? e.inputKind} → ${OUTPUT_OF[kind] ?? "a result"}`}
-                  meta={
-                    reason ? (
-                      <Because reason={reason} />
-                    ) : (
-                      <Facts
-                        items={[
-                          { k: "via", v: e.provider },
-                          {
-                            k: "needs",
-                            v: e.needs.includes("baseUrl") ? "your endpoint + key" : "your API key",
-                          },
-                        ]}
-                      />
-                    )
-                  }
-                  actions={<Ghost tone="accent">Inspect</Ghost>}
-                />
-              );
-            })}
-                </Rail>
+                {/* Tiles, not rows: a catalogue is browsed, and a grid of
+                    small cards is scanned in a glance where sixteen three-line
+                    rows read as a directory listing. */}
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {rows.map((e) => {
+                    const kind = kindOf(e.toolKind || e.toolKindLabel);
+                    const reason = matchReason(e, q);
+                    const live = e.tags?.includes("live");
+                    const free = e.tags?.includes("free");
+                    const selected = sel?.kind === "catalogue" && sel.id === e.id;
+                    return (
+                      <button
+                        key={e.id}
+                        type="button"
+                        data-surface=""
+                        aria-pressed={selected}
+                        onClick={() => setSel({ kind: "catalogue", id: e.id })}
+                        className="relative flex min-w-0 items-start gap-3 rounded-[var(--r-lg)] border bg-card p-3.5 text-left shadow-card"
+                        style={{ borderColor: selected ? "var(--accent-edge)" : "rgb(var(--card-edge))" }}
+                      >
+                        <KindMark kind={kind} size={30} />
+                        <span className="min-w-0 flex-1">
+                          <span className="line-clamp-2 text-[13px] font-medium leading-snug text-slate-100">
+                            {e.title}
+                          </span>
+                          <span className="mt-1 block truncate text-[11.5px] text-slate-500">
+                            {INPUT_LABEL[e.inputKind] ?? e.inputKind} → {OUTPUT_OF[kind] ?? "a result"}
+                          </span>
+                          <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <Pill tone="mute">{e.provider}</Pill>
+                            {free && <Pill tone="ok" dot>free tier</Pill>}
+                            {live && <Pill tone="info" dot>live</Pill>}
+                            {e.needs.includes("baseUrl") && <Pill tone="mute">your endpoint</Pill>}
+                          </span>
+                          {reason && <span className="mt-1.5 block"><Because reason={reason} /></span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>
@@ -491,7 +491,7 @@ export default function Specialists() {
                         : src && !src.available && src.reason
                           ? src.reason
                           : `${conn.name} · takes ${p.inputKinds.join(", ")}`
-                      : `Connect to use ${label} models with your own key`
+                      : `takes ${p.inputKinds.join(" · ")}`
                   }
                   action={
                     conn?.hasCredential ? (

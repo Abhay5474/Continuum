@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
-import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
+import { Meter, PageHeader, Readout, Switch, Note } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Explain, Empty } from "../system/hub";
 import { Select } from "../system/controls";
@@ -119,7 +119,7 @@ export default function Counterfactual() {
         glyph="spark"
         tone="accent"
         title="Counterfactual Replay"
-        subtitle="What would last week's traffic have cost on a different routing policy — answered before you switch, not after."
+        subtitle="Replay past traffic under another routing policy"
       />
 
       <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -146,18 +146,18 @@ export default function Counterfactual() {
           label="Counterfactual evaluation"
           hint="Off by default. It reads the request log and changes nothing on the request path — no traffic is re-sent to any provider."
         />
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+        <Note>
           This is a batch evaluator, deliberately. Replaying one request against a different model
           and showing both answers is a demo; replaying every logged request against a candidate
           policy and reporting the cost delta is how you tune a routing threshold without
           experimenting on live traffic.
-        </p>
+        </Note>
       </div>
 
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : armNames.length === 0 ? (
-        <Empty title={"No routed traffic logged yet"} hint={"Send requests through the gateway and the models they used become the candidate policies you can replay against."} />
+        <Empty title={"No routed traffic logged yet"} hint={"Send traffic to create policies to replay against."} />
       ) : (
         <div className="space-y-3">
           <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Candidate policy</h2>
@@ -321,12 +321,9 @@ export default function Counterfactual() {
       )}
 
       <div>
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Why the answer is split in two</h2>
-        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
-          <b className="text-slate-500">Continuum's routing is deterministic</b>, so the logs contain
-          no evidence about the arms it did not pick. Measured and modelled are never blended.
-        </p>
-        <Explain title="The estimator, and why it cannot be used here">
+      <Explain title="Why measured and modelled are kept apart">
+          <p><b className="text-slate-500">Continuum's routing is deterministic</b>, so the logs contain
+          no evidence about the arms it did not pick. Measured and modelled are never blended.</p>
           <p>
             Estimating how a policy you did <em>not</em> run would have performed, from logs of the
             one you <em>did</em>, is off-policy evaluation. The standard tool is the doubly robust
@@ -338,12 +335,10 @@ export default function Counterfactual() {
             action. Here the chosen arm has probability 1 and every other arm has 0. There is no
             overlap, and no arithmetic recovers information the logs do not contain.
           </p>
-        </Explain>
-        <p className="mt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
-          So the measured share and the modelled share are reported separately and never blended. A
+          <p>So the measured share and the modelled share are reported separately and never blended. A
           single number would hide the one thing worth knowing before changing your routing: how
-          much of it is a guess.
-        </p>
+          much of it is a guess.</p>
+      </Explain>
       </div>
     </section>
   );

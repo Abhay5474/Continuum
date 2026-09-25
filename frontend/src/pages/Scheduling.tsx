@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Explain, Empty } from "../system/hub";
 import { Select, Table, TH, TR, TD } from "../system/controls";
@@ -123,7 +123,7 @@ export default function Scheduling() {
         glyph="clock"
         tone="info"
         title="Priority & Deadlines"
-        subtitle="Admission control answers whether there is room. This answers who gets it."
+        subtitle="Who gets the next free slot"
       />
 
       <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -167,10 +167,10 @@ export default function Scheduling() {
           label="Priority and deadline scheduling"
           hint="Off by default. While it is off a free slot goes to whichever waiting request happened to poll at the right moment."
         />
-        <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+        <Note>
           Set <span className="readout">criticality</span> to choose a band and{" "}
           <span className="readout">deadlineMs</span> to say how long the result stays useful.
-        </p>
+        </Note>
         <Explain>
           <p>
             Ordering only applies while requests are waiting for capacity, so it does nothing until
@@ -182,20 +182,19 @@ export default function Scheduling() {
             nobody can use also delays the requests that could still make theirs.
           </p>
         </Explain>
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+        <Note>
           Waiting is aged into the band — every{" "}
           <span className="readout">{status?.agingStepSeconds ?? 120}s</span> queued lifts a task one
           band, up to two. Without that, &ldquo;low priority&rdquo; quietly means &ldquo;never&rdquo;
           under sustained load.
-        </p>
+        </Note>
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Order a queue without running it</h2>
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-          Nothing is executed. The same ordering the scheduler uses is applied to the tasks below,
-          so the rules can be checked before they are trusted with real traffic.
-        </p>
+        <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">
+          Try the ordering
+          <InfoTip text="Nothing is executed. The scheduler's own ordering is applied to these tasks, so the rules can be checked before real traffic depends on them." />
+        </h2>
 
         <Table
           minWidth={520}
@@ -280,7 +279,7 @@ export default function Scheduling() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : providers.length === 0 ? (
-        <Empty title={"Nothing has queued yet"} hint={"A request only enters the queue when a provider is at its inferred limit, and the wait is bounded at a quarter second — so this stays empty until you are genuinely near capacity."} />
+        <Empty title={"Nothing has queued yet"} hint={"Requests queue only when a provider is at capacity."} />
       ) : (
         <div className="space-y-2">
           {providers.map((p) => (
@@ -314,18 +313,14 @@ export default function Scheduling() {
       )}
 
       <div>
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What this does not do</h2>
-        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
-          Each instance orders its own waiters. There is no global order across instances, and
-          nothing is persisted.
-        </p>
-        <Explain title="Why not">
+      <Explain title="What this does not do">
+          <p>Each instance orders its own waiters. There is no global order across instances, and nothing is persisted.</p>
           <p>
             A shared queue needs a round trip to reach, and at a quarter-second wait that trip costs
             more than the ordering saves. A waiter exists only while its request is blocked, so a
             restart has no queue to lose.
           </p>
-        </Explain>
+      </Explain>
       </div>
 
       {providers.length > 0 && (

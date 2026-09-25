@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Meter, PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Explain, Segmented, Empty } from "../system/hub";
 
@@ -133,7 +133,7 @@ export default function LoopGuard() {
         glyph="shield"
         tone="ok"
         title="Loop Detection"
-        subtitle="An agent that has lost the thread does not crash — it keeps working, and every step is billable."
+        subtitle="Stops agents that repeat without progress"
       />
 
       <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -191,19 +191,16 @@ export default function LoopGuard() {
             : "A detected loop is recorded; the run continues."}
         </p>
 
-        <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+        <Note>
           Start in <span className="readout">MONITOR</span> — it records what it would have stopped
           without stopping anything. A false positive stops an agent that was working.
-        </p>
+        </Note>
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Try it against a sequence</h2>
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-          One step per line, oldest first. Nothing is executed — the detector reads the steps and
-          says what it sees. Progress is left unreported here, which is the pessimistic case: an
-          agent that cannot say whether it advanced is exactly the one worth watching.
-        </p>
+        <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">Try it against a sequence
+          <InfoTip text="One step per line, oldest first. Nothing is executed — the detector reads the steps and says what it sees. Progress is left unreported here, which is the pessimistic case: an agent that cannot say whether it advanced is exactly the one worth watching." />
+        </h2>
 
         <div className="flex flex-wrap gap-2">
           {SAMPLES.map((s) => (
@@ -274,12 +271,9 @@ export default function LoopGuard() {
       </div>
 
       <div>
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">What it will not do</h2>
-        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
-          Repetition alone never trips it — the signal is repetition <em>without progress</em>. And
-          paraphrase detection is deliberately narrow.
-        </p>
-        <Explain title="Why both are deliberate">
+      <Explain title="What it will not do">
+          <p>Repetition alone never trips it — the signal is repetition <em>without progress</em>. And
+          paraphrase detection is deliberately narrow.</p>
           <p>
             A loop over twenty files issues twenty similar steps and is not stuck. Arguments count
             as part of the step: <span className="readout">read file src/a.java</span> and{" "}
@@ -292,7 +286,7 @@ export default function LoopGuard() {
             plainly different steps score 0.67 — the populations overlap and no threshold separates
             them. The threshold is set high: it catches near-identical rewording and misses the rest.
           </p>
-        </Explain>
+      </Explain>
       </div>
 
       <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Loops caught</h2>
@@ -300,7 +294,7 @@ export default function LoopGuard() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : events.length === 0 ? (
-        <Empty title={"Nothing caught yet"} hint={"Loops found in your agents — or by the inspector above — appear here with the steps they are accusing."} />
+        <Empty title={"Nothing caught yet"} hint={"Detected loops appear here with their steps."} />
       ) : (
         <div className="space-y-2">
           {events.map((e, i) => (

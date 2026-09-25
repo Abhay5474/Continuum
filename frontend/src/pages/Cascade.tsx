@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { Meter, PageHeader, Switch } from "../system/primitives";
+import { Meter, PageHeader, Switch, Note, InfoTip } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
 import {
   Dot,
@@ -70,10 +70,10 @@ type Status = {
 /**
  * Named thresholds. 0.75 means nothing on its own; what it costs you does.
  */
-const BANDS: [number, string, string][] = [
-  [0.55, "Frugal", "Accepts more cheap answers. Lowest bill, most risk of a weak answer slipping through."],
-  [0.75, "Balanced", "Escalates on any clear defect. The recommended setting."],
-  [0.9, "Careful", "Escalates on the slightest doubt. Closest to always using the strong model."],
+const BANDS: [number, string, string, string][] = [
+  [0.55, "Frugal", "Accepts more cheap answers. Lowest bill, most risk of a weak answer slipping through.", "lowest cost"],
+  [0.75, "Balanced", "Escalates on any clear defect. The recommended setting.", "recommended"],
+  [0.9, "Careful", "Escalates on the slightest doubt. Closest to always using the strong model.", "highest quality"],
 ];
 
 export default function Cascade() {
@@ -122,7 +122,7 @@ export default function Cascade() {
         glyph="route"
         tone="accent"
         title="Model Cascade"
-        subtitle="Answer with the cheap model, check the answer, and pay for the expensive one only when the check fails."
+        subtitle="Cheap model first · strong model only when needed"
       />
 
       {/* The ladder, as a path. Two tiers and a judge between them is the whole
@@ -179,7 +179,7 @@ export default function Cascade() {
 
       {/* ---- the ladder: where requests actually left ---- */}
       <section className="mt-9">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+        <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">
           Where requests left
         </h2>
         <div className="mt-3">
@@ -189,10 +189,9 @@ export default function Cascade() {
 
       {/* ---- savings, next to the numbers that could disprove them ---- */}
       <section className="mt-9">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Did it work</h2>
-        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-          Shown with the two numbers that would disprove it.
-        </p>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Did it work
+          <InfoTip text="Shown with the two numbers that would disprove it." />
+        </h2>
         <div className="mt-4">
           <Stats>
             <Stat
@@ -266,10 +265,9 @@ export default function Cascade() {
 
       {/* ---- tiers ---- */}
       <section className="mt-9">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Tiers</h2>
-        <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
-          From the model registry, by price.
-        </p>
+        <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">Tiers
+          <InfoTip text="From the model registry, by price." />
+        </h2>
         <div className="mt-3">
           <Rail>
             <TierRow tier={status?.cheapTier ?? null} role="Cheap" note="Every request starts here" />
@@ -280,12 +278,10 @@ export default function Cascade() {
 
       {/* ---- threshold ---- */}
       <section className="mt-9">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
+        <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">
           Escalation threshold
+          <InfoTip text="How sure the judge must be to accept a cheap answer." />
         </h2>
-        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-          How sure the judge must be to accept a cheap answer.
-        </p>
 
         <div className="mt-5 max-w-2xl">
           <div className="flex items-baseline justify-between text-[11px]">
@@ -304,14 +300,16 @@ export default function Cascade() {
             />
           </div>
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
-            {BANDS.map(([value, name, note]) => {
+            {BANDS.map(([value, name, note, tag]) => {
               const active = Math.abs((status?.threshold ?? 0.75) - value) < 0.005;
               return (
                 <button
                   key={name}
                   disabled={busy}
                   onClick={() => run(() => portal.cascade.configure({ threshold: value }), `Threshold: ${name}`)}
-                  className="min-w-0 flex-1 basis-48 text-left transition-opacity disabled:opacity-50"
+                  className="min-w-0 flex-1 basis-40 text-left transition-opacity disabled:opacity-50"
+                  data-tip={note}
+                  aria-pressed={active}
                 >
                   <div className="flex items-baseline gap-2">
                     <span
@@ -322,7 +320,7 @@ export default function Cascade() {
                     </span>
                     <span className="readout text-[11px] text-slate-600">{value.toFixed(2)}</span>
                   </div>
-                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">{note}</p>
+                  <span className="micro mt-0.5 block">{tag}</span>
                   <span
                     className="mt-1.5 block h-[2px] w-full rounded-full transition-opacity duration-200"
                     style={{ background: "var(--accent)", opacity: active ? 1 : 0 }}
@@ -349,9 +347,9 @@ export default function Cascade() {
               <option value={0.05}>5% of requests</option>
               <option value={0.1}>10% of requests</option>
             </Select>
-            <p className="mt-1.5 max-w-xs text-[11.5px] leading-relaxed text-slate-600">
+            <Note className="mt-1.5">
               Runs both tiers on a sample to find missed escalations. Costs a second call on those.
-            </p>
+            </Note>
           </label>
           <div className="flex items-center gap-3 self-end">
             <span className="text-xs text-slate-500">
@@ -370,13 +368,10 @@ export default function Cascade() {
       {/* ---- should this cascade run speculatively? ---- */}
       {status?.speculation && (
         <section className="mt-10">
-          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
-            Should the strong model run in parallel instead of afterwards?
-          </h2>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-            Firing both tiers at once trades cost for latency. Whether that pays depends on how
-            often you escalate.
-          </p>
+          <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">
+            Parallel escalation
+          <InfoTip text="Firing both tiers at once trades cost for latency. Whether that pays depends on how often you escalate." />
+        </h2>
 
           <div className="mt-4 max-w-xl">
             <Meter
@@ -412,9 +407,20 @@ export default function Cascade() {
             </Stats>
           </div>
 
-          <p className="mt-4 max-w-2xl text-xs leading-relaxed text-slate-500">
-            {status.speculation.summary}
-          </p>
+          {/* Too few decisions: show how far along the sample is, rather than
+              a paragraph apologising for the lack of one. */}
+          {(status?.requests ?? 0) < 30 ? (
+            <div className="mt-4 max-w-xl">
+              <Meter
+                value={Math.min(1, (status?.requests ?? 0) / 30)}
+                state="idle"
+                label={`Sample ${status?.requests ?? 0} / 30 decisions — the verdict needs 30`}
+                height={6}
+              />
+            </div>
+          ) : (
+            <p className="mt-4 max-w-2xl text-xs text-slate-500">{status.speculation.summary}</p>
+          )}
           <Explain title="Why there is no single score">
             <p>
               Whether a millisecond is worth a cent is a product decision, not an arithmetic one.
@@ -428,10 +434,9 @@ export default function Cascade() {
       {/* ---- calibration curve ---- */}
       {(status?.calibration?.observations ?? 0) > 0 && (
         <section className="mt-10">
-          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Calibration</h2>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-            Judge score against how often the cheap answer actually sufficed.
-          </p>
+          <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">Calibration
+          <InfoTip text="Judge score against how often the cheap answer actually sufficed." />
+        </h2>
           <div className="mt-4">
             <CalibrationCurve
               curve={status!.calibration.curve}
@@ -455,7 +460,7 @@ export default function Cascade() {
           ) : rows.length === 0 ? (
             <Empty
               title="No decisions yet"
-              hint="Send a request through the gateway with the cascade on and each one appears here with the judge's reasoning."
+              hint="Turn the cascade on and send a request."
             />
           ) : (
             <Rail>

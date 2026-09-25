@@ -95,9 +95,7 @@ export default function Dashboard() {
           <Chip glyph="list" tone="accent" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Run History</h1>
         </div>
-        <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
-          Every durable run, its event log and its replay
-        </p>
+        <p className="mt-1 text-[13px] text-slate-500">Every durable run, its event log and its replay</p>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Total" value={stats?.total ?? "—"} />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
+import { Meter, PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
 import { BarChart, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Explain, Empty } from "../system/hub";
@@ -104,7 +104,7 @@ export default function CostAdmission() {
         glyph="coin"
         tone="info"
         title="Cost-Aware Limits"
-        subtitle="A fifty-step agent carrying twenty thousand tokens is not one request in the way that “hello” is one request."
+        subtitle="Limits by tokens and dollars, not request count"
       />
 
       <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -191,10 +191,10 @@ export default function CostAdmission() {
           </button>
         </div>
 
-        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+        <Note>
           Both refill continuously, and a request needs room in both. Whichever a caller is nearest
           to exhausting is the one that limits them.
-        </p>
+        </Note>
         <Explain>
           <p>
             So someone making many tiny calls is bounded by request count and someone making one
@@ -204,12 +204,12 @@ export default function CostAdmission() {
         </Explain>
       </div>
 
-      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Per caller</h2>
+      <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">Per caller</h2>
 
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : callers.length === 0 ? (
-        <Empty title={"No traffic yet"} hint={"Once requests arrive, each caller's consumption of both allowances appears here."} />
+        <Empty title={"No traffic yet"} hint={"Callers appear here once requests arrive."} />
       ) : (
         <div className="space-y-4">
           {/* Across callers, before the per-caller detail. One caller usually
@@ -277,11 +277,9 @@ export default function CostAdmission() {
       )}
 
       <div>
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Reserve, then settle</h2>
-        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
-          Real token cost is unknown until the response returns, so admission reserves an estimate
-          and settles the true figure afterwards.
-        </p>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Reserve, then settle
+          <InfoTip text="Real token cost is unknown until the response returns, so admission reserves an estimate and settles the true figure afterwards." />
+        </h2>
         <Explain>
           <p>
             The estimate is the prompt plus the caller's completion cap, or{" "}

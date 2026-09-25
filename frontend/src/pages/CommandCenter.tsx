@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ContinuumCore from "../system/ContinuumCore";
 import { useTelemetry } from "../system/useTelemetry";
-import { Micro, StateDot, Trace, Meter } from "../system/primitives";
+import { Micro, StateDot, Trace, Meter, Note } from "../system/primitives";
 import { STATE } from "../system/tokens";
 import {
   Allocation,
@@ -446,10 +446,10 @@ function CoreInspector({ t, onClose }: { t: Telemetry; onClose: () => void }) {
           Close
         </button>
       </div>
-      <p className="text-xs leading-relaxed text-slate-400 max-w-2xl">
+      <Note>
         The core state is the worst state among installed subsystems. It reflects what your
         traffic would actually experience, not an average.
-      </p>
+      </Note>
       <div className="well p-3">
         <Meter label="System load" value={t.load} state={t.load > 0.8 ? "warning" : "active"} />
       </div>

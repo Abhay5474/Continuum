@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { PageHeader, Readout, Switch } from "../system/primitives";
+import { PageHeader, Readout, Switch, Note } from "../system/primitives";
 import { ChartFrame, Histogram } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
-import { Segmented, Empty } from "../system/hub";
+import { Segmented, Empty, Pill } from "../system/hub";
 import { Select } from "../system/controls";
 
 /**
@@ -91,7 +91,7 @@ export default function Uncertainty() {
         glyph="gauge"
         tone="warn"
         title="Answer Confidence"
-        subtitle="Asks the same question several times and measures whether the model agrees with itself. Disagreement about meaning — not wording — is what a hallucination looks like from the outside."
+        subtitle="Samples an answer several times · measures agreement"
       />
 
       {/* ---- mode ----
@@ -178,13 +178,13 @@ export default function Uncertainty() {
                 }))}
               />
             </ChartFrame>
-            <p className="mt-3 text-xs text-slate-500 max-w-2xl leading-relaxed">
+            <Note className="mt-3">
               Bands at or below{" "}
               <span className="readout text-amber-400">
                 {status!.lowConfidence.toFixed(2)}
               </span>{" "}
               are flagged as low confidence in the response your application receives.
-            </p>
+            </Note>
           </div>
         </section>
       )}
@@ -226,14 +226,14 @@ export default function Uncertainty() {
             </Select>
           </label>
 
-          <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+          <Note>
             Never stops below two samples, never exceeds the budget — so it can only ever cost less.
-          </p>
-          <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+          </Note>
+          <Note>
             It cannot shorten a genuinely contested question, and should not — disagreement is
             exactly what the extra samples are for. The saving comes from the easy majority of
             traffic.
-          </p>
+          </Note>
         </div>
       </section>
 
@@ -301,10 +301,10 @@ export default function Uncertainty() {
           >
             Clear history
           </button>
-          <p className="w-full text-xs text-slate-600 max-w-2xl leading-relaxed">
+          <Note>
             Temperature cannot be set to zero: every sample would be identical and the measurement
             would report certainty about everything.
-          </p>
+          </Note>
         </div>
       </section>
 
@@ -402,12 +402,16 @@ function Measurement({
                   </p>
                 </div>
               ))}
-              <p className="border-t border-edge/40 pt-2 text-xs text-slate-600 max-w-2xl leading-relaxed">
-                {row.clusters === 1
-                  ? "Every sample said the same thing. That is what a confident answer looks like."
-                  : `The model gave ${row.clusters} incompatible answers to one question. Entropy ${row.entropy.toFixed(2)} nats.`}
-                {row.extraCost > 0 && ` Measuring cost $${row.extraCost.toFixed(5)} and ${row.extraMs}ms.`}
-              </p>
+              {/* The verdict as figures: agreement, spread, what measuring cost. */}
+              <div className="flex flex-wrap items-center gap-2 border-t border-edge/40 pt-2.5">
+                <Pill tone={row.clusters === 1 ? "ok" : "warn"} dot>
+                  {row.clusters === 1 ? "samples agree" : `${row.clusters} conflicting answers`}
+                </Pill>
+                <span className="micro">entropy {row.entropy.toFixed(2)} nats</span>
+                {row.extraCost > 0 && (
+                  <span className="micro">cost ${row.extraCost.toFixed(5)} · {row.extraMs}ms</span>
+                )}
+              </div>
             </div>
           )}
         </div>

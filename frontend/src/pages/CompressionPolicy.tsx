@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { Switch } from "../system/primitives";
+import { Switch, Note } from "../system/primitives";
 import { ChartFrame, TargetVsActual } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
 import { Explain, Chip } from "../system/hub";
@@ -94,10 +94,7 @@ export default function CompressionPolicy() {
           <Chip glyph="gauge" tone="accent" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Compression Budget</h1>
         </div>
-        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
-          One ratio for the whole prompt is the wrong shape — instructions, examples and the question
-          do not carry information at the same density.
-        </p>
+        <p className="mt-1 text-[13px] text-slate-500">A compression ratio per prompt region</p>
       </header>
 
       {/* The dependency, drawn. This budget allocates work that the compressor
@@ -158,14 +155,14 @@ export default function CompressionPolicy() {
           label="Per-region compression budget"
           hint="Off by default. While it is off, every message the compressor touches gets the same ratio."
         />
-        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
+        <Note className="mt-3">
           When off, every touched message is compressed to{" "}
           <span className="readout text-slate-400">{status?.defaultRatio ?? 0.55}</span>. When on,
           each region gets its own budget, and a prompt under{" "}
           <span className="readout text-slate-400">{status?.shortPromptTokens ?? 400}</span> tokens is
           left alone entirely — below that there is little to remove and the fidelity cost outweighs
           the saving.
-        </p>
+        </Note>
       </div>
 
       <section className="mt-10">
@@ -201,10 +198,10 @@ export default function CompressionPolicy() {
               />
             </ChartFrame>
             </div>
-            <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-600">
+            <Note className="mt-3">
               Above target is correct — protected spans stopped it. <em>Below</em> target is the
               real fault: compressing harder than asked.
-            </p>
+            </Note>
             <Explain>
               <p>
                 Numbers, identifiers, quoted text and code are never dropped, so a demonstration
@@ -225,7 +222,7 @@ export default function CompressionPolicy() {
           {(status?.skipped ?? []).length === 0 ? (
             <Empty
               title="Nothing has been declined"
-              hint="Prompts short enough that trimming would cost more fidelity than it saves in tokens land here."
+              hint="Prompts too short to be worth trimming appear here."
             />
           ) : (
             <Rail>
@@ -241,15 +238,10 @@ export default function CompressionPolicy() {
         </div>
       </section>
 
-      <section className="mt-10 max-w-2xl">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
-          Where the numbers come from
-        </h2>
-        <p className="mt-2 text-xs leading-relaxed text-slate-600 max-w-2xl">
-          Budgets come from LLMLingua (Jiang et al., EMNLP 2023).{" "}
-          <b className="text-slate-400">Unsure means gentler, never harsher.</b>
-        </p>
-        <Explain>
+      <div className="mt-8">
+      <Explain title="Where the budgets come from">
+          <p>Budgets come from LLMLingua (Jiang et al., EMNLP 2023).{" "}
+          <b className="text-slate-400">Unsure means gentler, never harsher.</b></p>
           <p>
             That paper measures that instructions tolerate losing 10–20%, demonstrations 60–80%, and
             the question 0–10%. Examples are largely redundant with each other — that is what makes
@@ -266,8 +258,8 @@ export default function CompressionPolicy() {
             Per-region tallies are held in memory and reset on restart. Cumulative savings are
             stored durably and appear under Prompt Guard.
           </p>
-        </Explain>
-      </section>
+      </Explain>
+      </div>
 
       {totalIn > 0 && (
         <div className="mt-8">

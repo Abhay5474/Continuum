@@ -92,7 +92,7 @@ export default function BreakerPage() {
         glyph="shield"
         tone="warn"
         title="Semantic Breaker"
-        subtitle="Trips a model out of rotation when its answers get worse — not when it errors. Off by default."
+        subtitle="Pulls a model when its answers degrade"
       />
 
       <div>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { PageHeader, Switch } from "../system/primitives";
+import { PageHeader, Switch, InfoTip } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 import {
@@ -145,7 +145,7 @@ export default function QualityGatePage() {
         glyph="check"
         tone="ok"
         title="Quality Gate"
-        subtitle="Checks a finished answer against the request that asked for it. Off by default; the gate can rewrite an answer, so it has to earn that first."
+        subtitle="Checks answers against the request · repairs defects"
       />
 
       {/* Where it sits. This is the only stage on the path that runs *after*
@@ -186,7 +186,7 @@ export default function QualityGatePage() {
               ) : undefined,
           }))}
         />
-        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-500">{modeNote}</p>
+        {modeNote && <p className="mt-2 text-xs text-slate-500">{modeNote}</p>}
       </div>
 
       {/* ---- the case for or against enforcing ---- */}
@@ -245,10 +245,9 @@ export default function QualityGatePage() {
 
       {/* ---- which check is doing the work ---- */}
       <section className="mt-10">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Dimensions</h2>
-        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-          One failing almost everything is usually a threshold problem, not a fleet of bad answers.
-        </p>
+        <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">Dimensions
+          <InfoTip text="One failing almost everything is usually a threshold problem, not a fleet of bad answers." />
+        </h2>
         <div className="mt-3">
           <Rail>
             {(status?.dimensions ?? []).map((d) => {
@@ -346,7 +345,7 @@ export default function QualityGatePage() {
           ) : rows.length === 0 ? (
             <Empty
               title="Nothing checked yet"
-              hint="Set the mode to Monitor and send a request through the gateway. Monitoring records what the gate would have done without changing a single answer."
+              hint="Set Monitor mode and send a request. Monitoring records what the gate would have done without changing a single answer."
             />
           ) : (
             <Rail>
@@ -404,7 +403,7 @@ function Pick({
 }) {
   return (
     <label className="block">
-      <span className="micro">{label}</span>
+      <span className="micro flex items-center gap-1">{label}{note && <InfoTip text={note} />}</span>
       <Select
         value={value}
         disabled={disabled}
@@ -416,7 +415,6 @@ function Pick({
           </option>
         ))}
       </Select>
-      {note && <p className="mt-1.5 max-w-[17rem] text-[11.5px] leading-relaxed text-slate-600">{note}</p>}
     </label>
   );
 }
@@ -623,7 +621,7 @@ function RepairEngine({
         {attempts.length === 0 ? (
           <Empty
             title="No repair attempts yet"
-            hint="They appear here as the gate finds defects worth fixing — including the attempts that were thrown away."
+            hint="Repairs appear here as the gate fixes defects."
           />
         ) : (
           <Rail>

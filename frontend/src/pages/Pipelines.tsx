@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { portal } from "../api";
-import { Micro, Switch } from "../system/primitives";
+import { InfoTip, Micro, Note, Switch } from "../system/primitives";
 import {
   Bar,
   CommandBar,
@@ -25,7 +25,7 @@ import {
   Split,
   Stat,
   Stats,
-  kindOf, Chip, Notice } from "../system/hub";
+  kindOf, Chip, Notice, Pill } from "../system/hub";
 import { Select } from "../system/controls";
 import { ErrorState, useToast } from "../components/ui";
 
@@ -273,10 +273,7 @@ export default function Pipelines() {
           <Chip glyph="flow" tone="accent" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Pipelines</h1>
         </div>
-        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
-          Your application sends an input and a question, and gets an answer back. It never learns a
-          specialist was involved, which one, or who hosts it.
-        </p>
+        <p className="mt-1 text-[13px] text-slate-500">One endpoint: input and question in, evidence-backed answer out</p>
       </header>
 
       <div className="mt-6">
@@ -327,14 +324,10 @@ export default function Pipelines() {
           beside an empty pane. So the first-run state gets the whole width. */}
       {pipelines !== null && all.length === 0 ? (
         <div className="mt-10 max-w-2xl">
-          <h2 className="text-[15px] font-semibold tracking-tight text-slate-100">
+          <h2 className="flex items-center gap-1.5 text-[15px] font-semibold tracking-tight text-slate-100">
             No pipelines yet
-          </h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
-            A pipeline is the endpoint your application calls. It takes the raw input, runs your
-            specialists over it, turns what they found into something a language model can reason
-            about, and returns the answer — without the model ever seeing the input itself.
-          </p>
+          <InfoTip text="A pipeline is the endpoint your application calls. It takes the raw input, runs your specialists over it, turns what they found into something a language model can reason about, and returns the answer — without the model ever seeing the input itself." />
+        </h2>
           <div className="mt-5">
             <Flow
               input="an image and a question"
@@ -674,11 +667,11 @@ function Endpoint({
   -d '{"input":{"image":"<base64>"},"prompt":"What should I do?"}'`}
           </Code>
         </div>
-        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-600">
+        <Note className="mt-2">
           The response carries the answer and the chain behind it. Your application can show its user
           the working, or ignore the field entirely — but it never sees which provider ran or what
           credential was used.
-        </p>
+        </Note>
       </div>
     </div>
   );
@@ -777,10 +770,10 @@ function NewPipeline({
           placeholder="You are advising a member of the public on immediate first aid for an injured animal. Be brief and practical. Always say when a vet is needed."
           className="w-full focus:border-[color:var(--accent-edge)] field"
         />
-        <p className="mt-1 text-[11.5px] leading-relaxed text-slate-600">
+        <Note className="mt-1">
           Sent with every call, so your application does not have to repeat it. The findings and the
           user's own question are added underneath.
-        </p>
+        </Note>
       </Field>
 
       <Field label="Specialists, in the order they run">
@@ -1121,11 +1114,11 @@ function VerificationControls({
         <h3 className="text-[13px] font-semibold tracking-tight text-slate-200">Output verification</h3>
         <span className="micro">{p.verificationMode}</span>
       </div>
-      <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+      <Note className="mt-1">
         Does the advice match the findings? The confidence policy asks the model to behave and checks
         whether it did — both are about the instruction. This asks whether the answer is anchored to
         what the specialists actually found.
-      </p>
+      </Note>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {MODES.map((m) => {
@@ -1149,14 +1142,14 @@ function VerificationControls({
           );
         })}
       </div>
-      <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-500">{mode.hint}</p>
+      <Note className="mt-2">{mode.hint}</Note>
 
-      <p className="mt-2.5 max-w-2xl text-xs leading-relaxed text-slate-600">
+      <Note className="mt-2.5">
         Three checks: certainty beyond the evidence, invented confidence figures, and which findings
         the advice actually addresses. Only the first two can fail an answer — coverage matching is
         lexical, so a model writing "laceration" for a finding labelled "open wound" reads as
         uncovered while having covered it perfectly, and failing that would punish good writing.
-      </p>
+      </Note>
     </div>
   );
 }
@@ -1299,10 +1292,10 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
 
   return (
     <div>
-      <p className="max-w-2xl text-xs leading-relaxed text-slate-500">
+      <Note>
         Runs the same code path your application would, including a disabled pipeline's refusal — a
         test route that skipped a step would be worse than no test route.
-      </p>
+      </Note>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0 space-y-3">
@@ -1346,7 +1339,7 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
               rows={2}
               className="mt-1 w-full font-mono text-[11px] focus:border-[color:var(--accent-edge)] field"
             />
-            {file && <p className="mt-1 text-xs text-slate-600 max-w-2xl leading-relaxed">Ignored while a file is attached.</p>}
+            {file && <Note className="mt-1">Ignored while a file is attached.</Note>}
           </label>
           <label className="block">
             <Micro>What your user asked</Micro>
@@ -1406,10 +1399,9 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
 
               {!run.analysisRan && (
                 <Verdict tone="bad" title="Nothing was examined.">
-                  <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-                    No specialist answered. The model was told this explicitly rather than being left
-                    to fill the silence — "we looked and found nothing" and "we never looked" are
-                    different facts, and only the first one is evidence.
+                  <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                    No specialist answered — the model was told so
+                    <InfoTip text={'"We looked and found nothing" and "we never looked" are different facts; only the first is evidence, so the model is not left to fill the silence.'} />
                   </p>
                 </Verdict>
               )}
@@ -1424,9 +1416,10 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-                Trace <span className="readout text-slate-500">{run.traceId}</span> — returned to your
-                application so it can show its own user the same chain.
+              <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                <span className="micro">trace</span>
+                <span className="readout">{run.traceId}</span>
+                <InfoTip text="Returned to your application with the answer, so it can show its user the same chain." />
               </p>
             </>
           )}
@@ -1461,7 +1454,7 @@ function PolicyVerdict({ policy, compliance }: { policy: Policy; compliance: Com
         </>
       }
     >
-      <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">{copy.note}</p>
+      <Note className="mt-1">{copy.note}</Note>
 
       {compliance?.checked && (
         <div className="mt-3 border-t border-edge/60 pt-2.5">
@@ -1479,9 +1472,12 @@ function PolicyVerdict({ policy, compliance }: { policy: Policy; compliance: Com
             <span className="micro opacity-70">measured, {compliance.method}</span>
           </div>
           {compliance.markers.length > 0 && (
-            <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
-              Found in the answer: {compliance.markers.map((m) => `"${m}"`).join(", ")}
-            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="micro">found in the answer</span>
+              {compliance.markers.map((m) => (
+                <Pill key={m} tone="info">{m}</Pill>
+              ))}
+            </div>
           )}
           {compliance.flatAssertions.length > 0 && (
             <p className="mt-1 text-xs" style={{ color: "var(--state-warning-ink)" }}>
@@ -1489,12 +1485,12 @@ function PolicyVerdict({ policy, compliance }: { policy: Policy; compliance: Com
               {compliance.flatAssertions.map((m) => `"${m}"`).join(", ")}
             </p>
           )}
-          <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
+          <Note className="mt-1.5">
             Checked on the answer that came back, not assumed from the instruction — the policy can
             only ask, and a page that reported success because it asked would be reporting its own
             intent. The check is lexical: it reliably catches an instruction that produced flat,
             unqualified prose, and cannot tell a real hedge from a decorative one.
-          </p>
+          </Note>
         </div>
       )}
     </Verdict>
@@ -1611,9 +1607,7 @@ function Chain({
             open={detail === s.ordinal}
           >
             <div className="pb-2">
-              <p className="max-w-2xl text-xs leading-relaxed text-slate-500">
-                {KIND_NOTE[s.kind] ?? ""}
-              </p>
+              {KIND_NOTE[s.kind] && <Note>{KIND_NOTE[s.kind]}</Note>}
               <StepDetail step={s} />
             </div>
           </SpineNode>
@@ -1635,10 +1629,10 @@ function StepDetail({ step }: { step: Step }) {
     return (
       <div className="mt-2">
         <p className="text-[13px] text-slate-300">{step.detail?.reason ?? "Condition not met."}</p>
-        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600">
+        <Note className="mt-1">
           Recorded rather than left out. A step that did not run and a step that ran and found
           nothing look identical in the answer, and they need different fixes.
-        </p>
+        </Note>
       </div>
     );
   }
@@ -1690,10 +1684,10 @@ function StepDetail({ step }: { step: Step }) {
           <div className="mt-1.5">
             <Code>{step.detail?.prompt ?? "—"}</Code>
           </div>
-          <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-600">
+          <Note className="mt-1.5">
             Kept verbatim rather than rebuilt from the findings. When an answer is wrong this is the
             first thing worth reading, and a reconstruction is not the same artefact.
-          </p>
+          </Note>
         </div>
       </div>
     );

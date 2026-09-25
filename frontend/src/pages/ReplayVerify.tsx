@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { Chip } from "../system/hub";
-import { Readout, StateDot } from "../system/primitives";
+import { Readout, StateDot, InfoTip } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
 
@@ -77,10 +77,9 @@ export default function ReplayVerify() {
           <Chip glyph="check" tone="accent" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Replay Audit</h1>
         </div>
-        <p className="mt-0.5 max-w-2xl text-sm text-slate-500">
-          Replays a run's decisions against its own recorded history to confirm it would execute
-          identically — the property crash recovery depends on. Model outputs are additionally
-          re-scored against today's provider. Nothing is re-sent to your services.
+        <p className="mt-1 flex items-center gap-1 text-[13px] text-slate-500">
+          Proves a run would replay identically
+          <InfoTip text="Replays a run's decisions against its own recorded history — the property crash recovery depends on. Model outputs are re-scored against today's provider. Nothing is re-sent to your services." />
         </p>
       </header>
 

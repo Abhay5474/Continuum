@@ -120,10 +120,7 @@ export default function PromptGuard() {
           <Chip glyph="shield" tone="ok" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Prompt Guard</h1>
         </div>
-        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
-          What happens to a prompt between your request and the provider. Both controls are
-          per-account and off by default — while off, the prompt is forwarded verbatim.
-        </p>
+        <p className="mt-1 text-[13px] text-slate-500">Redaction and compression between your app and the provider</p>
       </header>
 
       <div className="mt-6" data-guide="guard-route">

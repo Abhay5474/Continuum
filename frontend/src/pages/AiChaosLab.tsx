@@ -54,10 +54,7 @@ export default function AiChaosLab() {
           <Chip glyph="alert" tone="bad" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Model Failures</h1>
         </div>
-        <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
-          Inject AI-native failures — hallucinations, schema/tool corruption, prompt injection, context
-          truncation, memory corruption, provider drift — then measure whether workflows survive.
-        </p>
+        <p className="mt-1 text-[13px] text-slate-500">Inject AI-native failures and watch the gateway absorb them</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

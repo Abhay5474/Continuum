@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { InfoTip, Switch } from "../system/primitives";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
 import { Chip } from "../system/hub";
@@ -49,7 +50,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
           </span>
           <div>
             <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Developer Portal</h1>
-            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Your API keys, credentials and analytics.</p>
+            <p className="mt-1 text-[13px] text-slate-500">Your API keys, credentials and analytics</p>
           </div>
         </div>
 
@@ -270,7 +271,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* analytics */}
-      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label="Requests" value={stats?.totalRequests ?? "—"} />
         <Stat label="Success rate" value={stats ? `${Math.round(stats.successRate * 100)}%` : "—"} accent="text-emerald-300" />
         <Stat label="Failures prevented" value={stats?.failuresPrevented ?? "—"} accent="text-indigo-300" />
@@ -280,11 +281,10 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
       {/* credential vault */}
       <div>
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Configure upstream keys</h2>
-        <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-          Store your own LLM provider API keys. They are encrypted with AES-256-GCM and decrypted only
-          in-memory at request execution. Secrets are write-only — never displayed after saving.
-        </p>
+        <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">
+          Provider keys
+          <InfoTip text="Your own LLM provider keys. Encrypted with AES-256-GCM, decrypted only in memory at call time, and never shown again after saving." />
+        </h2>
         <div className="mt-3 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
         <table className="w-full min-w-[420px] text-sm">
           <thead className="text-xs text-slate-400">
@@ -324,101 +324,61 @@ function Portal({ onLogout }: { onLogout: () => void }) {
         </table>
         </div>
 
-        <div className="mt-4 rounded-md border border-edge bg-ink p-3">
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={me?.useOwnKeysPrimary ?? true} onChange={(e) => toggle(e.target.checked)} className="mt-1" />
-            <span>
-              <span className="text-[13px] font-medium text-slate-200">Use my provider API keys as primary</span>
-              <span className="block text-xs text-slate-400">
-                When checked, the gateway routes through your own keys and gracefully falls back to the
-                platform (or mock) if they fail or are rate-limited. When unchecked, requests run on the
-                platform's global keys.
-              </span>
-            </span>
-          </label>
+        <div className="mt-3">
+          <Switch
+            checked={me?.useOwnKeysPrimary ?? true}
+            onChange={(next) => toggle(next)}
+            label="Use my provider keys first"
+            hint="On: requests go through your keys and fall back to the platform if they fail or are rate-limited. Off: requests use the platform's keys."
+          />
         </div>
       </div>
 
-      {/* Consensus Verification (opt-in, off by default) */}
-      <div className={`rounded-lg border bg-panel p-4 transition-all ${v6Enabled ? "border-neon/50 shadow-glow-cyan" : "border-edge"}`}>
-        <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <div className="text-[13px] font-semibold tracking-tight text-slate-200">
-              Verification Engine <span className="text-xs text-slate-500">(Consensus DAG)</span>
-              {v6Enabled && <span className="ml-2 rounded bg-neon/15 px-2 py-0.5 text-[10px] font-bold text-neon">ACTIVE</span>}
-            </div>
-            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-              Routes your gateway requests through a parallel DAG of solver and verifier nodes with
-              Bayesian conflict resolution — every answer is checked, scored, and fully auditable in
-              the <span className="text-slate-300">Execution Command Center</span>. Response format is unchanged.
-            </p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => setV6Guide(!v6Guide)}
-              className="rounded-md border border-edge px-3 py-1.5 text-xs hover:border-neon/50">
-              {v6Guide ? "Hide guide" : "When should I use this?"}
-            </button>
-            <button onClick={toggleV6} disabled={v6Enabled === null}
-              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-                v6Enabled
-                  ? "bg-neon/20 text-neon ring-1 ring-neon/50"
-                  : "bg-[color:var(--accent-strong)] text-white hover:opacity-90"}`}>
-              {v6Enabled === null ? "…" : v6Enabled ? "Enabled — click to disable" : "Enable Verification Engine"}
-            </button>
-          </div>
-        </div>
-
-        {v6Guide && (
-          <div className="mt-3 grid gap-3 rounded-md border border-edge bg-ink p-3 text-xs sm:grid-cols-2 animate-fade-up">
-            <div>
-              <div className="font-semibold text-emerald-300">✔ Turn it ON when…</div>
-              <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-400">
-                <li>Outputs feed <span className="text-slate-300">high-stakes actions</span>: generated SQL, Terraform/K8s configs, payment or approval logic.</li>
-                <li>You need an <span className="text-slate-300">audit trail</span> — compliance, finance, legal, healthcare ("why did the AI say this?").</li>
-                <li>Correctness matters more than latency: each request runs a multi-node verification DAG (expect seconds, not milliseconds).</li>
-                <li>You want hallucinations and contradictions <span className="text-slate-300">caught before execution</span>, with a confidence score per answer.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="font-semibold text-rose-300">✘ Keep it OFF when…</div>
-              <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-400">
-                <li>Latency-sensitive chat/UX flows — the legacy path answers in one hop.</li>
-                <li>Creative or open-ended generation, where "verification" has no ground truth.</li>
-                <li>High-volume, low-risk traffic where per-request verification cost isn't justified.</li>
-                <li>Anything already covered by your own downstream validation.</li>
-              </ul>
-              <div className="mt-2 text-slate-500">
-                Off = the exact legacy gateway path, bit for bit. Your clients never see a difference
-                in response format either way.
+      {/* Opt-in engines: each is one switch. What it does is behind the tip;
+          when to use it is behind a disclosure, drawn as two lists. */}
+      <div className="grid items-start gap-3 lg:grid-cols-2">
+        <div className="space-y-2">
+          <Switch
+            checked={!!v6Enabled}
+            busy={v6Enabled === null}
+            onChange={() => void toggleV6()}
+            label="Verification Engine"
+            hint="Runs each gateway request through a DAG of solver and verifier nodes with Bayesian conflict resolution. Every answer is checked, scored and auditable in the Execution Command Center. Response format unchanged."
+          />
+          <button onClick={() => setV6Guide(!v6Guide)} aria-expanded={v6Guide}
+            className="ml-1 text-[11.5px] text-slate-500 hover:text-slate-300">
+            {v6Guide ? "Hide" : "When to use it"}
+          </button>
+          {v6Guide && (
+            <div className="grid gap-3 rounded-[var(--r-lg)] border border-edge p-3 text-xs sm:grid-cols-2 animate-fade-up">
+              <div>
+                <div className="font-semibold text-emerald-300">✓ On for</div>
+                <ul className="mt-1 space-y-1 text-slate-400">
+                  <li>High-stakes outputs: SQL, infra config, payments</li>
+                  <li>Audit trails: finance, legal, healthcare</li>
+                  <li>Correctness over latency (seconds, not ms)</li>
+                  <li>Catching contradictions before execution</li>
+                </ul>
+              </div>
+              <div>
+                <div className="font-semibold text-rose-300">✕ Off for</div>
+                <ul className="mt-1 space-y-1 text-slate-400">
+                  <li>Latency-sensitive chat</li>
+                  <li>Creative, open-ended generation</li>
+                  <li>High-volume, low-risk traffic</li>
+                  <li>Already validated downstream</li>
+                </ul>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Context Optimizer (opt-in, off by default) */}
-      <div className={`rounded-lg border bg-panel p-4 transition-all ${v7Enabled ? "border-aurora/50 shadow-glow" : "border-edge"}`}>
-        <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <div className="text-[13px] font-semibold tracking-tight text-slate-200">
-              Context Optimizer Virtualization <span className="text-xs text-slate-500">(Paging MMU)</span>
-              {v7Enabled && <span className="ml-2 rounded bg-aurora/15 px-2 py-0.5 text-[10px] font-bold text-indigo-300">ACTIVE</span>}
-            </div>
-            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-              Continuum owns the Virtual Context Space: long histories are paged into semantic stubs
-              (L2) backed by immutable event streams (L3); relevant pages are prefetched and page
-              faults resolved mid-generation. Infinite-context workflows without bigger token limits —
-              inspect it live in the <span className="text-slate-300">Context Memory Profiler</span>.
-            </p>
-          </div>
-          <button onClick={toggleV7} disabled={v7Enabled === null}
-            className={`ml-auto rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-              v7Enabled
-                ? "bg-aurora/20 text-indigo-300 ring-1 ring-aurora/50"
-                : "bg-[color:var(--accent-strong)] text-white hover:opacity-90"}`}>
-            {v7Enabled === null ? "…" : v7Enabled ? "Enabled — click to disable" : "Enable Context Optimizer Virtualization"}
-          </button>
+          )}
         </div>
+        <Switch
+          checked={!!v7Enabled}
+          busy={v7Enabled === null}
+          onChange={() => void toggleV7()}
+          label="Context Optimizer"
+          hint="Pages long histories into semantic stubs backed by immutable event streams, prefetches what is relevant and resolves page faults mid-generation. Inspect it in the Context Memory Profiler."
+        />
       </div>
 
       {/* api keys */}
@@ -453,8 +413,9 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
       {/* playground */}
       <div>
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Sandbox playground</h2>
-        <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Send a request through your gateway right now — no code required.</p>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Sandbox playground
+          <InfoTip text="Send a request through your gateway right now — no code required." />
+        </h2>
         <textarea aria-label="Prompt" value={playPrompt} onChange={(e) => setPlayPrompt(e.target.value)}
           className="mt-2 h-16 w-full field" />
         <button

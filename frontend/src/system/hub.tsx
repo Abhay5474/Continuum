@@ -1,5 +1,6 @@
 import { Children, cloneElement, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { firstSentence, InfoTip } from "./primitives";
 import type { ReactNode } from "react";
 import { motion, prefersReducedMotion, projectedRest, rubberband, useDrag, useLiquidIndicator, usePresence, useSpring } from "./physics";
 
@@ -590,10 +591,11 @@ export function Section({
           {count !== undefined && (
             <span className="readout text-[11px] font-normal text-slate-600">{count}</span>
           )}
+          {/* The section's explanation sits behind the title, not under it. */}
+          {hint && <InfoTip text={hint} className="self-center" />}
         </h2>
         {action}
       </div>
-      {hint && <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">{hint}</p>}
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -1479,7 +1481,12 @@ export function Empty({
         </svg>
       </span>
       <p className="mt-3 text-[13px] font-medium text-slate-200">{title}</p>
-      {hint && <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-slate-500">{hint}</p>}
+      {/* The next step, in one sentence. */}
+      {hint && (
+        <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-slate-500">
+          {typeof hint === "string" ? firstSentence(hint) : hint}
+        </p>
+      )}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -1602,6 +1609,48 @@ export function Pill({
       )}
       {children}
     </span>
+  );
+}
+
+/**
+ * Steps as a chain of beads: what ran, in order, and how each ended.
+ *
+ * <p>Replaces the sentence the console used to print for this — "1 rolled back;
+ * 1 could not be and their effects remain" — with the steps themselves. The
+ * eye reads a row of green and red faster than it reads a count in prose, and
+ * the names are right there.
+ */
+export type ChainStep = { label: string; state?: "done" | "undone" | "failed" | "stranded" | "pending" | "plain"; note?: string };
+
+export function StepChain({ steps, arrow = "→", label }: { steps: ChainStep[]; arrow?: string; label?: ReactNode }) {
+  const look: Record<string, { tone: Tone; icon?: string }> = {
+    done: { tone: "ok", icon: "✓" },
+    undone: { tone: "ok", icon: "↺" },
+    failed: { tone: "bad", icon: "✕" },
+    stranded: { tone: "bad", icon: "!" },
+    pending: { tone: "mute" },
+    plain: { tone: "info" },
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {label && <span className="micro mr-1">{label}</span>}
+      {steps.map((st, i) => {
+        const l = look[st.state ?? "plain"];
+        return (
+          <span key={i} className="inline-flex items-center gap-1.5">
+            {i > 0 && <span aria-hidden className="text-[11px] text-slate-500">{arrow}</span>}
+            <span
+              data-tip={st.note}
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-[3px] font-mono text-[11px] font-medium"
+              style={{ background: toneWash(l.tone), color: toneInk(l.tone) }}
+            >
+              {l.icon && <span aria-hidden>{l.icon}</span>}
+              {st.label}
+            </span>
+          </span>
+        );
+      })}
+    </div>
   );
 }
 

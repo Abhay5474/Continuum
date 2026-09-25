@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { api, portal } from "../api";
 import { useToast } from "../components/ui";
-import { Micro, Switch } from "../system/primitives";
+import { Micro, Switch, Note } from "../system/primitives";
 import FeatureToggle from "../system/FeatureToggle";
 import { timeOf, toMillis } from "../system/time";
 import {
@@ -95,10 +95,7 @@ export default function MmuProfiler() {
             <Chip glyph="chip" tone="accent" size={28} />
             <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Context Optimizer</h1>
           </div>
-          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
-            The working set stays resident inside the model's window. Everything else pages out to a
-            semantic stub and faults back in when it is referenced.
-          </p>
+          <p className="mt-1 text-[13px] text-slate-500">Keep the working set in the window · page out the rest</p>
         </div>
         <FeatureToggle status={portal.v7.status} enable={portal.v7.enable} disable={portal.v7.disable} />
       </header>
@@ -152,7 +149,7 @@ export default function MmuProfiler() {
         <div className="mt-10">
           <Empty
             title="Address space idle"
-            hint="Turn it on above, then send a long conversation through the gateway. Nothing is paged until there is more context than the window can hold."
+            hint="Turn it on and send a long conversation. Nothing is paged until there is more context than the window can hold."
           />
         </div>
       ) : (
@@ -414,11 +411,11 @@ export default function MmuProfiler() {
                 ]}
               />
             </Field>
-            <p className="mt-5 text-[11.5px] leading-relaxed text-slate-600">
+            <Note className="mt-5">
               <Micro>Why a version rather than a rewrite</Micro>
               A mutated page is not rewritten in place — its stream is appended to, and the page is
               re-folded from base plus deltas when it is next faulted in.
-            </p>
+            </Note>
           </>
         )}
       </SidePanel>

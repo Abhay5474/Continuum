@@ -3,7 +3,7 @@ import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
 import { Empty, Primary, Chip } from "../system/hub";
-import { Micro, Readout, StateDot, Meter } from "../system/primitives";
+import { Micro, Readout, StateDot, Meter, Note } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
 import { Select } from "../system/controls";
@@ -155,9 +155,9 @@ export default function GodMode() {
     return (
       <div className="mx-auto mt-16 max-w-md text-center">
         <Micro>Adaptive Policy</Micro>
-        <p className="mt-2 text-sm text-slate-400 max-w-2xl leading-relaxed">
+        <Note className="mt-2">
           The autonomous memory and policy engine is scoped to your account.
-        </p>
+        </Note>
         <Link to="/signin" className="mt-4 inline-block rounded border border-edge px-4 py-2 text-sm hover:border-aurora/50">
           Sign in →
         </Link>

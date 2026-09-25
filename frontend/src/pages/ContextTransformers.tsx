@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { portal } from "../api";
-import { Micro, Switch } from "../system/primitives";
+import { Micro, Switch, Note } from "../system/primitives";
 import { BarChart, BeforeAfter, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
 import {
@@ -209,10 +209,7 @@ export default function ContextTransformers() {
           Context Transformers
         </h1>
         </div>
-        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
-          Application data into a canonical form a model can reason over — deterministic, in process,
-          with no model involved.
-        </p>
+        <p className="mt-1 text-[13px] text-slate-500">Application data in a form a model can reason over</p>
       </header>
 
       {/* The distinction from Specialists is the thing developers get wrong, so
@@ -242,12 +239,12 @@ export default function ContextTransformers() {
             state={reach ? (reach.gatewayEnabled ? "on" : "off") : "plain"}
           />
         </Route>
-        <p className="mt-3 max-w-2xl text-[12.5px] leading-relaxed text-slate-500">
+        <Note className="mt-3">
           A <span className="text-slate-300">Specialist</span> calls somebody else's model with your
           key. A <span className="text-slate-300">transformer</span> is Continuum doing the work
           itself. The same bytes produce the same output forever, which is what makes it safe to put
           in a cached, replayed, audited prompt.
-        </p>
+        </Note>
       </div>
 
       <Reaches
@@ -502,13 +499,13 @@ function Reaches({
           <Row
             mark={<KindMark kind="detection" size={28} />}
             title="Pipelines"
-            subtitle="A recognised payload is transformed before the model sees it, and the exact prose appears in the run's trace."
+            subtitle="Recognised payloads reach the model in canonical form"
             status={<Dot tone="ok" label="always on" />}
           />
           <Row
             mark={<KindMark kind="conversation" size={28} />}
             title="Chat completions"
-            subtitle="Data pasted into a user message is transformed on its way out. Prose is never restructured."
+            subtitle="Pasted data transformed in gateway messages"
             meta={
               reach ? (
                 <Facts
@@ -690,10 +687,10 @@ function ResultView({
           >
             Not determined — and deliberately not guessed
           </h3>
-          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-500">
+          <Note className="mt-2">
             These travel into the prompt as well as this page. A model told a unit is unknown says
             so; one that is handed a guessed unit reasons in it and never questions it.
-          </p>
+          </Note>
           <div className="mt-3">
             <Rail>
               {result.ambiguities.map((a, i) => (
@@ -740,10 +737,10 @@ function ResultView({
               <p className="text-[13px] text-slate-500">No sources were recorded for this input.</p>
             ) : (
               <>
-                <p className="max-w-2xl pb-3 text-xs leading-relaxed text-slate-500">
+                <Note>
                   Where the values came from. A number a model was given that nobody can trace back
                   is a number nobody can check.
-                </p>
+                </Note>
                 <Rail>
                   {result.provenance.slice(0, 60).map((p, i) => (
                     <Row
@@ -767,11 +764,11 @@ function ResultView({
             ))}
           {tab === "raw" && (
             <div className="max-w-2xl">
-              <p className="text-[13px] leading-relaxed text-slate-500">
+              <Note>
                 The comparison baseline is a plain-text rendering of your input — the CSV a
                 spreadsheet flattens to, the log lines themselves. It is not shown here because it is
                 your data; the {s.before.toLocaleString()}-token figure above is measured from it.
-              </p>
+              </Note>
               <div className="mt-4 flex items-center gap-3">
                 <span className="micro w-20 shrink-0">baseline</span>
                 <Bar fraction={1} tone="mute" width={180} />

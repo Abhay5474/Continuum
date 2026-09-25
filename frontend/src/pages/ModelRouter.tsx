@@ -3,7 +3,7 @@ import { visibleInterval } from "../system/poll";
 import { api } from "../api";
 import { Chip, Empty } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
-import { Readout, Plane, StateDot, Meter } from "../system/primitives";
+import { Readout, Plane, StateDot, Meter, InfoTip } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
 import { Morph } from "../system/motion";
@@ -186,10 +186,10 @@ export default function ModelRouter() {
           required, so the switches read as broken rather than protected. */}
       {!operator && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-2.5 text-sm">
-          <span className="text-amber-300">Read-only.</span>
+          <span className="text-amber-300">Read-only</span>
           <span className="min-w-0 flex-1 text-slate-400">
-            The router and hedging apply to every tenant on this deployment and change what it
-            spends, so changing them needs operator access.
+            Engine-wide settings · operator access needed
+            <InfoTip text="The router and hedging apply to every tenant on this deployment and change what it spends." />
           </span>
           <button
             onClick={unlock}
@@ -708,7 +708,7 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
       </div>
 
       {(comparison?.decisions ?? 0) === 0 ? (
-        <Empty title={"No routing decisions recorded yet"} hint={"Send traffic through the gateway and every choice — and the choice it overrode — lands here."} />
+        <Empty title={"No routing decisions recorded yet"} hint={"Routing choices appear here as traffic arrives."} />
       ) : (
         <>
           <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">

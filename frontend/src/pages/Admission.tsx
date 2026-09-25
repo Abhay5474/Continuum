@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
+import { Meter, PageHeader, Readout, Switch, Note } from "../system/primitives";
 import { BarChart, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Explain, Empty } from "../system/hub";
@@ -88,7 +88,7 @@ export default function Admission() {
         glyph="gauge"
         tone="info"
         title="Admission Control"
-        subtitle="How much a provider will actually take, measured from latency instead of guessed."
+        subtitle="Provider capacity, measured from latency"
       />
 
       <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -122,10 +122,10 @@ export default function Admission() {
           label="Congestion-controlled admission"
           hint="Off by default. While it is off every request goes straight to the provider and overload is the provider's problem — which it solves with 429s."
         />
-        <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+        <Note>
           A request waits up to {status?.queueMs ?? 250}ms for a slot, then gets{" "}
           <span className="readout">429</span> with a <span className="readout">Retry-After</span>.
-        </p>
+        </Note>
         <Explain>
           <p>
             A fast honest refusal is worth more than a slow one: the caller can retry, degrade, or
@@ -153,10 +153,10 @@ export default function Admission() {
             </div>
           ))}
         </div>
-        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-600">
+        <Note className="mt-2">
           Set <span className="readout">criticality</span> on the request. Anything unrecognised
           reads as <span className="readout">NORMAL</span>, never as background.
-        </p>
+        </Note>
         <Explain>
           <p>
             Past capacity something is refused; the only question is whether it is chosen or random.
@@ -169,7 +169,7 @@ export default function Admission() {
       {status === null ? (
         <SkeletonRows rows={2} />
       ) : providers.length === 0 ? (
-        <Empty title={"No provider has been observed yet"} hint={"Send traffic through the gateway and the inferred limit for each provider appears here, moving as it learns."} />
+        <Empty title={"No provider has been observed yet"} hint={"Send traffic to see each provider's inferred limit."} />
       ) : (
         <div className="space-y-2">
           {providers.map((p) => (

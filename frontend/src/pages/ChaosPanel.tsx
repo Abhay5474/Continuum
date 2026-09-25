@@ -1,4 +1,5 @@
 import DataView from "../system/DataView";
+import { Note } from "../system/primitives";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Chip } from "../system/hub";
@@ -25,15 +26,12 @@ export default function ChaosPanel() {
           <Chip glyph="alert" tone="bad" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Fault Injection</h1>
         </div>
-        <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
-          Inject faults at runtime, then start workflows and watch the runtime recover. The
-          guarantee: workflows still complete, and side effects still fire exactly once.
-        </p>
-        <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
+        <p className="mt-1 text-[13px] text-slate-500">Inject faults · watch durable runs recover</p>
+        <Note className="mt-1">
           Faults you arm here apply to your account's traffic only — your requests, your
           workflows, your deliveries. Nobody else on the engine sees them, so a drill is safe
           to run against production.
-        </p>
+        </Note>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

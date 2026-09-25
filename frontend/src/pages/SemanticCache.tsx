@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { PageHeader, Switch } from "../system/primitives";
+import { PageHeader, Switch, InfoTip } from "../system/primitives";
 import { ChartFrame, Donut } from "../system/charts";
 import { ErrorState, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
@@ -143,7 +143,7 @@ export default function SemanticCache() {
             {on ? "Live" : "Off"}
           </Pill>
         }
-        subtitle="Answers a repeated question from a previous answer instead of paying a provider for it again. Scoped to your account, and off by default."
+        subtitle="Serve repeated questions without a provider call"
       />
 
       {/* Where the cache sits. It is the one stage on the path that can end a
@@ -217,11 +217,9 @@ export default function SemanticCache() {
       </div>
 
       <section className="mt-10">
-        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Match threshold</h2>
-        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-          How close an incoming prompt has to be before a stored answer is served. A false hit is
-          worse than a miss, because the caller cannot tell it happened.
-        </p>
+        <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-slate-200">Match threshold
+          <InfoTip text="How close an incoming prompt has to be before a stored answer is served. A false hit is worse than a miss, because the caller cannot tell it happened." />
+        </h2>
 
         {/* A scale, not three products. The three named points sit on it, so
             picking one is visibly picking a position between two costs rather

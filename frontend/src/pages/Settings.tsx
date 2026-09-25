@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Note } from "../system/primitives";
 import { useNavigate } from "react-router-dom";
 import { portal } from "../api";
 import { Chip, Ghost, Pill } from "../system/hub";
@@ -47,7 +48,7 @@ export default function Settings() {
       <div className="plane mx-auto mt-16 max-w-md p-8 text-center">
         <div className="text-3xl">⚙️</div>
         <h1 className="mt-2 text-[22px] font-semibold tracking-tight">Account settings</h1>
-        <p className="mt-1 text-sm text-slate-400 max-w-2xl leading-relaxed">Sign in through the Developer Portal first.</p>
+        <Note className="mt-1">Sign in through the Developer Portal first.</Note>
         <a href="/portal" className="mt-4 inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-semibold text-ink">
           Open Developer Portal →
         </a>
@@ -157,7 +158,7 @@ export default function Settings() {
       </div>
 
       {/* API keys */}
-      <Section title="API keys" subtitle="Name a key so you remember what it's for. Keys are shown once.">
+      <Section title="API keys" subtitle="Shown once — name each for what it's for">
         <div className="flex flex-wrap gap-2">
           <input value={keyLabel} onChange={(e) => setKeyLabel(e.target.value)} placeholder="Key name (e.g. production)"
             className="min-w-0 flex-1 field" />
@@ -257,7 +258,7 @@ export default function Settings() {
       {/* team */}
       <Section
         title="Team"
-        subtitle="Anyone who accepts an invite signs in with their own password and works in this account."
+        subtitle="Teammates sign in with their own password"
       >
         {members.length > 0 && (
           <div className="mb-3 space-y-1">
@@ -326,10 +327,10 @@ export default function Settings() {
       ) : (
       <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-5">
         <div className="text-sm font-semibold text-rose-200">Danger zone</div>
-        <p className="mt-1 text-xs text-slate-400 max-w-2xl leading-relaxed">
+        <Note className="mt-1">
           Deleting your account permanently removes your keys, credentials, memory, billing and all data (GDPR).
           This cannot be undone. Type <b>DELETE</b> to confirm.
-        </p>
+        </Note>
         <div className="mt-3 flex flex-wrap gap-2">
           <input value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="DELETE"
             className="w-40 border-rose-500/30 field" />

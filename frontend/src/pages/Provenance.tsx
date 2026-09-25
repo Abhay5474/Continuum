@@ -2,7 +2,7 @@ import { useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { PageHeader, Readout, Switch } from "../system/primitives";
+import { PageHeader, Readout, Switch, Note } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
 import { Explain } from "../system/hub";
 
@@ -102,7 +102,7 @@ export default function Provenance() {
         glyph="list"
         tone="info"
         title="Decision Provenance"
-        subtitle="Why Continuum did what it did — as data, not as a sentence."
+        subtitle="Every decision behind a request, as data"
       />
 
       <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -136,9 +136,9 @@ export default function Provenance() {
           label="Record decisions"
           hint="Off by default. Recording is cheap but not free, and a request path is the wrong place to add writes nobody asked for."
         />
-        <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+        <Note>
           One row per decision, so you can aggregate and alert on them.
-        </p>
+        </Note>
         <Explain title="Why not the routing reason">
           <p>
             Every response already carries one, like{" "}
@@ -233,13 +233,13 @@ export default function Provenance() {
                   <pre className="well max-h-72 w-full max-w-full overflow-auto p-3 text-[11px] leading-relaxed text-slate-400">
                     {JSON.stringify(otel, null, 2)}
                   </pre>
-                  <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                  <Note>
                     Uses the GenAI semantic conventions where they exist —{" "}
                     <span className="readout">gen_ai.request.model</span>,{" "}
                     <span className="readout">gen_ai.usage.cost</span> — so this groups correctly in
                     a dashboard that already exists. An observability feature only readable inside
                     the product it observes has solved the easy half of the problem.
-                  </p>
+                  </Note>
                 </>
               )}
             </div>
@@ -305,11 +305,11 @@ function Degradation() {
         <Readout label="Nothing to serve" value={byRung.STATIC ?? 0} size="sm" />
       </div>
 
-      <p className="max-w-2xl text-xs leading-relaxed text-slate-600">
+      <Note>
         Every degraded response names its rung: the model reads{" "}
         <span className="readout">degraded/cached</span> or{" "}
         <span className="readout">degraded/static</span>.
-      </p>
+      </Note>
       <Explain>
         <p>
           A degraded answer presented as a normal one is worse than an error — the caller cannot

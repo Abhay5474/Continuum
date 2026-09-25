@@ -92,7 +92,7 @@ const panelX = () => {
   check("press", scales[0] < 0.99 && peak > 1.001 && Math.abs(scales.at(-1) - 1) < 0.002,
     `from ${scales[0].toFixed(3)}, peak ${peak.toFixed(4)}, rest ${scales.at(-1).toFixed(4)}`);
 
-  const row = await page.$('[data-surface="row"]');
+  const row = await page.$('[data-surface="row"], main button[data-surface]');
   if (row) {
     await row.click();
     await page.waitForTimeout(90);
@@ -129,7 +129,7 @@ const panelX = () => {
 {
   const page = await open("reduce");
   await page.goto(BASE + "/specialists", { waitUntil: "networkidle" });
-  const row = await page.$('[data-surface="row"]');
+  const row = await page.$('[data-surface="row"], main button[data-surface]');
   if (row) {
     await row.click();
     const xs = (await frames(page, panelX, 12)).filter((x) => x !== null);
