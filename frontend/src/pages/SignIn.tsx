@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { portal } from "../api";
 import { Spinner, ThemeToggle, useToast } from "../components/ui";
@@ -11,6 +11,12 @@ import { Spinner, ThemeToggle, useToast } from "../components/ui";
 export default function SignIn() {
   const [params] = useSearchParams();
   const next = params.get("next") || "/dashboard";
+  const ended = params.get("ended") === "1";
+  // A lapsed token left in storage would make the rest of the app believe the
+  // user is still signed in.
+  useEffect(() => {
+    if (ended) portal.setSession(null);
+  }, [ended]);
   const nav = useNavigate();
   const toast = useToast();
 
@@ -116,6 +122,12 @@ export default function SignIn() {
                   className="w-full field"
                 />
               </Field>
+
+              {ended && !error && (
+                <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                  Your session ended, so you have been signed out. Sign in again to carry on where you were.
+                </div>
+              )}
 
               {error && (
                 <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">

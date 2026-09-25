@@ -26,3 +26,7 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      # Signs console sessions. Generated once by Render and kept private; the
+      # master key in application.yml is public, so it must never sign.
+      - key: CONTINUUM_SESSION_KEY
+        generateValue: true

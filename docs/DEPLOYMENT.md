@@ -85,8 +85,9 @@ failover, configure both Gemini and Groq.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `CONTINUUM_MASTER_KEY` | _(empty)_ | AES-256-GCM key for the provider-credential vault and API-key pepper. **Required in production.** If unset, the vault uses an ephemeral key (logs a loud warning) and stored secrets won't survive a restart. |
-| `CONTINUUM_ADMIN_TOKEN` | _(empty)_ | Required `X-Admin-Token` for `/api/admin/**` onboarding endpoints. If unset, admin routes are open (dev only) with a warning. |
+| `CONTINUUM_MASTER_KEY` | _(empty)_ | AES-256-GCM key for the provider-credential vault and API-key pepper. **Required in production** — and must not be the placeholder in `application.yml`, which is public (the server warns at startup). If unset, the vault uses an ephemeral key (logs a loud warning) and stored secrets won't survive a restart. |
+| `CONTINUUM_ADMIN_TOKEN` | _(empty)_ | Required `X-Admin-Token` for `/api/admin/**` onboarding endpoints and for operator sign-in. If unset, the admin surface is refused (fails closed). |
+| `CONTINUUM_SESSION_KEY` | _(empty)_ | Signs console session tokens. If unset, a private `CONTINUUM_MASTER_KEY` is used; if that is also unset or is the value committed in `application.yml`, sessions are signed with a per-process random key and end on restart. The Render blueprint generates one. |
 | `continuum.registry.discovery-cron` | `0 0 3 1 * *` | Model discovery schedule (monthly). |
 
 See **[docs/V3_GATEWAY.md](V3_GATEWAY.md)** for the full gateway feature set.

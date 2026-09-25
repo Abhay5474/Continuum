@@ -1,21 +1,26 @@
 package io.continuum.portal;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Issues and verifies stateless portal session tokens (HMAC-SHA256 signed).
  *
  * Token format: {@code base64url(payload).base64url(hmac)} where payload is
  * {@code role:subject:expiryEpochSeconds}. The signing key is derived from
- * {@code CONTINUUM_MASTER_KEY}; tokens are tamper-evident and self-expiring, so
+ * {@code CONTINUUM_SESSION_KEY}, else a private {@code CONTINUUM_MASTER_KEY}; tokens are tamper-evident and self-expiring, so
  * no server-side session store is needed.
  */
 @Service
@@ -26,8 +31,46 @@ public class PortalSessionService {
     private static final long DEFAULT_TTL_SECONDS = 12 * 3600;
     private final byte[] signingKey;
 
-    public PortalSessionService(@Value("${CONTINUUM_MASTER_KEY:continuum-dev-secret}") String master) {
+    /**
+     * Master-key values that are published in this repository. A session signed
+     * with one of them can be forged by anyone who has read the source — an
+     * OPERATOR session included, which reads every tenant and reaches the admin
+     * API — so they are never used to sign.
+     */
+    public static final Set<String> PUBLIC_KEYS =
+            Set.of("", "continuum-dev-secret", "dev-persistent-master-key-change-in-prod");
+
+    private static final Logger log = LoggerFactory.getLogger(PortalSessionService.class);
+
+    @Autowired
+    public PortalSessionService(@Value("${CONTINUUM_SESSION_KEY:}") String sessionKey,
+                                @Value("${CONTINUUM_MASTER_KEY:}") String master) {
+        this.signingKey = ("portal-session|" + chooseSecret(sessionKey, master)).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Signs with {@code master} alone — for tests and callers that manage their own secret. */
+    public PortalSessionService(String master) {
         this.signingKey = ("portal-session|" + master).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * The dedicated session key if one is set; otherwise the master key, unless it
+     * is a published default; otherwise a random key for this process. The last
+     * case costs sign-ins across a restart, which is the correct trade: the
+     * alternative is sessions anyone can mint.
+     */
+    static String chooseSecret(String sessionKey, String master) {
+        if (sessionKey != null && !sessionKey.isBlank()) {
+            return sessionKey;
+        }
+        if (master != null && !PUBLIC_KEYS.contains(master.trim())) {
+            return master;
+        }
+        byte[] random = new byte[32];
+        new SecureRandom().nextBytes(random);
+        log.warn("Neither CONTINUUM_SESSION_KEY nor a private CONTINUUM_MASTER_KEY is set: console sessions are "
+                + "signed with a per-process key and will end when the server restarts.");
+        return Base64.getEncoder().encodeToString(random);
     }
 
     public String issue(String subject, Role role) {

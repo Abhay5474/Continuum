@@ -34,6 +34,14 @@ public class VaultConfig {
             log.warn("################################################################");
             return new AesGcmCipher(ephemeral);
         }
+        if (io.continuum.portal.PortalSessionService.PUBLIC_KEYS.contains(masterKey.trim())) {
+            // Not replaced automatically: secrets already stored under this key
+            // would become unreadable. But anyone holding a database dump and this
+            // repository can decrypt them, so say so every time the server starts.
+            log.warn("CONTINUUM_MASTER_KEY is the value published in application.yml. Stored provider "
+                    + "credentials are encrypted with a public key; set a private CONTINUUM_MASTER_KEY "
+                    + "and re-enter them.");
+        }
         return new AesGcmCipher(AesGcmCipher.deriveKey(masterKey));
     }
 }

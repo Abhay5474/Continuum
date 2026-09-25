@@ -47,7 +47,7 @@ public class GatewaySecurityConfig {
         // Pipelines are the same kind of endpoint — called by a program, not a
         // person — so they belong here rather than behind the console filter.
         reg.addUrlPatterns("/api/gateway/chat", "/v1/chat/completions",
-                "/api/gateway/pipeline/*");
+                "/api/gateway/pipeline/*", "/api/gateway/context/transform");
         reg.setOrder(1);
         return reg;
     }
@@ -67,7 +67,7 @@ public class GatewaySecurityConfig {
         reg.setFilter(new ConsoleAuthFilter(sessions, mapper));
         reg.addUrlPatterns(
                 "/api/workflows/*", "/api/workflows",
-                "/api/stats", "/api/costs",
+                "/api/stats", "/api/costs", "/api/deliveries", "/api/engine/capacity",
                 "/api/gateway/stats", "/api/gateway/requests", "/api/gateway/health",
                 "/api/gateway/healing/*",
                 "/api/dag/*", "/api/mmu/*", "/api/memory/*",

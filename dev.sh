@@ -5,7 +5,7 @@ pg_isready -p 5432 >/dev/null 2>&1 || su postgres -c "/usr/lib/postgresql/*/bin/
 until pg_isready -p 5432 >/dev/null 2>&1; do sleep 1; done
 curl -sf -o /dev/null http://localhost:8080/actuator/health || {
   cd /home/user/Continuum/backend
-  (SPRING_DATASOURCE_USERNAME=continuum SPRING_DATASOURCE_PASSWORD=abhay123 setsid java -jar target/continuum.jar > /tmp/backend.log 2>&1 < /dev/null &)
+  (SPRING_DATASOURCE_USERNAME=continuum SPRING_DATASOURCE_PASSWORD=abhay123 CONTINUUM_SESSION_KEY=${CONTINUUM_SESSION_KEY:-local-dev-only} setsid java -jar target/continuum.jar > /tmp/backend.log 2>&1 < /dev/null &)
 }
 curl -sf -o /dev/null http://localhost:5199/ || {
   cd /home/user/Continuum/frontend

@@ -8,6 +8,8 @@ import io.continuum.persistence.repository.WorkflowInstanceRepository;
 import io.continuum.portal.RequestScope;
 import io.continuum.provider.ProviderRouter;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -87,8 +89,16 @@ public class MetaController {
         return dev == null ? query.costReport() : query.costReportForDeveloper(dev);
     }
 
+    /**
+     * The outbox delivery log. It is engine-wide and carries payloads, with no
+     * tenant on each record, so only the operator may read it; it used to be
+     * anonymous.
+     */
     @GetMapping("/deliveries")
-    public List<DeliveryRecorder.Delivery> deliveries() {
-        return deliveries.deliveries();
+    public ResponseEntity<List<DeliveryRecorder.Delivery>> deliveries(HttpServletRequest http) {
+        if (!RequestScope.isOperator(http)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(deliveries.deliveries());
     }
 }

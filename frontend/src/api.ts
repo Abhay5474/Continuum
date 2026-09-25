@@ -7,7 +7,7 @@ import type {
   WorkflowSummary,
 } from "./types";
 
-const BASE = import.meta.env.VITE_API_BASE ?? "";
+export const BASE = import.meta.env.VITE_API_BASE ?? "";
 const SESSION_KEY = "continuum.portal.session";
 const OPERATOR_KEY = "continuum.portal.operator";
 
@@ -36,6 +36,46 @@ export class ForbiddenError extends Error {
 
 function sessionToken(): string | null {
   return localStorage.getItem(SESSION_KEY);
+}
+
+/** When the server last refused the held session; cleared by a new sign-in. */
+let endedAt = 0;
+
+/** Fired on window when the held session stops being accepted. */
+export const SESSION_ENDED = "continuum:session-ended";
+
+/** Seconds since the epoch at which a session token lapses, read from its payload. */
+export function sessionExpiry(token: string | null): number | null {
+  if (!token || !token.includes(".")) return null;
+  try {
+    const payload = atob(token.split(".")[0].replace(/-/g, "+").replace(/_/g, "/"));
+    const exp = Number(payload.split(":")[2]);
+    return Number.isFinite(exp) ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The server refused a token we sent. Sessions last twelve hours and end when
+ * the signing key changes, so this is routine — yet it used to leave the user
+ * on a console whose every panel said "Sign in to view this data", with no way
+ * to sign in short of clearing storage. Now the stale token is dropped and the
+ * console routes send the user to sign in, back to where they were.
+ *
+ * <p>An operator token that lapses only drops the elevation: the developer
+ * session underneath is still good.
+ */
+function sessionRejected(sent: string | null) {
+  if (!sent) return;
+  if (sent === localStorage.getItem(OPERATOR_KEY)) {
+    localStorage.removeItem(OPERATOR_KEY);
+    return;
+  }
+  if (sent !== localStorage.getItem(SESSION_KEY)) return; // already replaced by a new sign-in
+  localStorage.removeItem(SESSION_KEY);
+  endedAt = Date.now();
+  window.dispatchEvent(new Event(SESSION_ENDED));
 }
 
 /**
@@ -71,7 +111,10 @@ async function http<T>(path: string, init?: RequestInit, asOperator = false): Pr
       ...(init?.headers ?? {}),
     },
   });
-  if (res.status === 401) throw new UnauthorizedError();
+  if (res.status === 401) {
+    sessionRejected(token);
+    throw new UnauthorizedError();
+  }
   if (res.status === 403) {
     throw asOperator
       ? new ForbiddenError("This control changes engine-wide behaviour, so it needs operator access.", true)
@@ -116,6 +159,8 @@ export const api = {
   get: <T>(path: string) => http<T>(path),
   post: <T>(path: string, body?: unknown) =>
     http<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
+  put: <T>(path: string, body?: unknown) =>
+    http<T>(path, { method: "PUT", body: body === undefined ? undefined : JSON.stringify(body) }),
 
   /**
    * Same as {@link post}, for endpoints the backend gates to the operator —
@@ -134,6 +179,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function portalHttp<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const sent = sessionToken();
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -149,7 +195,11 @@ async function portalHttp<T>(path: string, method: string, body?: unknown): Prom
     } catch {
       /* a non-JSON body leaves the status code as the best available message */
     }
-    if (res.status === 401) throw new UnauthorizedError(message);
+    if (res.status === 401) {
+      // A refused sign-in or operator token is an answer, not a lapsed session.
+      if (!path.startsWith("/api/portal/operator/")) sessionRejected(sent);
+      throw new UnauthorizedError(message);
+    }
     throw new Error(message);
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
@@ -163,6 +213,7 @@ async function portalHttp<T>(path: string, method: string, body?: unknown): Prom
  * hand produces a body the server cannot parse.
  */
 async function portalUpload<T>(path: string, form: FormData): Promise<T> {
+  const sent = sessionToken();
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { ...authHeaders() },
@@ -176,7 +227,11 @@ async function portalUpload<T>(path: string, form: FormData): Promise<T> {
     } catch {
       /* a non-JSON body leaves the status code as the best available message */
     }
-    if (res.status === 401) throw new UnauthorizedError(message);
+    if (res.status === 401) {
+      // A refused sign-in or operator token is an answer, not a lapsed session.
+      if (!path.startsWith("/api/portal/operator/")) sessionRejected(sent);
+      throw new UnauthorizedError(message);
+    }
     throw new Error(message);
   }
   return (await res.json()) as T;
@@ -214,8 +269,12 @@ export const isOperator = () => sessionRole() === "OPERATOR" || hasOperator();
 
 export const portal = {
   session: () => localStorage.getItem(SESSION_KEY),
-  setSession: (t: string | null) =>
-    t ? localStorage.setItem(SESSION_KEY, t) : localStorage.removeItem(SESSION_KEY),
+  setSession: (t: string | null) => {
+    if (t) endedAt = 0;
+    t ? localStorage.setItem(SESSION_KEY, t) : localStorage.removeItem(SESSION_KEY);
+  },
+  /** True when the server, not the user, ended the last session. */
+  sessionEnded: () => endedAt > 0,
 
   async signup(name: string, email: string, password: string) {
     const r = await portalHttp<any>("/api/portal/developer/signup", "POST", { name, email, password });
@@ -228,6 +287,7 @@ export const portal = {
     return r;
   },
   logout: () => {
+    endedAt = 0;
     portal.setSession(null);
     portal.dropOperator();
   },
@@ -609,6 +669,7 @@ export const portal = {
      * first — which is exactly the kind of input this feature exists for.
      */
     transformText: async (text: string, filename = "pasted-input", budget = "standard") => {
+      const sent = sessionToken();
       const res = await fetch(
         `${BASE}/api/portal/developer/context/transform` +
           `?budget=${budget}&filename=${encodeURIComponent(filename)}`,
@@ -626,7 +687,10 @@ export const portal = {
         } catch {
           /* status code is the best available message */
         }
-        if (res.status === 401) throw new UnauthorizedError(message);
+        if (res.status === 401) {
+          sessionRejected(sent);
+          throw new UnauthorizedError(message);
+        }
         throw new Error(message);
       }
       return res.json();
