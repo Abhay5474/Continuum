@@ -138,14 +138,15 @@ public class WorkflowContext {
     public <T> List<T> executeActivitiesParallel(List<ParallelCall> calls, Class<T> resultType) {
         List<T> results = new ArrayList<>(calls.size());
         boolean allDone = true;
-        for (ParallelCall call : calls) {
+        for (int index = 0; index < calls.size(); index++) {
+            ParallelCall call = calls.get(index);
             long seq = aligner.alignActivity(++commandCounter, call.activityType());
             if (completedResults.containsKey(seq)) {
                 results.add(json.read(completedResults.get(seq), resultType));
                 continue;
             }
             if (failedActivities.containsKey(seq)) {
-                throw new ActivityFailedException(call.activityType(), failedActivities.get(seq));
+                throw new ActivityFailedException(call.activityType(), failedActivities.get(seq), index);
             }
             allDone = false;
             results.add(null);

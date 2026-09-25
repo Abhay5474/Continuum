@@ -155,6 +155,13 @@ public class WorkflowSpec {
             } else if (s.getCall() == null || s.getCall().getUrl() == null || s.getCall().getUrl().isBlank()) {
                 throw new InvalidSpecException("Step '" + s.getId() + "' needs a call.url.");
             }
+            if (s.getType() != Kind.WAIT) {
+                checkCall("Step '" + s.getId() + "'", s.getCall());
+            }
+            if (s.getCompensate() != null && s.getCompensate().getUrl() != null
+                    && !s.getCompensate().getUrl().isBlank()) {
+                checkCall("Step '" + s.getId() + "' compensate", s.getCompensate());
+            }
             if (s.getCondition() != null && !s.getCondition().isBlank()) {
                 // Fail at publish time rather than mid-run on an unparseable guard.
                 Conditions.parse(s.getCondition());
@@ -180,9 +187,41 @@ public class WorkflowSpec {
         if (onComplete != null && (onComplete.getUrl() == null || onComplete.getUrl().isBlank())) {
             throw new InvalidSpecException("onComplete needs a url.");
         }
+        if (onComplete != null) {
+            checkCall("onComplete", onComplete);
+        }
         // A cycle would never terminate, so it is rejected rather than discovered
         // at run time.
         topologicalLayers();
+    }
+
+    private static final Set<String> METHODS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
+
+    /**
+     * What can be known about a call before any run: a method HTTP has, and — when
+     * the URL is literal rather than templated from input or earlier steps — an
+     * absolute http(s) address. Both used to be accepted and then fail on every
+     * run, after the steps before them had already taken effect.
+     */
+    private static void checkCall(String where, Call call) {
+        String method = call.getMethod() == null ? "POST" : call.getMethod().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!METHODS.contains(method)) {
+            throw new InvalidSpecException(where + ": method '" + call.getMethod()
+                    + "' is not one of GET, POST, PUT, PATCH, DELETE.");
+        }
+        String url = call.getUrl().trim();
+        if (url.contains("${")) {
+            return; // resolved per run; checked when it is
+        }
+        try {
+            java.net.URI u = new java.net.URI(url);
+            String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase(java.util.Locale.ROOT);
+            if (!(scheme.equals("http") || scheme.equals("https")) || u.getHost() == null) {
+                throw new IllegalArgumentException();
+            }
+        } catch (Exception e) {
+            throw new InvalidSpecException(where + ": '" + url + "' is not an absolute http(s) URL.");
+        }
     }
 
     /**

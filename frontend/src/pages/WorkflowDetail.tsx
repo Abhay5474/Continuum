@@ -158,7 +158,18 @@ export default function WorkflowDetailPage() {
         <StatusBadge status={isCancelled(detail.error) ? "CANCELLED" : detail.summary.status} />
         <div className="flex items-center gap-2.5">
           <Chip glyph="flow" tone="accent" size={28} />
-          <h1 className="text-[20px] font-semibold tracking-[-0.011em]">{detail.summary.workflowType}</h1>
+          {/* A declarative run is named by its definition — "Declarative" is
+              the engine's word for every one of them. */}
+          {definitionOf(detail) ? (
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">
+              {definitionOf(detail)!.name}
+              <span className="ml-2 align-middle text-xs font-medium text-slate-500">
+                v{definitionOf(detail)!.version} · {detail.summary.workflowType}
+              </span>
+            </h1>
+          ) : (
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">{detail.summary.workflowType}</h1>
+          )}
         </div>
         <span className="font-mono text-xs text-slate-400">{detail.summary.workflowId}</span>
         {stale && (
@@ -172,7 +183,7 @@ export default function WorkflowDetailPage() {
             Stop workflow
           </Button>
         )}
-        {finished && (
+        {finished && !(detail.summary.status === "FAILED" && detail.error && !isCancelled(detail.error)) && (
           <Button size="sm" busy={rerunning} onClick={rerun} className="ml-auto"
             title="Starts a new run with the same input. This one is kept as it is.">
             Run again
@@ -210,6 +221,16 @@ export default function WorkflowDetailPage() {
               , which was cancelled.
             </>
           )}
+        </div>
+      )}
+
+      {detail.summary.status === "FAILED" && detail.error && !isCancelled(detail.error) && (
+        <div role="alert" className="-mt-3 flex flex-wrap items-center gap-3 rounded-[var(--r-lg)] border border-rose-500/30 bg-rose-500/[0.07] px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold text-rose-200">This run failed</div>
+            <div className="mt-0.5 text-[12.5px] text-slate-300">{detail.error}</div>
+          </div>
+          <Button size="sm" busy={rerunning} onClick={rerun}>Run again</Button>
         </div>
       )}
 
@@ -260,7 +281,7 @@ export default function WorkflowDetailPage() {
             {detail.activities.map((a) => (
               <div key={a.sequenceNumber} className="flex items-center gap-2 py-1 text-sm">
                 <StatusBadge status={a.status} />
-                <span>{a.activityType}</span>
+                <span>{stepNames[a.sequenceNumber] ?? a.activityType}</span>
                 {a.retryCount > 0 && (
                   <span className="text-xs text-amber-400">retries: {a.retryCount}</span>
                 )}
@@ -368,6 +389,14 @@ function EventRow({
               </button>
             )}
           </div>
+          {/* Why a step failed belongs on the row that says it failed, not
+              behind "+ payload". */}
+          {event.eventType === "ACTIVITY_FAILED" && (payload as any)?.error && (
+            <div className="mt-0.5 text-xs text-rose-300">
+              {String((payload as any).error)}
+              {(payload as any).terminal === false && <span className="text-slate-500"> — will retry</span>}
+            </div>
+          )}
           {open && (
             <div className="mt-1.5 border-l border-edge pl-3">
               <DataView value={payload} />
@@ -384,6 +413,15 @@ function EventRow({
       </div>
     </li>
   );
+}
+
+/** The definition a declarative run (or its rollback) was started from. */
+function definitionOf(d: WorkflowDetail): { name: string; version: number } | null {
+  const input: any = d.input;
+  if (input && typeof input === "object" && typeof input.definition === "string") {
+    return { name: input.definition, version: Number(input.version ?? 1) };
+  }
+  return null;
 }
 
 /** Recursively parses JSON that the API embedded as a string. */

@@ -73,6 +73,11 @@ public class HttpStepActivity implements Activity {
             // A refused target will be refused identically next time; retrying
             // it only burns the step's budget.
             throw new NonRetryable(e.getMessage());
+        } catch (java.io.IOException e) {
+            // Retried by the engine like any transient failure — but described,
+            // because this text is what the run's timeline and failure show. It
+            // used to read, in full, "ConnectException".
+            throw new IllegalStateException(describe(e, in.url(), in.timeoutSeconds()), e);
         }
         int code = res.status();
 
@@ -104,6 +109,31 @@ public class HttpStepActivity implements Activity {
      * Kept for the guard's own tests, which assert on this class rather than on
      * the sender it now delegates to.
      */
+    /** A network failure in words a person can act on. */
+    static String describe(java.io.IOException e, String url, int timeoutSeconds) {
+        String host;
+        try {
+            java.net.URI u = java.net.URI.create(url);
+            host = u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "");
+        } catch (Exception ignored) {
+            host = url;
+        }
+        if (e instanceof java.net.http.HttpTimeoutException) {
+            return "no response from " + host + " within " + timeoutSeconds + "s";
+        }
+        if (e instanceof java.net.ConnectException) {
+            return "could not connect to " + host + " (nothing accepted the connection)";
+        }
+        if (e instanceof java.net.UnknownHostException) {
+            return "host " + host + " could not be found";
+        }
+        if (e instanceof javax.net.ssl.SSLException) {
+            return "TLS handshake with " + host + " failed: " + e.getMessage();
+        }
+        return "request to " + host + " failed: "
+                + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+    }
+
     GuardedHttpSender.Target resolveTarget(String url) throws Exception {
         return sender.resolve(url);
     }

@@ -98,7 +98,15 @@ public class DeclarativeWorkflow implements Workflow {
             List<Map> results;
             try {
                 results = ctx.executeActivitiesParallel(calls, Map.class);
-            } catch (ActivityFailedException failure) {
+            } catch (ActivityFailedException raw) {
+                // Named by the step the author wrote, not the engine's activity
+                // type: "Step 'notify' failed: could not connect to …" is a
+                // diagnosis; "Activity 'declarative.httpStep' failed" was not.
+                int i = raw.getCallIndex();
+                String step = i >= 0 && i < live.size() ? live.get(i).getId()
+                        : live.stream().map(WorkflowSpec.Step::getId)
+                                .collect(java.util.stream.Collectors.joining(", "));
+                ActivityFailedException failure = raw.describedAs("Step '" + step + "' failed: " + raw.getFailure());
                 // The forward path is over. Everything already in stepResults ran
                 // against a system that has never heard of this transaction, so
                 // undoing it is the workflow's job, not the engine's.

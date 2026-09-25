@@ -96,4 +96,29 @@ class WorkflowSpecTest {
                 .isEqualTo(s.topologicalLayers().get(0).stream().map(WorkflowSpec.Step::getId).toList())
                 .containsExactly("a", "m", "z");
     }
+
+    /** Caught at publish, not on every run after the earlier steps took effect. */
+    @Test
+    void rejectsAMethodHttpDoesNotHave() {
+        assertThatThrownBy(() -> spec(Map.of("steps", List.of(Map.of("id", "a",
+                "call", Map.of("url", "https://x.test/a", "method", "FETCH"))))).validate())
+                .isInstanceOf(WorkflowSpec.InvalidSpecException.class)
+                .hasMessageContaining("FETCH");
+    }
+
+    @Test
+    void rejectsALiteralUrlThatIsNotAnAbsoluteHttpUrl() {
+        for (String bad : List.of("not a url", "/relative", "ftp://x.test/a")) {
+            assertThatThrownBy(() -> spec(Map.of("steps", List.of(Map.of("id", "a",
+                    "call", Map.of("url", bad))))).validate())
+                    .isInstanceOf(WorkflowSpec.InvalidSpecException.class);
+        }
+    }
+
+    @Test
+    void leavesTemplatedUrlsForRunTimeAndAcceptsLowerCaseMethods() {
+        WorkflowSpec s = spec(Map.of("steps", List.of(Map.of("id", "a",
+                "call", Map.of("url", "${input.callback}", "method", "patch")))));
+        assertThatCode(s::validate).doesNotThrowAnyException();
+    }
 }
