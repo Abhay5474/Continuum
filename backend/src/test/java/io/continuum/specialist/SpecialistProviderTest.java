@@ -84,6 +84,72 @@ class SpecialistProviderTest {
         assertThat(call.url()).doesNotContain("//animal").contains("/animal-injury/3");
     }
 
+    @Test
+    @DisplayName("a real Roboflow response parses to the detections Roboflow reported")
+    void roboflowParsesARecordedResponse() throws Exception {
+        // Captured from Roboflow's hosted API (RF-DETR nano, animal-injury/1)
+        // rather than written by hand. Hand-written fixtures only ever match
+        // what the parser already expects, which is how the multi-label shape
+        // below went unnoticed.
+        Object body;
+        try (var in = getClass().getResourceAsStream("/fixtures/roboflow/animal-injury-v1.json")) {
+            body = new com.fasterxml.jackson.databind.ObjectMapper().readValue(in, Map.class);
+        }
+
+        List<SpecialistProvider.Finding> findings = roboflow.parse(body);
+
+        assertThat(findings).extracting(SpecialistProvider.Finding::label).containsExactly("animal", "blood");
+        assertThat(findings.get(0).confidence()).isCloseTo(0.9816, org.assertj.core.api.Assertions.within(1e-4));
+        assertThat(findings.get(1).confidence()).isCloseTo(0.3744, org.assertj.core.api.Assertions.within(1e-4));
+        // Roboflow's x/y are box centres in pixels; they are carried through
+        // untouched rather than reinterpreted.
+        assertThat(findings.get(1).region()).containsEntry("x", 185.5).containsEntry("width", 23);
+    }
+
+    @Test
+    @DisplayName("a multi-label classifier's map of classes becomes findings, not silence")
+    void roboflowParsesMultiLabelClassification() {
+        // The documented multi-label shape: predictions is a map, not a list.
+        Object body = Map.of(
+                "predictions", Map.of(
+                        "dent", Map.of("confidence", 0.5253),
+                        "severe", Map.of("confidence", 0.5804),
+                        "scratch", Map.of("confidence", 0.0412)),
+                "predicted_classes", List.of("dent", "severe"),
+                "prediction_type", "ClassificationModel");
+
+        List<SpecialistProvider.Finding> findings = roboflow.parse(body);
+
+        // Only the classes Roboflow judged present, strongest first.
+        assertThat(findings).extracting(SpecialistProvider.Finding::label).containsExactly("severe", "dent");
+        assertThat(findings.get(0).region()).isNull();
+    }
+
+    @Test
+    @DisplayName("a single-label classifier's list parses without boxes")
+    void roboflowParsesSingleLabelClassification() {
+        Object body = Map.of(
+                "predictions", List.of(
+                        Map.of("class", "real-image", "confidence", 0.7149),
+                        Map.of("class", "illustration", "confidence", 0.2851)),
+                "top", "real-image");
+
+        List<SpecialistProvider.Finding> findings = roboflow.parse(body);
+
+        assertThat(findings.get(0).label()).isEqualTo("real-image");
+        assertThat(findings.get(0).region()).isNull();
+    }
+
+    @Test
+    @DisplayName("new connections default to Roboflow's serverless host")
+    void roboflowDefaultsToServerless() {
+        var call = roboflow.buildCall(connection("roboflow", null), "animal-injury/1",
+                Map.of("imageBase64", "AAAA", "minConfidence", 0.3));
+
+        assertThat(call.url()).isEqualTo(
+                "https://serverless.roboflow.com/animal-injury/1?format=json&confidence=30");
+    }
+
     // --- generic HTTP -------------------------------------------------------
 
     @Test

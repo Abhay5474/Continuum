@@ -2,6 +2,7 @@ package io.continuum.specialist.discovery;
 
 import io.continuum.portal.TenantContext;
 import io.continuum.specialist.CatalogueEntry;
+import io.continuum.specialist.RoboflowProvider;
 import io.continuum.specialist.CatalogueSource;
 import io.continuum.specialist.SpecialistConnectionService;
 import io.continuum.tool.ToolKind;
@@ -225,9 +226,9 @@ public class RoboflowCatalogueSource implements CatalogueSource {
                             ? "A Roboflow model discovered in the public directory."
                             : m.description(),
                     "roboflow",
-                    kind == ToolKind.CLASSIFICATION
-                            ? "https://classify.roboflow.com"
-                            : "https://detect.roboflow.com",
+                    // One host for every task type: serverless replaced the
+                    // separate detect./classify. v1 endpoints.
+                    RoboflowProvider.SERVERLESS,
                     invocable ? m.invocationPath() : "",
                     "image",
                     kind,

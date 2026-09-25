@@ -36,7 +36,7 @@ public class CuratedCatalogue implements CatalogueSource {
                     "Object or defect detection (Roboflow)",
                     "A model you trained in Roboflow, returning labelled boxes with confidences. "
                             + "The common case: damage, defects, wear, presence or absence of a part.",
-                    "roboflow", "https://detect.roboflow.com", "", "image", ToolKind.DETECTION,
+                    "roboflow", RoboflowProvider.SERVERLESS, "", "image", ToolKind.DETECTION,
                     0.40,
                     List.of("roboflow", "detection", "object", "defect", "damage", "boxes", "vision"),
                     List.of("modelPath", "secret"),

@@ -23,6 +23,16 @@ import java.util.Map;
  */
 public class RoboflowProvider implements SpecialistProvider {
 
+    /**
+     * Roboflow's hosted inference endpoint for every task type.
+     *
+     * <p>This used to be {@code detect.roboflow.com}, with classifiers on a
+     * separate {@code classify.} host. Those are the v1 API; serverless is the
+     * documented endpoint for new projects and serves both. Connections saved
+     * with the old host keep it — it still answers — so nothing is rewritten.
+     */
+    public static final String SERVERLESS = "https://serverless.roboflow.com";
+
     @Override
     public String name() {
         return "roboflow";
@@ -35,7 +45,7 @@ public class RoboflowProvider implements SpecialistProvider {
 
     @Override
     public String defaultBaseUrl() {
-        return "https://detect.roboflow.com";
+        return SERVERLESS;
     }
 
     @Override
@@ -76,40 +86,73 @@ public class RoboflowProvider implements SpecialistProvider {
         return new Call(url.toString(), "POST", headers, image == null ? "" : image.toString());
     }
 
+    /**
+     * Normalises every response shape Roboflow's inference API returns.
+     *
+     * <p>Detection, segmentation, keypoints and single-label classification all
+     * return {@code predictions} as a list. Multi-label classification does not:
+     * it returns a map from class to {@code {confidence}}. The first version of
+     * this parser only read lists, so a multi-label classifier came back as "no
+     * findings" — and the pipeline then told the model nothing had been seen,
+     * which is a confident statement built on a parsing failure.
+     */
     @Override
-    @SuppressWarnings("unchecked")
     public List<Finding> parse(Object responseBody) {
         List<Finding> out = new ArrayList<>();
         if (!(responseBody instanceof Map<?, ?> body)) {
             return out;
         }
         Object predictions = body.get("predictions");
-        if (!(predictions instanceof List<?> list)) {
-            return out;
-        }
-        for (Object o : list) {
-            if (!(o instanceof Map<?, ?> p)) {
-                continue;
-            }
-            Object cls = p.get("class");
-            Object conf = p.get("confidence");
-            if (cls == null) {
-                continue;
-            }
-            Map<String, Object> region = new LinkedHashMap<>();
-            for (String k : List.of("x", "y", "width", "height")) {
-                Object v = p.get(k);
-                if (v != null) {
-                    region.put(k, v);
+        if (predictions instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> p) {
+                    Finding f = fromPrediction(p);
+                    if (f != null) {
+                        out.add(f);
+                    }
                 }
             }
-            out.add(new Finding(cls.toString(),
-                    conf instanceof Number n ? n.doubleValue() : 0.0,
-                    region.isEmpty() ? null : region));
+        } else if (predictions instanceof Map<?, ?> byClass) {
+            // Multi-label: { "dent": { "confidence": 0.52 }, ... }. Every class
+            // is scored; the ones Roboflow judged present are listed separately
+            // in predicted_classes, and only those are findings.
+            Object predicted = body.get("predicted_classes");
+            java.util.Set<String> present = new java.util.HashSet<>();
+            if (predicted instanceof List<?> names) {
+                for (Object n : names) {
+                    present.add(String.valueOf(n));
+                }
+            }
+            for (Map.Entry<?, ?> e : byClass.entrySet()) {
+                String cls = String.valueOf(e.getKey());
+                if (!present.isEmpty() && !present.contains(cls)) {
+                    continue;
+                }
+                Object conf = e.getValue() instanceof Map<?, ?> m ? m.get("confidence") : e.getValue();
+                out.add(new Finding(cls, conf instanceof Number n ? n.doubleValue() : 0.0, null));
+            }
         }
         // Strongest first: the context builder and the confidence policy both
         // care most about the top finding.
         out.sort((a, b) -> Double.compare(b.confidence(), a.confidence()));
         return out;
+    }
+
+    private static Finding fromPrediction(Map<?, ?> p) {
+        Object cls = p.get("class");
+        if (cls == null) {
+            return null;
+        }
+        Object conf = p.get("confidence");
+        Map<String, Object> region = new LinkedHashMap<>();
+        for (String k : List.of("x", "y", "width", "height")) {
+            Object v = p.get(k);
+            if (v != null) {
+                region.put(k, v);
+            }
+        }
+        return new Finding(cls.toString(),
+                conf instanceof Number n ? n.doubleValue() : 0.0,
+                region.isEmpty() ? null : region);
     }
 }
