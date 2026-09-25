@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MenuSurface } from "./system/MenuSurface";
 import { PageStage } from "./system/PageStage";
+import { NavProgress } from "./system/NavProgress";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { portal } from "./api";
 import { ThemeToggle } from "./components/ui";
@@ -272,6 +273,7 @@ export default function App() {
             </div>
           </nav>
         )}
+        <NavProgress />
       </header>
 
       {/* One entrance for every page, keyed on the route, applied in the shell

@@ -5,44 +5,9 @@ import "./index.css";
 import App from "./App";
 import RequireAuth from "./components/RequireAuth";
 import Landing from "./pages/Landing";
-import Docs from "./pages/Docs";
 import SignIn from "./pages/SignIn";
-import AcceptInvite from "./pages/AcceptInvite";
-import Dashboard from "./pages/Dashboard";
-import CommandCenter from "./pages/CommandCenter";
-import WorkflowBuilder from "./pages/WorkflowBuilder";
-import WorkflowDetailPage from "./pages/WorkflowDetail";
-import ChaosPanel from "./pages/ChaosPanel";
-import ReplayVerify from "./pages/ReplayVerify";
-import ModelRouter from "./pages/ModelRouter";
-import AiChaosLab from "./pages/AiChaosLab";
-import Memory from "./pages/Memory";
-import GatewayDashboard from "./pages/GatewayDashboard";
-import DeveloperPortal from "./pages/DeveloperPortal";
-import Autopilot from "./pages/Autopilot";
-import GodMode from "./pages/GodMode";
-import DagCommandCenter from "./pages/DagCommandCenter";
-import MmuProfiler from "./pages/MmuProfiler";
-import Billing from "./pages/Billing";
-import Settings from "./pages/Settings";
-import PromptGuard from "./pages/PromptGuard";
-import SemanticCache from "./pages/SemanticCache";
-import Cascade from "./pages/Cascade";
-import Uncertainty from "./pages/Uncertainty";
-import QualityGatePage from "./pages/QualityGate";
-import BreakerPage from "./pages/Breaker";
-import Specialists from "./pages/Specialists";
-import Pipelines from "./pages/Pipelines";
-import Admission from "./pages/Admission";
-import CompressionPolicy from "./pages/CompressionPolicy";
-import ContextTransformers from "./pages/ContextTransformers";
-import Counterfactual from "./pages/Counterfactual";
-import CostAdmission from "./pages/CostAdmission";
-import LoopGuard from "./pages/LoopGuard";
-import Saga from "./pages/Saga";
-import Scheduling from "./pages/Scheduling";
-import Provenance from "./pages/Provenance";
 import { ToastProvider } from "./components/ui";
+import { NotFound, RouteError } from "./system/RouteError";
 import { OperatorProvider } from "./system/OperatorAccess";
 import { installMotionTokens, installSurfaceLight, installTooltips } from "./system/physics";
 
@@ -52,63 +17,82 @@ installMotionTokens();
 installSurfaceLight();
 installTooltips();
 
+/**
+ * A route whose page is downloaded when first visited. The public landing page
+ * used to carry every console page with it — one 840 KB script before anything
+ * drew. The router resolves the import before it commits the navigation, so a
+ * page never flashes a spinner in place of the one being left.
+ */
+const page = (load: () => Promise<{ default: React.ComponentType }>) => async () => ({
+  Component: (await load()).default,
+});
+
 const router = createBrowserRouter([
   // Public: marketing, docs and authentication.
   { path: "/", element: <Landing /> },
-  { path: "/docs", element: <Docs /> },
+  { path: "/docs", lazy: page(() => import("./pages/Docs")) },
   { path: "/signin", element: <SignIn /> },
   // Open by necessity: an invitee has no account until they accept.
-  { path: "/accept-invite", element: <AcceptInvite /> },
+  { path: "/accept-invite", lazy: page(() => import("./pages/AcceptInvite")) },
 
   // Console. Every route below requires a session — the APIs behind them are
   // tenant-scoped, so an anonymous visitor has nothing legitimate to render.
   // Paths are unchanged so existing links keep working.
   {
     element: <RequireAuth />,
+    errorElement: <RouteError />,
     children: [
       {
         element: <App />,
         children: [
+          {
+            // Pathless: a page that fails renders its error inside the console,
+            // with the bar still there, rather than replacing the whole app.
+            errorElement: <RouteError />,
+            children: [
           // The command centre is the front of the console; the workflow
           // console it replaced stays reachable at /workflows.
-          { path: "dashboard", element: <CommandCenter /> },
+          { path: "dashboard", lazy: page(() => import("./pages/CommandCenter")) },
           // /workflows is now where a developer authors and runs their own
           // definitions; the original run console keeps its own path. A static
           // segment outranks :id, so /workflows/console is unambiguous.
-          { path: "workflows", element: <WorkflowBuilder /> },
-          { path: "workflows/console", element: <Dashboard /> },
-          { path: "workflows/:id", element: <WorkflowDetailPage /> },
-          { path: "chaos", element: <ChaosPanel /> },
-          { path: "replay", element: <ReplayVerify /> },
-          { path: "router", element: <ModelRouter /> },
-          { path: "ai-chaos", element: <AiChaosLab /> },
-          { path: "memory", element: <Memory /> },
-          { path: "gateway", element: <GatewayDashboard /> },
-          { path: "portal", element: <DeveloperPortal /> },
-          { path: "billing", element: <Billing /> },
-          { path: "settings", element: <Settings /> },
-          { path: "autopilot", element: <Autopilot /> },
-          { path: "godmode", element: <GodMode /> },
-          { path: "dag", element: <DagCommandCenter /> },
-          { path: "dag/:workflowId", element: <DagCommandCenter /> },
-          { path: "mmu", element: <MmuProfiler /> },
-          { path: "guard", element: <PromptGuard /> },
-          { path: "cache", element: <SemanticCache /> },
-          { path: "cascade", element: <Cascade /> },
-          { path: "confidence", element: <Uncertainty /> },
-          { path: "quality", element: <QualityGatePage /> },
-          { path: "breaker", element: <BreakerPage /> },
-          { path: "specialists", element: <Specialists /> },
-          { path: "pipelines", element: <Pipelines /> },
-          { path: "admission", element: <Admission /> },
-          { path: "scheduling", element: <Scheduling /> },
-          { path: "cost-limits", element: <CostAdmission /> },
-          { path: "compression", element: <CompressionPolicy /> },
-          { path: "context", element: <ContextTransformers /> },
-          { path: "counterfactual", element: <Counterfactual /> },
-          { path: "loops", element: <LoopGuard /> },
-          { path: "saga", element: <Saga /> },
-          { path: "provenance", element: <Provenance /> },
+          { path: "workflows", lazy: page(() => import("./pages/WorkflowBuilder")) },
+          { path: "workflows/console", lazy: page(() => import("./pages/Dashboard")) },
+          { path: "workflows/:id", lazy: page(() => import("./pages/WorkflowDetail")) },
+          { path: "chaos", lazy: page(() => import("./pages/ChaosPanel")) },
+          { path: "replay", lazy: page(() => import("./pages/ReplayVerify")) },
+          { path: "router", lazy: page(() => import("./pages/ModelRouter")) },
+          { path: "ai-chaos", lazy: page(() => import("./pages/AiChaosLab")) },
+          { path: "memory", lazy: page(() => import("./pages/Memory")) },
+          { path: "gateway", lazy: page(() => import("./pages/GatewayDashboard")) },
+          { path: "portal", lazy: page(() => import("./pages/DeveloperPortal")) },
+          { path: "billing", lazy: page(() => import("./pages/Billing")) },
+          { path: "settings", lazy: page(() => import("./pages/Settings")) },
+          { path: "autopilot", lazy: page(() => import("./pages/Autopilot")) },
+          { path: "godmode", lazy: page(() => import("./pages/GodMode")) },
+          { path: "dag", lazy: page(() => import("./pages/DagCommandCenter")) },
+          { path: "dag/:workflowId", lazy: page(() => import("./pages/DagCommandCenter")) },
+          { path: "mmu", lazy: page(() => import("./pages/MmuProfiler")) },
+          { path: "guard", lazy: page(() => import("./pages/PromptGuard")) },
+          { path: "cache", lazy: page(() => import("./pages/SemanticCache")) },
+          { path: "cascade", lazy: page(() => import("./pages/Cascade")) },
+          { path: "confidence", lazy: page(() => import("./pages/Uncertainty")) },
+          { path: "quality", lazy: page(() => import("./pages/QualityGate")) },
+          { path: "breaker", lazy: page(() => import("./pages/Breaker")) },
+          { path: "specialists", lazy: page(() => import("./pages/Specialists")) },
+          { path: "pipelines", lazy: page(() => import("./pages/Pipelines")) },
+          { path: "admission", lazy: page(() => import("./pages/Admission")) },
+          { path: "scheduling", lazy: page(() => import("./pages/Scheduling")) },
+          { path: "cost-limits", lazy: page(() => import("./pages/CostAdmission")) },
+          { path: "compression", lazy: page(() => import("./pages/CompressionPolicy")) },
+          { path: "context", lazy: page(() => import("./pages/ContextTransformers")) },
+          { path: "counterfactual", lazy: page(() => import("./pages/Counterfactual")) },
+          { path: "loops", lazy: page(() => import("./pages/LoopGuard")) },
+          { path: "saga", lazy: page(() => import("./pages/Saga")) },
+          { path: "provenance", lazy: page(() => import("./pages/Provenance")) },
+          { path: "*", element: <NotFound /> },
+            ],
+          },
         ],
       },
     ],
