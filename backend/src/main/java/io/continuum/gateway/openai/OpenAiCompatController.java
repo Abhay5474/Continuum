@@ -117,7 +117,12 @@ public class OpenAiCompatController {
 
         if (!body.wantsStream()) {
             try {
-                return ResponseEntity.ok(translator.toCompletion(id, gateway.chat(developer.getId(), req), null));
+                GatewayDtos.ChatResponse r = gateway.chat(developer.getId(), req);
+                var ok = ResponseEntity.ok();
+                if (r != null && r.requestId() != null) {
+                    ok.header(REQUEST_ID_HEADER, r.requestId());
+                }
+                return ok.body(translator.toCompletion(id, r, null));
             } catch (RuntimeException e) {
                 return errorResponse(e);
             }
@@ -223,7 +228,7 @@ public class OpenAiCompatController {
                         body.wantsUsageInStream() ? translator.usage(r) : null,
                         new OpenAiDtos.ContinuumMeta(r.provider(), r.routingReason(), r.failovers(),
                                 r.latency(), r.cost(), null, r.confidence(), r.lowConfidence(),
-                                mode.wire())));
+                                mode.wire(), r.requestId())));
                 send(emitter, "[DONE]");
                 emitter.complete();
             } catch (Exception e) {
@@ -277,6 +282,9 @@ public class OpenAiCompatController {
     }
 
     /** Maps the gateway's refusals onto the status codes an OpenAI client expects. */
+    /** Carries {@link GatewayDtos.ChatResponse#requestId()}, on success and on failure. */
+    static final String REQUEST_ID_HEADER = "X-Continuum-Request-Id";
+
     private ResponseEntity<OpenAiDtos.ErrorEnvelope> errorResponse(RuntimeException e) {
         String message = e.getMessage() == null ? "Upstream failure." : e.getMessage();
         if (e instanceof io.continuum.admission.CostAdmissionService.CostLimitedException c) {
@@ -293,7 +301,12 @@ public class OpenAiCompatController {
             return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(OpenAiDtos.ErrorEnvelope.of("invalid_request_error", message, "deadline_unreachable"));
         }
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(OpenAiDtos.ErrorEnvelope.of("api_error", message, "upstream_unavailable"));
+        var failed = ResponseEntity.status(HttpStatus.BAD_GATEWAY);
+        if (e instanceof io.continuum.gateway.GatewayService.GatewayException g && g.requestId != null) {
+            // A failed request is logged too, and its id is where diagnosis starts.
+            failed.header(REQUEST_ID_HEADER, g.requestId);
+            message = message + " (request " + g.requestId + ")";
+        }
+        return failed.body(OpenAiDtos.ErrorEnvelope.of("api_error", message, "upstream_unavailable"));
     }
 }

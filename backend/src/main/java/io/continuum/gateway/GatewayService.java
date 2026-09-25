@@ -200,6 +200,45 @@ public class GatewayService {
      * holds allowance nobody is using until it times out.
      */
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
+        LOGGED.remove();
+        try {
+            GatewayDtos.ChatResponse response = admitted(developerId, req);
+            Long id = LOGGED.get();
+            return response == null || id == null ? response : response.withRequestId(requestId(id));
+        } catch (GatewayException e) {
+            // A failed request is logged too; its id is what a caller quotes.
+            Long id = LOGGED.get();
+            if (id != null && e.requestId == null) {
+                e.requestId = requestId(id);
+            }
+            throw e;
+        } finally {
+            LOGGED.remove();
+        }
+    }
+
+    /** The public form of a logged request's id, as callers and the console show it. */
+    public static String requestId(long logId) {
+        return "req_" + logId;
+    }
+
+    /**
+     * The id of the row this request was logged under. The request runs on one
+     * thread from {@link #chat} to its return — the hedged path waits for its
+     * race — so a thread-local carries it out without threading a parameter
+     * through every stage. Cleared on entry and exit, because the thread is pooled.
+     */
+    private static final ThreadLocal<Long> LOGGED = new ThreadLocal<>();
+
+    private GatewayRequestLogEntity logged(GatewayRequestLogEntity row) {
+        GatewayRequestLogEntity saved = logRepo.save(row);
+        if (saved != null && saved.getId() != null) {
+            LOGGED.set(saved.getId());
+        }
+        return saved;
+    }
+
+    private GatewayDtos.ChatResponse admitted(String developerId, GatewayDtos.ChatRequest req) {
         CostAwareLimiter.Ticket ticket = costAdmission.reserve(
                 developerId, promptTokensOf(req), req == null ? null : req.maxTokens());
         if (ticket == null) {
@@ -278,7 +317,7 @@ public class GatewayService {
                 long cachedMs = (System.nanoTime() - started) / 1_000_000;
                 // Logged like any other request, with zero cost, so usage and
                 // spend reporting stay truthful about what the cache avoided.
-                logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), h.provider(),
+                logged(new GatewayRequestLogEntity(developerId, req.model(), h.provider(),
                         h.model(), 0, "semantic-cache", cachedMs, 0, 0, true, 0));
                 return new GatewayDtos.ChatResponse(h.response(), h.provider(), h.model(),
                         cachedMs, 0, 0, 0,
@@ -483,8 +522,9 @@ public class GatewayService {
                 metrics.tokens(c.provider(), resp.promptTokens(), resp.completionTokens());
                 metrics.cost(c.provider(), cost);
 
-                var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
-                        resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers));
+                var savedLog = logged(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
+                        resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers)
+                        .withTraceId(prov == null ? null : prov.requestId()));
                 labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
                 recordBandit(complexity, c.provider(), true, totalMs, cost);
                 // The counterfactual: what the heuristic would have chosen is
@@ -951,7 +991,7 @@ public class GatewayService {
                 : String.format("cascade: answered by %s — %s%s", cheap.model(), assessment.reason(),
                         audit ? " (audit sample)" : "");
 
-        var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), chosenProvider,
+        var savedLog = logged(new GatewayRequestLogEntity(developerId, req.model(), chosenProvider,
                 chosen.model(), complexity, reason, totalMs, tokens, billed, true, 0));
         labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, billed);
         recordBandit(complexity, chosenProvider, true, totalMs, billed);
@@ -1051,7 +1091,7 @@ public class GatewayService {
                     result.attemptedProviders(), winner, result.elapsedMs(),
                     result.hedged() ? " (hedge fired)" : " (no hedge needed)");
 
-            var savedLog = logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), winner,
+            var savedLog = logged(new GatewayRequestLogEntity(developerId, req.model(), winner,
                     resp.model(), complexity, reason, totalMs, tokens, billedCost, true, 0));
             labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, billedCost);
             recordBandit(complexity, winner, true, totalMs, billedCost);
@@ -1159,7 +1199,7 @@ public class GatewayService {
     private GatewayRequestLogEntity logFailure(String developerId, GatewayDtos.ChatRequest req,
                                                double complexity, RoutingMode mode) {
         try {
-            return logRepo.save(new GatewayRequestLogEntity(developerId, req.model(), null, null,
+            return logged(new GatewayRequestLogEntity(developerId, req.model(), null, null,
                     complexity, "no provider succeeded (mode " + mode + ")", 0, 0, 0, false, 0));
         } catch (Exception ignored) {
             return null;
@@ -1276,6 +1316,9 @@ public class GatewayService {
 
     /** Thrown when the gateway cannot fulfil a request; mapped to a secure error by the controller. */
     public static class GatewayException extends RuntimeException {
+        /** The logged request's id, when it got as far as being logged. */
+        public String requestId;
+
         public GatewayException(String message) {
             super(message);
         }

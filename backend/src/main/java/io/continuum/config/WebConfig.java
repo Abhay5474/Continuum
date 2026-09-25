@@ -32,7 +32,7 @@ public class WebConfig {
         config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Admin-Token", "X-Continuum-Session"));
-        config.setExposedHeaders(List.of("X-Continuum-Session"));
+        config.setExposedHeaders(List.of("X-Continuum-Session", "X-Continuum-Request-Id", "Retry-After", "X-RateLimit-Remaining"));
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

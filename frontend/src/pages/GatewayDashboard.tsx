@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { api, BASE } from "../api";
+import { useToast } from "../components/ui";
 import { Chip, Stat, Stats } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { Readout, Plane, StateDot } from "../system/primitives";
@@ -28,6 +29,7 @@ const GW_TABS = [
 ] as const;
 
 export default function GatewayDashboard() {
+  const toast = useToast();
   const [tab, setTab] = useState<"flow" | "health" | "models" | "send">("flow");
   const [stats, setStats] = useState<any | null>(null);
   const [models, setModels] = useState<any[]>([]);
@@ -257,6 +259,33 @@ export default function GatewayDashboard() {
                       failed
                     </span>
                   )}
+
+                  {/* The id a caller receives as request_id / X-Continuum-Request-Id,
+                      so "request req_812 failed" can be found here; and, when the
+                      decision trail was recorded, the way into it. */}
+                  <span className="ml-auto flex shrink-0 items-center gap-2">
+                    {r.traceId && (
+                      <Link
+                        to={`/provenance?request=${r.traceId}`}
+                        className="font-medium text-[color:var(--accent-ink)] hover:underline"
+                        data-tip="Every decision behind this request: routing, provider, output"
+                      >
+                        Why?
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(`req_${r.id}`);
+                        toast(`Copied req_${r.id}`, "success");
+                      }}
+                      className="readout rounded px-1 text-slate-500 hover:text-slate-200"
+                      data-tip="Copy request id"
+                      aria-label={`Copy request id req_${r.id}`}
+                    >
+                      req_{r.id}
+                    </button>
+                  </span>
 
                   <span className="ml-auto flex items-center gap-3 text-slate-500">
                     <span title="Scored prompt complexity">

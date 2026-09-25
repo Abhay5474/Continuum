@@ -222,7 +222,8 @@ public class OpenAiTranslator {
                         "cache".equals(r.provider()) ? Boolean.TRUE : null,
                         r.confidence(),
                         r.lowConfidence(),
-                        streamMode));
+                        streamMode,
+                        r.requestId()));
     }
 
     /**

@@ -213,7 +213,9 @@ public final class OpenAiDtos {
              * has seen it. Saying so is the difference between a slow first
              * token and an apparently broken one.
              */
-            @JsonProperty("stream_mode") String streamMode) {
+            @JsonProperty("stream_mode") String streamMode,
+            /** Quote this to find the request in the console's feed and its decision trail. */
+            @JsonProperty("request_id") String requestId) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

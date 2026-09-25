@@ -171,6 +171,18 @@ class OpenAiCompatTest {
         assertThat(meta.get("stream_mode")).isEqualTo("buffered");
     }
 
+    /** The id a caller quotes to find a request in the console survives every later stage. */
+    @Test
+    void carriesTheRequestIdThroughLaterStages() throws Exception {
+        var r = new GatewayDtos.ChatResponse("x", "mock", "m", 5, 1, 0, 0, "r")
+                .withRequestId("req_42")
+                .withNote(" (checked)")
+                .withFinishReason("stop");
+        Map<?, ?> meta = (Map<?, ?>) json.readValue(
+                json.writeValueAsString(translator.toCompletion("id", r, null)), Map.class).get("continuum");
+        assertThat(meta.get("request_id")).isEqualTo("req_42");
+    }
+
     /* ---------------------------------------------------------------- *
      * Streaming frames
      * ---------------------------------------------------------------- */

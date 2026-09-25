@@ -148,7 +148,21 @@ public final class GatewayDtos {
              * cut off. Reporting every answer as "stop" told clients a truncated
              * answer was complete.
              */
-            String finishReason) {
+            String finishReason,
+            /**
+             * The id this request was logged under: in the console's request
+             * feed, and — when provenance is on — the key to its decision trail.
+             * What a caller quotes to find out what happened to one request.
+             */
+            String requestId) {
+
+        public ChatResponse(String response, String provider, String model, long latency, int tokens,
+                            double cost, int failovers, String routingReason, Double confidence,
+                            Boolean lowConfidence, Integer agreementClusters, List<ToolCallRef> toolCalls,
+                            Integer promptTokens, Integer completionTokens, String finishReason) {
+            this(response, provider, model, latency, tokens, cost, failovers, routingReason, confidence,
+                    lowConfidence, agreementClusters, toolCalls, promptTokens, completionTokens, finishReason, null);
+        }
 
         /** The ordinary, unmeasured response. */
         public ChatResponse(String response, String provider, String model, long latency, int tokens,
@@ -177,28 +191,28 @@ public final class GatewayDtos {
         public ChatResponse withCompletion(List<ToolCallRef> calls, Integer prompt, Integer completion) {
             return new ChatResponse(response, provider, model, latency, tokens, cost, failovers,
                     routingReason, confidence, lowConfidence, agreementClusters, calls, prompt, completion,
-                    finishReason);
+                    finishReason, requestId);
         }
 
         /** The same response with the provider's reason for stopping. */
         public ChatResponse withFinishReason(String reason) {
             return new ChatResponse(response, provider, model, latency, tokens, cost, failovers,
                     routingReason, confidence, lowConfidence, agreementClusters, toolCalls, promptTokens,
-                    completionTokens, reason);
+                    completionTokens, reason, requestId);
         }
 
         /** The same answer, with something appended to how it was reached. */
         public ChatResponse withNote(String note) {
             return new ChatResponse(response, provider, model, latency, tokens, cost, failovers,
                     routingReason + note, confidence, lowConfidence, agreementClusters, toolCalls,
-                    promptTokens, completionTokens, finishReason);
+                    promptTokens, completionTokens, finishReason, requestId);
         }
 
         /** A rewritten answer, and what rewriting it cost. */
         public ChatResponse withRevision(String revised, long extraMs, double extraCost, String note) {
             return new ChatResponse(revised, provider, model, latency + extraMs, tokens, cost + extraCost,
                     failovers, routingReason + note, confidence, lowConfidence, agreementClusters,
-                    toolCalls, promptTokens, completionTokens, finishReason);
+                    toolCalls, promptTokens, completionTokens, finishReason, requestId);
         }
 
         /** The same answer, with a self-agreement measurement and what taking it cost. */
@@ -206,7 +220,14 @@ public final class GatewayDtos {
                                            long extraMs, double extraCost, String note) {
             return new ChatResponse(response, provider, model, latency + extraMs, tokens, cost + extraCost,
                     failovers, routingReason + note, measured, low, clusters, toolCalls, promptTokens,
-                    completionTokens, finishReason);
+                    completionTokens, finishReason, requestId);
+        }
+    
+        public ChatResponse withRequestId(String id) {
+            return new ChatResponse(response, provider, model, latency, tokens, cost, failovers, routingReason,
+                    confidence, lowConfidence, agreementClusters, toolCalls, promptTokens, completionTokens,
+                    finishReason, id);
         }
     }
+
 }

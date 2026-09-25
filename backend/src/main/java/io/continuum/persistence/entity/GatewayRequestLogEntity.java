@@ -53,6 +53,19 @@ public class GatewayRequestLogEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** The provenance trail for this request, when the tenant records one. */
+    @Column(name = "trace_id", length = 64)
+    private String traceId;
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public GatewayRequestLogEntity withTraceId(String traceId) {
+        this.traceId = traceId;
+        return this;
+    }
+
     protected GatewayRequestLogEntity() {
     }
 

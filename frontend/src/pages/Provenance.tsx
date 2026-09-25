@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Readout, Switch } from "../system/primitives";
@@ -38,7 +39,21 @@ export default function Provenance() {
   const toast = useToast();
   const [status, setStatus] = useState<any | null>(null);
   const [requests, setRequests] = useState<string[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  // The selection lives in the URL, so a request can be linked to from the
+  // gateway feed (or pasted from a response's request_id trail) and reopened.
+  const [params, setParams] = useSearchParams();
+  const selected = params.get("request");
+  // Arrived by link (the gateway feed's "Why?"): the trail is the reason for
+  // the visit, so bring it into view once, rather than leaving it below the fold.
+  const arrivedFor = useRef(selected);
+  const graphRef = useRef<HTMLDivElement>(null);
+  const setSelected = (id: string | null) =>
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      if (id) n.set("request", id);
+      else n.delete("request");
+      return n;
+    }, { replace: true });
   const [graph, setGraph] = useState<any | null>(null);
   const [otel, setOtel] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +81,13 @@ export default function Provenance() {
       setOtel(null);
       return;
     }
-    portal.provenance.graph(selected).then(setGraph).catch(() => setGraph(null));
+    portal.provenance.graph(selected).then((g) => {
+      setGraph(g);
+      if (g?.found && arrivedFor.current === selected) {
+        arrivedFor.current = null;
+        requestAnimationFrame(() => graphRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
+      }
+    }).catch(() => setGraph(null));
     setOtel(null);
   }, [selected]);
 
@@ -156,7 +177,7 @@ export default function Provenance() {
           )}
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 scroll-mt-20" ref={graphRef}>
           {!graph?.found ? (
             <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
               Pick a request to see every decision made about it, in order.
