@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Note } from "../system/primitives";
+import { Note, InfoTip } from "../system/primitives";
 import { useNavigate } from "react-router-dom";
 import { portal } from "../api";
 import { Chip, Ghost, Pill } from "../system/hub";
@@ -228,14 +228,17 @@ export default function Settings() {
           className="mt-3 flex items-center gap-2 rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
           {pwBusy && <Spinner />} Update password
         </button>
-        <p className="mt-2 text-xs text-slate-500">Changing it signs you out everywhere else — useful if you think it leaked.</p>
+        <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+          Signs you out everywhere else
+          <InfoTip text="Useful if you think the password leaked." />
+        </p>
       </Section>
 
       {/* sessions */}
       <Section title="Sessions">
-        <p className="text-sm text-slate-400">
-          Signed in on a shared or lost computer? End every session except this one. Each one lasts up to twelve hours
-          otherwise.
+        <p className="flex items-center gap-1 text-sm text-slate-400">
+          End every session except this one
+          <InfoTip text="For a shared or lost computer. Otherwise each session lasts up to twelve hours." />
         </p>
         <button onClick={signOutElsewhere} disabled={elsewhereBusy}
           className="mt-3 flex items-center gap-2 rounded-lg border border-edge px-4 py-2 text-sm font-medium text-slate-200 hover:border-slate-500/60 disabled:opacity-50">

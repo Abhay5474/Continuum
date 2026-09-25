@@ -85,7 +85,7 @@
   --text-2: rgb(148 163 184);
   /* Matched to the lifted slate-500 above: rgb(100 116 139) is 3.97:1 on black
      and this is what clears the bar. */
-  --text-3: rgb(122 137 159);
+  --text-3: rgb(132 147 169);
   /* The label that sits on a filled accent button. It is not a fixed white:
      --accent-strong is a *light* blue on the dark theme and a mid coral on the
      light one, so a single hard-coded label colour cannot serve both. White on

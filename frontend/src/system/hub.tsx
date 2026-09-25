@@ -555,11 +555,12 @@ export function CardHead({
 }
 
 /** A responsive run of cards. Two up by default, three or four when asked. */
-export function Grid({ cols = 2, children }: { cols?: 2 | 3 | 4; children: ReactNode }) {
+export function Grid({ cols = 2, children }: { cols?: 2 | 3 | 4 | 5; children: ReactNode }) {
   const at = {
     2: "sm:grid-cols-2",
     3: "sm:grid-cols-2 lg:grid-cols-3",
     4: "sm:grid-cols-2 lg:grid-cols-4",
+    5: "sm:grid-cols-3 lg:grid-cols-5",
   }[cols];
   return <div className={`grid grid-cols-1 gap-3 ${at}`}>{children}</div>;
 }
@@ -1801,7 +1802,11 @@ export function Stat({
  * making every caller think about colour: a card that means something specific
  * says so, and the rest are simply told apart.
  */
-export function Stats({ children, cols = 4 }: { children: ReactNode; cols?: 2 | 3 | 4 }) {
+export function Stats({ children, cols }: { children: ReactNode; cols?: 2 | 3 | 4 | 5 }) {
+  // Five figures on a four-wide grid left one alone on a second row; the row
+  // is as wide as its figures, up to five.
+  const n = Children.toArray(children).filter(isValidElement).length;
+  const width = cols ?? (n === 5 ? 5 : n === 3 ? 3 : 4);
   let i = 0;
   const painted = Children.map(children, (child) => {
     if (!isValidElement(child)) return child;
@@ -1809,7 +1814,7 @@ export function Stats({ children, cols = 4 }: { children: ReactNode; cols?: 2 | 
     const hue = hueAt(i++);
     return props.tone === undefined ? cloneElement(child, { tone: hue } as never) : child;
   });
-  return <Grid cols={cols}>{painted}</Grid>;
+  return <Grid cols={width}>{painted}</Grid>;
 }
 
 /**

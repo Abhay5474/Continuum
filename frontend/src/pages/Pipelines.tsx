@@ -302,8 +302,7 @@ export default function Pipelines() {
             title="No probed specialist yet"
             body={
               <>
-                A pipeline whose specialist has never answered moves the failure from here, where you
-                are looking at it, to a customer's request, where you are not.
+                Probe one first, so a failure shows up here — not in a customer's request.
               </>
             }
             right={
