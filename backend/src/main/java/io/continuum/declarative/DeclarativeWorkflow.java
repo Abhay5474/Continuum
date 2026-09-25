@@ -48,6 +48,12 @@ public class DeclarativeWorkflow implements Workflow {
     @SuppressWarnings("unchecked")
     public Object execute(WorkflowContext ctx) {
         Run run = ctx.input(Run.class);
+        if (run == null || run.spec() == null) {
+            // Started by hand with no spec pinned in: there is nothing to run, and
+            // the NullPointerException this used to be told the user nothing.
+            throw new IllegalArgumentException("A Declarative run carries its workflow spec. Start it from a saved "
+                    + "definition (POST /api/portal/developer/workflows/definitions/{name}/run) instead.");
+        }
         WorkflowSpec spec = mapper.convertValue(run.spec(), WorkflowSpec.class);
 
         Map<String, Object> scope = new LinkedHashMap<>();

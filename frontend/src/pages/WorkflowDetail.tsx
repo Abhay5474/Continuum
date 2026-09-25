@@ -6,6 +6,8 @@ import type { WorkflowDetail } from "../types";
 import StatusBadge from "../components/StatusBadge";
 import DataView from "../system/DataView";
 import { elapsed, humanMs, timeOf } from "../system/time";
+import { Button } from "../system/controls";
+import { useToast } from "../components/ui";
 
 const EVENT_ICON: Record<string, string> = {
   WORKFLOW_STARTED: "\u25B6",       // ▶
@@ -23,18 +25,63 @@ export default function WorkflowDetailPage() {
   const { id } = useParams();
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
   const [healing, setHealing] = useState<any | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<{ missing: boolean; message: string } | null>(null);
+  const [stale, setStale] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const toast = useToast();
+  const finished = detail != null && detail.summary.status !== "RUNNING";
 
+  // Polls while the run can still change. It used to poll every 1.5s forever,
+  // including on a run that finished hours ago; and one failed poll replaced
+  // the whole page with the raw error, even with good data already on screen.
   useEffect(() => {
     if (!id) return;
-    const load = () => {
-      api.workflow(id).then(setDetail).catch((e) => setErr(String(e)));
-      api.get<any>(`/api/gateway/healing/workflow/${id}`).then(setHealing).catch(() => {});
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      try {
+        const d = await api.workflow(id);
+        if (!alive) return;
+        setDetail(d);
+        setErr(null);
+        setStale(false);
+        api.get<any>(`/api/gateway/healing/workflow/${id}`).then((h) => alive && setHealing(h)).catch(() => {});
+        if (d.summary.status !== "RUNNING") return; // settled: nothing more will happen
+      } catch (e: any) {
+        if (!alive) return;
+        if (e?.status === 404 || e?.name === "ForbiddenError") {
+          setErr({ missing: true, message: "" });
+          return;
+        }
+        // Keep what is on screen and say it may be out of date; retry.
+        setStale(true);
+        setErr((prev) => prev ?? { missing: false, message: e?.body?.error ?? e?.message ?? String(e) });
+      }
+      timer = setTimeout(load, 1500);
     };
+    setDetail(null);
+    setErr(null);
     load();
-    const t = setInterval(load, 1500);
-    return () => clearInterval(t);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
   }, [id]);
+
+  const cancel = async () => {
+    if (!id || cancelling) return;
+    if (!window.confirm("Stop this workflow? Steps already done stay done; anything waiting to run will not run.")) return;
+    setCancelling(true);
+    try {
+      await api.post(`/api/workflows/${id}/cancel`, { reason: "stopped from the console" });
+      setDetail(await api.workflow(id));
+      toast("Workflow stopped", "success");
+    } catch (e: any) {
+      toast(`Could not stop the workflow: ${e?.body?.error ?? e?.message ?? "request failed"}`, "error");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   // Only the scheduling event carries the step's name. Started and completed
   // events reference it by commandSeq, so the name is carried across here
@@ -50,8 +97,22 @@ export default function WorkflowDetailPage() {
     return m;
   }, [detail]);
 
-  if (err) return <div className="text-rose-400">{err}</div>;
-  if (!detail) return <div className="text-slate-400">Loading…</div>;
+  if (err?.missing)
+    return (
+      <div className="space-y-3">
+        <Link to="/dashboard" className="text-sm text-slate-400 hover:text-slate-200">← Back</Link>
+        <p className="text-sm text-slate-300">
+          No workflow <span className="font-mono">{id}</span> in this account. It may have been started from another
+          account, or the link is mistyped.
+        </p>
+      </div>
+    );
+  if (!detail)
+    return err ? (
+      <div className="text-sm text-rose-300" role="alert">Could not load this workflow: {err.message}. Retrying…</div>
+    ) : (
+      <div className="text-sm text-slate-400" role="status">Loading workflow {id}…</div>
+    );
 
   return (
     <div className="space-y-8">
@@ -59,12 +120,23 @@ export default function WorkflowDetailPage() {
         <Link to="/dashboard" className="text-sm text-slate-400 hover:text-slate-200">
           ← Back
         </Link>
-        <StatusBadge status={detail.summary.status} />
+        <StatusBadge status={isCancelled(detail.error) ? "CANCELLED" : detail.summary.status} />
         <div className="flex items-center gap-2.5">
           <Chip glyph="flow" tone="accent" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em]">{detail.summary.workflowType}</h1>
         </div>
         <span className="font-mono text-xs text-slate-400">{detail.summary.workflowId}</span>
+        {stale && (
+          <span className="text-xs text-amber-300" role="status" title={err?.message}>
+            Connection lost — showing the last update
+          </span>
+        )}
+        {!finished && (
+          <Button variant="danger" size="sm" busy={cancelling} onClick={cancel} className="ml-auto"
+            title="Stops the run. Finished steps stay finished; waiting steps are withdrawn.">
+            Stop workflow
+          </Button>
+        )}
         {healing?.healed && (
           <>
             <span className="animate-pulse rounded bg-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-indigo-300">
@@ -161,7 +233,7 @@ export default function WorkflowDetailPage() {
             </Panel>
           )}
           {detail.error && (
-            <Panel title="Error">
+            <Panel title={isCancelled(detail.error) ? "Cancelled" : "Error"}>
               <pre className="whitespace-pre-wrap text-xs text-rose-300">{detail.error}</pre>
             </Panel>
           )}
@@ -217,7 +289,7 @@ function EventRow({
         <span className="shrink-0">{EVENT_ICON[event.eventType] ?? "•"}</span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-sm font-medium">{humanEvent(event.eventType)}</span>
+            <span className="text-sm font-medium">{humanEvent(event.eventType, payload)}</span>
             {line && <span className="truncate font-mono text-xs text-slate-400">{line}</span>}
             {expandable && (
               // Kept quiet: the payload is for when a summary is not enough,
@@ -283,7 +355,11 @@ const EVENT_LABEL: Record<string, string> = {
   WORKFLOW_FAILED: "Run failed",
 };
 
-function humanEvent(t: string): string {
+/** Cancellation is recorded as a failure whose reason starts "Cancelled:". */
+const isCancelled = (error: unknown) => typeof error === "string" && error.startsWith("Cancelled:");
+
+function humanEvent(t: string, payload?: any): string {
+  if (t === "WORKFLOW_FAILED" && isCancelled(payload?.error)) return "Run cancelled";
   return EVENT_LABEL[t] ?? t.toLowerCase().replace(/_/g, " ");
 }
 

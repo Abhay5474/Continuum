@@ -93,6 +93,20 @@ public class ActivityExecutor {
         ActivityTaskEntity task = activityTasks.findById(taskId).orElseThrow();
         WorkflowInstanceEntity instance = instances.findByIdForUpdate(task.getWorkflowId()).orElseThrow();
 
+        if (instance.getStatus() != io.continuum.persistence.entity.WorkflowStatus.RUNNING) {
+            // The workflow ended — cancelled — while this ran. Its history is
+            // closed, and its outbox messages must not go out on behalf of a run
+            // the user stopped. The money is spent regardless, so cost is kept.
+            recordCosts(task, ctx);
+            task.setStatus(TaskStatus.COMPLETED);
+            task.setLockedBy(null);
+            task.setLockedUntil(null);
+            activityTasks.save(task);
+            log.info("Activity {} (seq {}) finished after workflow {} ended; result discarded",
+                    task.getActivityType(), task.getSequenceNumber(), task.getWorkflowId());
+            return;
+        }
+
         eventStore.appendLocked(instance, EventType.ACTIVITY_COMPLETED,
                 new Payloads.ActivityCompleted(task.getSequenceNumber(), task.getActivityType(), resultJson));
 
@@ -103,15 +117,7 @@ public class ActivityExecutor {
                         m.eventType(), m.payload(), m.idempotencyKey()));
             }
         }
-        // Cost accounting, deduplicated by idempotency key (retries never double-count).
-        int idx = 0;
-        for (ActivityContext.CostEntry c : ctx.costEntries()) {
-            String key = task.getIdempotencyKey() + "#c" + idx++;
-            if (costs.findByIdempotencyKey(key).isEmpty()) {
-                costs.save(new CostRecordEntity(task.getWorkflowId(), key, c.provider(), c.model(),
-                        c.promptTokens(), c.completionTokens(), c.costUsd()));
-            }
-        }
+        recordCosts(task, ctx);
 
         task.setStatus(TaskStatus.COMPLETED);
         task.setLockedBy(null);
@@ -123,6 +129,18 @@ public class ActivityExecutor {
         workflowTasks.save(new WorkflowTaskEntity(task.getWorkflowId()));
         log.info("Activity {} (seq {}) completed for workflow {}",
                 task.getActivityType(), task.getSequenceNumber(), task.getWorkflowId());
+    }
+
+    /** Cost accounting, deduplicated by idempotency key (retries never double-count). */
+    private void recordCosts(ActivityTaskEntity task, ActivityContext ctx) {
+        int idx = 0;
+        for (ActivityContext.CostEntry c : ctx.costEntries()) {
+            String key = task.getIdempotencyKey() + "#c" + idx++;
+            if (costs.findByIdempotencyKey(key).isEmpty()) {
+                costs.save(new CostRecordEntity(task.getWorkflowId(), key, c.provider(), c.model(),
+                        c.promptTokens(), c.completionTokens(), c.costUsd()));
+            }
+        }
     }
 
     /** True when the failure (or any cause) is marked as not worth retrying. */
@@ -143,6 +161,18 @@ public class ActivityExecutor {
         // attempt: retrying a rejected request only delays the outcome and
         // multiplies load on the target.
         boolean settled = isNonRetryable(error);
+        // A workflow that has already ended — cancelled mid-activity — has no use
+        // for a retry: scheduling one would wake a finished run later.
+        boolean ended = instances.findById(task.getWorkflowId())
+                .map(i -> i.getStatus() != io.continuum.persistence.entity.WorkflowStatus.RUNNING)
+                .orElse(true);
+        if (ended) {
+            task.setStatus(TaskStatus.FAILED);
+            task.setLockedBy(null);
+            task.setLockedUntil(null);
+            activityTasks.save(task);
+            return;
+        }
         boolean terminal = settled || attempt >= task.getMaxAttempts();
         String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
 

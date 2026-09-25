@@ -62,8 +62,15 @@ public class WorkflowExecutor {
         } catch (RuntimeException bug) {
             // A deterministic bug in workflow code fails the workflow rather than
             // looping forever. (Genuinely transient problems belong in activities.)
-            return Commands.Decision.fail(ctx.newSideEffects(),
-                    "Workflow code raised: " + bug.getClass().getSimpleName() + ": " + bug.getMessage());
+            // An argument or state error is thrown deliberately and carries its
+            // own explanation — usually about the input — so it is shown as is.
+            // Anything else is a defect and keeps its type, which is what a
+            // developer reading the failure needs.
+            boolean explained = (bug instanceof IllegalArgumentException || bug instanceof IllegalStateException)
+                    && bug.getMessage() != null;
+            return Commands.Decision.fail(ctx.newSideEffects(), explained
+                    ? bug.getMessage()
+                    : "Workflow code raised: " + bug.getClass().getSimpleName() + ": " + bug.getMessage());
         }
     }
 }

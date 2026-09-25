@@ -81,8 +81,14 @@ public class WorkflowEngine {
         String workflowId = (requestedId != null && !requestedId.isBlank())
                 ? requestedId : UUID.randomUUID().toString();
 
-        if (instances.findById(workflowId).isPresent()) {
-            // Idempotent start: same id -> no-op, return existing.
+        var existing = instances.findById(workflowId);
+        if (existing.isPresent()) {
+            // Idempotent start: the same caller repeating the same start gets the
+            // existing run. Anyone else naming this id is refused.
+            if (!java.util.Objects.equals(existing.get().getDeveloperId(), developerId)
+                    || !existing.get().getWorkflowType().equals(workflowType)) {
+                throw new WorkflowIdInUseException(workflowId);
+            }
             return workflowId;
         }
 
@@ -96,6 +102,46 @@ public class WorkflowEngine {
         workflowTasks.save(new WorkflowTaskEntity(workflowId));
         log.info("Started workflow {} of type {}", workflowId, workflowType);
         return workflowId;
+    }
+
+    /**
+     * Stops a running workflow on request.
+     *
+     * <p>Recorded as a failure with a reason that says it was cancelled, not as a
+     * new status: every reader of the history — the console, the replay
+     * verifier, exports — already understands a terminal failure, and a status
+     * none of them knew would have broken them. Activities not yet picked up are
+     * withdrawn so a wait or a retry backoff does not later wake a finished run;
+     * one already executing is allowed to finish, and its result is discarded
+     * (see {@link ActivityExecutor#complete}).
+     *
+     * <p>Idempotent: cancelling a finished workflow changes nothing and reports
+     * how it actually ended.
+     *
+     * @return the workflow's status after the call
+     */
+    @Transactional
+    public WorkflowStatus cancel(String workflowId, String reason) {
+        WorkflowInstanceEntity instance = instances.findByIdForUpdate(workflowId)
+                .orElseThrow(() -> new IllegalArgumentException("No such workflow: " + workflowId));
+        if (instance.getStatus() != WorkflowStatus.RUNNING) {
+            return instance.getStatus();
+        }
+        String error = "Cancelled: " + (reason == null || reason.isBlank() ? "stopped by request" : reason.trim());
+        eventStore.appendLocked(instance, EventType.WORKFLOW_FAILED, new Payloads.WorkflowFailed(error));
+        instance.setStatus(WorkflowStatus.FAILED);
+        instance.setError(error);
+        instances.save(instance);
+        int withdrawn = 0;
+        for (var task : activityTasks.findByWorkflowIdOrderBySequenceNumberAsc(workflowId)) {
+            if (task.getStatus() == io.continuum.persistence.entity.TaskStatus.PENDING) {
+                task.setStatus(io.continuum.persistence.entity.TaskStatus.FAILED);
+                activityTasks.save(task);
+                withdrawn++;
+            }
+        }
+        log.info("Workflow {} cancelled ({} pending activities withdrawn): {}", workflowId, withdrawn, error);
+        return WorkflowStatus.FAILED;
     }
 
     /**

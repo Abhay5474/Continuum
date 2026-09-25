@@ -46,11 +46,22 @@ public class WorkflowQueryService {
                 .map(this::toSummary).getContent();
     }
 
+    /** A workflow's owner, type and status, without its history. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<Existing> find(String workflowId) {
+        return instances.findById(workflowId)
+                .map(i -> new Existing(i.getDeveloperId(), i.getWorkflowType(), i.getStatus().name()));
+    }
+
+    public record Existing(String ownerId, String workflowType, String status) {
+    }
+
     /** The owning developer of a workflow, for authorization checks. */
     @Transactional(readOnly = true)
     public String ownerOf(String workflowId) {
         return instances.findById(workflowId)
-                .orElseThrow(() -> new IllegalArgumentException("No such workflow: " + workflowId))
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "No such workflow: " + workflowId))
                 .getDeveloperId();
     }
 

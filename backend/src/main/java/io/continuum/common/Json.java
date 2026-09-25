@@ -32,7 +32,22 @@ public class Json {
         try {
             return mapper.readValue(json, type);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to deserialize value into " + type, e);
+            // This message reaches the console as the reason a run failed, so it
+            // names the problem in the input rather than a Java class.
+            String why = e instanceof com.fasterxml.jackson.core.JsonProcessingException jpe
+                    ? jpe.getOriginalMessage() : e.getMessage();
+            why = why == null ? "" : java.util.regex.Pattern
+                    .compile("`?(?:[a-z_]\\w*\\.)+([A-Z]\\w*)(?:\\$(\\w+))?`?")
+                    .matcher(why.split("\n")[0])
+                    .replaceAll(m -> m.group(2) != null ? m.group(2) : m.group(1));
+            // Jackson's "no String-argument constructor/factory method to
+            // deserialize from String value" means, to a caller, one thing.
+            var kind = java.util.regex.Pattern.compile("deserialize from (\\w+) value( \\('[^)]*'\\))?").matcher(why);
+            if (why.startsWith("Cannot construct instance") && kind.find()) {
+                why = "expected a JSON object, got " + kind.group(1).toLowerCase()
+                        + (kind.group(2) == null ? "" : kind.group(2));
+            }
+            throw new IllegalStateException("The input could not be read: " + why, e);
         }
     }
 
