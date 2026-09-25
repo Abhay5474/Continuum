@@ -28,8 +28,21 @@ public class AccountController {
         this.revocations = revocations;
     }
 
+    /** The account the session works in — whose data it reaches. */
     private String dev(HttpServletRequest req) {
         return (String) req.getAttribute(PortalAuthFilter.DEVELOPER_ID_ATTRIBUTE);
+    }
+
+    /**
+     * The person signed in. The same as {@link #dev} for the owner; for a team
+     * member it is their own id. Personal settings — password, email, sessions —
+     * belong to the person, and used to be applied to the account: a member's
+     * "change password" was checked against the owner's password, and a member's
+     * "delete account" deleted the owner's account.
+     */
+    private String actor(HttpServletRequest req) {
+        Object a = req.getAttribute(PortalAuthFilter.ACTOR_ID_ATTRIBUTE);
+        return a == null ? dev(req) : (String) a;
     }
 
     /**
@@ -38,29 +51,35 @@ public class AccountController {
      */
     @PostMapping("/password")
     public Map<String, Object> changePassword(HttpServletRequest req, @RequestBody PasswordRequest body) {
-        account.changePassword(dev(req), body.currentPassword(), body.newPassword());
-        return Map.of("ok", true, "sessionToken", renew(dev(req)), "otherSessionsEnded", true);
+        account.changePassword(actor(req), body.currentPassword(), body.newPassword());
+        return Map.of("ok", true, "sessionToken", renew(req), "otherSessionsEnded", true);
     }
 
     /** "Sign out everywhere else": every session but a fresh one for this device ends. */
     @PostMapping("/sessions/revoke")
     public Map<String, Object> signOutElsewhere(HttpServletRequest req) {
-        return Map.of("ok", true, "sessionToken", renew(dev(req)));
+        return Map.of("ok", true, "sessionToken", renew(req));
     }
 
-    private String renew(String developerId) {
-        java.time.Instant cutoff = revocations.revokeAll(developerId);
-        return sessions.issue(developerId, io.continuum.portal.PortalSessionService.Role.DEVELOPER, cutoff);
+    /** Ends the person's other sessions and hands this device a fresh one in the same account. */
+    private String renew(HttpServletRequest req) {
+        java.time.Instant cutoff = revocations.revokeAll(actor(req));
+        return sessions.issue(dev(req), PortalSessionService.Role.DEVELOPER, cutoff, actor(req));
     }
 
     @PutMapping("/email")
     public Map<String, Object> changeEmail(HttpServletRequest req, @RequestBody EmailRequest body) {
-        account.changeEmail(dev(req), body.email());
+        account.changeEmail(actor(req), body.email());
         return Map.of("ok", true, "email", body.email());
     }
 
     @DeleteMapping
     public Map<String, Object> deleteAccount(HttpServletRequest req) {
+        if (!dev(req).equals(actor(req))) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Only the account owner can delete the account. You are a member of it; ask the owner to remove you.");
+        }
         account.deleteAccount(dev(req));
         revocations.forget(dev(req)); // its sessions end with it
         return Map.of("ok", true, "deleted", true);
@@ -109,7 +128,7 @@ public class AccountController {
                 "developerId", accepted.accountId(),
                 "name", accepted.name(),
                 "email", accepted.email(),
-                "sessionToken", sessions.issue(accepted.accountId(), PortalSessionService.Role.DEVELOPER));
+                "sessionToken", sessions.issueFor(accepted.accountId(), accepted.memberDeveloperId()));
     }
 
     public record AcceptRequest(String token, String name, String password) {

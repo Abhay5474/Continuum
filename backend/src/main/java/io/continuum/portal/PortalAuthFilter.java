@@ -22,6 +22,8 @@ import java.util.Optional;
 public class PortalAuthFilter extends OncePerRequestFilter {
 
     public static final String DEVELOPER_ID_ATTRIBUTE = "continuum.portal.developerId";
+    /** The person behind the session: the account owner, or a team member working in it. */
+    public static final String ACTOR_ID_ATTRIBUTE = "continuum.portal.actorId";
 
     private final PortalSessionService sessions;
     private final ObjectMapper mapper;
@@ -53,6 +55,7 @@ public class PortalAuthFilter extends OncePerRequestFilter {
             return;
         }
         request.setAttribute(DEVELOPER_ID_ATTRIBUTE, session.get().subject());
+        request.setAttribute(ACTOR_ID_ATTRIBUTE, session.get().actor());
         TenantContext.set(session.get().subject());
         try {
             chain.doFilter(request, response);

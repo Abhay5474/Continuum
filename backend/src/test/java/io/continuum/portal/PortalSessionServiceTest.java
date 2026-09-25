@@ -77,7 +77,8 @@ class PortalSessionServiceTest {
         var row = new io.continuum.persistence.entity.DeveloperAuthEntity("dev_1", "hash");
         org.mockito.Mockito.when(repo.findById("dev_1")).thenReturn(java.util.Optional.of(row));
         org.mockito.Mockito.when(repo.findById("gone")).thenReturn(java.util.Optional.empty());
-        var revocations = new SessionRevocations(repo);
+        var members = org.mockito.Mockito.mock(io.continuum.persistence.repository.AccountMembershipRepository.class);
+        var revocations = new SessionRevocations(repo, members);
         PortalSessionService s = new PortalSessionService("k");
         s.setRevocations(revocations);
 
@@ -99,5 +100,49 @@ class PortalSessionServiceTest {
         assertTrue(s.verify(s.issue("gone", PortalSessionService.Role.DEVELOPER)).isEmpty(), "deleted account");
         assertTrue(s.verify(s.issue("operator", PortalSessionService.Role.OPERATOR)).isPresent(),
                 "operators are not tied to a developer row");
+    }
+
+    /**
+     * A team member's session reaches the account that invited them but belongs
+     * to the member: it names them, it ends when they are removed from the team,
+     * and ending the owner's sessions leaves it alone.
+     */
+    @Test
+    void memberSessionsBelongToTheMember() {
+        var repo = org.mockito.Mockito.mock(io.continuum.persistence.repository.DeveloperAuthRepository.class);
+        var members = org.mockito.Mockito.mock(io.continuum.persistence.repository.AccountMembershipRepository.class);
+        var owner = new io.continuum.persistence.entity.DeveloperAuthEntity("owner", "h");
+        var member = new io.continuum.persistence.entity.DeveloperAuthEntity("member", "h");
+        org.mockito.Mockito.when(repo.findById("owner")).thenReturn(java.util.Optional.of(owner));
+        org.mockito.Mockito.when(repo.findById("member")).thenReturn(java.util.Optional.of(member));
+        var link = new io.continuum.persistence.entity.AccountMembershipEntity("member", "owner", "m@x.test");
+        org.mockito.Mockito.when(members.findById("member")).thenReturn(java.util.Optional.of(link));
+        var revocations = new SessionRevocations(repo, members);
+        PortalSessionService s = new PortalSessionService("k");
+        s.setRevocations(revocations);
+
+        String token = s.issueFor("owner", "member");
+        var session = s.verify(token).orElseThrow();
+        assertEquals("owner", session.subject());
+        assertEquals("member", session.actor());
+        assertFalse(session.isOwner());
+
+        revocations.revokeAll("owner");
+        assertTrue(s.verify(token).isPresent(), "the owner signing out elsewhere does not end a member's session");
+
+        org.mockito.Mockito.when(members.findById("member")).thenReturn(java.util.Optional.empty());
+        revocations.forget("member");
+        assertTrue(s.verify(token).isEmpty(), "removed from the team: no longer reaches the account");
+    }
+
+    /** Sessions issued before the actor field existed still verify, as their own actor. */
+    @Test
+    void threePartTokensStillVerify() {
+        PortalSessionService s = new PortalSessionService("k");
+        String token = s.issue("dev_9", PortalSessionService.Role.DEVELOPER);
+        assertEquals(3, new String(java.util.Base64.getUrlDecoder().decode(token.split("\\.")[0])).split(":").length);
+        var session = s.verify(token).orElseThrow();
+        assertEquals("dev_9", session.actor());
+        assertTrue(session.isOwner());
     }
 }

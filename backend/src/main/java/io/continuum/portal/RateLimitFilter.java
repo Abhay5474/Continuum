@@ -115,18 +115,39 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * The client address, honouring one hop of {@code X-Forwarded-For}.
+     * The client address, for keying limits.
      *
-     * <p>That header is client-supplied and trivially spoofed, so it is only ever
-     * a limiting key, never an authorisation input. Behind a proxy that rewrites
-     * it, this is the real client; without a proxy, a spoofer can spread their
-     * attempts — which is why credential routes are also slow by construction.
+     * <p>{@code X-Forwarded-For} is honoured only when the connection itself
+     * comes from a proxy — a loopback or private address, which is how a
+     * platform load balancer reaches us — and then only its <em>rightmost</em>
+     * entry, the one that proxy appended. This used to take the leftmost entry
+     * whatever the source, and the leftmost entry is whatever the client wrote:
+     * a fresh value per request gave every password guess a fresh allowance.
      */
-    private static String clientIp(HttpServletRequest request) {
+    static String clientIp(HttpServletRequest request) {
+        String remote = request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
         String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        if (forwarded != null && !forwarded.isBlank() && fromProxy(remote)) {
+            String[] hops = forwarded.split(",");
+            String last = hops[hops.length - 1].trim();
+            if (!last.isEmpty()) {
+                return last;
+            }
         }
-        return request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
+        return remote;
+    }
+
+    private static boolean fromProxy(String addr) {
+        // Literals only, so getByName never becomes a DNS lookup.
+        if (addr == null || !addr.matches("[0-9A-Fa-f:.]+")) {
+            return false;
+        }
+        try {
+            java.net.InetAddress a = java.net.InetAddress.getByName(addr);
+            return a.isLoopbackAddress() || a.isSiteLocalAddress() || a.isLinkLocalAddress()
+                    || (a instanceof java.net.Inet6Address && (a.getAddress()[0] & 0xfe) == 0xfc); // fc00::/7
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

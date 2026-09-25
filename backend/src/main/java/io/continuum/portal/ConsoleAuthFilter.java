@@ -64,6 +64,7 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
             request.setAttribute(OPERATOR_ATTRIBUTE, Boolean.TRUE);
         } else {
             request.setAttribute(DEVELOPER_ID_ATTRIBUTE, s.subject());
+            request.setAttribute(PortalAuthFilter.ACTOR_ID_ATTRIBUTE, s.actor());
         }
         // Also published thread-locally, for cross-cutting concerns that run far
         // from the controller. Cleared unconditionally: this is a pooled thread.

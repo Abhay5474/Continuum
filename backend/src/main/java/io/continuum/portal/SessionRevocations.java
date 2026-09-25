@@ -27,30 +27,54 @@ public class SessionRevocations {
     static final long TTL_MS = 15_000;
 
     private final DeveloperAuthRepository auth;
+    private final io.continuum.persistence.repository.AccountMembershipRepository memberships;
     private final Map<String, Entry> cache = new ConcurrentHashMap<>();
 
-    private record Entry(boolean exists, long validAfterEpoch, long readAt) {
+    /** @param account the account this person works in: themselves, or the one that invited them */
+    private record Entry(boolean exists, long validAfterEpoch, String account, long readAt) {
     }
 
-    public SessionRevocations(DeveloperAuthRepository auth) {
+    public SessionRevocations(DeveloperAuthRepository auth,
+                              io.continuum.persistence.repository.AccountMembershipRepository memberships) {
         this.auth = auth;
+        this.memberships = memberships;
+    }
+
+    /**
+     * True when a session held by {@code actor} in {@code account}'s data may no
+     * longer be used: the person's sessions were ended, the person is gone, or —
+     * for a team member — they are no longer in that account (removed, or the
+     * account was deleted).
+     */
+    public boolean revoked(String actor, String account, long issuedAtEpoch) {
+        if (revoked(actor, issuedAtEpoch)) {
+            return true;
+        }
+        return account != null && !account.equals(actor) && !account.equals(entry(actor).account());
     }
 
     /** True when a developer session issued at {@code issuedAtEpoch} may no longer be used. */
     public boolean revoked(String developerId, long issuedAtEpoch) {
+        Entry e = entry(developerId);
+        return !e.exists() || issuedAtEpoch < e.validAfterEpoch();
+    }
+
+    private Entry entry(String developerId) {
         long now = System.currentTimeMillis();
         Entry e = cache.get(developerId);
         if (e == null || now - e.readAt() > TTL_MS) {
+            String account = memberships.findById(developerId)
+                    .map(m -> m.getAccountDeveloperId()).orElse(developerId);
             e = auth.findById(developerId)
                     .map(a -> new Entry(true, a.getSessionsValidAfter() == null ? 0
-                            : a.getSessionsValidAfter().getEpochSecond(), now))
-                    .orElse(new Entry(false, 0, now));
+                            : a.getSessionsValidAfter().getEpochSecond(), account, now))
+                    .orElse(new Entry(false, 0, account, now));
             if (cache.size() > 50_000) {
-                cache.clear(); // bounded; a miss is one indexed read
+                cache.clear(); // bounded; a miss is two indexed reads
             }
             cache.put(developerId, e);
         }
-        return !e.exists() || issuedAtEpoch < e.validAfterEpoch();
+        return e;
     }
 
     /** Ends every session for this developer issued before now. */

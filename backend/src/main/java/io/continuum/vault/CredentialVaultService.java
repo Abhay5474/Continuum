@@ -55,8 +55,11 @@ public class CredentialVaultService {
     }
 
     @Transactional
-    public void delete(String developerId, String provider) {
-        repo.findByDeveloperIdAndProvider(developerId, provider).ifPresent(repo::delete);
+    /** @return whether there was one to delete */
+    public boolean delete(String developerId, String provider) {
+        var existing = repo.findByDeveloperIdAndProvider(developerId, provider);
+        existing.ifPresent(repo::delete);
+        return existing.isPresent();
     }
 
     public record CredentialInfo(String provider, String createdAt, String updatedAt) {

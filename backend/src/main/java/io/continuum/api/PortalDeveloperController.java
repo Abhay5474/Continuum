@@ -52,9 +52,22 @@ public class PortalDeveloperController {
     @GetMapping("/me")
     public Map<String, Object> me(HttpServletRequest req) {
         String id = dev(req);
-        return developers.find(id).map(d -> Map.<String, Object>of(
-                "id", d.getId(), "name", d.getName(), "email", d.getEmail(),
-                "useOwnKeysPrimary", portal.useOwnKeysPrimary(id))).orElse(Map.of("id", id));
+        Object a = req.getAttribute(io.continuum.portal.PortalAuthFilter.ACTOR_ID_ATTRIBUTE);
+        String actor = a == null ? id : (String) a;
+        // id/name/email describe the account, as they always have. "you" is the
+        // person signed in, which differs for a team member — whose personal
+        // settings (email, password) are their own, not the owner's.
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        developers.find(id).ifPresentOrElse(d -> {
+            out.put("id", d.getId());
+            out.put("name", d.getName());
+            out.put("email", d.getEmail());
+            out.put("useOwnKeysPrimary", portal.useOwnKeysPrimary(id));
+        }, () -> out.put("id", id));
+        out.put("member", !actor.equals(id));
+        developers.find(actor).ifPresent(d ->
+                out.put("you", Map.of("id", d.getId(), "name", d.getName(), "email", d.getEmail())));
+        return out;
     }
 
     // --- API keys (self-service) ---
@@ -109,8 +122,9 @@ public class PortalDeveloperController {
 
     @DeleteMapping("/credentials/{provider}")
     public Map<String, Object> deleteCredential(HttpServletRequest req, @PathVariable String provider) {
-        vault.delete(dev(req), provider);
-        return Map.of("deleted", true, "provider", provider);
+        // Idempotent (a repeat is not an error), but it says whether anything
+        // was there: it used to report deleted:true for a key that never existed.
+        return Map.of("deleted", vault.delete(dev(req), provider), "provider", provider);
     }
 
     @PostMapping("/credentials/{provider}/verify")

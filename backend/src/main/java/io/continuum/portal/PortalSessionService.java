@@ -82,7 +82,16 @@ public class PortalSessionService {
     }
 
     public String issue(String subject, Role role) {
-        return issue(subject, role, Instant.now());
+        return issue(subject, role, Instant.now(), subject);
+    }
+
+    public String issue(String subject, Role role, Instant issuedAt) {
+        return issue(subject, role, issuedAt, subject);
+    }
+
+    /** A session in {@code subject}'s account, held by {@code actor} — a team member, or the owner. */
+    public String issueFor(String subject, String actor) {
+        return issue(subject, Role.DEVELOPER, Instant.now(), actor);
     }
 
     /**
@@ -90,9 +99,16 @@ public class PortalSessionService {
      * the token; it is its expiry less the fixed lifetime, which is what lets
      * revocation work without changing the token format.
      */
-    public String issue(String subject, Role role, Instant issuedAt) {
+    /**
+     * @param actor the person holding the session. For an account owner this is
+     *              the subject; for a team member it is their own id while the
+     *              subject is the account they work in. Tokens issued before this
+     *              field existed have three parts and read as actor = subject.
+     */
+    public String issue(String subject, Role role, Instant issuedAt, String actor) {
         long expiry = issuedAt.getEpochSecond() + DEFAULT_TTL_SECONDS;
-        String payload = role.name() + ":" + subject + ":" + expiry;
+        String payload = role.name() + ":" + subject + ":" + expiry
+                + (actor == null || actor.equals(subject) ? "" : ":" + actor);
         String p = b64(payload.getBytes(StandardCharsets.UTF_8));
         return p + "." + b64(hmac(p));
     }
@@ -116,20 +132,23 @@ public class PortalSessionService {
             return Optional.empty();
         }
         String payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
-        String[] f = payload.split(":", 3);
-        if (f.length != 3) {
+        String[] f = payload.split(":", 4);
+        if (f.length < 3) {
             return Optional.empty();
         }
         long expiry = Long.parseLong(f[2]);
+        String actor = f.length == 4 ? f[3] : f[1];
         if (Instant.now().getEpochSecond() > expiry) {
             return Optional.empty(); // expired
         }
         Role role = Role.valueOf(f[0]);
+        // Keyed by the person, not the account: a member changing their password
+        // ends their own sessions, not the owner's and every teammate's.
         if (role == Role.DEVELOPER && revocations != null
-                && revocations.revoked(f[1], expiry - DEFAULT_TTL_SECONDS)) {
+                && revocations.revoked(actor, f[1], expiry - DEFAULT_TTL_SECONDS)) {
             return Optional.empty(); // signed out everywhere, password changed, or account deleted
         }
-        return Optional.of(new Session(f[1], role, expiry));
+        return Optional.of(new Session(f[1], role, expiry, actor));
     }
 
     private byte[] hmac(String data) {
@@ -146,6 +165,18 @@ public class PortalSessionService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
     }
 
-    public record Session(String subject, Role role, long expiryEpoch) {
+    /**
+     * @param subject the account whose data the session reaches
+     * @param actor   who is holding it — equal to subject except for team members
+     */
+    public record Session(String subject, Role role, long expiryEpoch, String actor) {
+
+        public Session(String subject, Role role, long expiryEpoch) {
+            this(subject, role, expiryEpoch, subject);
+        }
+
+        public boolean isOwner() {
+            return subject.equals(actor);
+        }
     }
 }

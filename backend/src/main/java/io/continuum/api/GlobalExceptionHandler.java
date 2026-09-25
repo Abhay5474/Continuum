@@ -27,6 +27,16 @@ public class GlobalExceptionHandler {
             org.springframework.http.converter.HttpMessageNotReadableException.class})
     public ResponseEntity<Map<String, Object>> malformed(Exception e) {
         String message = e.getMessage();
+        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof com.fasterxml.jackson.core.exc.StreamConstraintsException) {
+                // Jackson's own ceiling on one value (20 MB of text). A body that
+                // hits it is too big, not malformed, and saying "not valid JSON"
+                // sent people looking for a syntax error that was not there.
+                return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(body(
+                        "The request is too large: one value in it exceeds the size limit. "
+                                + "Send large documents as a file upload instead.", 413));
+            }
+        }
         if (e instanceof org.springframework.http.converter.HttpMessageNotReadableException) {
             // Well-formed JSON of the wrong shape is a different mistake from a
             // syntax error, and saying "not valid JSON" about it sends the caller

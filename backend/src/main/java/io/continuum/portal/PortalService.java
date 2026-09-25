@@ -23,15 +23,21 @@ public class PortalService {
     private final AccountMembershipRepository memberships;
     private final PasswordHasher passwordHasher;
     private final PortalSessionService sessions;
+    private final RateLimiter limiter;
+
+    /** Attempts per account: a short burst, then five a minute. */
+    static final int LOGIN_BURST = 10;
+    static final double LOGIN_PER_MINUTE = 5;
 
     public PortalService(DeveloperRepository developers, DeveloperAuthRepository auth,
                          AccountMembershipRepository memberships,
-                         PasswordHasher passwordHasher, PortalSessionService sessions) {
+                         PasswordHasher passwordHasher, PortalSessionService sessions, RateLimiter limiter) {
         this.developers = developers;
         this.auth = auth;
         this.memberships = memberships;
         this.passwordHasher = passwordHasher;
         this.sessions = sessions;
+        this.limiter = limiter;
     }
 
     /**
@@ -63,13 +69,25 @@ public class PortalService {
 
     @Transactional(readOnly = true)
     public LoginResult login(String email, String password) {
+        // Per account, not per source: the source limit is keyed by address, and
+        // guesses spread across many addresses against one account passed it.
+        // Keyed on the email as typed (lower-cased), existing or not, so the
+        // limit itself does not reveal which addresses have accounts.
+        String key = "login:" + (email == null ? "" : email.trim().toLowerCase(java.util.Locale.ROOT));
+        RateLimiter.Decision d = limiter.take(key, LOGIN_BURST, LOGIN_PER_MINUTE);
+        if (!d.allowed()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many sign-in attempts for this account. Try again in " + d.retryAfterSeconds() + "s.");
+        }
         Optional<DeveloperEntity> dev = developers.findFirstByEmailIgnoreCase(email);
         if (dev.isPresent()) {
             DeveloperAuthEntity a = auth.findById(dev.get().getId()).orElse(null);
             if (a != null && passwordHasher.matches(password, a.getPasswordHash())) {
+                limiter.reset(key); // a correct password clears the slate
                 String account = accountFor(dev.get().getId());
                 return new LoginResult(account, dev.get().getName(), dev.get().getEmail(),
-                        sessions.issue(account, PortalSessionService.Role.DEVELOPER));
+                        sessions.issueFor(account, dev.get().getId()));
             }
         }
         throw new IllegalArgumentException("Invalid email or password");

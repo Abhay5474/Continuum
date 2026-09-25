@@ -32,7 +32,8 @@ export default function Settings() {
   const [confirmDelete, setConfirmDelete] = useState("");
 
   const load = () => {
-    portal.me().then((m) => { setMe(m); setEmail(m.email ?? ""); }).catch(() => {});
+    // Your own email, which differs from the account's when you are a member.
+    portal.me().then((m) => { setMe(m); setEmail(m.you?.email ?? m.email ?? ""); }).catch(() => {});
     portal.keys().then(setKeys).catch(() => {});
     portal.invites().then(setInvites).catch(() => {});
     portal.members().then(setMembers).catch(() => {});
@@ -152,7 +153,7 @@ export default function Settings() {
           <Chip glyph="chip" tone="accent" size={28} />
           <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Account Settings</h1>
         </div>
-        {me && <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">{me.email} · <span className="font-mono">{me.id}</span></p>}
+        {me && <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">{me.you?.email ?? me.email}{me.member ? ` · member of ${me.name}` : ""} · <span className="font-mono">{me.id}</span></p>}
       </div>
 
       {/* API keys */}
@@ -316,7 +317,13 @@ export default function Settings() {
         )}
       </Section>
 
-      {/* danger zone */}
+      {/* danger zone — the owner's alone: a member deleting "their" account
+          used to delete the account they had been invited into. */}
+      {me?.member ? (
+        <p className="text-xs text-slate-500">
+          You are a member of {me?.name ?? "this account"}. Only its owner can delete it.
+        </p>
+      ) : (
       <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-5">
         <div className="text-sm font-semibold text-rose-200">Danger zone</div>
         <p className="mt-1 text-xs text-slate-400 max-w-2xl leading-relaxed">
@@ -332,6 +339,7 @@ export default function Settings() {
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }
