@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { api, portal } from "../api";
 import { Chip } from "../system/hub";
@@ -124,8 +125,7 @@ export default function WorkflowBuilder() {
   };
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 5000);
-    return () => clearInterval(t);
+    return visibleInterval(refresh, 5000);
   }, []);
 
   // Parsed locally so the graph preview and errors are immediate, before publish.

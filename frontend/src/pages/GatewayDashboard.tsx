@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { api, BASE } from "../api";
 import { Chip, Stat, Stats } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { Readout, Plane, StateDot } from "../system/primitives";
@@ -55,8 +56,7 @@ export default function GatewayDashboard() {
   };
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 4000);
-    return () => clearInterval(t);
+    return visibleInterval(refresh, 4000);
   }, []);
 
   const runVerifyScan = async () => {
@@ -74,7 +74,9 @@ export default function GatewayDashboard() {
     setChatOut(null);
     setSending(true);
     try {
-      const res = await fetch("/api/gateway/chat", {
+      // Through BASE: a console served apart from its API (VITE_API_BASE) used to
+      // send this one request to itself.
+      const res = await fetch(`${BASE}/api/gateway/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({ model: "auto", messages: [{ role: "user", content: prompt }], maxTokens: 200 }),

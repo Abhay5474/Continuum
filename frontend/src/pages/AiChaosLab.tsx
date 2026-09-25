@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { api } from "../api";
 import { Chip } from "../system/hub";
 
@@ -38,8 +39,7 @@ export default function AiChaosLab() {
   };
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 2500);
-    return () => clearInterval(t);
+    return visibleInterval(refresh, 2500);
   }, []);
 
   const setRate = async (type: string, rate: number) => {

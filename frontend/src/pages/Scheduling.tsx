@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
@@ -69,8 +70,7 @@ export default function Scheduling() {
   useEffect(() => {
     void load();
     // The queue is a live quantity that drains in well under a second.
-    const t = setInterval(() => void load(), 1500);
-    return () => clearInterval(t);
+    return visibleInterval(() => void load(), 1500);
   }, [load]);
 
   const act = async (fn: () => Promise<unknown>, ok?: string) => {

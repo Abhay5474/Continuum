@@ -107,6 +107,10 @@ public class OpenAiCompatController {
                     .body(OpenAiDtos.ErrorEnvelope.of("invalid_request_error",
                             "'messages' must not be empty.", null));
         }
+        OpenAiDtos.ApiError invalid = validate(body);
+        if (invalid != null) {
+            return ResponseEntity.badRequest().body(new OpenAiDtos.ErrorEnvelope(invalid));
+        }
 
         String id = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "").substring(0, 24);
         GatewayDtos.ChatRequest req = translator.toGateway(body);
@@ -119,6 +123,51 @@ public class OpenAiCompatController {
             }
         }
         return stream(id, developer.getId(), req, body);
+    }
+
+    private static final java.util.Set<String> ROLES =
+            java.util.Set.of("system", "developer", "user", "assistant", "tool", "function");
+
+    /**
+     * The checks OpenAI itself makes before running anything. A request that
+     * would be refused upstream used to be served here — a temperature of 9,
+     * a negative token budget, a role nobody defines — so code that worked
+     * against Continuum failed the day it was pointed at the real API, and a
+     * typo in a role silently became a user turn.
+     *
+     * @return the first problem, in OpenAI's error shape, or null
+     */
+    static OpenAiDtos.ApiError validate(OpenAiDtos.ChatCompletionRequest body) {
+        Integer max = body.effectiveMaxTokens();
+        if (max != null && max < 1) {
+            String param = body.maxCompletionTokens() != null ? "max_completion_tokens" : "max_tokens";
+            return invalid("'" + param + "' must be at least 1, got " + max + ".", param);
+        }
+        if (body.temperature() != null && (body.temperature() < 0 || body.temperature() > 2)) {
+            return invalid("'temperature' must be between 0 and 2, got " + body.temperature() + ".", "temperature");
+        }
+        if (body.topP() != null && (body.topP() < 0 || body.topP() > 1)) {
+            return invalid("'top_p' must be between 0 and 1, got " + body.topP() + ".", "top_p");
+        }
+        if (body.n() != null && body.n() < 1) {
+            return invalid("'n' must be at least 1.", "n");
+        }
+        for (int i = 0; i < body.messages().size(); i++) {
+            OpenAiDtos.ChatMessage m = body.messages().get(i);
+            String param = "messages[" + i + "]";
+            if (m == null) {
+                return invalid("Message " + i + " is null.", param);
+            }
+            if (m.role() == null || !ROLES.contains(m.role())) {
+                return invalid("Message " + i + " has role " + (m.role() == null ? "missing" : "'" + m.role() + "'")
+                        + "; expected one of system, developer, user, assistant, tool.", param + ".role");
+            }
+        }
+        return null;
+    }
+
+    private static OpenAiDtos.ApiError invalid(String message, String param) {
+        return new OpenAiDtos.ApiError(message, "invalid_request_error", null, param);
     }
 
     /**

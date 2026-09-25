@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
 import { Empty, Primary, Chip } from "../system/hub";
@@ -75,8 +76,7 @@ export default function GodMode() {
   useEffect(() => {
     if (!loggedIn) return;
     refresh();
-    const t = setInterval(refresh, 6000);
-    return () => clearInterval(t);
+    return visibleInterval(refresh, 6000);
   }, [loggedIn]);
 
   const enabled = !!status?.enabled;

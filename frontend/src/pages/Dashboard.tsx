@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Chip } from "../system/hub";
@@ -45,8 +46,7 @@ export default function Dashboard() {
   useEffect(() => {
     api.meta().then(setMeta).catch(() => {});
     refresh();
-    const t = setInterval(() => refresh(), 2500);
-    return () => clearInterval(t);
+    return visibleInterval(() => refresh(), 2500);
   }, []);
 
   async function start() {

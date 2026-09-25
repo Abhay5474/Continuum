@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { Link, useParams } from "react-router-dom";
 import { api, portal } from "../api";
 import { Chip } from "../system/hub";
@@ -78,8 +79,7 @@ export default function DagCommandCenter() {
   useEffect(() => {
     const load = () => api.get<any[]>("/api/dag/runs").then(setRuns).catch(() => {});
     load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
+    return visibleInterval(load, 5000);
   }, []);
 
   if (workflowId) return <Constellation workflowId={workflowId} />;
@@ -154,8 +154,7 @@ function Constellation({ workflowId }: { workflowId: string }) {
   useEffect(() => {
     const load = () => api.get<any>(`/api/dag/trace/${workflowId}`).then(setTrace).catch(() => {});
     load();
-    const t = setInterval(load, 4000);
-    return () => clearInterval(t);
+    return visibleInterval(load, 4000);
   }, [workflowId]);
 
   const run = trace?.run;

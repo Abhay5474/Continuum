@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { visibleInterval } from "./poll";
 import { api, portal } from "../api";
 import { worst, type StateKey } from "./tokens";
 import type { Subsystem } from "./ContinuumCore";
@@ -284,10 +285,10 @@ export function useTelemetry(pollMs = 4000): Telemetry {
     };
 
     tick();
-    const id = setInterval(tick, pollMs);
+    const stop = visibleInterval(tick, pollMs);
     return () => {
       alive = false;
-      clearInterval(id);
+      stop();
     };
   }, [pollMs]);
 

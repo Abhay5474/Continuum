@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ChartFrame, Histogram } from "../system/charts";
@@ -66,8 +67,7 @@ export default function Uncertainty() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 6000);
-    return () => clearInterval(t);
+    return visibleInterval(load, 6000);
   }, [load]);
 
   const run = async (fn: () => Promise<any>, message: string) => {

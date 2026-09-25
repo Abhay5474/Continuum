@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { Empty } from "../system/hub";
 import { PageHeader, Readout, Switch } from "../system/primitives";
@@ -67,8 +68,7 @@ export default function BreakerPage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 4000);
-    return () => clearInterval(t);
+    return visibleInterval(load, 4000);
   }, [load]);
 
   const run = async (fn: () => Promise<any>, message: string) => {

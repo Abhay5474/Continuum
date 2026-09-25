@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader } from "../system/primitives";
 import { Card, CardHead, Grid, type GlyphName, type Tone } from "../system/hub";
@@ -32,8 +33,7 @@ export default function Autopilot() {
   };
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 4000);
-    return () => clearInterval(t);
+    return visibleInterval(refresh, 4000);
   }, []);
 
   if (!signedIn) {

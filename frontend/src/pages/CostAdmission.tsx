@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { BarChart, ChartFrame, foldTail } from "../system/charts";
@@ -58,8 +59,7 @@ export default function CostAdmission() {
   useEffect(() => {
     void load();
     // Buckets refill continuously, so the shares move while you watch.
-    const t = setInterval(() => void load(), 1500);
-    return () => clearInterval(t);
+    return visibleInterval(() => void load(), 1500);
   }, [load]);
 
   const act = async (fn: () => Promise<unknown>, ok?: string) => {

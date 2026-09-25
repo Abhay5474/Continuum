@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { Switch } from "../system/primitives";
 import { ChartFrame, TargetVsActual } from "../system/charts";
@@ -60,8 +61,7 @@ export default function CompressionPolicy() {
 
   useEffect(() => {
     void load();
-    const t = setInterval(() => void load(), 2500);
-    return () => clearInterval(t);
+    return visibleInterval(() => void load(), 2500);
   }, [load]);
 
   const act = async (fn: () => Promise<unknown>, ok?: string) => {

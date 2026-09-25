@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { Meter, PageHeader, Readout, Switch } from "../system/primitives";
 import { BarChart, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
@@ -57,8 +58,7 @@ export default function Admission() {
     void load();
     // The limit is a live quantity; a static reading of it would misrepresent
     // the whole feature.
-    const t = setInterval(() => void load(), 1500);
-    return () => clearInterval(t);
+    return visibleInterval(() => void load(), 1500);
   }, [load]);
 
   const act = async (fn: () => Promise<unknown>, ok?: string) => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { Meter, PageHeader, Plane, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
@@ -80,8 +81,7 @@ export default function LoopGuard() {
 
   useEffect(() => {
     void load();
-    const t = setInterval(() => void load(), 3000);
-    return () => clearInterval(t);
+    return visibleInterval(() => void load(), 3000);
   }, [load]);
 
   const act = async (fn: () => Promise<unknown>, ok?: string) => {

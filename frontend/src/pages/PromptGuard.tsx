@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { Switch } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
@@ -86,8 +87,7 @@ export default function PromptGuard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 6000);
-    return () => clearInterval(t);
+    return visibleInterval(load, 6000);
   }, [load]);
 
   const toggle = async (target: Which, next: boolean) => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
@@ -56,8 +57,7 @@ export default function Provenance() {
 
   useEffect(() => {
     void load();
-    const t = setInterval(() => void load(), 5000);
-    return () => clearInterval(t);
+    return visibleInterval(() => void load(), 5000);
   }, [load]);
 
   useEffect(() => {
@@ -250,8 +250,7 @@ function Degradation() {
 
   useEffect(() => {
     void load();
-    const t = setInterval(() => void load(), 5000);
-    return () => clearInterval(t);
+    return visibleInterval(() => void load(), 5000);
   }, [load]);
 
   const byRung: Record<string, number> = status?.byRung ?? {};

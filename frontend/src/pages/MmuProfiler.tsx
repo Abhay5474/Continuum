@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { api, portal } from "../api";
+import { useToast } from "../components/ui";
 import { Micro, Switch } from "../system/primitives";
 import FeatureToggle from "../system/FeatureToggle";
 import { timeOf, toMillis } from "../system/time";
@@ -45,8 +47,7 @@ export default function MmuProfiler() {
       api.get<any[]>("/api/mmu/stubs").then(setStubs).catch(() => {});
     };
     load();
-    const t = setInterval(load, 4000);
-    return () => clearInterval(t);
+    return visibleInterval(load, 4000);
   }, []);
 
   const p = profile ?? {};
@@ -71,20 +72,17 @@ export default function MmuProfiler() {
   }, [stubs]);
   const maxAge = ranked.length ? Math.max(...ranked.map((s) => s.age), 1) : 1;
 
+  const toast = useToast();
   const setWorkingSet = async (next: boolean) => {
     setBusyWs(true);
     try {
-      await api.get<any>("/api/mmu/profile");
-      await fetch("/api/mmu/settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("continuum.portal.session") ?? ""}`,
-        },
-        body: JSON.stringify({ workingSet: next }),
-      });
-      api.get<any>("/api/mmu/profile").then(setProfile).catch(() => {});
+      // The raw fetch this replaces never looked at the response, so a refused
+      // change left the switch where the user put it while the engine had not moved.
+      await api.put<any>("/api/mmu/settings", { workingSet: next });
+    } catch (e: any) {
+      toast(`Working set was not changed: ${e?.message ?? "request failed"}`, "error");
     } finally {
+      api.get<any>("/api/mmu/profile").then(setProfile).catch(() => {});
       setBusyWs(false);
     }
   };

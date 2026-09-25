@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { visibleInterval } from "../system/poll";
 import { api } from "../api";
 import { Chip, Empty } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
@@ -75,8 +76,7 @@ export default function ModelRouter() {
   };
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 5000);
-    return () => clearInterval(t);
+    return visibleInterval(refresh, 5000);
   }, []);
 
   const runProbe = async () => {
