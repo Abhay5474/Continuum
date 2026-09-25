@@ -543,9 +543,9 @@ export function CardHead({
     >
       {glyph && <Chip glyph={glyph} tone={tone} />}
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-[13px] font-semibold tracking-tight text-slate-100">
+        <h2 className="truncate text-[13px] font-semibold tracking-tight text-slate-100">
           {title}
-        </h3>
+        </h2>
         {sub && <p className="mt-0.5 truncate text-[11.5px] leading-relaxed text-slate-500">{sub}</p>}
       </div>
       {right && <div className="flex shrink-0 items-center gap-2">{right}</div>}
@@ -644,17 +644,13 @@ export function Row({
   selected?: boolean;
 }) {
   const interactive = !!onClick;
+  // The row's title is the button — a real one, reached by Tab and announced
+  // as such — and the rest of the row is a larger mouse target for it. The row
+  // itself used to be role="button", which cannot contain the row's own action
+  // buttons: a screen reader flattened them into one control, or skipped them.
   return (
     <div
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : undefined}
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (interactive && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onClick!();
-        }
-      }}
       // A row you can open is a surface: it catches the cursor's light and gives
       // under a press. It does not lift — rows sit edge to edge in a list, and
       // one rising a pixel would jostle its neighbours.
@@ -677,7 +673,22 @@ export function Row({
       {mark}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="truncate text-[13.5px] font-medium text-slate-100">{title}</span>
+          {interactive ? (
+            <button
+              type="button"
+              aria-current={selected ? "true" : undefined}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick!();
+              }}
+              className="truncate rounded-[4px] text-left text-[13.5px] font-medium text-slate-100 focus:outline-none focus-visible:shadow-[var(--ring)]"
+              data-no-press
+            >
+              {title}
+            </button>
+          ) : (
+            <span className="truncate text-[13.5px] font-medium text-slate-100">{title}</span>
+          )}
           {status}
         </div>
         {subtitle && (

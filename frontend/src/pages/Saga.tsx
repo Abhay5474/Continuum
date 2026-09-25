@@ -208,7 +208,7 @@ export default function Saga() {
                       </span>
                     ))}
                   </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
+                  <p className="mt-1 text-[11px] text-slate-400">
                     These steps completed and have no compensation, so their effects remain. Nothing
                     else will clean them up.
                   </p>

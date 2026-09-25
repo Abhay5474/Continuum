@@ -214,6 +214,7 @@ export default function Scheduling() {
                   <TD className="font-mono">{r.id}</TD>
                   <TD>
                     <Select
+                      aria-label={`${r.id}: priority`}
                       value={r.priority}
                       onChange={(e) => patch(i, { priority: e.target.value })}
                     >
@@ -223,10 +224,11 @@ export default function Scheduling() {
                     </Select>
                   </TD>
                   <TD>
-                    <Num value={r.waitedSeconds} onChange={(v) => patch(i, { waitedSeconds: v ?? 0 })} />
+                    <Num label={`${r.id}: seconds waited`} value={r.waitedSeconds} onChange={(v) => patch(i, { waitedSeconds: v ?? 0 })} />
                   </TD>
                   <TD>
                     <Num
+                      label={`${r.id}: deadline in seconds`}
                       value={r.deadlineSeconds}
                       placeholder="none"
                       onChange={(v) => patch(i, { deadlineSeconds: v })}
@@ -234,6 +236,7 @@ export default function Scheduling() {
                   </TD>
                   <TD>
                     <Num
+                      label={`${r.id}: seconds it takes`}
                       value={r.estimateSeconds}
                       onChange={(v) => patch(i, { estimateSeconds: v ?? 0 })}
                     />
@@ -342,14 +345,18 @@ function Num({
   value,
   onChange,
   placeholder,
+  label,
 }: {
   value: number | null;
   onChange: (v: number | null) => void;
   placeholder?: string;
+  /** Read out in place of the column header a sighted user sees above it. */
+  label?: string;
 }) {
   return (
     <input
       type="number"
+      aria-label={label}
       min={0}
       value={value ?? ""}
       placeholder={placeholder}

@@ -181,7 +181,7 @@ export default function Settings() {
                 <TH>Prefix</TH>
                 <TH>Last used</TH>
                 <TH>Status</TH>
-                <TH align="right" width={90} />
+                <TH align="right" width={90}><span className="sr-only">Actions</span></TH>
               </tr>
             }
           >

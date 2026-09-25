@@ -455,7 +455,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       <div>
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Sandbox playground</h2>
         <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">Send a request through your gateway right now — no code required.</p>
-        <textarea value={playPrompt} onChange={(e) => setPlayPrompt(e.target.value)}
+        <textarea aria-label="Prompt" value={playPrompt} onChange={(e) => setPlayPrompt(e.target.value)}
           className="mt-2 h-16 w-full field" />
         <button
           onClick={runPlay}

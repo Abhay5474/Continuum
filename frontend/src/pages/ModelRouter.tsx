@@ -153,6 +153,7 @@ export default function ModelRouter() {
           <div>
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Strategy</h2>
             <Select
+              aria-label="Routing strategy"
               value={routing?.configuredStrategy ?? "HEURISTIC"}
               onChange={(e) => api.opPost(`/api/routing/strategy?strategy=${e.target.value}`).then(refresh)}
               disabled={!operator}
@@ -166,6 +167,7 @@ export default function ModelRouter() {
           <div>
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Objective</h2>
             <Select
+              aria-label="Routing objective"
               value={routing?.mode ?? "BALANCED"}
               onChange={(e) => api.opPost(`/api/routing/mode?mode=${e.target.value}`).then(refresh)}
               disabled={!operator}

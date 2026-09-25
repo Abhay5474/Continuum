@@ -259,6 +259,7 @@ export default function WorkflowBuilder() {
                   </span>
                 </div>
                 <textarea
+                  aria-label="Run input (JSON)"
                   value={runInput}
                   onChange={(e) => setRunInput(e.target.value)}
                   spellCheck={false}
@@ -345,6 +346,7 @@ export default function WorkflowBuilder() {
                 </span>
               </div>
               <textarea
+                aria-label="Workflow definition (JSON)"
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
                 spellCheck={false}

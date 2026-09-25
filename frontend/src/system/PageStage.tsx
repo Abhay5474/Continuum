@@ -151,10 +151,21 @@ export function PageStage({ className, children }: { className: string; children
   useLayoutEffect(() => {
     const from = prev.current;
     prev.current = location.pathname;
-    if (from === null) return; // the first page has nothing to arrive from
+    // The first page has nothing to arrive from. The second check is the same
+    // page seen twice — StrictMode runs this effect twice on mount — which
+    // otherwise played a transition on first load and pulled focus into the
+    // page ahead of the skip link.
+    if (from === null || from === location.pathname) return;
     const m = main.current;
     if (!m) return;
 
+    // Keyboard and screen-reader users land on the new page rather than on
+    // the link that left the old one (often gone with it). Not while someone
+    // is typing in a field that survived the navigation.
+    const active = document.activeElement as HTMLElement | null;
+    const typing = !!active && document.contains(active) && !m.contains(active)
+      && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
+    if (!typing) m.focus({ preventScroll: true });
     const view = viewportRectOf(m);
     const origin = pending && performance.now() - pending.at < 1200 ? pending : null;
     pending = null;
@@ -219,7 +230,7 @@ export function PageStage({ className, children }: { className: string; children
           willChange: "transform, width, height, opacity",
         }}
       />
-      <main key={location.pathname} ref={main} className={`relative z-[1] ${className}`}>
+      <main id="main" tabIndex={-1} key={location.pathname} ref={main} className={`relative z-[1] outline-none ${className}`}>
         {children}
       </main>
     </>

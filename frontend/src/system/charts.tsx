@@ -199,7 +199,7 @@ export function ChartFrame({
       style={{ borderRadius: "var(--r-lg)", borderColor: "rgb(var(--card-edge))" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold tracking-tight text-slate-100">{title}</h3>
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-100">{title}</h2>
         <div className="flex items-center gap-2">
           {aside}
           {/* Two states, both visible. A single button that reads "table" and

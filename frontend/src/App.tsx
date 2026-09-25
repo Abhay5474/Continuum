@@ -73,7 +73,15 @@ export default function App() {
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setOpenMenu(null);
+        // Focus inside the menu goes back to the button that opened it, not
+        // to the top of the document when the menu unmounts under it.
+        const inMenu = (document.activeElement as HTMLElement | null)?.closest('[role="menu"]');
+        setOpenMenu((open) => {
+          if (open && inMenu) {
+            navRef.current?.querySelector<HTMLElement>(`[data-menu-trigger="${open}"]`)?.focus();
+          }
+          return null;
+        });
         setMobileOpen(false);
       }
     };
@@ -89,6 +97,48 @@ export default function App() {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  // Menu buttons, the way assistive tech expects them to behave: opening from
+  // the keyboard puts focus on the first item; arrows move through the items;
+  // Tab leaves the menu and closes it. Before, Tab from a trigger skipped the
+  // whole menu to the next trigger, so no menu item was reachable by keyboard.
+  const focusFirst = useRef(false);
+  const menuItems = () =>
+    Array.from(navRef.current?.querySelectorAll<HTMLElement>('[role="menu"] a[href], [role="menu"] button') ?? [])
+      .filter((el) => !el.closest("[aria-hidden='true'], .pointer-events-none"));
+  useEffect(() => {
+    if (!openMenu || !focusFirst.current) return;
+    focusFirst.current = false;
+    const id = requestAnimationFrame(() => menuItems()[0]?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [openMenu]);
+  const onTriggerKey = (label: string) => (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown" || ((e.key === "Enter" || e.key === " ") && openMenu !== label)) {
+      e.preventDefault();
+      focusFirst.current = true;
+      if (openMenu === label) menuItems()[0]?.focus();
+      else setOpenMenu(label);
+    }
+  };
+  const onMenuKey = (e: React.KeyboardEvent) => {
+    if (!(e.target as HTMLElement).closest('[role="menu"]')) return;
+    const items = menuItems();
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    const go = (n: number) => {
+      e.preventDefault();
+      items[(n + items.length) % items.length]?.focus();
+    };
+    if (e.key === "ArrowDown") go(i + 1);
+    else if (e.key === "ArrowUp") go(i - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(items.length - 1);
+    else if (e.key === "Tab") {
+      // Leave from the trigger, so Tab carries on to the bar's next control
+      // instead of falling to the top of the page as the menu unmounts.
+      navRef.current?.querySelector<HTMLElement>(`[data-menu-trigger="${openMenu}"]`)?.focus();
+      setOpenMenu(null);
+    }
+  };
+
   const signOut = () => {
     portal.logout();
     navigate("/");
@@ -97,10 +147,31 @@ export default function App() {
   const groupActive = (g: Group) => g.items.some((i) => location.pathname.startsWith(i.to));
   const guide = guideFor(location.pathname);
 
+  // Each page names its tab. Every console tab used to read "Continuum —
+  // Durable AI Workflow Runtime", so ten open tabs were ten identical labels,
+  // and a screen reader announced no page change at all.
+  useEffect(() => {
+    const view = FEATURES.flatMap((f) => f.views.map((v) => ({ ...v, feature: f.name })))
+      .filter((v) => location.pathname === v.to || location.pathname.startsWith(v.to + "/"))
+      .sort((a, b) => b.to.length - a.to.length)[0];
+    const name = location.pathname.startsWith("/dashboard")
+      ? "Command Centre"
+      : view
+        ? view.feature === view.label ? view.label : `${view.label} · ${view.feature}`
+        : null;
+    document.title = name ? `${name} — Continuum` : "Continuum";
+  }, [location.pathname]);
+
   return (
     <div className="min-h-full">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-full focus:bg-card focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-[var(--ring)]"
+      >
+        Skip to content
+      </a>
       <header className="glass-bar sticky top-0 z-30">
-        <div ref={navRef} className="relative mx-auto flex max-w-[1200px] items-center gap-2 px-5 py-2.5">
+        <div ref={navRef} onKeyDown={onMenuKey} className="relative mx-auto flex max-w-[1200px] items-center gap-2 px-5 py-2.5">
           <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">
             <span
               className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px]"
@@ -129,6 +200,7 @@ export default function App() {
                 <button
                   data-menu-trigger={g.label}
                   onClick={() => setOpenMenu(openMenu === g.label ? null : g.label)}
+                  onKeyDown={onTriggerKey(g.label)}
                   // With a menu already open, pointing at a neighbour switches
                   // to it — the shared surface then slides across rather than
                   // closing and reopening.
@@ -215,10 +287,12 @@ export default function App() {
               <button
                 data-menu-trigger="account"
                 onClick={() => setOpenMenu(openMenu === "account" ? null : "account")}
+                onKeyDown={onTriggerKey("account")}
+                aria-haspopup="true"
+                aria-expanded={openMenu === "account"}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-panel text-xs font-semibold text-slate-300 transition-colors hover:border-aurora/50"
                 aria-label="Account menu"
                 data-tip="Account"
-                aria-haspopup="true"
               >
                 ●
               </button>

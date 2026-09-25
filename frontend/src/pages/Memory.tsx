@@ -40,6 +40,7 @@ export default function Memory() {
       <div className="plane flex flex-wrap items-center gap-2 p-4">
         <span className="micro">Scope</span>
         <input
+          aria-label="Memory scope"
           value={scope}
           onChange={(e) => setScope(e.target.value)}
           className="min-w-0 flex-1 font-mono sm:flex-none field"
@@ -64,6 +65,7 @@ export default function Memory() {
           />
           <div className="mt-2 flex gap-2">
             <Select
+              aria-label="Memory tier"
               value={tier}
               onChange={(e) => setTier(e.target.value)}
             >
@@ -82,6 +84,7 @@ export default function Memory() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              aria-label="Retrieval query"
               placeholder="query…"
               className="flex-1 field"
             />

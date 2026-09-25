@@ -56,7 +56,7 @@ export function RouteError() {
 
   return (
     <div role="alert" className="mx-auto max-w-xl py-16 text-center">
-      <p className="text-[15px] font-semibold text-slate-100">This page ran into a problem</p>
+      <h1 className="text-[15px] font-semibold text-slate-100">This page ran into a problem</h1>
       <p className="mt-2 text-[13px] leading-relaxed text-slate-400">
         {stale
           ? "Continuum was updated while this tab was open, and this page's code could not be fetched. Reloading picks up the new version."
@@ -98,7 +98,7 @@ export function NotFound() {
     .slice(0, 3);
   return (
     <div className="mx-auto max-w-xl py-16 text-center">
-      <p className="text-[15px] font-semibold text-slate-100">There is no page at {location.pathname}</p>
+      <h1 className="text-[15px] font-semibold text-slate-100">There is no page at {location.pathname}</h1>
       <p className="mt-2 text-[13px] text-slate-400">
         The link may be mistyped, or the page may have moved.
         {suggestions.length > 0 ? " Perhaps one of these:" : ""}

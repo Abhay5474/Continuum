@@ -69,6 +69,8 @@ export default function AiChaosLab() {
                 <span className="w-full text-sm sm:w-48">{t}</span>
                 <input
                   type="range"
+                  aria-label={`${t} probability`}
+                  aria-valuetext={`${((state?.rates[t] ?? 0) * 100).toFixed(0)}%`}
                   min={0}
                   max={1}
                   step={0.1}

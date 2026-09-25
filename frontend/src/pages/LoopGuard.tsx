@@ -221,6 +221,7 @@ export default function LoopGuard() {
         </div>
 
         <textarea
+          aria-label="Conversation to check for loops"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={6}

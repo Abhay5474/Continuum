@@ -157,6 +157,7 @@ export default function Dashboard() {
             <div className="font-medium">Start a workflow</div>
             <label className="mt-3 block text-xs text-slate-400">Type</label>
             <Select
+              aria-label="Workflow type"
               value={type}
               onChange={(e) => setType(e.target.value)}
             >
@@ -168,6 +169,7 @@ export default function Dashboard() {
               {type === "CustomerAnalysis" ? "Customer ID" : "Name"}
             </label>
             <input
+              aria-label={type === "CustomerAnalysis" ? "Customer ID" : "Name"}
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               className="mt-1 w-full field"
