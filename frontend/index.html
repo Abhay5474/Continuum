@@ -12,6 +12,17 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%236366f1' stroke-width='3'/%3E%3Cpath d='M11 16h10M16 11v10' stroke='%236366f1' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"
     />
+    <!-- Light unless the visitor chose dark; applied before first paint. -->
+    <script>
+      try {
+        if (localStorage.getItem("continuum.theme.choice") !== "dark") {
+          document.documentElement.setAttribute("data-theme", "light");
+          document.documentElement.style.colorScheme = "light";
+        }
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    </script>
     <title>Continuum — Durable AI Workflow Runtime</title>
   </head>
   <body>

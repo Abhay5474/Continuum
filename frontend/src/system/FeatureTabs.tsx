@@ -52,14 +52,14 @@ export default function FeatureTabs() {
         </span>
         <div
           ref={strip}
-          className="relative flex flex-wrap items-center gap-0.5 rounded-[var(--r-md)] p-0.5"
+          className="relative flex flex-wrap items-center gap-0.5 rounded-full p-[3px]"
           style={{ background: "var(--wash-mute)" }}
         >
           <span
             ref={pill}
             aria-hidden
-            className="pointer-events-none absolute bottom-0.5 left-0 top-0.5 rounded-[5px]"
-            style={{ background: "rgb(var(--card))", boxShadow: "var(--card-shadow)", willChange: "transform" }}
+            className="glass-pill pointer-events-none absolute bottom-[3px] left-0 top-[3px] rounded-full"
+            style={{ willChange: "transform" }}
           />
           {feature.views.map((v) => (
             <NavLink
@@ -68,7 +68,7 @@ export default function FeatureTabs() {
               end
               data-indicator-key={v.to}
               className={({ isActive }) =>
-                `press relative z-[1] rounded-[5px] px-2.5 py-1 text-[12px] font-medium ${
+                `press relative z-[1] rounded-full px-3 py-1 text-[12px] font-medium ${
                   isActive ? "text-slate-100" : "text-slate-400 hover:text-slate-200"
                 }`
               }

@@ -94,6 +94,14 @@ export function PageStage({ className, children }: { className: string; children
       const sh = sheet.current;
       if (!m || !sh) return;
       const reduced = prefersReducedMotion();
+      if (p === 1) {
+        // Arrived (the spring lands exactly on its target). Leave no transform
+        // behind: see onRest below for why even an identity one matters.
+        sh.style.opacity = "0";
+        m.style.transform = "";
+        m.style.opacity = "";
+        return;
+      }
 
       if (reduced || s.mode === "settle") {
         sh.style.opacity = "0";
@@ -181,7 +189,16 @@ export function PageStage({ className, children }: { className: string; children
     // text rendering on some GPUs.
     m.style.willChange = "transform, opacity";
     t.onRest = () => {
-      if (main.current) main.current.style.willChange = "";
+      const el = main.current;
+      if (!el) return;
+      // At rest the page must carry no transform at all. Even scale(1) makes
+      // <main> the containing block for every position:fixed descendant, which
+      // clipped side panels, scrims and overlays to the page column instead
+      // of the viewport.
+      el.style.willChange = "";
+      el.style.transform = "";
+      el.style.transformOrigin = "";
+      el.style.opacity = "";
     };
     t.jump(0);
     t.set(1);

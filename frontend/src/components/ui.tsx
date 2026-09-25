@@ -395,18 +395,15 @@ function ToastItem({ toast, onGone }: { toast: Toast; onGone: () => void }) {
       role="status"
       onPointerEnter={pause}
       onPointerLeave={() => !leaving.current && arm()}
-      className="pointer-events-auto flex cursor-grab touch-pan-y select-none items-start gap-2.5 border border-l-[3px] px-3 py-2.5 text-[12.5px] active:cursor-grabbing"
+      data-glass
+      className="glass-strong pointer-events-auto relative flex cursor-grab touch-pan-y select-none items-start gap-2.5 px-3.5 py-3 text-[12.5px] active:cursor-grabbing"
       style={{
-        borderRadius: "var(--r-lg)",
-        borderColor: "rgb(var(--card-edge))",
-        borderLeftColor: toast.kind === "info" ? "var(--accent)" : TOAST_INK[toast.kind],
-        background: "rgb(var(--card))",
-        boxShadow: "var(--shadow-float)",
+        borderRadius: "var(--r-glass)",
         opacity: 0,
         willChange: "transform, opacity",
       }}
     >
-      <span aria-hidden className="mt-[1px] shrink-0" style={{ color: TOAST_INK[toast.kind] }}>
+      <span aria-hidden className="mt-[1px] shrink-0" style={{ color: toast.kind === "info" ? "var(--accent)" : TOAST_INK[toast.kind] }}>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
              strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           {toast.kind === "success" ? (
@@ -423,33 +420,64 @@ function ToastItem({ toast, onGone }: { toast: Toast; onGone: () => void }) {
   );
 }
 
-/* ============================ Theme (dark default) ============================ */
+/* ============================ Theme (light default) ============================ */
 
-const THEME_KEY = "continuum.theme";
+/**
+ * The theme a person chose, if they chose one.
+ *
+ * <p>Light is the default. The key is new: the previous one was written on
+ * every visit whether or not anyone touched the toggle, so it cannot tell a
+ * deliberate choice of dark from a default that was merely remembered. Only a
+ * click on the toggle writes this one. index.html reads the same key before
+ * first paint, so the page never flashes the wrong theme.
+ */
+const THEME_KEY = "continuum.theme.choice";
+type Theme = "dark" | "light";
 
-function applyTheme(theme: "dark" | "light") {
+function readTheme(): Theme {
+  try {
+    return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+}
+
+function applyTheme(theme: Theme) {
   const root = document.documentElement;
   if (theme === "light") root.setAttribute("data-theme", "light");
-  else root.removeAttribute("data-theme"); // dark is the default (no attribute)
+  else root.removeAttribute("data-theme"); // the dark tokens live on :root
+  root.style.colorScheme = theme;
 }
 
-// Apply the persisted theme as early as possible.
-if (typeof document !== "undefined") {
-  const saved = (localStorage.getItem(THEME_KEY) as "dark" | "light" | null) ?? "dark";
-  applyTheme(saved);
-}
+if (typeof document !== "undefined") applyTheme(readTheme());
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
-  const [theme, setTheme] = useState<"dark" | "light">(
-    () => (typeof localStorage !== "undefined" && (localStorage.getItem(THEME_KEY) as any)) || "dark"
-  );
+  const [theme, setTheme] = useState<Theme>(readTheme);
+  // Another toggle on the page (landing and console bar can both show one), or
+  // another tab, may change the theme; follow it rather than disagree with it.
   useEffect(() => {
-    applyTheme(theme);
-    localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
+    const sync = () => setTheme(readTheme());
+    window.addEventListener("continuum:theme", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("continuum:theme", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+  useEffect(() => applyTheme(theme), [theme]);
+  const choose = () => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      /* private mode: the choice lasts for this page only */
+    }
+    setTheme(next);
+    window.dispatchEvent(new Event("continuum:theme"));
+  };
   return (
     <button
-      onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+      onClick={choose}
       aria-label="Toggle theme"
       data-tip={theme === "dark" ? "Switch to light" : "Switch to dark"}
       className={`flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-slate-300 hover:border-neon/50 hover:text-neon ${className}`}

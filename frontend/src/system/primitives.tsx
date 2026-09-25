@@ -439,9 +439,13 @@ function SwitchThumb({
       <span
         ref={thumb}
         aria-hidden
-        className="absolute left-[3px] top-1/2 -mt-[7px] h-3.5 w-3.5 rounded-full bg-white"
+        className="absolute left-[3px] top-1/2 -mt-[7px] h-3.5 w-3.5 rounded-full"
         style={{
-          boxShadow: "0 1px 2px rgba(0,0,0,.28), 0 0 0 0.5px rgba(0,0,0,.06)",
+          // A bead of glass rather than a flat disc: lit from above, a little
+          // shade where it curves away underneath.
+          background: "radial-gradient(circle at 50% 28%, #fff 0 42%, #eef2f7 100%)",
+          boxShadow:
+            "inset 0 -1px 1px rgba(15,23,42,.10), 0 1px 3px rgba(0,0,0,.26), 0 0 0 0.5px rgba(0,0,0,.06)",
           transformOrigin: "center",
           willChange: "transform",
         }}

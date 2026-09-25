@@ -121,8 +121,10 @@ export default function IntroVideo() {
                   <path d="M3 2.5 19.5 12 3 21.5z" fill="#06080c" />
                 </svg>
               </span>
-              <span className="text-sm font-medium text-slate-100">Watch the introduction</span>
-              <span className="text-xs text-slate-400">
+              {/* Literal colours: the frame is dark in both themes, and the
+                  light theme's remap of text-slate-* turned these dark-on-dark. */}
+              <span className="text-sm font-medium" style={{ color: "#f1f5f9" }}>Watch the introduction</span>
+              <span className="text-xs" style={{ color: "#a7b3c6" }}>
                 {Math.round(TOTAL)} seconds · narrated · captions on screen
               </span>
             </span>

@@ -118,8 +118,9 @@ export function MenuSurface({
     <div
       ref={surface}
       role="menu"
-      className="absolute left-0 top-full z-40 mt-1.5 overflow-hidden rounded-[var(--r-lg)] border border-card-edge bg-card"
-      style={{ width, boxShadow: "var(--shadow-float)", willChange: "transform, opacity" }}
+      data-glass
+      className="glass-strong absolute left-0 top-full z-40 mt-2 overflow-hidden rounded-[var(--r-glass)]"
+      style={{ width, willChange: "transform, opacity" }}
     >
       {layers.map((l) => (
         <Layer

@@ -173,8 +173,8 @@ export function GuideButton({
       <button
         onClick={() => setOpen(true)}
         data-tip={`How ${guide.title} works`}
-        style={{ height: "var(--h-md)", borderRadius: "var(--r-md)" }}
-        className="relative inline-flex shrink-0 items-center gap-1.5 border border-card-edge bg-card px-2.5 text-[12.5px] font-medium text-slate-300 hover:border-slate-500/60 hover:text-slate-100"
+        style={{ height: "var(--h-md)" }}
+        className="relative inline-flex shrink-0 items-center gap-1.5 rounded-full border border-card-edge bg-card px-3 text-[12.5px] font-medium text-slate-300 hover:border-slate-500/60 hover:text-slate-100"
       >
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor"
              strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -412,12 +412,13 @@ function GuideScene({
       <div className="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center p-4">
         <div
           ref={card}
-          className="pointer-events-auto w-full max-w-xl overflow-hidden border p-4"
+          data-glass
+          className="glass-strong pointer-events-auto relative w-full max-w-xl overflow-hidden p-4"
           style={{
-            borderRadius: "var(--r-xl)",
-            borderColor: "rgb(var(--card-edge))",
-            background: "rgb(var(--card))",
-            boxShadow: "var(--shadow-float)",
+            borderRadius: "var(--r-glass)",
+            // It floats over a page already dimmed by the spotlight, where the
+            // standard tint turns grey; this one keeps it reading as white glass.
+            backgroundColor: "rgb(var(--glass-tint) / 0.92)",
             opacity: 0,
             transformOrigin: "50% 100%",
           }}

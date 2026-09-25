@@ -38,7 +38,8 @@ export function installSurfaceLight(doc: Document = document) {
     raf = 0;
     const e = lastEvent;
     if (!e) return;
-    const el = (e.target as Element | null)?.closest?.<HTMLElement>("[data-surface]") ?? null;
+    // Glass takes the light too, but never the lift: it is already floating.
+    const el = (e.target as Element | null)?.closest?.<HTMLElement>("[data-surface], [data-glass]") ?? null;
     if (el !== lit) {
       lit?.style.setProperty("--ma", "0");
       lit = el;

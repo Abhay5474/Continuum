@@ -1,4 +1,5 @@
-import { Children, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { motion, prefersReducedMotion, projectedRest, rubberband, useDrag, useLiquidIndicator, usePresence, useSpring } from "./physics";
 
@@ -1176,6 +1177,26 @@ export function SidePanel({
   // in briefly — appearing from nothing in one frame is its own kind of jolt.
   const { mounted, progress } = usePresence(open, motion.modal, "fade");
   const panel = useRef<HTMLElement>(null);
+  const titleId = useId();
+
+  // Focus goes into the panel when it opens and back to whatever opened it
+  // when it closes, so a keyboard user is neither left behind on the page nor
+  // dropped at the top of the document afterwards.
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const id = requestAnimationFrame(() => {
+      const el = panel.current;
+      if (el && !el.contains(document.activeElement)) {
+        el.querySelector<HTMLElement>("[data-autofocus]")?.focus() ??
+          el.querySelector<HTMLElement>('button[aria-label="Close"]')?.focus();
+      }
+    });
+    return () => {
+      cancelAnimationFrame(id);
+      if (opener && document.contains(opener)) opener.focus({ preventScroll: true });
+    };
+  }, [open]);
   const scrim = useRef<HTMLDivElement>(null);
   const veil = useRef<HTMLDivElement>(null);
   const handle = useRef<HTMLElement>(null);
@@ -1201,13 +1222,14 @@ export function SidePanel({
       if (!el) return;
       const w = el.offsetWidth || 480;
       const reduced = prefersReducedMotion();
-      const x = reduced ? 0 : (1 - p) * w + Math.max(0, drag.current);
+      // The panel floats 8px in from the edge, so it travels that much further
+      // to leave the screen entirely.
+      const x = reduced ? 0 : (1 - p) * (w + 16) + Math.max(0, drag.current);
       el.style.transform = `translate3d(${x}px,0,0)`;
       el.style.opacity = reduced ? String(Math.max(0, Math.min(1, p))) : "";
       const seen = Math.max(0, Math.min(1, p - Math.max(0, drag.current) / w));
       if (scrim.current) scrim.current.style.opacity = String(seen * 0.55);
       if (veil.current) veil.current.style.opacity = String(seen);
-      el.style.boxShadow = seen > 0.01 ? "var(--shadow-overlay)" : "none";
     };
     repaint.current = paint;
     return progress.subscribe(paint);
@@ -1246,7 +1268,10 @@ export function SidePanel({
 
   if (!mounted) return null;
 
-  return (
+  // Portalled to <body>: a fixed element is positioned against its nearest
+  // transformed ancestor, and page transitions transform <main>, which once
+  // left the panel and its scrim clipped to the page column.
+  return createPortal(
     <>
       <div ref={veil} aria-hidden className="pointer-events-none fixed inset-0 z-40"
         style={{ backdropFilter: "blur(var(--blur-modal))", WebkitBackdropFilter: "blur(var(--blur-modal))", opacity: 0 }} />
@@ -1261,8 +1286,11 @@ export function SidePanel({
         ref={panel}
         role="dialog"
         aria-hidden={!open}
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[30rem] flex-col border-l border-edge"
-        style={{ background: "rgb(var(--panel))", transform: "translate3d(100%,0,0)", willChange: "transform" }}
+        aria-modal={open ? true : undefined}
+        aria-labelledby={titleId}
+        data-glass
+        className="glass-strong fixed bottom-2 right-2 top-2 z-50 flex w-[calc(100%-1rem)] max-w-[30rem] flex-col overflow-hidden"
+        style={{ borderRadius: "var(--r-glass)", transform: "translate3d(100%,0,0)", willChange: "transform" }}
       >
         <header
           ref={handle}
@@ -1270,7 +1298,7 @@ export function SidePanel({
         >
           {shown.current.mark}
           <div className="min-w-0 flex-1 select-none">
-            <h2 className="truncate text-[15px] font-semibold tracking-tight text-slate-100">
+            <h2 id={titleId} className="truncate text-[15px] font-semibold tracking-tight text-slate-100">
               {shown.current.title}
             </h2>
             {shown.current.subtitle && <p className="mt-0.5 text-xs text-slate-500">{shown.current.subtitle}</p>}
@@ -1290,7 +1318,8 @@ export function SidePanel({
           <footer className="border-t border-edge/70 px-5 py-3">{shown.current.footer}</footer>
         )}
       </aside>
-    </>
+    </>,
+    document.body
   );
 }
 
@@ -1673,13 +1702,17 @@ export function Stat({
         {glyph ? (
           <Chip glyph={glyph} tone={tone ?? "info"} />
         ) : (
-          // No glyph chosen: a plain swatch still gives the card a mark to be
-          // found by, without inventing an icon that means the wrong thing.
+          // No glyph chosen: a plain mark still gives the card something to be
+          // found by, without inventing an icon that means the wrong thing. A
+          // filled bead, not an outlined square: the square read as an empty
+          // checkbox, which invited a click that did nothing.
           <span
             aria-hidden
-            className="mt-0.5 h-[18px] w-[18px] shrink-0 rounded-[6px]"
-            style={{ background: toneWash(tone ?? "mute"), boxShadow: `inset 0 0 0 2px ${toneInk(tone ?? "mute")}` }}
-          />
+            className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full"
+            style={{ background: toneWash(tone ?? "mute") }}
+          >
+            <span className="h-[7px] w-[7px] rounded-full" style={{ background: toneInk(tone ?? "mute") }} />
+          </span>
         )}
       </div>
       {series && series.length > 1 && (

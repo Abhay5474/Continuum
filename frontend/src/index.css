@@ -301,10 +301,15 @@ textarea.field { height: auto; padding-top: 8px; padding-bottom: 8px; line-heigh
   --h-sm: 26px;
   --h-md: 30px;
   --h-lg: 36px;
-  --r-sm: 5px;
-  --r-md: 7px;
-  --r-lg: 10px;
-  --r-xl: 12px;
+  /* Softer than it was, after OriginOS 7: continuous, generous corners read
+     as one object you could pick up, where tight corners read as a box drawn
+     on the page. Controls stay tighter than the surfaces that hold them. */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  /* Floating glass — menus, panels, toasts — rounder still. */
+  --r-glass: 20px;
   /* Every focusable thing gets the same ring, drawn outside the control so it
      never changes the layout when it appears. */
   --ring: 0 0 0 2px rgb(var(--ink)), 0 0 0 4px var(--accent-edge);
@@ -365,6 +370,24 @@ body,
 body {
   @apply bg-ink text-slate-200;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Ambient light, not decoration. Glass is only legible as glass when there is
+   something behind it to bend, so the top of the page carries a soft field of
+   colour that the header and menus refract as content scrolls under them. It
+   stops well above the readouts: numbers still sit on a flat plane. Fixed, so
+   it costs one paint, never a repaint on scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 420px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 70% at 8% -10%, rgb(var(--ambient-1) / var(--ambient-a)), transparent 70%),
+    radial-gradient(34% 64% at 58% -18%, rgb(var(--ambient-2) / var(--ambient-a)), transparent 72%),
+    radial-gradient(30% 60% at 96% -6%, rgb(var(--ambient-3) / var(--ambient-a)), transparent 70%);
 }
 
 /* In light mode, remap the light text scale the components use so dark-on-dark
@@ -945,20 +968,164 @@ body {
 
 /* The one tooltip (see physics/tooltip.ts). Inverted against the page so it
    reads as a label floating above it, in both themes. */
+
+/* ======================== Liquid glass ========================================
+   The material of everything that floats above the page: the bar, menus, the
+   side panel, notifications, tooltips, the guide, the travelling pills.
+
+   What makes it glass rather than a translucent box, in the order the eye
+   notices: the page behind is blurred and its colour *intensified* (saturate),
+   the way a thick lens gathers light; a bright rim along the top edge where
+   light enters, fainter along the bottom where it leaves; a sheen across the
+   upper third; and a hairline that separates it from what it sits over. Liquid
+   because its shapes move on springs and the light inside it follows the
+   pointer, rather than the surface being a static pane.
+
+   Only floating things are glass. A card holding numbers stays opaque: text
+   over a moving blur is harder to read, and data is what this console is for.
+
+   Tokens per theme, so glass on white reads as frosted and glass on black as
+   smoked, without either theme carrying the other's contrast problems. */
+:root {
+  --ambient-1: 76 139 245;
+  --ambient-2: 139 92 246;
+  --ambient-3: 45 212 191;
+  --ambient-a: 0.10;
+  --glass-tint: 22 26 35;
+  --glass-a: 0.64;
+  --glass-a-strong: 0.84;
+  --glass-blur: 24px;
+  --glass-sat: 1.8;
+  --glass-rim: 255 255 255;
+  --glass-rim-a: 0.12;
+  --glass-sheen-a: 0.05;
+  --glass-edge: 255 255 255;
+  --glass-edge-a: 0.09;
+  --glass-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 18px 44px -14px rgba(0, 0, 0, 0.7);
+}
+:root[data-theme="light"] {
+  --ambient-1: 240 78 62;
+  --ambient-2: 99 102 241;
+  --ambient-3: 20 184 166;
+  --ambient-a: 0.085;
+  --glass-tint: 255 255 255;
+  --glass-a: 0.62;
+  --glass-a-strong: 0.82;
+  --glass-rim: 255 255 255;
+  --glass-rim-a: 0.9;
+  --glass-sheen-a: 0.5;
+  --glass-edge: 15 23 42;
+  --glass-edge-a: 0.08;
+  --glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 20px 48px -18px rgba(15, 23, 42, 0.22);
+}
+
+.glass,
+.glass-strong {
+  background-color: rgb(var(--glass-tint) / var(--glass-a));
+  background-image: linear-gradient(180deg, rgb(var(--glass-rim) / var(--glass-sheen-a)) 0%,
+      rgb(var(--glass-rim) / 0) 38%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border: 1px solid rgb(var(--glass-edge) / var(--glass-edge-a));
+  box-shadow:
+    inset 0 1px 0 rgb(var(--glass-rim) / var(--glass-rim-a)),
+    inset 0 -1px 0 rgb(var(--glass-rim) / calc(var(--glass-rim-a) * 0.25)),
+    var(--glass-shadow);
+}
+/* For surfaces carrying forms and long text: more tint, same material. */
+.glass-strong {
+  background-color: rgb(var(--glass-tint) / var(--glass-a-strong));
+}
+/* The bar: a pane across the top edge, so no side borders and no drop.
+
+   Its blur lives on a pseudo-element, not the header itself. An element with
+   a backdrop-filter becomes the "backdrop root" for everything inside it, so
+   the menus that open from the bar could only blur the bar's own contents —
+   page text showed through them unblurred. */
+.glass-bar {
+  border-bottom: 1px solid rgb(var(--glass-edge) / var(--glass-edge-a));
+}
+.glass-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: rgb(var(--glass-tint) / var(--glass-a));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow: inset 0 -1px 0 rgb(var(--glass-rim) / calc(var(--glass-rim-a) * 0.4));
+}
+
+/* The light inside the glass follows the pointer (surface.ts writes --mx/--my
+   on [data-glass]). A soft caustic, not a spotlight: a liquid lens catching the
+   room's light as you move over it. */
+[data-glass] { isolation: isolate; }
+[data-glass]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  opacity: var(--ma, 0);
+  transition: opacity var(--dur-slow, 420ms) var(--ease-fade, ease);
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 0%),
+      rgb(var(--glass-rim) / calc(var(--glass-rim-a) * 0.5)), transparent 70%);
+}
+
+/* A liquid pill: the travelling selection in tabs and segmented controls. A
+   bead of glass lying on the track, lit from above. */
+.glass-pill {
+  background-color: rgb(var(--glass-tint) / var(--glass-a-strong));
+  background-image: linear-gradient(180deg, rgb(var(--glass-rim) / calc(var(--glass-sheen-a) * 1.2)) 0%,
+      rgb(var(--glass-rim) / 0) 60%);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--glass-rim) / var(--glass-rim-a)),
+    0 0 0 1px rgb(var(--glass-edge) / var(--glass-edge-a)),
+    0 2px 6px -2px rgba(15, 23, 42, 0.18);
+}
+
+/* Where the platform cannot blur, or the person has asked for less
+   transparency, the same shapes and rims on a solid tint — never glass that
+   leaves text over an unblurred page. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .glass-bar::before { background-color: rgb(var(--glass-tint) / 0.97); }
+  .glass-strong { background-color: rgb(var(--glass-tint)); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-strong, .glass-bar::before, .glass-pill {
+    background-color: rgb(var(--glass-tint));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  body::before { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-glass]::after { display: none; }
+}
+
+/* A tooltip is smoked glass in both themes — a label has to stand out from
+   whatever it floats over, so it is the one glass that inverts. */
 .physics-tip {
   max-width: 260px;
-  padding: 4px 8px;
-  border-radius: var(--r-sm, 6px);
+  padding: 5px 9px;
+  border-radius: 9px;
   font-size: 11.5px;
   line-height: 1.35;
   font-weight: 500;
   color: rgb(var(--tip-ink));
-  background: rgb(var(--tip-bg));
-  box-shadow: var(--shadow-float);
+  background: rgb(var(--tip-bg) / 0.78);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 0 0 1px rgb(var(--tip-bg) / 0.25), var(--shadow-float);
   white-space: normal;
 }
 :root { --tip-bg: 226 232 240; --tip-ink: 15 23 42; }
 :root[data-theme="light"] { --tip-bg: 15 23 42; --tip-ink: 241 245 249; }
+@media (prefers-reduced-transparency: reduce) {
+  .physics-tip { background: rgb(var(--tip-bg)); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
 
 /* Links and fields that are not .press still change colour on the fade token
    rather than on a stock 160ms ease. No transform here: a link that moves

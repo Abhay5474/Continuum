@@ -98,7 +98,7 @@ export default function App() {
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-30 border-b border-card-edge bg-card/90 backdrop-blur-md">
+      <header className="glass-bar sticky top-0 z-30">
         <div ref={navRef} className="relative mx-auto flex max-w-[1200px] items-center gap-2 px-5 py-2.5">
           <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">
             <span
@@ -158,7 +158,7 @@ export default function App() {
                     <>
                       <button
                         onClick={operator ? dropOperator : requestOperator}
-                        className="w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-edge/50"
+                        className="w-full rounded-[12px] px-3 py-2 text-left transition-colors hover:bg-slate-500/[0.09]"
                       >
                         <div className="text-sm font-medium text-slate-200">
                           {operator ? "Drop operator access" : "Operator access"}
@@ -171,7 +171,7 @@ export default function App() {
                       </button>
                       <button
                         onClick={signOut}
-                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-edge/50 hover:text-slate-200"
+                        className="w-full rounded-[12px] px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-slate-500/[0.09] hover:text-slate-200"
                       >
                         Sign out
                       </button>
@@ -237,7 +237,7 @@ export default function App() {
 
         {/* mobile menu */}
         {mobileOpen && (
-          <nav className="mx-auto max-h-[70vh] max-w-[1200px] overflow-y-auto border-t border-card-edge bg-card/95 px-5 py-3 lg:hidden">
+          <nav className="mx-auto max-h-[70vh] max-w-[1200px] overflow-y-auto border-t border-edge/60 px-5 py-3 lg:hidden">
             <MobileLink to="/dashboard" label="Command Centre" />
             {GROUPS.map((g) => (
               <div key={g.label} className="mt-3">
@@ -286,7 +286,7 @@ export default function App() {
 }
 
 function topLink(isActive: boolean) {
-  return `press rounded-[var(--r-md)] px-2.5 py-1.5 text-[13px] font-medium ${
+  return `press rounded-full px-3 py-1.5 text-[13px] font-medium ${
     isActive
       ? "bg-slate-500/[0.13] text-slate-100"
       : "text-slate-400 hover:bg-slate-500/[0.08] hover:text-slate-200"
@@ -324,7 +324,7 @@ function MenuItems({
           to={i.to}
           role="menuitem"
           className={({ isActive }) =>
-            `press block rounded-[var(--r-md)] px-3 py-2 ${
+            `press block rounded-[12px] px-3 py-2 ${
               isActive ? "bg-slate-500/[0.13]" : "hover:bg-slate-500/[0.08]"
             }`
           }
