@@ -139,6 +139,35 @@ class ByokProviderTest {
             assertThat(p.parseEvidence(null)).isEmpty();
             assertThat(p.parseEvidence("not json at all")).isEmpty();
         }
+
+        @Test
+        @DisplayName("with no language named, Deepgram is asked to detect one rather than assume English")
+        void detectsLanguageWhenUnset() {
+            String url = p.buildCall(connection("deepgram", null), "nova-2",
+                    Map.of("audioBase64", wav())).url();
+
+            assertThat(url).contains("detect_language=true").doesNotContain("language=en");
+        }
+
+        @Test
+        @DisplayName("a named language is sent as-is, and detection is not also requested")
+        void namedLanguageWins() {
+            String url = p.buildCall(connection("deepgram", null), "nova-2",
+                    Map.of("audioBase64", wav(), "language", "hi")).url();
+
+            assertThat(url).contains("language=hi").doesNotContain("detect_language");
+        }
+
+        @Test
+        @DisplayName("the detected language is recorded with the transcript")
+        void recordsDetectedLanguage() throws Exception {
+            List<Evidence> ev = p.parseEvidence(json("""
+                    {"results":{"channels":[{"detected_language":"hi","alternatives":[
+                      {"transcript":"boiler se awaaz aa rahi hai","confidence":0.88}]}]}}
+                    """));
+
+            assertThat(ev.get(0).attributes()).containsEntry("language", "hi");
+        }
     }
 
     // --- AssemblyAI ----------------------------------------------------------
@@ -157,6 +186,34 @@ class ByokProviderTest {
             assertThat(call.url()).endsWith("/v2/upload");
             assertThat(call.body()).isInstanceOf(byte[].class);
             assertThat(call.headers()).containsEntry("Content-Type", "application/octet-stream");
+        }
+
+        @Test
+        @DisplayName("a language named by the caller survives the upload round trip")
+        @SuppressWarnings("unchecked")
+        void languageSurvivesUpload() throws Exception {
+            // The upload response carries only the upload URL. Before next() was
+            // given the caller's input, the job was submitted without the
+            // language and the caller's "hi" was silently dropped.
+            SpecialistProvider.Next next = p.next(connection("assemblyai", null),
+                    json("{\"upload_url\":\"https://cdn.assemblyai.com/upload/abc\"}"), 1,
+                    Map.of("audioBase64", wav(), "language", "hi"));
+
+            assertThat((Map<String, Object>) next.call().body())
+                    .containsEntry("language_code", "hi")
+                    .doesNotContainKey("language_detection");
+        }
+
+        @Test
+        @DisplayName("with no language named, the job asks AssemblyAI to detect it")
+        @SuppressWarnings("unchecked")
+        void detectsLanguageWhenUnset() {
+            SpecialistProvider.Call call = p.buildCall(connection("assemblyai", null), null,
+                    Map.of("audioUrl", "https://example.com/call.mp3"));
+
+            assertThat((Map<String, Object>) call.body())
+                    .containsEntry("language_detection", true)
+                    .doesNotContainKey("language_code");
         }
 
         @Test
@@ -337,6 +394,39 @@ class ByokProviderTest {
 
             assertThat(ev.get(0).text()).contains("page one").contains("page two");
             assertThat(ev.get(0).attributes()).containsEntry("pages", 2);
+        }
+
+        @Test
+        @DisplayName("pages OCR.space could not read are named, not silently dropped")
+        void unreadablePagesAreNamed() throws Exception {
+            List<Evidence> ev = p.parseEvidence(json("""
+                    {"OCRExitCode":2,"IsErroredOnProcessing":false,"ParsedResults":[
+                      {"FileParseExitCode":1,"ParsedText":"Clause 1. The tenant shall pay"},
+                      {"FileParseExitCode":-10,"ParsedText":"","ErrorMessage":"Unable to recognize"},
+                      {"FileParseExitCode":1,"ParsedText":"Clause 3. Termination"}]}
+                    """));
+
+            assertThat(ev).hasSize(2);
+            assertThat(ev.get(0).text()).contains("Clause 1").contains("Clause 3");
+            assertThat(ev.get(0).attributes()).containsEntry("unreadablePages", 1);
+            // The model must be told the document is incomplete, or it will
+            // answer about the whole contract from two thirds of it.
+            assertThat(ev.get(1).kind()).isEqualTo(Evidence.Kind.NOTE);
+            assertThat(ev.get(1).text()).contains("1 of 3 pages").contains("incomplete");
+        }
+
+        @Test
+        @DisplayName("a file with no readable pages is not mistaken for a blank one")
+        void allPagesUnreadable() throws Exception {
+            List<Evidence> ev = p.parseEvidence(json("""
+                    {"OCRExitCode":3,"ParsedResults":[
+                      {"FileParseExitCode":-10,"ParsedText":""},
+                      {"FileParseExitCode":-10,"ParsedText":""}]}
+                    """));
+
+            assertThat(ev).singleElement().satisfies(e ->
+                    assertThat(e.text()).contains("could not read any of the 2 pages")
+                            .doesNotContain("blank"));
         }
     }
 

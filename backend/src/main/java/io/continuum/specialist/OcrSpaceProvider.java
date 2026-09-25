@@ -157,12 +157,19 @@ public class OcrSpaceProvider implements SpecialistProvider {
         List<Evidence> out = new ArrayList<>();
         StringBuilder full = new StringBuilder();
         int pages = 0;
+        int unreadable = 0;
 
         for (Object o : list) {
             if (!(o instanceof Map<?, ?> page)) {
                 continue;
             }
             pages++;
+            // FileParseExitCode 1 is a page read successfully. Anything else is a
+            // page OCR.space gave up on, which still arrives as an entry.
+            if (page.get("FileParseExitCode") instanceof Number code && code.intValue() != 1) {
+                unreadable++;
+                continue;
+            }
             if (page.get("ParsedText") instanceof String text && !text.isBlank()) {
                 if (!full.isEmpty()) {
                     full.append('\n');
@@ -171,6 +178,10 @@ public class OcrSpaceProvider implements SpecialistProvider {
             }
         }
 
+        if (full.isEmpty() && unreadable > 0) {
+            return List.of(Evidence.note("OCR.space could not read any of the " + pages
+                    + (pages == 1 ? " page" : " pages") + " in this file."));
+        }
         if (full.isEmpty()) {
             // A blank page and a failed read look the same in an empty string.
             // The distinction is what tells a developer whether to fix the file
@@ -180,11 +191,26 @@ public class OcrSpaceProvider implements SpecialistProvider {
                             + "image may be too low-resolution to recognise."));
         }
 
+        // OCRExitCode 2 is "parsed partially". Reading three pages of a five-page
+        // contract and presenting that as the whole document is the failure that
+        // matters here: the model answers from what it was given, confidently.
+        boolean partial = body.get("OCRExitCode") instanceof Number exit && exit.intValue() == 2;
+
         Map<String, Object> attrs = new LinkedHashMap<>();
         if (pages > 1) {
             attrs.put("pages", pages);
         }
+        if (unreadable > 0) {
+            attrs.put("unreadablePages", unreadable);
+        }
         out.add(Evidence.text("Recognised text", full.toString(), attrs));
+        if (unreadable > 0 || partial) {
+            out.add(Evidence.note(unreadable > 0
+                    ? "OCR.space could not read " + unreadable + " of " + pages + " pages. The text "
+                            + "above is incomplete; do not treat it as the whole document."
+                    : "OCR.space reports this file was only partly read. The text above may be "
+                            + "incomplete."));
+        }
         return out;
     }
 

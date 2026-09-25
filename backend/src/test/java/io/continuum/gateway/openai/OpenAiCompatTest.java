@@ -267,6 +267,42 @@ class OpenAiCompatTest {
         assertThat(resp.content()).contains("1 image");
     }
 
+    /** Tool calls, usage and finish reason survive the quality and confidence stages. */
+    @Test
+    void laterStagesPreserveTheCompletion() {
+        // The quality gate and the uncertainty stage used to rebuild the response
+        // through the short constructors, which set tool calls and usage to null.
+        // With the gate switched on — even in monitor mode — every tool-calling
+        // answer reached the client as empty prose.
+        var r = new GatewayDtos.ChatResponse("", "gemini", "g", 10, 12, 0.001, 0, "routed")
+                .withCompletion(List.of(new GatewayDtos.ToolCallRef("call_1", "get_weather", "{}")), 8, 4)
+                .withFinishReason("tool_calls")
+                .withNote(" · quality 0.91")
+                .withRevision("", 5, 0.0002, " · repaired")
+                .withConfidence(0.8, false, 1, 3, 0.0001, " · confidence 0.80");
+
+        assertThat(r.toolCalls()).hasSize(1);
+        assertThat(r.promptTokens()).isEqualTo(8);
+        assertThat(r.completionTokens()).isEqualTo(4);
+        assertThat(r.finishReason()).isEqualTo("tool_calls");
+        assertThat(r.confidence()).isEqualTo(0.8);
+        assertThat(r.latency()).isEqualTo(18);
+        assertThat(r.routingReason()).isEqualTo("routed · quality 0.91 · repaired · confidence 0.80");
+    }
+
+    /** A truncated answer is reported as length, not stop. */
+    @Test
+    void truncationIsReported() throws Exception {
+        var r = new GatewayDtos.ChatResponse("The first three steps are", "gemini", "g", 10, 12, 0, 0, "r")
+                .withFinishReason("length");
+
+        Map<?, ?> parsed = json.readValue(json.writeValueAsString(translator.toCompletion("id", r, null)), Map.class);
+        Map<?, ?> choice = (Map<?, ?>) ((List<?>) parsed.get("choices")).get(0);
+
+        // The only signal a caller has that the answer stopped mid-sentence.
+        assertThat(choice.get("finish_reason")).isEqualTo("length");
+    }
+
     private OpenAiDtos.ChatCompletionRequest parse(String body) throws Exception {
         return json.readValue(body, OpenAiDtos.ChatCompletionRequest.class);
     }

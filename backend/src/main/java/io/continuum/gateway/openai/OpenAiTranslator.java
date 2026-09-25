@@ -179,6 +179,19 @@ public class OpenAiTranslator {
      * Outbound
      * ---------------------------------------------------------------- */
 
+    /**
+     * The finish reason to report. The provider's, normalised, when there is
+     * one; otherwise decided from the shape of the answer.
+     */
+    public String finishReason(GatewayDtos.ChatResponse r, boolean calling) {
+        if (calling) {
+            return io.continuum.gateway.FinishReason.TOOL_CALLS;
+        }
+        return r.finishReason() == null
+                ? io.continuum.gateway.FinishReason.STOP
+                : io.continuum.gateway.FinishReason.normalize(r.finishReason(), false);
+    }
+
     public OpenAiDtos.ChatCompletion toCompletion(String id, GatewayDtos.ChatResponse r, String streamMode) {
         List<OpenAiDtos.ToolCallDto> toolCalls = parseToolCalls(r.toolCalls());
         boolean calling = toolCalls != null && !toolCalls.isEmpty();
@@ -197,7 +210,7 @@ public class OpenAiTranslator {
                 "chat.completion",
                 System.currentTimeMillis() / 1000,
                 r.model(),
-                List.of(OpenAiDtos.Choice.message(message, calling ? "tool_calls" : "stop")),
+                List.of(OpenAiDtos.Choice.message(message, finishReason(r, calling))),
                 usageOf(r),
                 null,
                 new OpenAiDtos.ContinuumMeta(

@@ -138,13 +138,23 @@ public final class GatewayDtos {
             List<ToolCallRef> toolCalls,
             /** The prompt/completion split, kept so usage reporting is not invented. */
             Integer promptTokens,
-            Integer completionTokens) {
+            Integer completionTokens,
+            /**
+             * Why the model stopped, in OpenAI's vocabulary: stop, length,
+             * tool_calls or content_filter. Null when the answer did not come
+             * from a model (a cache hit, a degraded rung).
+             *
+             * <p>Carried because "length" is how a caller learns an answer was
+             * cut off. Reporting every answer as "stop" told clients a truncated
+             * answer was complete.
+             */
+            String finishReason) {
 
         /** The ordinary, unmeasured response. */
         public ChatResponse(String response, String provider, String model, long latency, int tokens,
                             double cost, int failovers, String routingReason) {
             this(response, provider, model, latency, tokens, cost, failovers, routingReason,
-                    null, null, null, null, null, null);
+                    null, null, null, null, null, null, null);
         }
 
         /** The eleven-argument form the uncertainty and quality stages build. */
@@ -152,13 +162,51 @@ public final class GatewayDtos {
                             double cost, int failovers, String routingReason,
                             Double confidence, Boolean lowConfidence, Integer agreementClusters) {
             this(response, provider, model, latency, tokens, cost, failovers, routingReason,
-                    confidence, lowConfidence, agreementClusters, null, null, null);
+                    confidence, lowConfidence, agreementClusters, null, null, null, null);
         }
+
+        /*
+         * Every stage after the provider call annotates or revises a response
+         * rather than building a new one. These copy every field, so a stage
+         * cannot drop one by omission. Rebuilding through the short constructors
+         * above is how the quality gate used to strip tool calls and token usage
+         * from every answer it looked at.
+         */
 
         /** The same response carrying the model's tool calls and its token split. */
         public ChatResponse withCompletion(List<ToolCallRef> calls, Integer prompt, Integer completion) {
             return new ChatResponse(response, provider, model, latency, tokens, cost, failovers,
-                    routingReason, confidence, lowConfidence, agreementClusters, calls, prompt, completion);
+                    routingReason, confidence, lowConfidence, agreementClusters, calls, prompt, completion,
+                    finishReason);
+        }
+
+        /** The same response with the provider's reason for stopping. */
+        public ChatResponse withFinishReason(String reason) {
+            return new ChatResponse(response, provider, model, latency, tokens, cost, failovers,
+                    routingReason, confidence, lowConfidence, agreementClusters, toolCalls, promptTokens,
+                    completionTokens, reason);
+        }
+
+        /** The same answer, with something appended to how it was reached. */
+        public ChatResponse withNote(String note) {
+            return new ChatResponse(response, provider, model, latency, tokens, cost, failovers,
+                    routingReason + note, confidence, lowConfidence, agreementClusters, toolCalls,
+                    promptTokens, completionTokens, finishReason);
+        }
+
+        /** A rewritten answer, and what rewriting it cost. */
+        public ChatResponse withRevision(String revised, long extraMs, double extraCost, String note) {
+            return new ChatResponse(revised, provider, model, latency + extraMs, tokens, cost + extraCost,
+                    failovers, routingReason + note, confidence, lowConfidence, agreementClusters,
+                    toolCalls, promptTokens, completionTokens, finishReason);
+        }
+
+        /** The same answer, with a self-agreement measurement and what taking it cost. */
+        public ChatResponse withConfidence(Double measured, Boolean low, Integer clusters,
+                                           long extraMs, double extraCost, String note) {
+            return new ChatResponse(response, provider, model, latency + extraMs, tokens, cost + extraCost,
+                    failovers, routingReason + note, measured, low, clusters, toolCalls, promptTokens,
+                    completionTokens, finishReason);
         }
     }
 }

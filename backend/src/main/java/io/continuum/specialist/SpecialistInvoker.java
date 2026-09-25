@@ -219,7 +219,7 @@ public class SpecialistInvoker {
                 // The provider's own message is the useful part; a developer
                 // debugging a bad model path needs to see it verbatim.
                 long failedMs = (System.nanoTime() - start) / 1_000_000;
-                String detail = "Specialist returned " + res.status() + ": " + truncate(res.body());
+                String detail = "Specialist returned " + res.status() + ": " + providerMessage(res.body());
                 recordFailure(connection, detail);
                 return trace(specialist, traceId,
                         new Result(false, List.of(), 0, res.body(), res.status(), failedMs, detail));
@@ -235,7 +235,7 @@ public class SpecialistInvoker {
 
             SpecialistProvider.Next next;
             try {
-                next = adapter.next(connection, parsedBody, round);
+                next = adapter.next(connection, parsedBody, round, input);
             } catch (RuntimeException e) {
                 log.warn("Adapter {} threw deciding the next call: {}", adapter.name(), e.getMessage());
                 next = null;
@@ -336,6 +336,44 @@ public class SpecialistInvoker {
                 s.getName(), detail, r.ok() ? "OK" : "FAILED",
                 r.findings().isEmpty() ? null : r.topConfidence(), 0, r.latencyMs());
         return r;
+    }
+
+    /**
+     * The provider's own explanation, lifted out of its error body.
+     *
+     * <p>A developer debugging a bad key needs "API key not valid", not the
+     * first 500 characters of a nested JSON envelope with the sentence buried
+     * inside it. Falls back to the raw body when no message field is found, so
+     * nothing a provider said is ever hidden.
+     */
+    String providerMessage(String body) {
+        if (body == null || body.isBlank()) {
+            return "(empty response)";
+        }
+        try {
+            Object parsed = mapper.readValue(body, Object.class);
+            if (parsed instanceof java.util.Map<?, ?> m) {
+                // Google: {"error":{"message":…}}; OpenAI-style: {"error":{"message":…}};
+                // Hugging Face: {"error":"…"}; Roboflow and most others: {"message":…};
+                // OCR.space: {"ErrorMessage":[…]}; Deepgram: {"err_msg":…}.
+                Object err = m.get("error");
+                if (err instanceof java.util.Map<?, ?> em && em.get("message") instanceof String msg) {
+                    return truncate(msg.strip());
+                }
+                for (String key : java.util.List.of("error", "message", "err_msg", "detail", "ErrorMessage")) {
+                    Object v = m.get(key);
+                    if (v instanceof String msg && !msg.isBlank()) {
+                        return truncate(msg.strip());
+                    }
+                    if (v instanceof java.util.List<?> list && !list.isEmpty() && list.get(0) != null) {
+                        return truncate(String.valueOf(list.get(0)).strip());
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // Not JSON: the raw text is the message.
+        }
+        return truncate(body.strip());
     }
 
     private static String truncate(String s) {

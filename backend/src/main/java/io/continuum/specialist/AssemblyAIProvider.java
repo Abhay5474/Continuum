@@ -119,6 +119,11 @@ public class AssemblyAIProvider implements SpecialistProvider {
         body.put("audio_url", audioUrl);
         if (input != null && input.get("language") instanceof String s && !s.isBlank()) {
             body.put("language_code", s.strip());
+        } else {
+            // Unset, AssemblyAI assumes US English, and a recording in any other
+            // language comes back as confident English gibberish rather than as
+            // an error. Detection runs on the same job at no extra round trip.
+            body.put("language_detection", true);
         }
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Content-Type", "application/json");
@@ -135,6 +140,12 @@ public class AssemblyAIProvider implements SpecialistProvider {
      */
     @Override
     public Next next(SpecialistConnectionEntity connection, Object responseBody, int round) {
+        return next(connection, responseBody, round, null);
+    }
+
+    @Override
+    public Next next(SpecialistConnectionEntity connection, Object responseBody, int round,
+                     Map<String, Object> input) {
         if (!(responseBody instanceof Map<?, ?> body)) {
             return null;
         }
@@ -142,7 +153,7 @@ public class AssemblyAIProvider implements SpecialistProvider {
 
         // Stage one answered: an upload URL, which becomes the job's input.
         if (body.get("upload_url") instanceof String uploaded && !uploaded.isBlank()) {
-            return Next.of(submit(base, uploaded.strip(), null));
+            return Next.of(submit(base, uploaded.strip(), input));
         }
 
         Object status = body.get("status");

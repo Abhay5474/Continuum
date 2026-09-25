@@ -4,6 +4,8 @@ import io.continuum.persistence.entity.SpecialistConnectionEntity;
 import io.continuum.tool.Evidence;
 import io.continuum.tool.MediaBytes;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -94,7 +96,12 @@ public class DeepgramProvider implements SpecialistProvider {
                 .append("&smart_format=true&punctuate=true");
         Object language = input.get("language");
         if (language instanceof String s && !s.isBlank()) {
-            url.append("&language=").append(s.strip());
+            url.append("&language=").append(URLEncoder.encode(s.strip(), StandardCharsets.UTF_8));
+        } else {
+            // Unset, Deepgram transcribes as English, and a recording in any
+            // other language comes back as fluent-looking English nonsense rather
+            // than as an error — the worst way for this to fail.
+            url.append("&detect_language=true");
         }
 
         Map<String, String> headers = new LinkedHashMap<>();
@@ -188,11 +195,24 @@ public class DeepgramProvider implements SpecialistProvider {
             // Recorded, never filtered on — see the class comment.
             attrs.put("recogniserConfidence", bestConfidence);
         }
+        if (detectedLanguage(r) instanceof String lang) {
+            attrs.put("language", lang);
+        }
         if (body.get("metadata") instanceof Map<?, ?> meta
                 && meta.get("duration") instanceof Number d) {
             attrs.put("durationSeconds", d.doubleValue());
         }
         out.add(Evidence.text("Transcript", full.toString(), attrs));
         return out;
+    }
+
+    /** The language Deepgram detected, when it was asked to detect one. */
+    private static String detectedLanguage(Map<?, ?> results) {
+        if (results.get("channels") instanceof List<?> chans && !chans.isEmpty()
+                && chans.get(0) instanceof Map<?, ?> chan
+                && chan.get("detected_language") instanceof String lang && !lang.isBlank()) {
+            return lang;
+        }
+        return null;
     }
 }

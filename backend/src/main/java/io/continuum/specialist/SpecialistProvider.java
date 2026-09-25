@@ -125,6 +125,20 @@ public interface SpecialistProvider {
     }
 
     /**
+     * {@link #next(SpecialistConnectionEntity, Object, int)}, with the caller's
+     * original input.
+     *
+     * <p>Exists because a provider's intermediate responses do not echo what the
+     * caller asked for. AssemblyAI's upload answers with only an upload URL, so
+     * an adapter building the next call from that response alone had no way to
+     * know the caller had asked for, say, Hindi — and silently dropped it.
+     */
+    default Next next(SpecialistConnectionEntity connection, Object responseBody, int round,
+                      Map<String, Object> input) {
+        return next(connection, responseBody, round);
+    }
+
+    /**
      * A ceiling on round trips, so a provider that never reports completion
      * cannot hold a customer request open indefinitely.
      */

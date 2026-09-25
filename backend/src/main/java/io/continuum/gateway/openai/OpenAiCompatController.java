@@ -169,7 +169,7 @@ public class OpenAiCompatController {
                     }
                 }
 
-                String finish = r.toolCalls() != null && !r.toolCalls().isEmpty() ? "tool_calls" : "stop";
+                String finish = translator.finishReason(r, r.toolCalls() != null && !r.toolCalls().isEmpty());
                 send(emitter, translator.finalChunk(id, model, finish,
                         body.wantsUsageInStream() ? translator.usage(r) : null,
                         new OpenAiDtos.ContinuumMeta(r.provider(), r.routingReason(), r.failovers(),

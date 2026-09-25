@@ -415,7 +415,15 @@ public class GatewayService {
 
         int failovers = 0;
         RuntimeException lastError = null;
+        // Providers that rejected the credential on this request. The chain lists
+        // several models per provider, and a key Gemini refuses for one model it
+        // refuses for all of them: trying each cost a round trip apiece and
+        // delayed a failover that was going to happen anyway.
+        java.util.Set<String> rejectedCredential = new java.util.HashSet<>();
         for (ModelFallbackPolicy.ModelCandidate c : chain) {
+            if (rejectedCredential.contains(c.provider())) {
+                continue;
+            }
             // withModel, not a fresh four-argument request: rebuilding it that way
             // silently dropped the caller's tools and response_format, so a
             // tool-calling client got prose back and could not tell why.
@@ -504,10 +512,8 @@ public class GatewayService {
                 // asked to call a function got a 200 with empty prose, which is
                 // indistinguishable from the model having refused.
                 GatewayDtos.ChatResponse answered =
-                        new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
-                                totalMs, tokens, cost, failovers, reason)
-                                .withCompletion(toToolCallRefs(resp.toolCalls()),
-                                        resp.promptTokens(), resp.completionTokens());
+                        completed(new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
+                                totalMs, tokens, cost, failovers, reason), resp);
 
                 return withUncertainty(
                         withQualityGate(answered,
@@ -533,6 +539,9 @@ public class GatewayService {
                             "failing over: " + e.getMessage());
                 }
                 lastError = new RuntimeException(e.getMessage(), e);
+                if (isCredentialRejection(e)) {
+                    rejectedCredential.add(c.provider());
+                }
                 log.warn("Gateway: {} {} failed, falling over: {}", c.provider(), c.model(), e.getMessage());
             } finally {
                 // Idempotent: success()/dropped() already closed it. This only
@@ -669,12 +678,9 @@ public class GatewayService {
             if (!better) {
                 return annotate(response, verdict, false);
             }
-            return annotate(new GatewayDtos.ChatResponse(safe, response.provider(), response.model(),
-                    response.latency() + repairMs, response.tokens(), response.cost() + repairCost,
-                    response.failovers(),
-                    response.routingReason() + String.format(" · repaired (%.2f → %.2f): %s",
-                            verdict.score(), after.score(), verdict.summary()),
-                    response.confidence(), response.lowConfidence(), response.agreementClusters()),
+            return annotate(response.withRevision(safe, repairMs, repairCost,
+                    String.format(" · repaired (%.2f → %.2f): %s",
+                            verdict.score(), after.score(), verdict.summary())),
                     after, true);
         } catch (Exception e) {
             log.warn("Quality gate failed for {}; returning the answer unchecked: {}",
@@ -721,13 +727,46 @@ public class GatewayService {
             // hidden: an engine that never improves anything is one to turn off.
             return annotate(response, verdict, false);
         }
-        return new GatewayDtos.ChatResponse(result.answer(), response.provider(), response.model(),
-                response.latency() + result.totalMs(), response.tokens(),
-                response.cost() + result.totalCost(), response.failovers(),
-                response.routingReason() + String.format(" · repaired (%.2f → %.2f) over %d attempt%s",
+        return response.withRevision(result.answer(), result.totalMs(), result.totalCost(),
+                String.format(" · repaired (%.2f → %.2f) over %d attempt%s",
                         result.originalScore(), result.finalScore(), result.attempts().size(),
-                        result.attempts().size() == 1 ? "" : "s"),
-                response.confidence(), response.lowConfidence(), response.agreementClusters());
+                        result.attempts().size() == 1 ? "" : "s"));
+    }
+
+    /**
+     * A gateway response carrying everything the provider said beyond the text:
+     * the tool calls, the prompt/completion split, and why it stopped.
+     *
+     * <p>One definition used by every path that calls a provider — direct,
+     * cascaded and hedged. Before this, only the direct path carried tool calls,
+     * so the same request answered differently depending on which routing mode
+     * happened to serve it.
+     */
+    private static GatewayDtos.ChatResponse completed(GatewayDtos.ChatResponse r, LlmResponse resp) {
+        if (resp == null) {
+            return r;
+        }
+        boolean calling = resp.toolCalls() != null && !resp.toolCalls().isEmpty();
+        return r.withCompletion(toToolCallRefs(resp.toolCalls()), resp.promptTokens(), resp.completionTokens())
+                .withFinishReason(FinishReason.normalize(resp.finishReason(), calling));
+    }
+
+    /**
+     * Whether a provider failure was it refusing the key rather than the model.
+     *
+     * <p>Matched on the provider's own words as well as the status, because
+     * Google reports a bad key as 400 rather than 401.
+     */
+    static boolean isCredentialRejection(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            String m = t.getMessage();
+            if (m != null && (m.contains("HTTP 401") || m.contains("HTTP 403")
+                    || m.contains("API_KEY_INVALID") || m.contains("invalid_api_key")
+                    || m.contains("Invalid API Key"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Appends the verdict to the routing reason without altering the answer. */
@@ -741,9 +780,7 @@ public class GatewayService {
                 ? String.format(" · quality %.2f", v.score())
                 : String.format(" · quality %.2f (%s): %s", v.score(),
                         v.action().name().toLowerCase(), v.summary());
-        return new GatewayDtos.ChatResponse(r.response(), r.provider(), r.model(), r.latency(),
-                r.tokens(), r.cost(), r.failovers(), r.routingReason() + note,
-                r.confidence(), r.lowConfidence(), r.agreementClusters());
+        return r.withNote(note);
     }
 
     /**
@@ -811,16 +848,14 @@ public class GatewayService {
                         m.clusters() > 1 ? m.clusters() + " conflicting answers across samples" : null);
             }
 
-            return new GatewayDtos.ChatResponse(response.response(), response.provider(), response.model(),
-                    response.latency() + extraMs, response.tokens(), response.cost() + extraCost,
-                    response.failovers(),
-                    response.routingReason() + String.format(" · confidence %.2f over %d samples in %d meaning%s",
+            return response.withConfidence(
+                    Double.isNaN(m.confidence()) ? null : m.confidence(), m.lowConfidence(), m.clusters(),
+                    extraMs, extraCost,
+                    String.format(" · confidence %.2f over %d samples in %d meaning%s",
                             m.confidence(), m.samples(), m.clusters(), m.clusters() == 1 ? "" : "s")
                             + (stopped != null && stopped.stop() && m.samples() < cfg.getSamples()
                                     ? String.format(" · stopped early, %d of %d drawn",
-                                            m.samples(), cfg.getSamples()) : ""),
-                    Double.isNaN(m.confidence()) ? null : m.confidence(),
-                    m.lowConfidence(), m.clusters());
+                                            m.samples(), cfg.getSamples()) : ""));
         } catch (Exception e) {
             log.warn("Uncertainty measurement failed for {}; returning the answer unmeasured: {}",
                     developerId, e.getMessage());
@@ -932,8 +967,8 @@ public class GatewayService {
         String finalModel = served ? strong.model() : cheap.model();
         return withUncertainty(
                 withQualityGate(
-                        new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
-                                totalMs, tokens, billed, 0, reason),
+                        completed(new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
+                                totalMs, tokens, billed, 0, reason), chosen),
                         developerId, canonical, chosenProvider, finalModel, devKeys, complexity),
                 developerId, req, canonical, chosenProvider, finalModel, devKeys, judgeUnsure);
     }
@@ -1026,8 +1061,8 @@ public class GatewayService {
             godMode.observeExchange(developerId, "gateway", lastUserContent(canonical), safeContent);
             semanticCache.store(developerId, cacheKey, req.model(), winner, safeContent, tokens, billedCost);
 
-            return new GatewayDtos.ChatResponse(safeContent, winner, resp.model(),
-                    totalMs, tokens, billedCost, 0, reason);
+            return completed(new GatewayDtos.ChatResponse(safeContent, winner, resp.model(),
+                    totalMs, tokens, billedCost, 0, reason), resp);
         } catch (Exception e) {
             log.warn("Hedged execution failed for {}; falling back to the sequential chain: {}",
                     developerId, e.getMessage());
