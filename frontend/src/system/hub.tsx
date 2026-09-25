@@ -1,5 +1,6 @@
-import { Children, cloneElement, isValidElement, useEffect, useRef, useState } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { motion, prefersReducedMotion, projectedRest, rubberband, useDrag, useLiquidIndicator, usePresence, useSpring } from "./physics";
 
 /**
  * The console's second vocabulary: rows, marks and flows.
@@ -493,7 +494,11 @@ export function Card({
         }
       }}
       data-guide={guide}
-      className={`relative border bg-card shadow-card transition-[background-color,border-color] duration-150 ${
+      // Only a card you can open behaves like one: lifts toward the cursor,
+      // catches its light, gives under a press. A read-only card doing the same
+      // would be claiming to be clickable.
+      data-surface={interactive ? "" : undefined}
+      className={`relative border bg-card shadow-card ${
         pad ? "p-4" : ""
       } ${interactive ? "cursor-pointer hover:border-slate-500/40 hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}
       style={{
@@ -649,16 +654,21 @@ export function Row({
           onClick!();
         }
       }}
-      className={`group relative flex items-center gap-3.5 px-3 py-2.5 transition-colors duration-150 ${
+      // A row you can open is a surface: it catches the cursor's light and gives
+      // under a press. It does not lift — rows sit edge to edge in a list, and
+      // one rising a pixel would jostle its neighbours.
+      data-surface={interactive ? "row" : undefined}
+      className={`group relative flex items-center gap-3.5 px-3 py-2.5 ${
         interactive ? "cursor-pointer" : ""
       } ${selected ? "bg-accent-wash" : "hover:bg-slate-500/[0.055]"}`}
       style={selected ? { background: "var(--accent-wash)" } : undefined}
     >
       {/* The selected marker is a rule on the leading edge, not a filled block.
-          It marks position without repainting the row. */}
+          It marks position without repainting the row, and grows from the
+          row's middle on the elastic spring — the selection lands. */}
       {selected && (
         <span
-          className="absolute inset-y-0 left-0 w-[2px]"
+          className="grow-y absolute inset-y-0 left-0 w-[2px]"
           style={{ background: "var(--accent)" }}
           aria-hidden
         />
@@ -670,7 +680,11 @@ export function Row({
           {status}
         </div>
         {subtitle && (
-          <p className="mt-0.5 truncate text-xs leading-relaxed text-slate-500">{subtitle}</p>
+          // One step brighter on a selected row: the accent wash under it lifts
+          // the background, and slate-500 drops to 4.1:1 there.
+          <p className={`mt-0.5 truncate text-xs leading-relaxed ${selected ? "text-slate-400" : "text-slate-500"}`}>
+            {subtitle}
+          </p>
         )}
         {meta && <div className="mt-1.5">{meta}</div>}
       </div>
@@ -1154,58 +1168,127 @@ export function SidePanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Unmounted once the exit animation has run, rather than parked off-screen
-  // with a transform. A translated fixed element still contributes to the
-  // document's scroll width, and `overflow-x: hidden` on html does not clip it
-  // — fixed elements sit in the initial containing block. Every page carrying
-  // one had grown a horizontal scrollbar and a band of dead space to its right.
-  const [mounted, setMounted] = useState(open);
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      return;
-    }
-    const t = setTimeout(() => setMounted(false), 320);
-    return () => clearTimeout(t);
-  }, [open]);
+  // Mounted for exactly as long as the spring says it is visible — unmounted
+  // when it comes to rest closed, not after a guessed timeout. Unmounting still
+  // matters: a translated fixed element contributes to the document's scroll
+  // width, and every page carrying one had grown a horizontal scrollbar.
+  // "fade": under reduced motion the panel does not travel, but it still fades
+  // in briefly — appearing from nothing in one frame is its own kind of jolt.
+  const { mounted, progress } = usePresence(open, motion.modal, "fade");
+  const panel = useRef<HTMLElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
+  const veil = useRef<HTMLDivElement>(null);
+  const handle = useRef<HTMLElement>(null);
+  const drag = useRef(0);
+  const repaint = useRef<() => void>(() => {});
+
+  // What leaves is what you were looking at. The parent usually clears its
+  // selection on close, so the panel keeps the last content it showed while
+  // open and carries that out with it, instead of sliding away blank.
+  const shown = useRef({ title, subtitle, mark, footer, children });
+  if (open) shown.current = { title, subtitle, mark, footer, children };
+
+  // One paint for the whole scene, driven by the panel's progress: the panel's
+  // position, and the page behind it dimming and losing focus in proportion.
+  // The blur is a fixed backdrop-filter whose opacity follows progress, which
+  // looks like a progressive blur and costs a fraction of animating the
+  // filter's radius every frame.
+  useLayoutEffect(() => {
+    if (!mounted) return;
+    const paint = () => {
+      const p = progress.value;
+      const el = panel.current;
+      if (!el) return;
+      const w = el.offsetWidth || 480;
+      const reduced = prefersReducedMotion();
+      const x = reduced ? 0 : (1 - p) * w + Math.max(0, drag.current);
+      el.style.transform = `translate3d(${x}px,0,0)`;
+      el.style.opacity = reduced ? String(Math.max(0, Math.min(1, p))) : "";
+      const seen = Math.max(0, Math.min(1, p - Math.max(0, drag.current) / w));
+      if (scrim.current) scrim.current.style.opacity = String(seen * 0.55);
+      if (veil.current) veil.current.style.opacity = String(seen);
+      el.style.boxShadow = seen > 0.01 ? "var(--shadow-overlay)" : "none";
+    };
+    repaint.current = paint;
+    return progress.subscribe(paint);
+  }, [mounted, progress]);
+
+  // Drag the header to the right to dismiss. The panel follows the finger;
+  // dragging it the wrong way meets resistance. On release, its momentum
+  // decides: a flick closes it from anywhere, a slow drag that stops short
+  // springs back, carrying whatever velocity the finger had.
+  useDrag(handle, {
+    axis: "x",
+    enabled: mounted,
+    onMove: ({ offset }) => {
+      const w = panel.current?.offsetWidth ?? 480;
+      drag.current = offset >= 0 ? offset : rubberband(offset, w * 0.25);
+      progress.jump(1);
+      // The spring is already at 1, so it will not repaint by itself.
+      repaint.current();
+    },
+    onEnd: ({ offset, velocity }) => {
+      const w = panel.current?.offsetWidth ?? 480;
+      const landing = projectedRest(offset, velocity);
+      drag.current = 0;
+      // Hand the drag over to the spring without a jump: the panel's current
+      // offset becomes the progress it starts from.
+      const p = 1 - Math.max(0, offset) / w;
+      progress.jump(p);
+      if (landing > w * 0.4 || velocity > 900) {
+        progress.set(0, { velocity: -velocity / w, config: motion.gesture });
+        onClose();
+      } else {
+        progress.set(1, { velocity: -velocity / w, config: motion.gesture });
+      }
+    },
+  });
 
   if (!mounted) return null;
 
   return (
     <>
+      <div ref={veil} aria-hidden className="pointer-events-none fixed inset-0 z-40"
+        style={{ backdropFilter: "blur(var(--blur-modal))", WebkitBackdropFilter: "blur(var(--blur-modal))", opacity: 0 }} />
       <div
+        ref={scrim}
         onClick={onClose}
         aria-hidden
-        className={`fixed inset-0 z-40 bg-ink/50 backdrop-blur-[1px] transition-opacity duration-250 ${
-          open ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        className={`fixed inset-0 z-40 ${open ? "" : "pointer-events-none"}`}
+        style={{ background: "rgb(var(--scrim))", opacity: 0 }}
       />
       <aside
+        ref={panel}
         role="dialog"
         aria-hidden={!open}
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-[30rem] flex-col border-l border-edge transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-        style={{ background: "rgb(var(--panel))" }}
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[30rem] flex-col border-l border-edge"
+        style={{ background: "rgb(var(--panel))", transform: "translate3d(100%,0,0)", willChange: "transform" }}
       >
-        <header className="flex items-start gap-3 border-b border-edge/70 px-5 py-4">
-          {mark}
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[15px] font-semibold tracking-tight text-slate-100">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+        <header
+          ref={handle}
+          className="flex cursor-grab touch-pan-y items-start gap-3 border-b border-edge/70 px-5 py-4 active:cursor-grabbing"
+        >
+          {shown.current.mark}
+          <div className="min-w-0 flex-1 select-none">
+            <h2 className="truncate text-[15px] font-semibold tracking-tight text-slate-100">
+              {shown.current.title}
+            </h2>
+            {shown.current.subtitle && <p className="mt-0.5 text-xs text-slate-500">{shown.current.subtitle}</p>}
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="-mr-1 shrink-0 rounded p-1 text-slate-500 transition-colors hover:text-slate-200"
+            className="-mr-1 shrink-0 rounded p-1 text-slate-500 hover:text-slate-200"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
               <path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{open && children}</div>
-        {footer && <footer className="border-t border-edge/70 px-5 py-3">{footer}</footer>}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-scroll>{shown.current.children}</div>
+        {shown.current.footer && (
+          <footer className="border-t border-edge/70 px-5 py-3">{shown.current.footer}</footer>
+        )}
       </aside>
     </>
   );
@@ -1404,8 +1487,21 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
   options: { value: T; label: string; badge?: ReactNode }[];
 }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLSpanElement>(null);
+  // One rule that travels, rather than one per option that fades: the eye
+  // follows the move from the old view to the new, which a cross-fade cannot
+  // show.
+  useLiquidIndicator(wrap, value, (l, r) => {
+    const el = bar.current;
+    if (el) el.style.transform = `translate3d(${l}px,0,0) scaleX(${Math.max(0, r - l)})`;
+  });
   return (
-    <div role="tablist" className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-edge/60">
+    <div
+      ref={wrap}
+      role="tablist"
+      className="relative flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-edge/60"
+    >
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -1413,23 +1509,25 @@ export function Segmented<T extends string>({
             key={o.value}
             role="tab"
             aria-selected={on}
+            data-indicator-key={o.value}
             onClick={() => onChange(o.value)}
-            className={`relative -mb-px flex items-center gap-1.5 py-2 text-[12.5px] transition-colors ${
+            className={`relative -mb-px flex items-center gap-1.5 py-2 text-[12.5px] ${
               on ? "text-slate-100" : "text-slate-500 hover:text-slate-300"
             }`}
           >
             {o.label}
             {o.badge}
-            {/* The indicator is a rule under the live tab, not a filled pill.
-                A pill is the same shape as a button and invites a second click. */}
-            <span
-              className="absolute inset-x-0 -bottom-px h-[1.5px] transition-opacity duration-200"
-              style={{ background: "var(--accent)", opacity: on ? 1 : 0 }}
-              aria-hidden
-            />
           </button>
         );
       })}
+      {/* The indicator is a rule under the live tab, not a filled pill.
+          A pill is the same shape as a button and invites a second click. */}
+      <span
+        ref={bar}
+        aria-hidden
+        className="pointer-events-none absolute -bottom-px left-0 h-[1.5px] w-px origin-left"
+        style={{ background: "var(--accent)", willChange: "transform" }}
+      />
     </div>
   );
 }
@@ -1986,8 +2084,81 @@ export function Bar({
  * bordered rows is a list, and a list does not say that the third thing happened
  * because of the second.
  */
-export function Spine({ children }: { children: ReactNode }) {
-  return <ol className="relative ml-[7px] border-l border-edge pl-6">{children}</ol>;
+/**
+ * A vertical chain of steps on a rail.
+ *
+ * <p>The rail is also the channel work travels along. {@code flowing} sends a
+ * packet of light down it — a request in flight, shown as movement through the
+ * actual stages rather than a spinner beside them — and {@code progress} charges
+ * the rail up to the last step that has completed, on a spring, so completion
+ * reads as the chain filling rather than rows appearing.
+ */
+export function Spine({
+  children,
+  flowing = false,
+  progress,
+}: {
+  children: ReactNode;
+  /** A request is in flight through this chain. */
+  flowing?: boolean;
+  /** 0–1: how much of the chain has completed. Omit for a static chain. */
+  progress?: number;
+}) {
+  const charge = useRef<HTMLSpanElement>(null);
+  const rail = useRef<HTMLOListElement>(null);
+  const p = useSpring(progress ?? 0, { config: motion.standard, precision: 0.001 });
+  // The packet travels the rail's real length, so its speed through each
+  // stage is the same whether the chain has three steps or eight.
+  useLayoutEffect(() => {
+    const el = rail.current;
+    if (!el || !flowing || typeof ResizeObserver === "undefined") return;
+    const sync = () => {
+      const h = el.offsetHeight;
+      el.style.setProperty("--rail-h", `${h}px`);
+      // Each node lights when the packet's centre reaches it: timed from the
+      // node's measured position, not its index, because rows are not evenly
+      // spaced. The packet runs from -44px to the rail's end at constant speed,
+      // and the node's flash peaks 5% into its own cycle.
+      const dur = parseFloat(getComputedStyle(el).getPropertyValue("--packet-dur")) || 1500;
+      const top = el.getBoundingClientRect().top;
+      el.querySelectorAll<HTMLElement>(".node-sense").forEach((n) => {
+        const y = n.getBoundingClientRect().top + n.offsetHeight / 2 - top;
+        n.style.animationDelay = `${(dur * (y + 22)) / (h + 44) - 0.05 * dur}ms`;
+      });
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [flowing]);
+  useEffect(() => {
+    if (progress != null) p.set(progress);
+  }, [progress, p]);
+  useLayoutEffect(() => {
+    if (progress == null) return;
+    return p.subscribe((v) => {
+      if (charge.current) charge.current.style.transform = `scaleY(${Math.max(0, Math.min(1, v)).toFixed(4)})`;
+    });
+  }, [p, progress == null]);
+  return (
+    <ol ref={rail} className="relative ml-[7px] pl-6">
+      <span aria-hidden className="absolute bottom-0 left-0 top-0 w-px" style={{ background: "rgb(var(--edge))" }} />
+      {progress != null && (
+        <span
+          ref={charge}
+          aria-hidden
+          className="absolute bottom-0 left-0 top-0 w-px origin-top"
+          style={{
+            background: "linear-gradient(var(--accent), color-mix(in srgb, var(--accent) 55%, transparent))",
+            boxShadow: "0 0 6px var(--accent-wash)",
+            transform: "scaleY(0)",
+          }}
+        />
+      )}
+      {flowing && <span aria-hidden className="rail-packet absolute left-[-1px] top-0 w-[3px]" />}
+      {children}
+    </ol>
+  );
 }
 
 export function SpineNode({
@@ -2000,8 +2171,14 @@ export function SpineNode({
   children,
   index = 0,
   revealed = true,
+  sensing,
 }: {
   tone?: "ok" | "warn" | "bad" | "idle" | "accent" | "skipped";
+  /**
+   * A request is flowing down the rail: this node lights as the packet passes
+   * it. The Spine times it from the node's measured position.
+   */
+  sensing?: boolean;
   head: ReactNode;
   aside?: ReactNode;
   trailing?: ReactNode;
@@ -2021,21 +2198,30 @@ export function SpineNode({
   }[tone];
   return (
     <li
-      className="relative py-1.5 transition-all duration-300"
-      style={{
-        opacity: revealed ? 1 : 0,
-        transform: revealed ? "none" : "translateY(4px)",
-        transitionDelay: `${index * 20}ms`,
-      }}
+      className={`spine-step relative py-1.5 ${revealed ? "is-in" : ""}`}
+      style={{ transitionDelay: `${index * 20}ms` }}
     >
       {/* The node sits on the rail, half outside the padding box. Hollow when
           the step was skipped: an outline reads as "this position exists and
-          nothing happened in it", which is exactly what a skip is. */}
+          nothing happened in it", which is exactly what a skip is. A node that
+          has just completed lands — scales in on the elastic spring — and the
+          model's node flashes once as the answer arrives at it. */}
       <span
-        className="absolute -left-[29px] top-[13px] h-[9px] w-[9px] rounded-full"
+        className={`absolute -left-[29px] top-[13px] h-[9px] w-[9px] rounded-full ${
+          // Waiting for the packet and landing are exclusive: both are the
+          // node's one animation, and giving it both lets the later rule win.
+          sensing
+            ? "node-sense"
+            : revealed
+              ? tone === "accent"
+                ? "node-land node-arrive"
+                : "node-land"
+              : ""
+        }`}
         style={{
           background: tone === "skipped" ? "rgb(var(--panel))" : colour,
           boxShadow: `0 0 0 2px rgb(var(--ink)), inset 0 0 0 ${tone === "skipped" ? 1.5 : 0}px ${colour}`,
+
         }}
         aria-hidden
       />

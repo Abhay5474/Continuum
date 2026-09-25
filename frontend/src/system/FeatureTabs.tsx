@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useLiquidIndicator } from "./physics";
 import { featureFor } from "./features";
 
 /**
@@ -15,6 +17,27 @@ import { featureFor } from "./features";
 export default function FeatureTabs() {
   const { pathname } = useLocation();
   const feature = featureFor(pathname);
+  const strip = useRef<HTMLDivElement>(null);
+  const pill = useRef<HTMLSpanElement>(null);
+
+  // The pill travels from the view you were on to the one you chose. This
+  // strip is remounted by the very navigation it performs, so the indicator is
+  // remembered per feature — otherwise it would appear rather than move, and
+  // the tab strip would be the one place the console loses track of where you
+  // came from. Width, not scale: the pill is rounded, and scaling it would
+  // squash its corners into ellipses mid-flight.
+  useLiquidIndicator(
+    strip,
+    feature ? pathname : null,
+    (l, r) => {
+      const el = pill.current;
+      if (!el) return;
+      el.style.transform = `translate3d(${l}px,0,0)`;
+      el.style.width = `${Math.max(0, r - l)}px`;
+    },
+    { memoryKey: feature ? `feature:${feature.name}` : undefined }
+  );
+
   if (!feature) {
     return null;
   }
@@ -28,21 +51,26 @@ export default function FeatureTabs() {
           /
         </span>
         <div
-          className="flex flex-wrap items-center gap-0.5 rounded-[var(--r-md)] p-0.5"
+          ref={strip}
+          className="relative flex flex-wrap items-center gap-0.5 rounded-[var(--r-md)] p-0.5"
           style={{ background: "var(--wash-mute)" }}
         >
+          <span
+            ref={pill}
+            aria-hidden
+            className="pointer-events-none absolute bottom-0.5 left-0 top-0.5 rounded-[5px]"
+            style={{ background: "rgb(var(--card))", boxShadow: "var(--card-shadow)", willChange: "transform" }}
+          />
           {feature.views.map((v) => (
             <NavLink
               key={v.to}
               to={v.to}
               end
+              data-indicator-key={v.to}
               className={({ isActive }) =>
-                `rounded-[5px] px-2.5 py-1 text-[12px] font-medium transition-colors duration-150 ${
+                `press relative z-[1] rounded-[5px] px-2.5 py-1 text-[12px] font-medium ${
                   isActive ? "text-slate-100" : "text-slate-400 hover:text-slate-200"
                 }`
-              }
-              style={({ isActive }) =>
-                isActive ? { background: "rgb(var(--card))", boxShadow: "var(--card-shadow)" } : undefined
               }
             >
               {v.label}

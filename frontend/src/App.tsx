@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { MenuSurface } from "./system/MenuSurface";
+import { PageStage } from "./system/PageStage";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { portal } from "./api";
 import { ThemeToggle } from "./components/ui";
@@ -97,7 +99,7 @@ export default function App() {
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-30 border-b border-card-edge bg-card/90 backdrop-blur-md">
-        <div ref={navRef} className="mx-auto flex max-w-[1200px] items-center gap-2 px-5 py-2.5">
+        <div ref={navRef} className="relative mx-auto flex max-w-[1200px] items-center gap-2 px-5 py-2.5">
           <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">
             <span
               className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px]"
@@ -124,7 +126,14 @@ export default function App() {
             {GROUPS.map((g) => (
               <div key={g.label} className="relative">
                 <button
+                  data-menu-trigger={g.label}
                   onClick={() => setOpenMenu(openMenu === g.label ? null : g.label)}
+                  // With a menu already open, pointing at a neighbour switches
+                  // to it — the shared surface then slides across rather than
+                  // closing and reopening.
+                  onPointerEnter={(e) => {
+                    if (e.pointerType === "mouse" && openMenu && openMenu !== g.label) setOpenMenu(g.label);
+                  }}
                   className={`${topLink(groupActive(g))} inline-flex items-center gap-1`}
                   aria-expanded={openMenu === g.label}
                   aria-haspopup="true"
@@ -132,10 +141,48 @@ export default function App() {
                   {g.label}
                   <Chevron open={openMenu === g.label} />
                 </button>
-                {openMenu === g.label && <Menu items={g.items} />}
               </div>
             ))}
           </nav>
+
+          {/* Every menu in the bar is this one surface. See MenuSurface. */}
+          <MenuSurface
+            open={openMenu}
+            root={navRef}
+            align={(k) => (k === "account" ? "right" : "left")}
+            render={(k) =>
+              k === "account" ? (
+                <MenuItems
+                  items={ACCOUNT}
+                  footer={
+                    <>
+                      <button
+                        onClick={operator ? dropOperator : requestOperator}
+                        className="w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-edge/50"
+                      >
+                        <div className="text-sm font-medium text-slate-200">
+                          {operator ? "Drop operator access" : "Operator access"}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {operator
+                            ? "Return to your own permissions"
+                            : "Unlock routing, hedging and the model catalogue"}
+                        </div>
+                      </button>
+                      <button
+                        onClick={signOut}
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-edge/50 hover:text-slate-200"
+                      >
+                        Sign out
+                      </button>
+                    </>
+                  }
+                />
+              ) : (
+                <MenuItems items={GROUPS.find((g) => g.label === k)?.items ?? []} />
+              )
+            }
+          />
 
           {/* right side */}
           <div className="ml-auto flex items-center gap-1.5">
@@ -165,42 +212,15 @@ export default function App() {
 
             <div className="relative hidden lg:block">
               <button
+                data-menu-trigger="account"
                 onClick={() => setOpenMenu(openMenu === "account" ? null : "account")}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-panel text-xs font-semibold text-slate-300 transition-colors hover:border-aurora/50"
                 aria-label="Account menu"
+                data-tip="Account"
                 aria-haspopup="true"
               >
                 ●
               </button>
-              {openMenu === "account" && (
-                <Menu
-                  items={ACCOUNT}
-                  align="right"
-                  footer={
-                    <>
-                      <button
-                        onClick={operator ? dropOperator : requestOperator}
-                        className="w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-edge/50"
-                      >
-                        <div className="text-sm font-medium text-slate-200">
-                          {operator ? "Drop operator access" : "Operator access"}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {operator
-                            ? "Return to your own permissions"
-                            : "Unlock routing, hedging and the model catalogue"}
-                        </div>
-                      </button>
-                      <button
-                        onClick={signOut}
-                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-edge/50 hover:text-slate-200"
-                      >
-                        Sign out
-                      </button>
-                    </>
-                  }
-                />
-              )}
             </div>
 
             <button
@@ -254,21 +274,19 @@ export default function App() {
         )}
       </header>
 
-      {/* One entrance for every page, keyed on the route.
-          Applied in the shell rather than in thirty-seven pages: a page that
-          forgot it would be the only one that snapped in, and that
-          inconsistency reads as a bug rather than as restraint. Short and
-          small — 260ms and 6px is "it arrived", not "watch this". */}
-      <main key={location.pathname} className="page-enter mx-auto max-w-[1200px] px-5 pb-16 pt-6">
+      {/* One entrance for every page, keyed on the route, applied in the shell
+          so no page can forget it. The entrance depends on where the page
+          came from — see PageStage. */}
+      <PageStage className="mx-auto max-w-[1200px] px-5 pb-16 pt-6">
         <FeatureTabs />
         <Outlet />
-      </main>
+      </PageStage>
     </div>
   );
 }
 
 function topLink(isActive: boolean) {
-  return `rounded-[var(--r-md)] px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-150 ${
+  return `press rounded-[var(--r-md)] px-2.5 py-1.5 text-[13px] font-medium ${
     isActive
       ? "bg-slate-500/[0.13] text-slate-100"
       : "text-slate-400 hover:bg-slate-500/[0.08] hover:text-slate-200"
@@ -279,7 +297,9 @@ function Chevron({ open }: { open: boolean }) {
   return (
     <svg
       viewBox="0 0 12 12"
-      className={`h-2.5 w-2.5 transition-transform ${open ? "rotate-180" : ""}`}
+      // Turns on the elastic spring, landing with the same small settle as the
+      // menu it belongs to.
+      className={`spin-to h-2.5 w-2.5 ${open ? "rotate-180" : ""}`}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
@@ -289,28 +309,22 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function Menu({
+function MenuItems({
   items,
-  align = "left",
   footer,
 }: {
   items: Item[];
-  align?: "left" | "right";
   footer?: import("react").ReactNode;
 }) {
   return (
-    <div
-      className={`absolute top-full z-40 mt-1.5 w-72 rounded-[var(--r-lg)] border border-card-edge bg-card p-1.5 ${
-        align === "right" ? "right-0" : "left-0"
-      }`}
-      style={{ boxShadow: "0 4px 6px -2px rgba(0,0,0,.12), 0 12px 28px -6px rgba(0,0,0,.28)" }}
-    >
+    <>
       {items.map((i) => (
         <NavLink
           key={i.to}
           to={i.to}
+          role="menuitem"
           className={({ isActive }) =>
-            `block rounded-[var(--r-md)] px-3 py-2 transition-colors duration-150 ${
+            `press block rounded-[var(--r-md)] px-3 py-2 ${
               isActive ? "bg-slate-500/[0.13]" : "hover:bg-slate-500/[0.08]"
             }`
           }
@@ -325,7 +339,7 @@ function Menu({
         </NavLink>
       ))}
       {footer && <div className="mt-1 border-t border-edge/60 pt-1">{footer}</div>}
-    </div>
+    </>
   );
 }
 

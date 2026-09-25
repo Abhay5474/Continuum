@@ -139,6 +139,7 @@ export default function Dashboard() {
                 <Link
                   key={w.workflowId}
                   to={`/workflows/${w.workflowId}`}
+                  data-morph
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-edge/50"
                 >
                   <StatusBadge status={w.status} />

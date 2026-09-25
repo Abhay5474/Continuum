@@ -87,12 +87,13 @@ export function Button({
   if (variant === "primary") {
     style.background = "var(--accent-strong)";
     style.color = "var(--accent-on)";
-    tone = "font-medium hover:brightness-110 active:brightness-95";
+    // Filled, so it catches white light where it is pressed, in both themes.
+    tone = "press-on-accent font-medium hover:brightness-110";
   } else if (variant === "secondary") {
     style.borderColor = "rgb(var(--card-edge))";
     style.background = "rgb(var(--card))";
     tone =
-      "border font-medium text-slate-200 hover:border-slate-500/60 hover:bg-[color:rgb(var(--card-hover))] active:brightness-95";
+      "border font-medium text-slate-200 hover:border-slate-500/60 hover:bg-[color:rgb(var(--card-hover))]";
   } else if (variant === "danger") {
     style.color = "var(--state-critical-ink)";
     style.borderColor = "var(--state-critical-ink)";
@@ -113,7 +114,10 @@ export function Button({
       title={title}
       aria-busy={busy || undefined}
       style={style}
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap transition-[background-color,border-color,filter,opacity] duration-150 disabled:cursor-not-allowed disabled:opacity-45 ${
+      // .press: compresses under the finger, springs back with a small
+      // overshoot, and lights from the point that was touched. The timing
+      // comes from the motion tokens, so no transition class here.
+      className={`press inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-45 ${
         PAD[size]
       } ${tone} ${full ? "w-full" : ""} ${className}`}
     >
@@ -149,10 +153,12 @@ export function IconButton({
         onClick?.();
       }}
       disabled={disabled}
-      title={label}
+      // The label as a physics tooltip rather than a native title: it appears
+      // on focus as well as hover, and travels between adjacent icon buttons.
+      data-tip={label}
       aria-label={label}
       style={{ width: px, height: px, borderRadius: "var(--r-md)" }}
-      className={`inline-flex shrink-0 items-center justify-center transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 ${
+      className={`press inline-flex shrink-0 items-center justify-center disabled:cursor-not-allowed disabled:opacity-45 ${
         variant === "secondary"
           ? "border border-card-edge bg-card text-slate-300 hover:border-slate-500/60"
           : "text-slate-400 hover:bg-slate-500/10 hover:text-slate-100"

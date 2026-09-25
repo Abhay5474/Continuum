@@ -5,6 +5,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { motion, useSpring } from "./physics";
 
 /**
  * Motion system.
@@ -72,8 +73,8 @@ export function Reveal({
       className={className}
       style={{
         opacity: seen ? 1 : 0,
-        transform: seen ? "none" : "translateY(14px)",
-        transition: `opacity 520ms cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 520ms cubic-bezier(0.22,1,0.36,1) ${delay}ms`,
+        translate: seen ? "0 0" : "0 14px",
+        transition: `opacity var(--dur-slow) var(--ease-fade) ${delay}ms, translate var(--dur-standard) var(--ease-standard) ${delay}ms`,
       }}
     >
       {children}
@@ -185,7 +186,7 @@ export function Magnetic({
     <span
       ref={ref}
       className={`inline-block will-change-transform ${className}`}
-      style={{ transition: "transform 380ms cubic-bezier(0.22,1,0.36,1)" }}
+      style={{ transition: "transform var(--dur-standard) var(--ease-standard)" }}
     >
       {children}
     </span>
@@ -204,41 +205,39 @@ export function Magnetic({
 export function CountUp({
   value,
   decimals = 0,
-  duration = 600,
   format,
 }: {
   value: number;
   decimals?: number;
+  /** Kept for callers that pass it; the spring decides how long a roll takes. */
   duration?: number;
   format?: (n: number) => string;
 }) {
-  const [shown, setShown] = useState(value);
-  const from = useRef(value);
-  const raf = useRef(0);
-
+  // A spring writing straight into the text node. The old version set state
+  // every frame, so each figure on a polled page re-rendered its component
+  // sixty times a second while it rolled. The gentle preset never overshoots:
+  // a readout that passed through 101 on its way to 100 would briefly report a
+  // number that was never true.
+  const el = useRef<HTMLSpanElement>(null);
+  const fmt = useRef(format);
+  fmt.current = format;
+  const text = (n: number) => {
+    const v = decimals ? Number(n.toFixed(decimals)) : Math.round(n);
+    return fmt.current ? fmt.current(v) : v.toLocaleString();
+  };
+  const spring = useSpring(value, {
+    config: motion.slow,
+    kind: "fade",
+    precision: decimals ? Math.pow(10, -decimals) / 2 : 0.5,
+    onUpdate: (n) => {
+      if (el.current) el.current.textContent = text(n);
+    },
+  });
   useEffect(() => {
-    if (reduced() || from.current === value) {
-      from.current = value;
-      setShown(value);
-      return;
-    }
-    const start = performance.now();
-    const a = from.current;
-    const b = value;
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / duration);
-      // ease-out cubic: fast settle, no overshoot on a readout
-      const e = 1 - Math.pow(1 - p, 3);
-      setShown(a + (b - a) * e);
-      if (p < 1) raf.current = requestAnimationFrame(tick);
-      else from.current = b;
-    };
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
-  }, [value, duration]);
-
-  const n = decimals ? Number(shown.toFixed(decimals)) : Math.round(shown);
-  return <>{format ? format(n) : n.toLocaleString()}</>;
+    spring.set(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return <span ref={el}>{text(spring.value)}</span>;
 }
 
 /* ------------------------------------------------------------------ *
@@ -283,7 +282,7 @@ export function Morph({
         transform: entering ? "translateY(6px) scale(0.995)" : "none",
         transition: reduced()
           ? undefined
-          : "opacity 300ms cubic-bezier(0.22,1,0.36,1), transform 300ms cubic-bezier(0.22,1,0.36,1)",
+          : "opacity var(--dur-fade) var(--ease-fade), transform var(--dur-standard) var(--ease-standard)",
       }}
     >
       {state.children}

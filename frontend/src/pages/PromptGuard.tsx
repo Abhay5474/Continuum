@@ -114,7 +114,7 @@ export default function PromptGuard() {
   const acted = (fw?.piiRedacted ?? 0) + (fw?.injectionsBlocked ?? 0) + (fw?.injectionsFlagged ?? 0);
 
   return (
-    <div className="page-enter">
+    <div>
       <header>
         <div className="flex items-center gap-2.5">
           <Chip glyph="shield" tone="ok" size={28} />

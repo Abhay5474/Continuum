@@ -140,7 +140,7 @@ export default function QualityGatePage() {
   const selected = (rows ?? []).find((r) => r.id === open) ?? null;
 
   return (
-    <div className="page-enter">
+    <div>
       <PageHeader
         glyph="check"
         tone="ok"

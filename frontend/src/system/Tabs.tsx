@@ -1,4 +1,5 @@
-import { useRef, useLayoutEffect, useState } from "react";
+import { useLiquidIndicator } from "./physics";
+import { useRef } from "react";
 
 /**
  * Section switcher.
@@ -20,13 +21,15 @@ export default function Tabs<T extends string>({
   right?: React.ReactNode;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
-  const [bar, setBar] = useState({ left: 0, width: 0 });
+  const bar = useRef<HTMLSpanElement>(null);
 
-  // Measure the active tab so the indicator can travel to it.
-  useLayoutEffect(() => {
-    const el = wrap.current?.querySelector<HTMLElement>(`[data-tab="${tab}"]`);
-    if (el) setBar({ left: el.offsetLeft, width: el.offsetWidth });
-  }, [tab, items]);
+  // The underline travels between tabs on two springs — see useLiquidIndicator.
+  // Painted straight onto the element: no state, no re-render per frame.
+  useLiquidIndicator(wrap, tab, (l, r) => {
+    const el = bar.current;
+    if (!el) return;
+    el.style.transform = `translate3d(${l}px,0,0) scaleX(${Math.max(0, r - l)})`;
+  });
 
   return (
     <div
@@ -38,14 +41,14 @@ export default function Tabs<T extends string>({
         {items.map(([k, label]) => (
           <button
             key={k}
-            data-tab={k}
+            data-indicator-key={k}
             role="tab"
             aria-selected={tab === k}
             onClick={() => setTab(k)}
             // Inactive tabs are muted rather than absent, and lift on hover —
             // a tab strip where only the active item is visible reads as a
             // heading with some grey text after it.
-            className={`px-3 pb-2.5 pt-2 text-[12.5px] font-medium transition-colors duration-150 ${
+            className={`px-3 pb-2.5 pt-2 text-[12.5px] font-medium ${
               tab === k ? "text-slate-100" : "text-slate-500 hover:text-slate-300"
             }`}
           >
@@ -53,14 +56,10 @@ export default function Tabs<T extends string>({
           </button>
         ))}
         <span
+          ref={bar}
           aria-hidden
-          className="absolute -bottom-px h-[2px] rounded-full"
-          style={{
-            left: bar.left,
-            width: bar.width,
-            background: "var(--accent)",
-            transition: "left 320ms cubic-bezier(0.22,1,0.36,1), width 320ms cubic-bezier(0.22,1,0.36,1)",
-          }}
+          className="pointer-events-none absolute -bottom-px left-0 h-[2px] w-px origin-left rounded-full"
+          style={{ background: "var(--accent)", willChange: "transform" }}
         />
       </div>
       {right && <div className="pb-1.5">{right}</div>}

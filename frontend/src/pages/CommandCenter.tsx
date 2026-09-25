@@ -350,7 +350,8 @@ export default function CommandCenter() {
                         <Link
                           key={w.workflowId}
                           to={`/workflows/${w.workflowId}`}
-                          className="flex items-center gap-2 px-4 py-1.5 transition-colors hover:bg-slate-500/[0.055]"
+                          data-morph
+                          className="flex items-center gap-2 px-4 py-1.5 hover:bg-slate-500/[0.055]"
                         >
                           <StateDot
                             state={w.status === "FAILED" ? "critical" : w.status === "RUNNING" ? "active" : "healthy"}

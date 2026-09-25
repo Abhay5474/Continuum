@@ -133,7 +133,7 @@ export default function SemanticCache() {
   const maxHits = Math.max(1, ...(rows ?? []).map((r) => r.hitCount ?? 0));
 
   return (
-    <div className="page-enter">
+    <div>
       <PageHeader
         glyph="cache"
         tone={on ? "ok" : "mute"}

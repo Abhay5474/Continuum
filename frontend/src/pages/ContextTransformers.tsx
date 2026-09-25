@@ -201,7 +201,7 @@ export default function ContextTransformers() {
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (
-    <div className="page-enter">
+    <div>
       <header>
         <div className="flex items-center gap-2.5">
           <Chip glyph="layers" tone="accent" size={28} />

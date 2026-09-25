@@ -44,6 +44,13 @@ import Scheduling from "./pages/Scheduling";
 import Provenance from "./pages/Provenance";
 import { ToastProvider } from "./components/ui";
 import { OperatorProvider } from "./system/OperatorAccess";
+import { installMotionTokens, installSurfaceLight, installTooltips } from "./system/physics";
+
+// Before the first render, so the first frame already speaks the motion
+// language: every --ease-* and --dur-* the stylesheet reads comes from here.
+installMotionTokens();
+installSurfaceLight();
+installTooltips();
 
 const router = createBrowserRouter([
   // Public: marketing, docs and authentication.

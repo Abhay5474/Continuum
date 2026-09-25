@@ -138,7 +138,10 @@ export default function ContinuumCore({
         const motionPath =
           s.direction === "out" ? path : `M ${to.x} ${to.y} L ${from.x} ${from.y}`;
         return (
-          <g key={s.id} opacity={dim ? 0.18 : 1} style={{ transition: `opacity ${MOTION.base}ms` }}>
+          // Focus is a data attribute, not inline opacity, so the stylesheet
+          // can move several properties together on the motion tokens: the
+          // selected edge brightens and thickens, the rest dim and defocus.
+          <g key={s.id} className="topo-edge" data-focus={selected === null ? undefined : dim ? "off" : "on"}>
             <path
               d={path}
               stroke={color}
@@ -177,9 +180,8 @@ export default function ContinuumCore({
           e.stopPropagation();
           onSelect("core");
         }}
-        className="cursor-pointer"
-        opacity={selected && selected !== "core" ? 0.35 : 1}
-        style={{ transition: `opacity ${MOTION.base}ms` }}
+        className="topo-node cursor-pointer"
+        data-focus={selected && selected !== "core" ? "off" : selected === "core" ? "on" : undefined}
       >
         <g style={{ ["--spin" as string]: spin }}>
           <circle
@@ -233,7 +235,6 @@ export default function ContinuumCore({
       {/* ---- subsystem nodes ---- */}
       {edges.map(({ s, p }) => {
         const isSel = selected === s.id;
-        const dim = selected !== null && !isSel;
         const color = s.installed ? STATE[s.state].color : STATE.offline.color;
         const attention = s.state === "degraded" || s.state === "critical";
         return (
@@ -243,16 +244,27 @@ export default function ContinuumCore({
               e.stopPropagation();
               onSelect(isSel ? null : s.id);
             }}
-            className="cursor-pointer"
-            opacity={dim ? 0.3 : 1}
-            style={{ transition: `opacity ${MOTION.base}ms` }}
+            // Selected: lifts toward the viewer on the elastic spring and casts
+            // a shadow. Unselected while something else is: recedes — dimmer
+            // and slightly out of focus, so the eye goes to what was chosen.
+            className="topo-node cursor-pointer"
+            data-focus={selected === null ? undefined : isSel ? "on" : "off"}
           >
             {/* An incident radiates from the node it originates at. */}
             {attention && (
               <circle cx={p.x} cy={p.y} r={6} fill={color} className="incident-pulse" />
             )}
             {isSel && (
-              <circle cx={p.x} cy={p.y} r={NODE_R + 9} fill="none" stroke={color} strokeOpacity={0.45} strokeWidth={1} />
+              <circle
+                className="topo-ring"
+                cx={p.x}
+                cy={p.y}
+                r={NODE_R + 9}
+                fill="none"
+                stroke={color}
+                strokeOpacity={0.45}
+                strokeWidth={1}
+              />
             )}
             <circle cx={p.x} cy={p.y} r={NODE_R} style={{ fill: "rgb(var(--topo-node))" }} fillOpacity={0.95} />
             <circle
@@ -279,7 +291,7 @@ export default function ContinuumCore({
                 strokeLinecap="round"
                 strokeDasharray={`${(2 * Math.PI * (NODE_R - 5) * Math.min(1, s.flow)).toFixed(1)} 999`}
                 transform={`rotate(-90 ${p.x} ${p.y})`}
-                style={{ transition: `stroke-dasharray ${MOTION.slow}ms ${MOTION.ease}` }}
+                style={{ transition: "stroke-dasharray var(--dur-slow) var(--ease-slow)" }}
               />
             )}
             <text

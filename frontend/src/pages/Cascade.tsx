@@ -117,7 +117,7 @@ export default function Cascade() {
   const accepted = (status?.requests ?? 0) - (status?.escalated ?? 0);
 
   return (
-    <div className="page-enter">
+    <div>
       <PageHeader
         glyph="route"
         tone="accent"

@@ -109,6 +109,22 @@
      interface read as wireframe rather than product. */
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --card-hover: 21 25 34;
+  /* Elevation, for the motion system. A surface's shadow says how high it is,
+     so a surface that moves up has to take its shadow with it. On black the
+     shadow does little, so height is carried by a faint top highlight too —
+     the edge catching light as it rises. */
+  --shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 20px -10px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --shadow-active: 0 1px 1px rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 2px 4px -1px rgba(0, 0, 0, 0.35), 0 16px 36px -10px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-overlay: -24px 0 60px -20px rgba(0, 0, 0, 0.75);
+  --scrim: 5 7 11;
+  /* Light that surfaces catch: under a pressed finger, and following the cursor. */
+  --press-light: 255 255 255;
+  --press-light-a: 0.13;
+  --surface-light-a: 0.045;
   /* The hairline *inside* a card: header dividers, table rules. A card's own
      border is darker than its internal rules, never the same weight. */
   --card-rule: 30 35 46;
@@ -219,6 +235,15 @@
      sticker or a smudge. */
   --card-shadow: 0 1px 1px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.06);
   --card-hover: 252 253 255;
+  --shadow-rest: 0 1px 1px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.06);
+  --shadow-hover: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 24px -10px rgba(15, 23, 42, 0.16);
+  --shadow-active: 0 1px 1px rgba(15, 23, 42, 0.06);
+  --shadow-float: 0 2px 4px -1px rgba(15, 23, 42, 0.06), 0 18px 40px -12px rgba(15, 23, 42, 0.22);
+  --shadow-overlay: -24px 0 60px -24px rgba(15, 23, 42, 0.28);
+  --scrim: 15 23 42;
+  --press-light: 15 23 42;
+  --press-light-a: 0.06;
+  --surface-light-a: 0.03;
   --card-rule: 235 239 245;
 
   --wash-ok: rgba(4, 120, 87, 0.10);
@@ -659,30 +684,344 @@ body {
 }
 .value-settle { animation: valueSettle 900ms ease-out both; }
 
-/* Reduced motion is a correctness requirement, not a courtesy: someone who has
-   asked the OS to stop animation has usually done so because animation makes
-   them ill. So this disables everything — including the chart transitions,
-   which a hand-maintained list of class names kept missing. */
+/* ---- physics ---------------------------------------------------------------
+   Every value below is a token written by installMotionTokens(): --ease-* is a
+   spring sampled into a linear() curve, --dur-* is how long that spring takes
+   to settle. Nothing here states its own duration. */
+
+@layer components {
+  /* A press. Compresses quickly under the finger (micro) and springs back with
+     a small overshoot when released (elastic) — the asymmetry is the point: a
+     real button gives immediately and rebounds. The two phases get different
+     curves because :active swaps the transform's curve while held. */
+  /* Every button is pressable unless it opts out. 131 raw buttons across the
+     console; tagging each by hand is how some end up inert. */
+  .press,
+  :where(button:not([data-no-press])) {
+    --press-dur: var(--dur-elastic, 600ms);
+    --press-ease: var(--ease-elastic, ease);
+    position: relative;
+    isolation: isolate;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Timing at full specificity, position at none. A Tailwind transition-colors
+     on a raw button would otherwise drop scale from the transition list and
+     the press would snap instead of spring; an .absolute on the same button
+     must still win over position: relative. */
+  .press,
+  button:not([data-no-press]) {
+    /* scale, not transform: the individual property composes with any
+       translate or rotate a utility class already set, so pressing a centred
+       button does not snap it out of position. */
+    transition-property: scale, box-shadow, background-color, border-color, color, filter, opacity;
+    transition-duration: var(--press-dur), var(--dur-standard, 400ms), var(--dur-fade, 250ms),
+      var(--dur-fade, 250ms), var(--dur-fade, 250ms), var(--dur-fade, 250ms), var(--dur-fade, 250ms);
+    transition-timing-function: var(--press-ease), var(--ease-standard, ease), var(--ease-fade, ease),
+      var(--ease-fade, ease), var(--ease-fade, ease), var(--ease-fade, ease), var(--ease-fade, ease);
+  }
+  .press:active:not(:disabled):not([aria-disabled="true"]),
+  :where(button:not([data-no-press])):active:not(:disabled):not([aria-disabled="true"]) {
+    --press-dur: var(--dur-micro, 200ms);
+    --press-ease: var(--ease-micro, ease);
+    scale: var(--scale-press, 0.965);
+  }
+  /* Light blooming from the exact point that was pressed, then fading slowly
+     after release — the surface remembers the touch for a moment. */
+  .press::after,
+  :where(button:not([data-no-press]))::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(
+      circle at var(--px, 50%) var(--py, 50%),
+      rgb(var(--press-light) / var(--press-light-a)) 0%,
+      rgb(var(--press-light) / 0) 70%
+    );
+    opacity: 0;
+    transition: opacity var(--dur-slow, 600ms) var(--ease-slow, ease);
+  }
+  .press:active:not(:disabled)::after,
+  :where(button:not([data-no-press])):active:not(:disabled)::after {
+    opacity: 1;
+    transition-duration: 70ms;
+  }
+  /* Filled buttons catch white light in both themes. */
+  .press-on-accent { --press-light: 255 255 255; --press-light-a: 0.22; }
+
+  /* An interactive surface: a card you can open. Lifts a pixel toward the
+     cursor with its shadow, catches a faint light under the pointer, and
+     compresses slightly on press. Read-only cards do none of this. */
+  [data-surface] {
+    position: relative;
+    transition-property: translate, scale, box-shadow, background-color, border-color;
+    transition-duration: var(--dur-standard, 400ms), var(--dur-standard, 400ms), var(--dur-standard, 400ms),
+      var(--dur-fade, 250ms), var(--dur-fade, 250ms);
+    transition-timing-function: var(--ease-standard, ease), var(--ease-standard, ease),
+      var(--ease-standard, ease), var(--ease-fade, ease), var(--ease-fade, ease);
+  }
+  [data-surface]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(
+      420px circle at var(--mx, 50%) var(--my, 50%),
+      rgb(var(--press-light) / var(--surface-light-a)),
+      transparent 60%
+    );
+    opacity: var(--ma, 0);
+    transition: opacity var(--dur-slow, 600ms) var(--ease-fade, ease);
+  }
+  @media (hover: hover) {
+    [data-surface]:hover {
+      translate: 0 calc(var(--lift, 1px) * -1);
+      box-shadow: var(--shadow-hover);
+    }
+  }
+  [data-surface]:active {
+    translate: 0 0;
+    scale: var(--scale-press-surface, 0.988);
+    box-shadow: var(--shadow-active);
+    transition-duration: var(--dur-micro, 200ms), var(--dur-micro, 200ms), var(--dur-micro, 200ms),
+      var(--dur-fade, 250ms), var(--dur-fade, 250ms);
+    transition-timing-function: var(--ease-micro, ease), var(--ease-micro, ease), var(--ease-micro, ease),
+      var(--ease-fade, ease), var(--ease-fade, ease);
+  }
+
+  /* Rows sit edge to edge: light and a gentle give, no lift. */
+  @media (hover: hover) {
+    [data-surface="row"]:hover {
+      translate: none;
+      box-shadow: none;
+    }
+  }
+  [data-surface="row"]:active {
+    scale: 0.996;
+    box-shadow: none;
+  }
+
+  /* A marker that arrives — a selection rule — grows from its centre and
+     lands with the elastic settle, once, when it mounts. */
+  .grow-y {
+    animation: growY var(--dur-elastic, 500ms) var(--ease-elastic, ease) both;
+  }
+  @keyframes growY {
+    from { scale: 1 0; }
+    to { scale: 1 1; }
+  }
+
+  /* A check mark that draws itself after its container has landed: the
+     success is confirmed after the arrival, not at the same instant. */
+  .draw-in {
+    stroke-dasharray: 12;
+    stroke-dashoffset: 12;
+    animation: drawIn var(--dur-standard, 400ms) var(--ease-standard, ease) 140ms forwards;
+  }
+  @keyframes drawIn {
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* The theme icon is one object changing state: the sun's rays retract and
+     turn while a shadow slides across the disc to leave a crescent. */
+  .theme-icon .rays {
+    transform-origin: 12px 12px;
+    transition: transform var(--dur-elastic, 500ms) var(--ease-elastic, ease),
+      opacity var(--dur-fade, 250ms) var(--ease-fade, ease);
+  }
+  .theme-icon .disc {
+    transform-origin: 12px 12px;
+    transition: transform var(--dur-elastic, 500ms) var(--ease-elastic, ease);
+  }
+  .theme-icon .shade {
+    transition: transform var(--dur-standard, 400ms) var(--ease-standard, ease);
+  }
+  .theme-icon[data-mode="dark"] .rays { transform: rotate(-60deg) scale(0.4); opacity: 0; }
+  .theme-icon[data-mode="dark"] .disc { transform: scale(1.35); }
+  .theme-icon[data-mode="light"] .shade { transform: translate(9px, -9px); }
+
+  /* ---- work moving through a chain (Spine) ----------------------------
+     The packet is a request in flight: it travels the rail at constant speed,
+     like a signal down a wire, and each node lights as it passes. It loops only
+     while the request is actually outstanding — the component mounts it for
+     exactly that long. */
+  :root { --packet-dur: 1500ms; }
+  .rail-packet {
+    height: 44px;
+    border-radius: 2px;
+    background: linear-gradient(transparent, var(--accent), transparent);
+    box-shadow: 0 0 10px var(--accent);
+    animation: railPacket var(--packet-dur) linear infinite;
+  }
+  @keyframes railPacket {
+    from { translate: 0 -44px; opacity: 0; }
+    12% { opacity: 1; }
+    88% { opacity: 1; }
+    to { translate: 0 var(--rail-h, 260px); opacity: 0; }
+  }
+  .node-sense {
+    animation: nodeSense var(--packet-dur) linear infinite;
+  }
+  @keyframes nodeSense {
+    0%, 14%, 100% { box-shadow: 0 0 0 2px rgb(var(--ink)); scale: 1; }
+    5% { box-shadow: 0 0 0 2px rgb(var(--ink)), 0 0 0 5px var(--accent-wash), 0 0 12px var(--accent); scale: 1.35; }
+  }
+  /* A completed step arrives in the chain: its row resolves, its node lands. */
+  .spine-step {
+    opacity: 0;
+    translate: 0 4px;
+    transition: opacity var(--dur-fade, 250ms) var(--ease-fade, ease),
+      translate var(--dur-standard, 400ms) var(--ease-standard, ease);
+  }
+  .spine-step.is-in { opacity: 1; translate: 0 0; }
+  .node-land {
+    animation: nodeLand var(--dur-elastic, 600ms) var(--ease-elastic, ease) both;
+  }
+  @keyframes nodeLand {
+    from { scale: 0.2; }
+    to { scale: 1; }
+  }
+  /* The answer reaching the model: one flash of edge light, then still. */
+  .node-arrive::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border-radius: 999px;
+    border: 1.5px solid var(--accent);
+    animation: nodeArrive var(--dur-slow, 700ms) var(--ease-standard, ease) both;
+  }
+  @keyframes nodeArrive {
+    from { scale: 0.4; opacity: 0.9; }
+    to { scale: 1.9; opacity: 0; }
+  }
+
+  /* ---- the topology: selecting a node ---------------------------------
+     The chosen node lifts and casts a shadow; its path to the core brightens;
+     everything unrelated dims and falls slightly out of focus. Nothing is
+     redrawn — the same elements move between states on the tokens, so the
+     graph keeps its shape and the eye keeps its place. */
+  .topo-node,
+  .topo-edge {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: scale var(--dur-elastic, 600ms) var(--ease-elastic, ease),
+      opacity var(--dur-fade, 250ms) var(--ease-fade, ease),
+      filter var(--dur-standard, 400ms) var(--ease-standard, ease);
+  }
+  @media (hover: hover) {
+    .topo-node:not([data-focus="off"]):hover { scale: 1.035; }
+  }
+  .topo-node[data-focus="on"] {
+    scale: 1.08;
+    filter: drop-shadow(0 6px 12px rgb(0 0 0 / 0.4));
+  }
+  .topo-node[data-focus="off"] { opacity: 0.3; filter: blur(0.6px); }
+  .topo-edge[data-focus="off"] { opacity: 0.16; filter: blur(0.6px); }
+  .topo-edge[data-focus="on"] path {
+    stroke-opacity: 0.75;
+    stroke-width: 1.7;
+    transition: stroke-opacity var(--dur-fade, 250ms) var(--ease-fade, ease),
+      stroke-width var(--dur-standard, 400ms) var(--ease-standard, ease);
+  }
+  .topo-ring {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ringGrow var(--dur-elastic, 600ms) var(--ease-elastic, ease) both;
+  }
+  @keyframes ringGrow {
+    from { scale: 0.6; opacity: 0; }
+    to { scale: 1; opacity: 1; }
+  }
+
+  /* An icon that turns — a chevron opening — rotates on a spring, so it
+     arrives with the same small settle as the menu it belongs to. */
+  .spin-to {
+    transition: transform var(--dur-elastic, 500ms) var(--ease-elastic, ease);
+  }
+}
+
+/* The one tooltip (see physics/tooltip.ts). Inverted against the page so it
+   reads as a label floating above it, in both themes. */
+.physics-tip {
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: var(--r-sm, 6px);
+  font-size: 11.5px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: rgb(var(--tip-ink));
+  background: rgb(var(--tip-bg));
+  box-shadow: var(--shadow-float);
+  white-space: normal;
+}
+:root { --tip-bg: 226 232 240; --tip-ink: 15 23 42; }
+:root[data-theme="light"] { --tip-bg: 15 23 42; --tip-ink: 241 245 249; }
+
+/* Links and fields that are not .press still change colour on the fade token
+   rather than on a stock 160ms ease. No transform here: a link that moves
+   when you point at it is harder to click. */
+a,
+input,
+select,
+textarea {
+  transition-property: background-color, border-color, color, box-shadow, opacity;
+  transition-duration: var(--dur-fade, 250ms);
+  transition-timing-function: var(--ease-fade, ease);
+}
+
+/* Nested scroll regions keep their scroll to themselves. Without this a wheel
+   that reaches the end of a panel's list carries on into the page behind it,
+   and the page moves when the thing under the pointer did not. */
+aside,
+pre,
+[data-scroll] {
+  overscroll-behavior: contain;
+}
+
+/* Reduced motion removes movement, not information.
+   Transforms, slides, parallax and looping animation stop. Colour and opacity
+   still change, briefly, because those are how a state change is seen at all —
+   a toggle whose colour snapped with no transition is easy to miss. The JS
+   springs follow the same rule: "move" springs arrive instantly, "fade" springs
+   still ease (see Spring.kind). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+  /* scale and translate, not transform: the press and the lift use the
+     individual properties so they compose with utility transforms, and
+     "transform: none" would leave them untouched. */
+  .press:active:not(:disabled):not([aria-disabled="true"]),
+  button:active,
+  [data-surface]:hover,
+  [data-surface]:active {
+    scale: none !important;
+    translate: none !important;
+  }
+  .rail-packet { display: none; }
+  .topo-node, .topo-edge { scale: none !important; filter: none !important; }
+  .spine-step { translate: none !important; }
+  .press,
+  button,
+  [data-surface],
+  .spin-to {
+    transition-property: background-color, border-color, color, box-shadow, opacity !important;
+    transition-duration: 120ms !important;
   }
 }
 
-/* Smooth theme-wide micro-interactions without being distracting. */
-button,
-a,
-input,
-select,
-textarea {
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease,
-    box-shadow 200ms ease, opacity 160ms ease, transform 160ms ease;
-}
-button:active {
-  transform: translateY(1px);
+/* Programmatic scrolls (jump to a section) glide; the wheel and the trackpad
+   are left alone. A script that smooths native scrolling adds latency to every
+   frame and stutters whenever the main thread is busy — during an SSE burst,
+   exactly when the page is most alive. The OS already supplies inertia,
+   velocity continuity and edge resistance, better than script can. */
+html {
+  scroll-behavior: smooth;
 }

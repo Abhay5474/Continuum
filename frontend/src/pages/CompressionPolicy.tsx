@@ -88,7 +88,7 @@ export default function CompressionPolicy() {
   const on = !!status?.enabled;
 
   return (
-    <section className="page-enter">
+    <section>
       <header>
         <div className="flex items-center gap-2.5">
           <Chip glyph="gauge" tone="accent" size={28} />

@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { STATE, type StateKey } from "./tokens";
+import { motion, projectedRest, rubberband, useDrag, useSpring, useSpringPaint } from "./physics";
 import { CountUp } from "./motion";
 import { Chip, type GlyphName, type Tone } from "./hub";
 
@@ -286,31 +287,7 @@ export function Switch({
   // of these screens, and floating it in the margin made it read like a caption.
   return (
     <div className="plane flex min-w-0 items-start gap-3 p-4">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        // The on-state wears the theme's accent: aurora on instrument black,
-        // coral on paper. A toggle is chrome, so it follows the chrome colour
-        // rather than keeping a hard-coded blue that belongs to one theme.
-        style={
-          checked
-            ? { background: "var(--accent-strong)", borderColor: "var(--accent-strong)" }
-            : undefined
-        }
-        className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors ${
-          checked ? "" : "border-edge bg-edge/40"
-        } ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-[color:var(--accent-edge)]"}`}
-      >
-        <span
-          className={`h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
-            checked ? "translate-x-[18px]" : "translate-x-[3px]"
-          }`}
-        />
-      </button>
+      <SwitchThumb checked={checked} disabled={disabled} label={label} onChange={onChange} />
       <div className="min-w-0">
         <div className="text-sm font-medium text-slate-200">{label}</div>
         {/* Capped, because a hint set to the full width of a 1400px console is
@@ -331,5 +308,144 @@ export function Switch({
         )}
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The toggle, as an object
+ * ------------------------------------------------------------------ */
+
+/** Track 36px, thumb 14px, 3px inset each side. */
+const TRAVEL = 36 - 14 - 3 * 2 - 2;
+
+/**
+ * The switch itself: a thumb with mass on a track.
+ *
+ * <ul>
+ *   <li><b>Anticipation.</b> Held down, the thumb stretches toward where it is
+ *       about to go, the way a finger leaning on a real switch loads it.</li>
+ *   <li><b>Momentum.</b> It travels on the elastic spring and lands with a
+ *       small overshoot; in flight it elongates with its speed and relaxes as
+ *       it stops, so the motion reads as mass rather than a slide.</li>
+ *   <li><b>Gesture.</b> Drag the thumb and it follows the finger, with
+ *       resistance past either end. Released, its momentum decides the outcome
+ *       — a short flick commits, a slow drag that stops halfway goes back.</li>
+ *   <li><b>Truth.</b> The thumb always returns to {@code checked}. If the change
+ *       was refused — locked, or the request failed — it springs back rather
+ *       than staying where the finger left it and lying about the state.</li>
+ * </ul>
+ */
+function SwitchThumb({
+  checked,
+  disabled,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  disabled: boolean;
+  label: string;
+  onChange: (next: boolean) => void;
+}) {
+  const track = useRef<HTMLButtonElement>(null);
+  const thumb = useRef<HTMLSpanElement>(null);
+  const pos = useSpring(checked ? 1 : 0, { config: motion.elastic, precision: 0.0005 });
+  const press = useSpring(0, { config: motion.micro });
+  const dragged = useRef(false);
+  const from = useRef(0);
+
+  // The spring follows the prop. Also re-asserted when a request settles, so a
+  // refused change springs back instead of sticking where it was dropped.
+  useEffect(() => {
+    pos.set(checked ? 1 : 0);
+  }, [checked, disabled, pos]);
+
+  const paint = () => {
+    const el = thumb.current;
+    const tr = track.current;
+    if (!el || !tr) return;
+    const p = pos.value;
+    const speed = Math.abs(pos.velocity) * TRAVEL; // px/s
+    // Stretch with speed, capped so a hard flick is a smear, not a stripe.
+    const stretch = Math.min(0.32, speed / 2600);
+    const held = press.value * 0.28;
+    const sx = 1 + stretch + held;
+    const sy = 1 - stretch * 0.35;
+    // Held, it grows toward the side it is heading for, anchored on the other.
+    const lean = held * 7 * (p < 0.5 ? 1 : -1);
+    el.style.transform = `translate3d(${p * TRAVEL + lean}px,0,0) scale(${sx},${sy})`;
+    tr.style.setProperty("--p", Math.max(0, Math.min(1, p)).toFixed(3));
+  };
+  useSpringPaint(pos, thumb, paint);
+  useSpringPaint(press, thumb, paint);
+
+  useDrag(track, {
+    axis: "x",
+    ignore: "[data-none]",
+    enabled: !disabled,
+    onStart: () => {
+      dragged.current = true;
+      from.current = pos.value;
+      press.set(0);
+    },
+    onMove: ({ offset }) => {
+      const raw = from.current + offset / TRAVEL;
+      // Past either end the thumb resists rather than stopping dead.
+      const over = raw < 0 ? raw : raw > 1 ? raw - 1 : 0;
+      pos.jump((raw < 0 ? 0 : raw > 1 ? 1 : raw) + rubberband(over * TRAVEL, TRAVEL) / TRAVEL);
+    },
+    onEnd: ({ velocity }) => {
+      const v = velocity / TRAVEL;
+      const next = projectedRest(pos.value, v * 0.35) > 0.5;
+      pos.set(next ? 1 : 0, { velocity: v, config: motion.gesture });
+      if (next !== checked) onChange(next);
+    },
+  });
+
+  return (
+    <button
+      ref={track}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      data-no-press
+      onPointerDown={() => {
+        if (!disabled) press.set(1);
+      }}
+      onPointerUp={() => press.set(0)}
+      onPointerLeave={() => press.set(0)}
+      onClick={() => {
+        // A drag already decided; the click that ends it must not toggle again.
+        if (dragged.current) {
+          dragged.current = false;
+          return;
+        }
+        onChange(!checked);
+      }}
+      // The track's colour follows the thumb's position, not the prop, so
+      // mid-drag the track is part-lit — it shows where the gesture would land.
+      style={{
+        background:
+          "color-mix(in srgb, var(--accent-strong) calc(var(--p, 0) * 100%), rgb(var(--edge) / 0.4))",
+        borderColor:
+          "color-mix(in srgb, var(--accent-strong) calc(var(--p, 0) * 100%), rgb(var(--edge)))",
+        touchAction: "pan-y",
+      }}
+      className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border ${
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-grab active:cursor-grabbing"
+      }`}
+    >
+      <span
+        ref={thumb}
+        aria-hidden
+        className="absolute left-[3px] top-1/2 -mt-[7px] h-3.5 w-3.5 rounded-full bg-white"
+        style={{
+          boxShadow: "0 1px 2px rgba(0,0,0,.28), 0 0 0 0.5px rgba(0,0,0,.06)",
+          transformOrigin: "center",
+          willChange: "transform",
+        }}
+      />
+    </button>
   );
 }

@@ -267,7 +267,7 @@ export default function Pipelines() {
   const current = all.find((p) => p.id === selected) ?? null;
 
   return (
-    <section className="page-enter">
+    <section>
       <header>
         <div className="flex items-center gap-2.5">
           <Chip glyph="flow" tone="accent" size={28} />
@@ -1261,9 +1261,15 @@ function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => void }) {
   const [shown, setShown] = useState(0);
   const [detail, setDetail] = useState<number | null>(null);
 
+  // Paced by what each step actually took: a slow specialist visibly takes
+  // longer to land than a fast one, so the replay carries the run's real
+  // shape instead of dealing out rows at one fixed beat.
   useEffect(() => {
     if (!run || shown >= run.trace.length) return;
-    const t = setTimeout(() => setShown((n) => n + 1), 260);
+    const slowest = Math.max(1, ...run.trace.map((s) => s.latencyMs));
+    const step = run.trace[shown];
+    const pace = 150 + 450 * ((step?.latencyMs ?? 0) / slowest);
+    const t = setTimeout(() => setShown((n) => n + 1), pace);
     return () => clearTimeout(t);
   }, [run, shown]);
 
@@ -1532,23 +1538,22 @@ function Chain({
   // other rather than against an arbitrary ceiling.
   const slowest = Math.max(1, ...steps.map((s) => s.latencyMs));
 
+  // In flight: the stages the request will pass through, with the request
+  // itself travelling the rail and lighting each stage as it reaches it. Not a
+  // spinner beside a list — the motion is the request moving through the
+  // actual structure. It does not claim to know which step is running; the
+  // run is one synchronous call, and the packet says only that it is inside.
   if (pending) {
     return (
-      <div className="mt-5" aria-label="running">
-        <Spine>
+      <div className="mt-5" aria-label="running" aria-busy="true">
+        <Spine flowing>
           {skeleton.map((k, i) => (
             <SpineNode
               key={k}
               index={i}
               tone="idle"
+              sensing
               head={<span className="text-slate-500">{k.toLowerCase()}</span>}
-              trailing={
-                <span
-                  className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full"
-                  style={{ background: "var(--accent)", animationDelay: `${i * 120}ms` }}
-                  aria-hidden
-                />
-              }
             />
           ))}
         </Spine>
@@ -1557,7 +1562,7 @@ function Chain({
   }
 
   return (
-    <Spine>
+    <Spine progress={steps.length ? Math.min(shown, steps.length) / steps.length : 0}>
       {steps.map((s, i) => {
         // CONSTRAINED and DECLINED are the policy working, not something
         // breaking. Painting them the same red as a dead specialist would teach

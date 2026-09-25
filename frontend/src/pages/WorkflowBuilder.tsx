@@ -442,7 +442,8 @@ export default function WorkflowBuilder() {
                     <Link
                       key={r.workflowId}
                       to={`/workflows/${r.workflowId}`}
-                      className="flex items-center gap-x-4 px-1 py-2.5 text-[11px] transition-colors hover:bg-edge/40"
+                      data-morph
+                      className="flex items-center gap-x-4 px-1 py-2.5 text-[11px] hover:bg-edge/40"
                     >
                       <StateDot state={st} size={6} />
                       <span className="readout w-16 shrink-0 text-slate-600">

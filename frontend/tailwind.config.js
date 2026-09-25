@@ -24,6 +24,31 @@ export default {
         card: "rgb(var(--card) / <alpha-value>)",
         "card-edge": "rgb(var(--card-edge) / <alpha-value>)",
       },
+      // Every duration and easing class in the app resolves to a motion token
+      // (see src/system/physics/tokens.ts), so a `transition-colors
+      // duration-150` written anywhere still speaks the one motion language.
+      // Short durations are colour and opacity changes: the fade spring, which
+      // never overshoots. Long ones are almost all data — bars filling, arcs
+      // sweeping — and get the gentle spring, also without overshoot: a bar
+      // that overshot its value would, for a moment, show a number that is
+      // not true.
+      transitionDuration: {
+        DEFAULT: "var(--dur-fade)",
+        75: "var(--dur-micro)",
+        100: "var(--dur-micro)",
+        150: "var(--dur-fade)",
+        200: "var(--dur-fade)",
+        300: "var(--dur-standard)",
+        500: "var(--dur-slow)",
+        700: "var(--dur-slow)",
+        1000: "var(--dur-slow)",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "var(--ease-fade)",
+        in: "var(--ease-fade)",
+        out: "var(--ease-slow)",
+        "in-out": "var(--ease-slow)",
+      },
       boxShadow: {
         card: "var(--card-shadow)",
         // Soft, subtle elevation — no neon halos.

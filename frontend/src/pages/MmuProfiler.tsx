@@ -90,7 +90,7 @@ export default function MmuProfiler() {
   };
 
   return (
-    <div className="page-enter">
+    <div>
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
