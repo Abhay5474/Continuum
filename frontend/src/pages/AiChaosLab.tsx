@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { api } from "../api";
-import { Chip } from "../system/hub";
+import { BarList, Chip, Pill } from "../system/hub";
+import { Gauge } from "../system/viz";
+
+const human = (t: string) => t.charAt(0) + t.slice(1).toLowerCase().replace(/_/g, " ");
 
 const FAILURE_TYPES = [
   "HALLUCINATION",
@@ -63,7 +66,7 @@ export default function AiChaosLab() {
           <div className="space-y-3">
             {FAILURE_TYPES.map((t) => (
               <div key={t} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="w-full text-sm sm:w-48">{t}</span>
+                <span className="w-full text-sm sm:w-48">{human(t)}</span>
                 <input
                   type="range"
                   aria-label={`${t} probability`}
@@ -92,7 +95,22 @@ export default function AiChaosLab() {
         <div className="space-y-4">
           <div className="card rounded-lg border border-edge bg-panel p-4">
             <div className="font-medium">Survival metrics</div>
-            <div className="mt-2 space-y-1 text-sm">
+            {/* Of the workflows a failure reached, how many still finished. */}
+            <div className="mt-3 flex justify-center">
+              <Gauge
+                value={metrics?.survived ?? 0}
+                max={Math.max(1, (metrics?.survived ?? 0) + (metrics?.failed ?? 0))}
+                display={(metrics?.survived ?? 0) + (metrics?.failed ?? 0) === 0 ? "—" : `${(((metrics?.workflowSurvivalRate ?? 1) * 100) || 0).toFixed(0)}%`}
+                label="workflows survived"
+                sub={(metrics?.survived ?? 0) + (metrics?.failed ?? 0) === 0 ? "nothing hit yet" : `${metrics?.survived ?? 0} of ${(metrics?.survived ?? 0) + (metrics?.failed ?? 0)} hit`}
+                tone={(metrics?.survived ?? 0) + (metrics?.failed ?? 0) === 0 ? "mute" : undefined}
+                invert
+                warnAt={0.2}
+                badAt={0.5}
+                size={140}
+              />
+            </div>
+            <div className="mt-3 space-y-1 text-sm">
               <Row label="Total injections" value={metrics?.totalInjections ?? 0} />
               <Row label="Affected workflows" value={metrics?.affectedWorkflows ?? 0} />
               <Row label="Survived" value={metrics?.survived ?? 0} accent="text-emerald-300" />
@@ -106,13 +124,22 @@ export default function AiChaosLab() {
           </div>
           <div className="card rounded-lg border border-edge bg-panel p-4">
             <div className="font-medium">By type</div>
-            <div className="mt-2 space-y-1 text-xs text-slate-400">
-              {Object.entries(metrics?.injectionsByType ?? {}).map(([k, v]) => (
-                <div key={k} className="flex justify-between">
-                  <span>{k}</span>
-                  <span>{v}</span>
-                </div>
-              ))}
+            <div className="mt-3">
+              {Object.keys(metrics?.injectionsByType ?? {}).length === 0 ? (
+                <p className="text-xs text-slate-500">no injections yet</p>
+              ) : (
+                <BarList
+                  items={Object.entries(metrics?.injectionsByType ?? {})
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([k, v]) => ({
+                      key: k,
+                      label: human(k),
+                      note: String(v),
+                      fraction: v / Math.max(1, ...Object.values(metrics?.injectionsByType ?? {})),
+                      tone: "red" as const,
+                    }))}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -123,7 +150,7 @@ export default function AiChaosLab() {
         <div className="divide-y divide-edge text-sm">
           {events.map((e) => (
             <div key={e.id} className="flex items-center gap-3 px-4 py-2">
-              <span className="rounded bg-rose-500/20 px-2 py-0.5 text-xs text-rose-300">{e.failureType}</span>
+              <Pill tone="bad">{human(String(e.failureType ?? ""))}</Pill>
               <span className="font-mono text-xs text-slate-400">{(e.workflowId || "").slice(0, 8)}</span>
               <span className="text-xs text-slate-400">{e.detail}</span>
             </div>

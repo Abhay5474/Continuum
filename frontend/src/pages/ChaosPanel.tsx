@@ -2,7 +2,8 @@ import DataView from "../system/DataView";
 import { Note } from "../system/primitives";
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { Chip } from "../system/hub";
+import { Chip, Pill } from "../system/hub";
+import { Gauge } from "../system/viz";
 import type { ChaosState } from "../types";
 
 export default function ChaosPanel() {
@@ -35,34 +36,41 @@ export default function ChaosPanel() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card title="Provider failover" desc="Force the primary LLM provider down to trigger failover.">
+        <Card title="Provider failover" desc="Force the primary LLM provider down to trigger failover."
+              now={<Light on={!!state?.primaryProviderDown} onLabel="primary is down" offLabel="primary is up" />}>
           <Btn onClick={() => run("provider-down?down=true", "primary provider DOWN")}>Take primary down</Btn>
           <Btn onClick={() => run("provider-down?down=false", "primary provider UP")} ghost>
             Bring primary up
           </Btn>
         </Card>
 
-        <Card title="Worker crash" desc="Simulate a worker dying during the next activity.">
+        <Card title="Worker crash" desc="Simulate a worker dying during the next activity."
+              now={<Light on={(state?.crashAfterActivities ?? 0) > 0}
+                          onLabel={`armed — after ${state?.crashAfterActivities} activit${state?.crashAfterActivities === 1 ? "y" : "ies"}`}
+                          offLabel="not armed" />}>
           <Btn onClick={() => run("crash-after?activities=1", "crash after 1 activity")}>
             Crash after next activity
           </Btn>
         </Card>
 
-        <Card title="Activity failures" desc="Randomly fail activities to exercise retries.">
+        <Card title="Activity failures" desc="Randomly fail activities to exercise retries."
+              now={<Rate value={state?.activityFailureRate ?? 0} label="of activities fail" />}>
           <Btn onClick={() => run("activity-failure-rate?rate=0.5", "activity failure 50%")}>50% fail</Btn>
           <Btn onClick={() => run("activity-failure-rate?rate=0", "activity failure 0%")} ghost>
             Disable
           </Btn>
         </Card>
 
-        <Card title="Sink failures" desc="Make email/payment delivery flaky (tests exactly-once).">
+        <Card title="Sink failures" desc="Make email/payment delivery flaky (tests exactly-once)."
+              now={<Rate value={state?.sinkFailureRate ?? 0} label="of deliveries fail" />}>
           <Btn onClick={() => run("sink-failure-rate?rate=0.7", "sink failure 70%")}>70% fail</Btn>
           <Btn onClick={() => run("sink-failure-rate?rate=0", "sink failure 0%")} ghost>
             Disable
           </Btn>
         </Card>
 
-        <Card title="Latency" desc="Inject latency into every activity.">
+        <Card title="Latency" desc="Inject latency into every activity."
+              now={<Light on={(state?.activityLatencyMs ?? 0) > 0} onLabel={`+${((state?.activityLatencyMs ?? 0) / 1000).toFixed(1)}s on every activity`} offLabel="no added latency" tone="warn" />}>
           <Btn onClick={() => run("activity-latency?ms=3000", "3s latency")}>+3s</Btn>
           <Btn onClick={() => run("activity-latency?ms=0", "no latency")} ghost>
             Reset
@@ -84,12 +92,32 @@ export default function ChaosPanel() {
   );
 }
 
-function Card({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
+function Card({ title, desc, now, children }: { title: string; desc: string; now?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="card rounded-lg border border-edge bg-panel p-4">
-      <div className="font-medium">{title}</div>
-      <div className="mb-3 text-xs text-slate-400">{desc}</div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-medium">{title}</div>
+          <div className="mb-3 text-xs text-slate-400">{desc}</div>
+        </div>
+      </div>
+      {now && <div className="mb-3">{now}</div>}
       <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+/** Whether a fault is live right now — the state a drill is in, not the button that set it. */
+function Light({ on, onLabel, offLabel, tone = "bad" }: { on: boolean; onLabel: string; offLabel: string; tone?: "bad" | "warn" }) {
+  return <Pill tone={on ? tone : "ok"} dot>{on ? onLabel : offLabel}</Pill>;
+}
+
+/** A failure rate as the share of calls it will break. */
+function Rate({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Gauge value={Math.round(value * 100)} max={100} display={`${Math.round(value * 100)}%`} label={label} size={110}
+             warnAt={0.01} badAt={0.5} />
     </div>
   );
 }

@@ -45,7 +45,7 @@ export default function Billing() {
   if (!loggedIn) {
     return (
       <div className="plane mx-auto mt-16 max-w-md p-8 text-center">
-        <div className="text-3xl">💳</div>
+        <div className="flex justify-center"><Chip glyph="coin" tone="accent" size={40} /></div>
         <h1 className="mt-2 text-[22px] font-semibold tracking-tight">Billing</h1>
         <Note className="mt-1">Sign in through the Developer Portal to view your plan and usage.</Note>
         <a href="/portal" className="mt-4 inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-4 py-2 text-sm font-semibold text-ink">
@@ -145,6 +145,25 @@ export default function Billing() {
               <div className="mt-1 text-xs text-slate-400">
                 {Number(p.monthlyTokenQuota).toLocaleString()} tokens / month
               </div>
+              {/* This month's usage against this plan's quota — the same
+                  tokens on three scales, so the plan that fits is the one
+                  whose bar is comfortably short. */}
+              {(() => {
+                const used = Number(data?.tokensUsed ?? 0);
+                const quota = Number(p.monthlyTokenQuota ?? 0);
+                const f = quota > 0 ? used / quota : 0;
+                const tone = f >= 1 ? "var(--state-critical-ink)" : f >= 0.8 ? "var(--state-warning-ink)" : "var(--state-healthy-ink)";
+                return (
+                  <div className="mt-3" title={`${used.toLocaleString()} of ${quota.toLocaleString()} tokens`}>
+                    <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "rgb(var(--card-rule))" }}>
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(f > 0 ? 1.5 : 0, f * 100))}%`, background: tone }} />
+                    </div>
+                    <div className="mt-1 text-[10.5px] text-slate-500">
+                      your usage would be <span className="readout" style={{ color: tone }}>{f < 0.001 && f > 0 ? "<0.1" : (f * 100).toFixed(f < 0.1 ? 1 : 0)}%</span> of it
+                    </div>
+                  </div>
+                );
+              })()}
               <button
                 disabled={current || blocked || switching === p.id}
                 title={blocked ? "No payment processor is configured on this deployment" : undefined}
