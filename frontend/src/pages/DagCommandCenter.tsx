@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { Link, useParams } from "react-router-dom";
 import { api, portal } from "../api";
-import { Chip } from "../system/hub";
+import { Chip, Explain, Pill } from "../system/hub";
 import { Micro, Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
@@ -130,10 +130,23 @@ Turn it on above, then send a gateway request.
                   <span className="min-w-0 flex-1 truncate text-sm text-slate-300">
                     {r.prompt || <span className="text-slate-600">no prompt recorded</span>}
                   </span>
-                  <span className="readout text-sm font-semibold" style={{ color: STATE[s].ink }}>
-                    {r.finalConfidence != null ? `${(conf * 100).toFixed(1)}%` : "—"}
+                  {/* Confidence as a length, so a run to be wary of is found by
+                      its short bar before its number is read. */}
+                  <span className="flex items-center gap-2">
+                    <span className="relative hidden h-1.5 w-24 overflow-hidden rounded-full sm:inline-block" style={{ background: "rgb(var(--card-rule))" }} aria-hidden>
+                      <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${conf * 100}%`, background: STATE[s].ink }} />
+                    </span>
+                    <span className="readout text-sm font-semibold" style={{ color: STATE[s].ink }}>
+                      {r.finalConfidence != null ? `${(conf * 100).toFixed(1)}%` : "—"}
+                    </span>
                   </span>
-                  <span className="micro w-20 text-right">{r.uncertainty ?? "—"}</span>
+                  <span className="w-24 text-right">
+                    {r.uncertainty ? (
+                      <Pill tone={r.uncertainty === "LOW" ? "ok" : r.uncertainty === "MEDIUM" ? "warn" : "bad"}>
+                        {String(r.uncertainty).toLowerCase()} uncertainty
+                      </Pill>
+                    ) : "—"}
+                  </span>
                   <span className="readout w-24 text-right text-[10px] text-slate-600">
                     {r.claimCount} claims · {r.nodeCount} nodes
                   </span>
@@ -376,12 +389,17 @@ function Constellation({ workflowId }: { workflowId: string }) {
               <span className="text-[10px] text-slate-500">arc = evidence strength · claim number inside solvers and verifiers · confidence inside the aggregate</span>
             </div>
 
+            <ClaimCard nodes={nodes} />
+
+            {/* The same figures as the card above, written out — kept one click
+                away for anyone who wants the narration verbatim. */}
             {run?.verdict && (
               <div className="mt-4">
-                <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Synthesised answer</h2>
-                <Plane inset className="mt-2 p-4">
-                  <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-300">{run.verdict}</p>
-                </Plane>
+                <Explain title="Synthesised answer, as written">
+                  <Plane inset className="mt-1 p-4">
+                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-300">{run.verdict}</p>
+                  </Plane>
+                </Explain>
               </div>
             )}
           </section>
@@ -473,5 +491,69 @@ function Legend({ color, label }: { color: string; label: string }) {
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
       {label}
     </span>
+  );
+}
+
+/**
+ * Every claim with what its checks said, as bars.
+ *
+ * <p>The synthesised text lists the same figures as indented lines — "validity
+ * 0.10 (weakens)" three lines under the claim it weakens. Here each claim is a
+ * row: the solver's own confidence, then one bar per verifier, red where the
+ * check failed. The claim a check undermined is found by colour, not by
+ * reading.
+ */
+function ClaimCard({ nodes }: { nodes: Node[] }) {
+  const solvers = nodes.filter((n) => n.nodeType === "SOLVER" && n.claimId != null);
+  if (solvers.length === 0) return null;
+  const human = (k: string) => k.toLowerCase().replace(/_/g, " ");
+  const bar = (v: number | null | undefined, ok: boolean) => (
+    <span className="relative h-1.5 w-full overflow-hidden rounded-full" style={{ background: "rgb(var(--card-rule))" }}>
+      <span className="absolute inset-y-0 left-0 rounded-full"
+            style={{ width: `${Math.max(0, Math.min(1, v ?? 0)) * 100}%`, background: ok ? "var(--state-healthy-ink)" : "var(--state-critical-ink)" }} />
+    </span>
+  );
+  return (
+    <div className="mt-4">
+      <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Claims and their checks</h2>
+      <div className="plane mt-2 space-y-4 p-4">
+        {solvers.map((sv) => {
+          const checks = nodes.filter((n) => n.nodeType === "VERIFIER" && n.claimId === sv.claimId);
+          const failed = checks.filter((c) => c.status === "FAIL").length;
+          return (
+            <div key={sv.nodeKey} className="grid gap-x-5 gap-y-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+              <div className="min-w-0">
+                <div className="flex items-start gap-2">
+                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold"
+                        style={{ background: failed ? "var(--wash-warn)" : "var(--wash-ok)", color: failed ? "var(--state-warning-ink)" : "var(--state-healthy-ink)" }}>
+                    {sv.claimId}
+                  </span>
+                  <span className="text-[12.5px] leading-snug text-slate-200">{sv.label}</span>
+                </div>
+                <div className="mt-1.5 flex items-center gap-2 pl-7">
+                  <span className="w-20 shrink-0 text-[10.5px] text-slate-500">solver prior</span>
+                  {bar(sv.validity, true)}
+                  <span className="readout w-9 shrink-0 text-right text-[10.5px] text-slate-500">{(sv.validity ?? 0).toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {checks.map((c) => {
+                  const kind = String(c.label ?? c.nodeKey).split("·")[0].trim();
+                  const ok = c.status !== "FAIL";
+                  return (
+                    <div key={c.nodeKey} className="flex items-center gap-2">
+                      <span className="w-32 shrink-0 truncate text-[10.5px] text-slate-500">{human(kind)}</span>
+                      {bar(c.validity, ok)}
+                      <span className="readout w-9 shrink-0 text-right text-[10.5px]"
+                            style={{ color: ok ? "var(--text-3)" : "var(--state-critical-ink)" }}>{(c.validity ?? 0).toFixed(2)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

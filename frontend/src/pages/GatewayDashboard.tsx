@@ -309,9 +309,9 @@ export default function GatewayDashboard() {
       </section>
         </>)}
         {tab === "health" && (<>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid items-start gap-6 lg:grid-cols-2">
         {/* ---- provider health ---- */}
-        <section>
+        <section className="plane p-5">
           <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Provider &amp; model health</h2>
           {health.length === 0 ? (
             <Plane className="mt-2 p-5 text-center text-xs text-slate-500">No calls recorded yet.</Plane>
@@ -365,7 +365,7 @@ export default function GatewayDashboard() {
         </section>
 
         {/* ---- self-healing ledger ---- */}
-        <section>
+        <section className="plane p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Self-healing ledger</h2>
             <button
@@ -488,7 +488,17 @@ export default function GatewayDashboard() {
                       <span className="text-slate-400">{m.status}</span>
                     </span>
                   </TD>
-                  <TD numeric>{(m.contextWindow ?? 0).toLocaleString()}</TD>
+                  <TD numeric>
+                    {/* Context windows span 32k to a million; a log bar keeps
+                        the small ones visible while still showing the gap. */}
+                    <span className="inline-flex items-center justify-end gap-2">
+                      <span className="relative hidden h-1.5 w-16 overflow-hidden rounded-full sm:inline-block" style={{ background: "rgb(var(--card-rule))" }} aria-hidden>
+                        <span className="absolute inset-y-0 left-0 rounded-full"
+                              style={{ width: `${Math.max(4, Math.min(100, (Math.log10(Math.max(1, m.contextWindow ?? 0)) - 3) / 3.2 * 100))}%`, background: "var(--state-active-ink)" }} />
+                      </span>
+                      {(m.contextWindow ?? 0).toLocaleString()}
+                    </span>
+                  </TD>
                   <TD align="right">
                     <Select
                       value={m.status}
