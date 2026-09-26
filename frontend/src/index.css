@@ -24,7 +24,7 @@
   --state-active-ink: #6BA1F7;
   --state-warning-ink: #F5B544;
   --state-degraded-ink: #F97C4A;
-  --state-critical-ink: #F4566E;
+  --state-critical-ink: #F76B81;  /* a notch above #F4566E: a label on its own 13% wash over smoked glass */
   --state-offline-ink: #6A7386;
 
   /* On instrument black the accent stays the aurora blue the console was built

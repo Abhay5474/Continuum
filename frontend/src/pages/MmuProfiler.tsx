@@ -136,10 +136,10 @@ export default function MmuProfiler() {
         <div className="mt-3 max-w-md" role="img" aria-label="What stays resident: 70% relevance to the current request, 30% recency">
           <div className="micro mb-1.5">What decides what stays in the window</div>
           <div className="flex h-7 overflow-hidden rounded-lg text-[11px] font-medium">
-            <span className="flex items-center justify-center" style={{ width: "70%", background: "color-mix(in srgb, var(--state-active-ink) 22%, transparent)", color: "var(--state-active-ink)" }}>
+            <span className="flex items-center justify-center" style={{ width: "70%", background: "color-mix(in srgb, var(--state-active-ink) 12%, transparent)", color: "color-mix(in srgb, var(--state-active-ink) 82%, black)" }}>
               relevance to this request · 70%
             </span>
-            <span className="flex flex-1 items-center justify-center" style={{ background: "color-mix(in srgb, var(--state-warning-ink) 22%, transparent)", color: "var(--state-warning-ink)" }}>
+            <span className="flex flex-1 items-center justify-center" style={{ background: "color-mix(in srgb, var(--state-warning-ink) 12%, transparent)", color: "color-mix(in srgb, var(--state-warning-ink) 82%, black)" }}>
               recency · 30%
             </span>
           </div>

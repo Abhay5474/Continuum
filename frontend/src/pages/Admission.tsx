@@ -354,7 +354,7 @@ function ShedScale({
   const marks = Object.entries(points).sort((a, b) => a[1] - b[1]);
   const top = Math.max(1.4, ...marks.map(([, v]) => v + 0.1));
   const x = (v: number) => `${(Math.min(v, top) / top) * 100}%`;
-  const tones = ["var(--state-warning-ink)", "var(--state-degraded-ink)", "var(--state-critical-ink)"];
+  const tones = ["var(--state-warning-ink)", "color-mix(in srgb, var(--state-degraded-ink) 85%, black)", "var(--state-critical-ink)"];
   const refusing = marks.filter(([, v]) => utilisation >= v).map(([k]) => k.toLowerCase());
   return (
     <div>

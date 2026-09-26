@@ -78,7 +78,7 @@ export function Note({ children, className = "" }: { children: ReactNode; classN
   const [full, setFull] = useState<string | undefined>(undefined);
   useEffect(() => setFull(ref.current?.textContent ?? undefined), [children]);
   return (
-    <p className={`flex max-w-md items-start gap-1.5 text-[11.5px] text-slate-500 ${className}`}>
+    <p className={`flex min-w-0 max-w-[min(28rem,100%)] items-start gap-1.5 text-[11.5px] text-slate-500 ${className}`}>
       <button
         type="button"
         aria-expanded={open}

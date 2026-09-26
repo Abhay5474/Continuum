@@ -544,15 +544,15 @@ function Ladder({ status, accepted }: { status: Status | null; accepted: number 
         ) : (
           <>
             <div
-              className="flex items-center justify-center bg-emerald-500/25 text-[11px] font-medium text-emerald-200 transition-all duration-500"
-              style={{ width: `${pctAccepted}%` }}
+              className="flex items-center justify-center bg-emerald-500/25 text-[11px] font-medium transition-all duration-500"
+              style={{ width: `${pctAccepted}%`, color: "var(--state-healthy-ink)" }}
               title={`${accepted} answered by the cheap tier`}
             >
               {pctAccepted > 14 && `${accepted} cheap`}
             </div>
             <div
-              className="flex items-center justify-center bg-amber-500/25 text-[11px] font-medium text-amber-200 transition-all duration-500"
-              style={{ width: `${100 - pctAccepted}%` }}
+              className="flex items-center justify-center bg-amber-500/25 text-[11px] font-medium transition-all duration-500"
+              style={{ width: `${100 - pctAccepted}%`, color: "var(--state-warning-ink)" }}
               title={`${escalated} escalated to the strong tier`}
             >
               {100 - pctAccepted > 14 && `${escalated} escalated`}

@@ -126,9 +126,9 @@ export default function Uncertainty() {
         </div>
         {/* What the position means, shown on ten requests: which of them get
             sampled, and what each sampled one costs. */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5">
           <Coverage mode={status?.mode ?? "OFF"} samples={status?.samples ?? 3} />
-          <p className="min-w-0 max-w-md flex-1 text-xs leading-relaxed text-slate-500">
+          <p className="min-w-0 max-w-md text-xs leading-relaxed text-slate-500 sm:flex-1">
             {MODES.find(([m]) => m === (status?.mode ?? "OFF"))?.[2]}
           </p>
         </div>
@@ -485,7 +485,7 @@ function Coverage({ mode, samples }: { mode: Mode; samples: number }) {
   const on = new Set(picked[mode]);
   const ink = mode === "ADAPTIVE" ? "var(--state-warning-ink)" : "var(--state-active-ink)";
   return (
-    <div className="flex items-center gap-3" role="img"
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" role="img"
          aria-label={`${on.size} of every 10 requests sampled, each at ${samples} times the tokens`}>
       <span className="flex gap-1">
         {Array.from({ length: 10 }, (_, i) => (

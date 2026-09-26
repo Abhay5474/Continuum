@@ -374,7 +374,7 @@ export function StackedBar({
               {/* Only where it genuinely fits — a clipped label is worse than
                   none, and the legend and table carry the rest. */}
               {pct > 12 && (
-                <span className="readout px-1 text-[10px] font-medium text-white/95">
+                <span className="readout rounded px-1 text-[10px] font-medium" style={{ color: "#fff", background: "rgb(0 0 0 / .5)" }}>
                   {pct.toFixed(0)}%
                 </span>
               )}

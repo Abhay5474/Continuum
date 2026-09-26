@@ -8,7 +8,7 @@ const TIERS = ["WORKING", "EPISODIC", "LONG_TERM", "ARCHIVED"];
 /** Warm to cold: the tiers are an order, and the colour says so. */
 const TIER_LOOK: Record<string, { label: string; tone: Tone; sub: string }> = {
   WORKING: { label: "Working", tone: "orange", sub: "in use now" },
-  EPISODIC: { label: "Episodic", tone: "amber", sub: "recent events" },
+  EPISODIC: { label: "Episodic", tone: "warn", sub: "recent events" },
   LONG_TERM: { label: "Long-term", tone: "blue", sub: "kept and consolidated" },
   ARCHIVED: { label: "Archived", tone: "mute", sub: "cold, rarely read" },
 };
@@ -76,7 +76,7 @@ export default function Memory() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card className="min-w-0">
           <CardHead glyph="layers" tone="violet" title="Store memory"
                     sub="Write one memory into a tier" />
           <textarea
@@ -114,7 +114,7 @@ export default function Memory() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHead glyph="spark" tone="cyan" title="Retrieve"
                     sub="Ranked by relevance, recency and salience together" />
           <div className="mt-2 flex gap-2">
@@ -123,7 +123,7 @@ export default function Memory() {
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Retrieval query"
               placeholder="query…"
-              className="flex-1 field"
+              className="min-w-0 flex-1 field"
             />
             <Primary onClick={retrieve}>Retrieve</Primary>
           </div>

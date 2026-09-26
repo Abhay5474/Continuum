@@ -4,7 +4,6 @@ import { portal } from "../api";
 import { Meter, PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Explain, Segmented, Empty, Pill } from "../system/hub";
-import { seriesColor } from "../system/charts";
 
 /**
  * Agent loop detection.
@@ -340,9 +339,13 @@ export default function LoopGuard() {
   );
 }
 
-/** A series hue deepened so a white letter on it keeps its contrast. */
+/**
+ * Bead colours: deep enough that a white letter clears 4.5:1 on each, and the
+ * same in both themes so a pattern read once is read the same way again.
+ */
+const BEADS = ["#1f5fb0", "#a8431b", "#11734f", "#7a5200", "#9c2f5a", "#2f6b00", "#5a4bbf", "#a33030"];
 function beadInk(i: number) {
-  return `color-mix(in srgb, ${seriesColor(i)} 72%, black)`;
+  return BEADS[i % BEADS.length];
 }
 
 function humanKind(kind: string) {

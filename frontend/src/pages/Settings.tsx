@@ -329,7 +329,7 @@ export default function Settings() {
         </p>
       ) : (
       <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-5">
-        <div className="text-sm font-semibold text-rose-200">Danger zone</div>
+        <div className="text-sm font-bold text-rose-200">Danger zone</div>
         <Note className="mt-1">
           Deleting your account permanently removes your keys, credentials, memory, billing and all data (GDPR).
           This cannot be undone. Type <b>DELETE</b> to confirm.

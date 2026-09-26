@@ -139,7 +139,7 @@ export default function Autopilot() {
                     <span className="flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-[12.5px] font-medium"
                           style={{ background: i === 0 ? "var(--wash-ok)" : "rgb(var(--card-rule) / .6)", color: i === 0 ? "var(--state-healthy-ink)" : "var(--text-2)" }}>
                       <span className="grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold"
-                            style={{ background: i === 0 ? "var(--state-healthy-ink)" : "rgb(var(--card-edge))", color: i === 0 ? "#fff" : "var(--text-2)" }}>
+                            style={{ background: i === 0 ? "var(--state-healthy-ink)" : "rgb(var(--card-edge))", color: i === 0 ? "rgb(var(--ink))" : "var(--text-2)" }}>
                         {i + 1}
                       </span>
                       {p}
@@ -175,7 +175,7 @@ export default function Autopilot() {
                     <ConfidenceBadge value={r.confidence} />
                     <div className="ml-auto flex gap-2">
                       <button onClick={() => act(() => portal.autopilot.accept(r.id))} disabled={busy}
-                        className="rounded bg-emerald-600 px-3 py-1 text-xs text-white">Accept → canary</button>
+                        className="rounded bg-emerald-700 px-3 py-1 text-xs text-white">Accept → canary</button>
                       <button onClick={() => act(() => portal.autopilot.reject(r.id))} disabled={busy}
                         className="rounded border border-edge px-3 py-1 text-xs">Dismiss</button>
                     </div>
