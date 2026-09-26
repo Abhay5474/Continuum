@@ -393,12 +393,26 @@ export default function ModelRouter() {
         </div>
 
         {probe && !probe.error && (
-          <div className="settle mt-3 grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="settle plane mt-3 grid gap-4 p-5 lg:grid-cols-[280px_minmax(0,1fr)]">
             <div className="space-y-2">
               <Readout label="Chosen" value={probe.chosenChain?.[0] ?? "—"} size="sm" state="active" />
               <div className="flex gap-6">
                 <Readout label="Complexity" value={(probe.complexity ?? 0).toFixed(2)} size="sm" />
                 <Readout label="Prompt tokens" value={probe.approxPromptTokens ?? 0} size="sm" />
+              </div>
+              {/* Where this prompt sits between simple and complex — the one
+                  number the choice of model turns on. */}
+              <div className="pt-1" role="img" aria-label={`Complexity ${(probe.complexity ?? 0).toFixed(2)} of 1`}>
+                <div className="relative h-2 rounded-full"
+                     style={{ background: "linear-gradient(90deg, var(--state-healthy-ink), var(--state-warning-ink), var(--state-degraded-ink))", opacity: 0.35 }} />
+                <div className="relative -mt-3.5 h-5">
+                  <span className="absolute top-0 h-5 w-5 -translate-x-1/2 rounded-full border-[3px] transition-[left] duration-500"
+                        style={{ left: `${Math.max(0, Math.min(1, probe.complexity ?? 0)) * 100}%`, background: "var(--accent)", borderColor: "rgb(var(--card))" }} />
+                </div>
+                <div className="mt-0.5 flex justify-between text-[10px] text-slate-500">
+                  <span>simple · cheaper model</span>
+                  <span>complex · stronger model</span>
+                </div>
               </div>
               {probe.chosenChain?.length > 1 && (
                 <div>
