@@ -72,4 +72,27 @@ class PromptCompressorTest {
         assertTrue(tight.compressedTokens() <= loose.compressedTokens(),
                 "a tighter target keeps fewer tokens");
     }
+
+    @Test
+    void aSentenceThatStartsWithAProtectedSpanIsRestored() {
+        // The span opens the text, and so a sentence; its placeholder used to
+        // lose a character to trim() and reach the model as "P0".
+        String text = "`retry()` is called from the worker loop, and if you could kindly take a careful look "
+                + "at it that would be really very helpful. 4096 is the limit we keep hitting in production, "
+                + "which is basically just a real problem for us at the moment. Thanks so much for your help!";
+        PromptCompressor.Result r = compressor.compress(text, 0.5, 0);
+        assertTrue(r.text().startsWith("`retry()`"), r.text());
+        assertTrue(r.text().contains("4096"), r.text());
+        assertFalse(r.text().matches("(?s).*[\\x00\\uE000\\uE001].*"), "no placeholder may leak: " + r.text());
+    }
+
+    @Test
+    void ordinaryWordsAreNotProtectedSpans() {
+        String text = "Please could you kindly, if at all possible, take a careful look at the following function "
+                + "and basically just tell me, in a really clear and simple way, why it might actually be "
+                + "returning undefined when it is called. I would really appreciate it very much.";
+        PromptCompressor.Result r = compressor.compress(text, 0.5, 0);
+        assertEquals(0, r.protectedSpans(), "plain prose has nothing to protect");
+        assertTrue(r.achievedRatio() < 0.8, "and so it can actually be compressed: " + r.achievedRatio());
+    }
 }
