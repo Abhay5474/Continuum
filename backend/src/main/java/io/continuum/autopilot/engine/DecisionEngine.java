@@ -8,6 +8,7 @@ import io.continuum.autopilot.stats.BetaDistribution;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -32,6 +33,8 @@ import java.util.Random;
 public class DecisionEngine {
 
     private static final int SAMPLES = 400;
+    /** How much better a provider must score to move above another. */
+    static final double MIN_GAIN = 0.03;
 
     private final Random rng;
 
@@ -71,16 +74,22 @@ public class DecisionEngine {
             feasible = cands; // never strand the developer
         }
 
-        double minCost = feasible.stream().mapToDouble(c -> c.arm.avgCostUsd()).min().orElse(0);
-        double maxCost = feasible.stream().mapToDouble(c -> c.arm.avgCostUsd()).max().orElse(0);
-        double minLat = feasible.stream().mapToDouble(c -> c.arm.avgLatencyMs()).min().orElse(0);
-        double maxLat = feasible.stream().mapToDouble(c -> c.arm.avgLatencyMs()).max().orElse(0);
+        // Cost and latency are normalised over the arms that have been measured.
+        // An arm with no traffic has an average cost and latency of zero, which
+        // used to read as "free and instant": every unmeasured provider outranked
+        // every measured one. Unmeasured arms now score neutral on both.
+        List<Cand> measured = feasible.stream().filter(c -> c.arm.total() > 0).toList();
+        double minCost = measured.stream().mapToDouble(c -> c.arm.avgCostUsd()).min().orElse(0);
+        double maxCost = measured.stream().mapToDouble(c -> c.arm.avgCostUsd()).max().orElse(0);
+        double minLat = measured.stream().mapToDouble(c -> c.arm.avgLatencyMs()).min().orElse(0);
+        double maxLat = measured.stream().mapToDouble(c -> c.arm.avgLatencyMs()).max().orElse(0);
 
         // Thompson-sampled expected utility per arm.
         for (Cand c : feasible) {
             BetaDistribution posterior = BetaDistribution.fromCounts(c.arm.successes(), c.arm.failures());
-            double costScore = 1.0 - norm(c.arm.avgCostUsd(), minCost, maxCost);
-            double latScore = 1.0 - norm(c.arm.avgLatencyMs(), minLat, maxLat);
+            boolean seen = c.arm.total() > 0;
+            double costScore = seen ? 1.0 - norm(c.arm.avgCostUsd(), minCost, maxCost) : 0.5;
+            double latScore = seen ? 1.0 - norm(c.arm.avgLatencyMs(), minLat, maxLat) : 0.5;
             double acc = 0;
             for (int i = 0; i < SAMPLES; i++) {
                 double q = posterior.sample(rng);
@@ -88,7 +97,26 @@ public class DecisionEngine {
             }
             c.score = acc / SAMPLES;
         }
-        feasible.sort(Comparator.comparingDouble((Cand c) -> c.score).reversed());
+        // Start from the current order and move a provider up only when it beats
+        // the one above it by a clear margin. A plain sort by sampled score let
+        // Monte-Carlo noise decide between near-equal providers, so the proposed
+        // order flipped back and forth from one cycle to the next.
+        List<Cand> ordered = new ArrayList<>(feasible);
+        ordered.sort(Comparator.comparingInt((Cand c) -> {
+            int at = current.providerOrder().indexOf(c.provider);
+            return at < 0 ? Integer.MAX_VALUE : at;
+        }));
+        boolean swapped = true;
+        while (swapped) {
+            swapped = false;
+            for (int i = 0; i + 1 < ordered.size(); i++) {
+                if (ordered.get(i + 1).score >= ordered.get(i).score + MIN_GAIN) {
+                    Collections.swap(ordered, i, i + 1);
+                    swapped = true;
+                }
+            }
+        }
+        feasible = ordered;
 
         List<String> newOrder = feasible.stream().map(c -> c.provider).toList();
 

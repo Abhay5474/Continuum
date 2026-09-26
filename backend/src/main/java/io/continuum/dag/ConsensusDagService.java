@@ -93,8 +93,16 @@ public class ConsensusDagService {
      * actual execution happens on the durable engine's worker pool.
      */
     public GatewayDtos.ChatResponse run(String developerId, GatewayDtos.ChatRequest req) {
+        return run(developerId, req, lastUserMessage(req));
+    }
+
+    /**
+     * @param prompt the text to verify — the gateway passes it after the prompt
+     *               firewall, so redacted content is what the DAG's providers see
+     */
+    public GatewayDtos.ChatResponse run(String developerId, GatewayDtos.ChatRequest req, String prompt) {
         long started = System.nanoTime();
-        String prompt = lastUserMessage(req);
+        prompt = prompt == null ? "" : prompt;
         String workflowId = "dag-" + UUID.randomUUID();
         engine.startWorkflow(ConsensusDagWorkflow.TYPE,
                 json.write(new ConsensusDagWorkflow.Input(developerId, prompt)), workflowId);

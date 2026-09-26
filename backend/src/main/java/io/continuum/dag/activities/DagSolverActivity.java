@@ -56,10 +56,25 @@ public class DagSolverActivity implements Activity {
                         resp.promptTokens(), resp.completionTokens()));
     }
 
-    private static String conclusionOf(String content) {
-        String stripped = content.replaceAll("(?i)confidence[:\\s]+[01]?\\.\\d+", "").trim();
-        String[] sentences = stripped.split("(?<=[.!?])\\s+");
-        return sentences.length == 0 ? stripped : sentences[sentences.length - 1].trim();
+    /**
+     * The last real sentence of the reply. The confidence line is removed with
+     * its punctuation: removing only the number left a lone "." behind, which
+     * then was "the last sentence" — every answer from a model that ends with
+     * "Confidence: 0.82." came back as ". .".
+     */
+    static String conclusionOf(String content) {
+        String stripped = content
+                .replaceAll("(?i)\\bconfidence\\s*[:=]?\\s*[01]?\\.\\d+\\s*[.!]?", " ")
+                .replaceAll("(?im)^\\s*(?:final\\s+)?conclusion\\s*:\\s*", "")
+                .trim();
+        String[] sentences = stripped.split("(?<=[.!?])\\s+|\\n+");
+        for (int i = sentences.length - 1; i >= 0; i--) {
+            String sentence = sentences[i].trim();
+            if (sentence.chars().anyMatch(Character::isLetterOrDigit)) {
+                return sentence;
+            }
+        }
+        return stripped;
     }
 
     private static double confidenceOf(String content) {

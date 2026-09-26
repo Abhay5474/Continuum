@@ -15,7 +15,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * V6 Step 1 — the compiler. A lightweight LLM planner converts the incoming
@@ -29,6 +33,8 @@ public class DagPlanActivity implements Activity {
     public static final String TYPE = "dag.plan";
     static final List<String> DEFAULT_CHECKS =
             List.of("LOGIC_CONSISTENCY", "EVIDENCE_GROUNDING", "CONSTRAINT_CHECK");
+    static final Set<String> KNOWN_CHECKS =
+            Set.of("LOGIC_CONSISTENCY", "EVIDENCE_GROUNDING", "CONSTRAINT_CHECK", "SCHEMA_ALIGNMENT");
 
     private static final Logger log = LoggerFactory.getLogger(DagPlanActivity.class);
     private static final int MAX_CLAIMS = 4;
@@ -71,7 +77,7 @@ public class DagPlanActivity implements Activity {
         return fallbackPlan(in.prompt());
     }
 
-    private Plan parse(String task, String content) {
+    Plan parse(String task, String content) {
         try {
             String cleaned = content.replaceAll("(?s)```(json)?", "").trim();
             int start = cleaned.indexOf('{');
@@ -84,22 +90,46 @@ public class DagPlanActivity implements Activity {
             if (claims == null || !claims.isArray() || claims.isEmpty()) {
                 return null;
             }
-            List<Claim> out = new ArrayList<>();
-            int id = 1;
+            // Claims are renumbered 1..n (a model's own ids can repeat or skip),
+            // so its dependsOn references are translated through the same map.
+            // Before, a skipped blank claim shifted every id after it and the
+            // dependencies pointed at the wrong claims.
+            List<JsonNode> kept = new ArrayList<>();
+            Map<Integer, Integer> renumber = new HashMap<>();
             for (JsonNode c : claims) {
-                if (out.size() >= MAX_CLAIMS) {
+                if (kept.size() >= MAX_CLAIMS) {
                     break;
                 }
-                String statement = c.path("statement").asText("");
-                if (statement.isBlank()) {
+                if (c.path("statement").asText("").isBlank()) {
                     continue;
                 }
-                List<Integer> deps = new ArrayList<>();
-                c.path("dependsOn").forEach(d -> deps.add(d.asInt()));
-                List<String> checks = new ArrayList<>();
-                c.path("checks").forEach(ch -> checks.add(ch.asText()));
-                out.add(new Claim(id++, statement, deps,
-                        checks.isEmpty() ? DEFAULT_CHECKS : checks));
+                kept.add(c);
+                if (c.has("id")) {
+                    renumber.putIfAbsent(c.path("id").asInt(), kept.size());
+                }
+            }
+            List<Claim> out = new ArrayList<>();
+            for (int i = 0; i < kept.size(); i++) {
+                JsonNode c = kept.get(i);
+                int id = i + 1;
+                Set<Integer> deps = new LinkedHashSet<>();
+                c.path("dependsOn").forEach(d -> {
+                    Integer to = renumber.get(d.asInt());
+                    if (to != null && to < id) {
+                        deps.add(to); // only earlier claims: no self-loops, no cycles
+                    }
+                });
+                // Each check once, and only checks a verifier exists for; a
+                // repeated check made two trace nodes with one key.
+                Set<String> checks = new LinkedHashSet<>();
+                c.path("checks").forEach(ch -> {
+                    String name = ch.asText("").trim().toUpperCase(java.util.Locale.ROOT);
+                    if (KNOWN_CHECKS.contains(name)) {
+                        checks.add(name);
+                    }
+                });
+                out.add(new Claim(id, c.path("statement").asText().trim(), List.copyOf(deps),
+                        checks.isEmpty() ? DEFAULT_CHECKS : List.copyOf(checks)));
             }
             return out.isEmpty() ? null : new Plan(task, out);
         } catch (Exception e) {
@@ -124,7 +154,9 @@ public class DagPlanActivity implements Activity {
             claims.add(new Claim(id++, s.trim(), List.of(), checks));
         }
         if (claims.isEmpty()) {
-            claims.add(new Claim(1, prompt.trim(), List.of(), checks));
+            // id++, not 1: the closing claim below takes the next id, and a
+            // prompt with no sentence in it used to give both claims id 1.
+            claims.add(new Claim(id++, prompt.trim(), List.of(), checks));
         }
         // A closing synthesis claim depending on all others.
         List<Integer> all = claims.stream().map(Claim::id).toList();

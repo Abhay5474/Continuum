@@ -301,31 +301,60 @@ public class GatewayService {
         // (throws QuotaExceededException → mapped to 402 upstream). The default
         // FREE plan quota is generous, so this is transparent for normal use.
         billing.assertWithinQuota(developerId);
+        // Validate before any path runs. The DAG branch below used to take the
+        // raw request, so with it enabled a request with no messages skipped
+        // the normalizer's check and a whole verification ran on an empty prompt.
+        LlmRequest canonical = normalizer.normalize(req);
+        final LlmRequest unguarded = canonical;
+        boolean firewalled = false;
         // V6 Consensus DAG Engine (opt-in, OFF by default): when the developer
         // enabled it in the portal, the request is verified through the DAG and
         // returned in the identical response shape. When the flag is off — or
         // the DAG fails for any reason — everything below is the exact legacy path.
         if (consensusDag.enabledFor(developerId)) {
+            // The firewall still goes first. This branch used to run before
+            // it, so turning verification on sent unredacted personal data and
+            // unscreened injection attempts to every provider the DAG called.
+            canonical = firewall.guardInbound(developerId, canonical);
+            firewalled = true;
+            GatewayDtos.ChatResponse verified = null;
             try {
-                return consensusDag.run(developerId, req);
+                verified = consensusDag.run(developerId, req, lastUserContent(canonical));
             } catch (Exception e) {
                 log.warn("V6 DAG run failed for {}, falling back to legacy path: {}",
                         developerId, e.getMessage());
             }
+            if (verified != null) {
+                // Logged like every other request. This path used to return
+                // without a row, so verified requests were missing from usage,
+                // spend and the request feed — and were never counted against
+                // the monthly token quota. Kept apart from the run itself, so
+                // a logging failure cannot send the request down a second path.
+                try {
+                    logged(new GatewayRequestLogEntity(developerId, req.model(), verified.provider(),
+                            verified.model(), 0, verified.routingReason(), verified.latency(),
+                            verified.tokens(), verified.cost(), true, verified.failovers()));
+                } catch (RuntimeException e) {
+                    log.warn("Could not log verified request for {}: {}", developerId, e.getMessage());
+                }
+                return verified;
+            }
         }
         long started = System.nanoTime();
-        LlmRequest canonical = normalizer.normalize(req);
         // Provenance: null unless the tenant turned it on. Opened here, before
         // anything touches the prompt, so the trail says what happened to the
         // context — redacted, transformed, paged, compressed, served from
         // cache — and not only which model answered. Those stages always ran;
         // the trail used to start after them.
         io.continuum.provenance.ProvenanceService.Recording prov = provenance.start(developerId);
-        LlmRequest before = canonical;
+        LlmRequest before = unguarded;
         // V8 Prompt Firewall (opt-in, OFF by default): redact PII and block
         // prompt-injection BEFORE anything else touches the prompt. Pass-through
         // when off. A blocked request throws (mapped to a clean 4xx upstream).
-        canonical = firewall.guardInbound(developerId, canonical);
+        // Already applied when the request came back from a failed DAG run.
+        if (!firewalled) {
+            canonical = firewall.guardInbound(developerId, canonical);
+        }
         contextStep(prov, io.continuum.provenance.Decision.Stage.FIREWALL, "redacted", before, canonical,
                 "sensitive content was masked before any other stage saw the prompt");
         before = canonical;
@@ -467,35 +496,9 @@ public class GatewayService {
         // Resolve developer-supplied provider keys (decrypted only here, never logged/returned).
         Map<String, String> devKeys = useOwnKeys ? resolveKeys(developerId, chain) : Map.of();
 
-        // Verify-then-escalate cascade (per-tenant, opt-in, OFF by default).
-        // Runs ahead of hedging and the ordinary chain: when it produces an
-        // answer, nothing below needs to. Declines silently when the registry
-        // offers no meaningful price difference between models.
-        if (cascade.enabledFor(developerId)) {
-            GatewayDtos.ChatResponse cascaded = tryCascade(developerId, req, canonical, devKeys,
-                    complexity, started, routingDecision, autopilot, cacheKey);
-            if (cascaded != null) {
-                return cascaded;
-            }
-        }
-
-        // Tail-latency hedging (engine-wide, opt-in, OFF by default). When a
-        // provider is slow past the governor's live p95, a second request goes
-        // to the next provider and the first answer back wins. This existed for
-        // durable workflows only; the gateway — the path an external
-        // application actually uses — never had it.
-        if (hedging.isEnabled() && chain.size() > 1) {
-            GatewayDtos.ChatResponse hedged = tryHedged(developerId, req, canonical, chain, devKeys,
-                    complexity, mode, started, routingDecision, autopilot, cacheKey);
-            if (hedged != null) {
-                return hedged;
-            }
-            // A failed race is not a failed request: fall through to the
-            // ordinary sequential chain, which is the behaviour without hedging.
-        }
-
         // Provenance: the same facts the routing reason concatenates, as data.
-        // Null unless the tenant turned it on.
+        // Null unless the tenant turned it on. Recorded before the cascade and
+        // hedging, which answer on their own and used to return before this.
         if (prov != null) {
             prov.add(io.continuum.provenance.Decision.Stage.COMPLEXITY,
                     String.format("%.2f", complexity),
@@ -508,6 +511,34 @@ public class GatewayService {
                     chain.stream().skip(1).map(ModelFallbackPolicy.ModelCandidate::model).toList(),
                     0, 0));
         }
+
+        // Verify-then-escalate cascade (per-tenant, opt-in, OFF by default).
+        // Runs ahead of hedging and the ordinary chain: when it produces an
+        // answer, nothing below needs to. Declines silently when the registry
+        // offers no meaningful price difference between models.
+        if (cascade.enabledFor(developerId)) {
+            GatewayDtos.ChatResponse cascaded = tryCascade(developerId, req, canonical, devKeys,
+                    complexity, started, routingDecision, autopilot, cacheKey, prov);
+            if (cascaded != null) {
+                return cascaded;
+            }
+        }
+
+        // Tail-latency hedging (engine-wide, opt-in, OFF by default). When a
+        // provider is slow past the governor's live p95, a second request goes
+        // to the next provider and the first answer back wins. This existed for
+        // durable workflows only; the gateway — the path an external
+        // application actually uses — never had it.
+        if (hedging.isEnabled() && chain.size() > 1) {
+            GatewayDtos.ChatResponse hedged = tryHedged(developerId, req, canonical, chain, devKeys,
+                    complexity, mode, started, routingDecision, autopilot, cacheKey, prov);
+            if (hedged != null) {
+                return hedged;
+            }
+            // A failed race is not a failed request: fall through to the
+            // ordinary sequential chain, which is the behaviour without hedging.
+        }
+
 
         int failovers = 0;
         RuntimeException lastError = null;
@@ -973,7 +1004,7 @@ public class GatewayService {
             Map<String, String> devKeys, double complexity, long started,
             io.continuum.routing.RoutingStrategyService.Decision routingDecision,
             java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> autopilot,
-            String cacheKey) {
+            String cacheKey, io.continuum.provenance.ProvenanceService.Recording prov) {
 
         List<io.continuum.cascade.ResponseCascadeService.Tier> pair = cascade.cheapAndStrong();
         if (pair.size() < 2) {
@@ -1048,8 +1079,37 @@ public class GatewayService {
                 : String.format("cascade: answered by %s — %s%s", cheap.model(), assessment.reason(),
                         audit ? " (audit sample)" : "");
 
+        // Live metrics and the decision trail, as on the ordinary path. The
+        // cascade answered on its own and skipped both: its traffic was missing
+        // from the gateway metrics, and no provenance trail was ever written.
+        metrics.request(cheap.provider(), cheapResp.model(), true, cheapMs);
+        metrics.tokens(cheap.provider(), cheapResp.promptTokens(), cheapResp.completionTokens());
+        metrics.cost(cheap.provider(), cheapCost);
+        if (strongResp != null) {
+            metrics.request(strong.provider(), strongResp.model(), true, totalMs - cheapMs);
+            metrics.tokens(strong.provider(), strongResp.promptTokens(), strongResp.completionTokens());
+            metrics.cost(strong.provider(), strongCost);
+        }
+        if (prov != null) {
+            prov.add(new io.continuum.provenance.Decision(
+                    io.continuum.provenance.Decision.Stage.CASCADE,
+                    served ? "escalated to " + strong.model() : "kept " + cheap.model(),
+                    assessment.reason() + (audit ? " (audit sample: both tiers ran)" : ""),
+                    runStrong ? List.of(strong.model()) : List.of(), cheapCost, cheapMs));
+            prov.add(new io.continuum.provenance.Decision(
+                    io.continuum.provenance.Decision.Stage.PROVIDER,
+                    chosenProvider + "/" + chosen.model(),
+                    served ? "the stronger tier's answer was served" : "the cheaper tier's answer was good enough",
+                    List.of(), billed, totalMs));
+            prov.add(new io.continuum.provenance.Decision(
+                    io.continuum.provenance.Decision.Stage.OUTPUT,
+                    tokens + " tokens", reason, List.of(), billed, totalMs));
+            prov.commit();
+        }
+
         var savedLog = logged(new GatewayRequestLogEntity(developerId, req.model(), chosenProvider,
-                chosen.model(), complexity, reason, totalMs, tokens, billed, true, 0));
+                chosen.model(), complexity, reason, totalMs, tokens, billed, true, 0)
+                .withTraceId(prov == null ? null : prov.requestId()));
         labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, billed);
         recordBandit(complexity, chosenProvider, true, totalMs, billed);
         routingStrategy.record(developerId, routingDecision, complexity, chosenProvider, true, totalMs, billed);
@@ -1107,7 +1167,7 @@ public class GatewayService {
             double complexity, RoutingMode mode, long started,
             io.continuum.routing.RoutingStrategyService.Decision routingDecision,
             java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> autopilot,
-            String cacheKey) {
+            String cacheKey, io.continuum.provenance.ProvenanceService.Recording prov) {
 
         // One entry per distinct provider, keeping that provider's best model.
         Map<String, ModelFallbackPolicy.ModelCandidate> byProvider = new java.util.LinkedHashMap<>();
@@ -1148,8 +1208,24 @@ public class GatewayService {
                     result.attemptedProviders(), winner, result.elapsedMs(),
                     result.hedged() ? " (hedge fired)" : " (no hedge needed)");
 
+            metrics.request(winner, resp.model(), true, totalMs);
+            metrics.tokens(winner, resp.promptTokens(), resp.completionTokens());
+            metrics.cost(winner, billedCost);
+            if (prov != null) {
+                prov.add(new io.continuum.provenance.Decision(
+                        io.continuum.provenance.Decision.Stage.PROVIDER,
+                        winner + "/" + resp.model(),
+                        result.hedged() ? "won a hedged race against " + result.attemptedProviders()
+                                : "answered before a hedge was needed",
+                        providers.stream().filter(pv -> !pv.equals(winner)).toList(), billedCost, totalMs));
+                prov.add(new io.continuum.provenance.Decision(
+                        io.continuum.provenance.Decision.Stage.OUTPUT,
+                        tokens + " tokens", reason, List.of(), billedCost, totalMs));
+                prov.commit();
+            }
             var savedLog = logged(new GatewayRequestLogEntity(developerId, req.model(), winner,
-                    resp.model(), complexity, reason, totalMs, tokens, billedCost, true, 0));
+                    resp.model(), complexity, reason, totalMs, tokens, billedCost, true, 0)
+                    .withTraceId(prov == null ? null : prov.requestId()));
             labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, billedCost);
             recordBandit(complexity, winner, true, totalMs, billedCost);
             routingStrategy.record(developerId, routingDecision, complexity, winner, true, totalMs, billedCost);

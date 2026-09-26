@@ -65,4 +65,30 @@ class DecisionEngineTest {
         var p = engine.propose(current, snapshot, profile(AutopilotMode.HIGH_QUALITY));
         assertEquals("gemini", p.candidate().providerOrder().get(0));
     }
+
+    @Test
+    void anUnmeasuredProviderDoesNotOutrankAGoodMeasuredOne() {
+        // groq has no traffic. Its average cost and latency are zero, which used
+        // to score as the cheapest and fastest provider there is.
+        var snapshot = new TelemetrySnapshot(200, 0.97, 400, 700, 0.001, 2, 1.0, Map.of(
+                "gemini", new TelemetrySnapshot.Arm(97, 3, 400, 0.001),
+                "groq", new TelemetrySnapshot.Arm(0, 0, 0, 0)));
+        for (int seed = 0; seed < 20; seed++) {
+            var p = new DecisionEngine(new Random(seed)).propose(base(), snapshot, profile(AutopilotMode.BALANCED));
+            assertEquals("gemini", p.candidate().providerOrder().get(0), "seed " + seed + ": " + p.rationale());
+        }
+    }
+
+    @Test
+    void samplingNoiseDoesNotReorderEquivalentProviders() {
+        // Two providers with the same record: whichever is first stays first,
+        // on every seed, instead of flipping from one cycle to the next.
+        var snapshot = new TelemetrySnapshot(200, 0.9, 800, 1200, 0.001, 2, 1.0, Map.of(
+                "gemini", new TelemetrySnapshot.Arm(90, 10, 800, 0.001),
+                "groq", new TelemetrySnapshot.Arm(90, 10, 800, 0.001)));
+        for (int seed = 0; seed < 20; seed++) {
+            var p = new DecisionEngine(new Random(seed)).propose(base(), snapshot, profile(AutopilotMode.BALANCED));
+            assertEquals(List.of("gemini", "groq"), p.candidate().providerOrder(), "seed " + seed);
+        }
+    }
 }
