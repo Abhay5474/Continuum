@@ -75,11 +75,14 @@ public final class ConcurrencyLimiter {
      */
     private static final double NOISE_FLOOR_MS = 20;
 
-    private double limit = INITIAL;
-    private double minRttMs = Double.NaN;
-    private double lastRttMs = Double.NaN;
-    private long samples;
-    private long drops;
+    // Written under the monitor, read without it on the admission hot path:
+    // volatile so a reader sees the latest value, and a whole one (a plain
+    // long or double may be read half-written).
+    private volatile double limit = INITIAL;
+    private volatile double minRttMs = Double.NaN;
+    private volatile double lastRttMs = Double.NaN;
+    private volatile long samples;
+    private volatile long drops;
 
     /** The limit right now, as a whole number of permits. */
     public int limit() {

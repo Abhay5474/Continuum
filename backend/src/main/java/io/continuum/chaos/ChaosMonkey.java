@@ -122,7 +122,11 @@ public class ChaosMonkey {
     }
 
     public void setActivityLatencyMs(String developerId, long ms) {
-        profile(developerId).activityLatencyMs = Math.max(0, ms);
+        // Capped. The delay is a sleep on the engine's shared activity workers,
+        // so an unbounded one let a single tenant park every worker for hours
+        // with a handful of its own workflows, stalling everyone else's.
+        long cap = developerId == null ? MAX_ENGINE_LATENCY_MS : MAX_TENANT_LATENCY_MS;
+        profile(developerId).activityLatencyMs = Math.max(0, Math.min(cap, ms));
     }
 
     public void scheduleCrashAfter(String developerId, int activities) {
@@ -154,6 +158,9 @@ public class ChaosMonkey {
         String dev = TenantContext.developerId();
         return dev == null ? null : perTenant.get(dev);
     }
+
+    static final long MAX_TENANT_LATENCY_MS = 30_000;
+    static final long MAX_ENGINE_LATENCY_MS = 300_000;
 
     private static double clamp(double v) {
         return Math.max(0, Math.min(1, v));

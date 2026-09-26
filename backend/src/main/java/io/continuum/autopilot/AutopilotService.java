@@ -133,8 +133,24 @@ public class AutopilotService {
 
     // ---- closed loop: observe → propose → verify → (canary) ----
 
+    /** Rows of loop history kept per developer. The loop writes on every cycle, every 30 s. */
+    static final int KEEP_DECISIONS = 500;
+    static final int KEEP_TELEMETRY = 200;
+
     @Transactional
     public void runLoopFor(String developerId) {
+        try {
+            runCycle(developerId);
+        } finally {
+            // Unbounded before: about 2,900 decision and 2,900 telemetry rows
+            // per account per day, kept forever, for history nobody pages past
+            // its first screen.
+            decisions.pruneTo(developerId, KEEP_DECISIONS);
+            telemetry.pruneTo(developerId, KEEP_TELEMETRY);
+        }
+    }
+
+    private void runCycle(String developerId) {
         AutopilotConfigEntity config = configRepo.findById(developerId).orElse(null);
         if (config == null || !config.isEnabled() || config.getActiveBundleId() == null) {
             return;

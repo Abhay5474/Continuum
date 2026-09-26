@@ -103,4 +103,13 @@ class ChaosTenantScopingTest {
         assertThat(chaos.state("dev-a").scope()).isEqualTo("account");
         assertThat(chaos.state(null).scope()).isEqualTo("engine");
     }
+
+    @Test
+    void activityLatencyIsCappedSoATenantCannotParkTheSharedWorkers() {
+        chaos.setActivityLatencyMs("dev_a", 3_600_000);
+        assertThat(chaos.state("dev_a").activityLatencyMs()).isEqualTo(ChaosMonkey.MAX_TENANT_LATENCY_MS);
+        chaos.setActivityLatencyMs(null, 3_600_000);
+        assertThat(chaos.state(null).activityLatencyMs()).isEqualTo(ChaosMonkey.MAX_ENGINE_LATENCY_MS);
+        chaos.reset(null);
+    }
 }

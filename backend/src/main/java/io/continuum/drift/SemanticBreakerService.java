@@ -144,10 +144,13 @@ public class SemanticBreakerService {
             String key = developerId + "|" + provider + "|" + model;
             CusumDetector d = detectors.computeIfAbsent(key,
                     k -> new CusumDetector(cfg.getWarmup(), cfg.getSlack(), cfg.getThreshold()));
-            traces.computeIfAbsent(key, k -> new ArrayDeque<>()).addLast(score);
+            // Concurrent: two requests for one model can land here at once,
+            // and an ArrayDeque corrupts under that (as did the detector's
+            // running statistics, now synchronized).
+            traces.computeIfAbsent(key, k -> new java.util.concurrent.ConcurrentLinkedDeque<>()).addLast(score);
             Deque<Double> trace = traces.get(key);
             while (trace.size() > TRACE) {
-                trace.removeFirst();
+                trace.pollFirst();
             }
 
             CusumDetector.State result = d.observe(score);

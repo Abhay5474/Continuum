@@ -92,7 +92,7 @@ public class CusumDetector {
      * baseline is frozen, because continuing to update it with degraded data is
      * how a monitor learns to accept the degradation.
      */
-    public State observe(double value) {
+    public synchronized State observe(double value) {
         count++;
         // Welford: numerically stable running mean and variance.
         double delta = value - mean;
@@ -117,12 +117,12 @@ public class CusumDetector {
     }
 
     /** Clears the accumulator without forgetting the baseline — used on recovery. */
-    public void reset() {
+    public synchronized void reset() {
         sum = 0;
     }
 
     /** Forgets everything, including the baseline. Used when re-learning a model. */
-    public void rebaseline() {
+    public synchronized void rebaseline() {
         count = 0;
         mean = 0;
         m2 = 0;
@@ -131,25 +131,25 @@ public class CusumDetector {
         peak = 0;
     }
 
-    public long count() {
+    public synchronized long count() {
         return count;
     }
 
-    public double mean() {
+    public synchronized double mean() {
         return mean;
     }
 
-    public double baseline() {
+    public synchronized double baseline() {
         return baseline;
     }
 
     /** Accumulated shortfall right now. */
-    public double accumulated() {
+    public synchronized double accumulated() {
         return sum;
     }
 
     /** How close the accumulator is to firing, in [0,1] — the console draws this. */
-    public double pressure() {
+    public synchronized double pressure() {
         return Math.max(0, Math.min(1, sum / threshold));
     }
 
