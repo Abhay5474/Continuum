@@ -3,42 +3,42 @@
     "id": "intro",
     "label": "What Continuum is",
     "text": "Continuum is a reliability layer. It sits between your application and a language model. Its job is to make the middle visible.",
-    "duration": 9.39
+    "duration": 9.08
   },
   {
     "id": "problem",
     "label": "Why raw data fails",
     "text": "Send a photo, a recording, or a spreadsheet straight to a model, and it cannot really read them. It will answer anyway. And you cannot tell that it was guessing.",
-    "duration": 10.63
+    "duration": 10.15
   },
   {
     "id": "specialists",
     "label": "Specialists",
     "text": "Continuum calls a specialist first. It uses your provider key. Images go to Roboflow. Audio goes to Deepgram. Scans go to an optical reader. What comes back becomes evidence.",
-    "duration": 12.73
+    "duration": 12.86
   },
   {
     "id": "evidence",
     "label": "The evidence model",
     "text": "Evidence carries a confidence score only where one was measured. A transcript has no score. So no threshold is applied to it. Nothing is invented to fill a gap.",
-    "duration": 11.17
+    "duration": 10.84
   },
   {
     "id": "context",
     "label": "Context transformers",
     "text": "Continuum also transforms data by itself, with no model at all. A spreadsheet keeps its merged headers and its units. Ten thousand log lines become one incident. Ninety eight percent smaller.",
-    "duration": 13.63
+    "duration": 13.51
   },
   {
     "id": "reliability",
     "label": "Reliability",
     "text": "Around all of this sits the reliability layer. Model routing. Admission control. Caching. And a check that the answer matches the evidence.",
-    "duration": 10.29
+    "duration": 10.31
   },
   {
     "id": "close",
     "label": "The trace",
     "text": "Every run leaves a trace. What was found. What it cost. Where each number came from. And what Continuum refused to guess.",
-    "duration": 8.7
+    "duration": 8.73
   }
 ]

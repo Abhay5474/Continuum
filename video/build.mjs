@@ -6,10 +6,12 @@
  * for by time, in any order, and the capture is reproducible rather than a
  * recording of whatever the machine managed that second.
  *
- * <p>Narration comes from `regen-audio.mjs`, which uses Festival's CMU SLT
- * arctic HTS voice. That was picked by measurement rather than by ear — see
- * `score-voice.mjs`. The captions are burned in so the video also works with
- * the sound off, which is how a good deal of it will be watched.
+ * <p>Narration comes from `regen-audio.mjs`, which uses Kokoro, a neural voice
+ * (see tts.py). The captions are burned in so the video also works with the
+ * sound off, which is how a good deal of it will be watched.
+ *
+ * <p>ffmpeg is taken from $FFMPEG when set — `pip install imageio-ffmpeg`
+ * provides a static build where no system ffmpeg is installed.
  *
  *   node build.mjs
  */
@@ -20,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const FFMPEG = process.env.FFMPEG ?? 'ffmpeg';
 const FPS = 25;
 const W = 1280;
 const H = 720;
@@ -67,7 +70,7 @@ const parts = [];
 for (const s of scenes) {
   const src = join(HERE, `audio-${s.id}.wav`);
   const padded = join(HERE, `pad-${s.id}.wav`);
-  execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', src,
+  execFileSync(FFMPEG, ['-y', '-v', 'error', '-i', src,
     '-af', `apad=whole_dur=${s.duration}`, '-ar', '44100', '-ac', '1', padded]);
   parts.push(`file '${padded}'`);
 }
@@ -79,16 +82,15 @@ const voice = join(HERE, 'voice.wav');
 // then made up the loss with a flat gain that left the mix at -27 dB mean.
 // loudnorm targets the -16 LUFS that web video is normally mixed to, so the
 // narration sits at a sane level next to everything else in a browser tab.
-execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', listPath,
+execFileSync(FFMPEG, ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', listPath,
   '-af', [
     'highpass=f=70',            // rumble only; the voice starts well above this
-    'deesser=i=0.4',            // HTS sibilance is a little hot at 32kHz
     'loudnorm=I=-16:TP=-1.5:LRA=11',
   ].join(','),
   '-ar', '44100', '-ac', '2', voice]);
 
 const out = join(HERE, '..', 'frontend', 'public', 'continuum-intro.mp4');
-execFileSync('ffmpeg', ['-y', '-v', 'error',
+execFileSync(FFMPEG, ['-y', '-v', 'error',
   '-framerate', String(FPS), '-i', join(FRAMES, 'f%05d.png'),
   '-i', voice,
   '-c:v', 'libx264', '-preset', 'slow', '-crf', '25',

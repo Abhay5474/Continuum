@@ -32,3 +32,4 @@ video/*.wav
 video/voice.wav
 video/audio-list.txt
 video/node_modules
+video/models/

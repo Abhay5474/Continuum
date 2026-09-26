@@ -1,5 +1,5 @@
 {
-  "total": 76.54,
+  "total": 75.48,
   "chapters": [
     {
       "id": "intro",
@@ -10,37 +10,37 @@
     {
       "id": "problem",
       "label": "Why raw data fails",
-      "at": 9.39,
+      "at": 9.08,
       "text": "Send a photo, a recording, or a spreadsheet straight to a model, and it cannot really read them. It will answer anyway. And you cannot tell that it was guessing."
     },
     {
       "id": "specialists",
       "label": "Specialists",
-      "at": 20.02,
+      "at": 19.23,
       "text": "Continuum calls a specialist first. It uses your provider key. Images go to Roboflow. Audio goes to Deepgram. Scans go to an optical reader. What comes back becomes evidence."
     },
     {
       "id": "evidence",
       "label": "The evidence model",
-      "at": 32.75,
+      "at": 32.09,
       "text": "Evidence carries a confidence score only where one was measured. A transcript has no score. So no threshold is applied to it. Nothing is invented to fill a gap."
     },
     {
       "id": "context",
       "label": "Context transformers",
-      "at": 43.92,
+      "at": 42.93,
       "text": "Continuum also transforms data by itself, with no model at all. A spreadsheet keeps its merged headers and its units. Ten thousand log lines become one incident. Ninety eight percent smaller."
     },
     {
       "id": "reliability",
       "label": "Reliability",
-      "at": 57.55,
+      "at": 56.44,
       "text": "Around all of this sits the reliability layer. Model routing. Admission control. Caching. And a check that the answer matches the evidence."
     },
     {
       "id": "close",
       "label": "The trace",
-      "at": 67.84,
+      "at": 66.75,
       "text": "Every run leaves a trace. What was found. What it cost. Where each number came from. And what Continuum refused to guess."
     }
   ]
