@@ -689,13 +689,22 @@ export const GUIDES: Record<string, Guide> = {
   },
 
   "/dag": {
-    title: "Verification",
+    title: "the Verification Engine",
     summary:
       "Claims solved in parallel, verified independently, and resolved by Bayesian aggregation.",
     steps: [
       {
         title: "What this is",
         body: "For questions where being wrong is expensive, one answer from one model is a single point of failure. This decomposes the question into claims, solves them in parallel, and verifies each one separately.",
+      },
+      {
+        title: "Turn it on",
+        target: '[data-guide="dag-toggle"]',
+        body: "Off by default. While on, every gateway request from this account runs through the graph and the reply carries its confidence; the response format does not change. It adds seconds, so keep it for traffic where correctness beats speed.",
+      },
+      {
+        title: "Open a run",
+        body: "Each run below opens its graph: the planner, a solver per claim, the verifiers on each, any conflict between them, and the aggregate that becomes the answer. Select a node to read what it produced.",
       },
       {
         title: "Why the verifier is separate",

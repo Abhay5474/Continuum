@@ -71,8 +71,9 @@ External clients keep calling `POST /api/gateway/chat` — nothing changes for t
 
 ## UI (scoped strictly to V6)
 
-- **Developer Portal**: the "Enable V6 Verification Engine" card (off by
-  default) with a **feature-journey guide** — turn it ON for generated
+- **Verification Engine page** (`/dag`, Reliability → Verification Engine in
+  the navigation): the on/off switch (off by default) with a
+  **feature-journey guide** — turn it ON for generated
   SQL/configs/payment logic, compliance audit trails, correctness-over-latency
   flows; keep it OFF for latency-sensitive chat, creative generation and
   high-volume low-risk traffic.

@@ -78,8 +78,8 @@ GET  /api/mmu/stubs?developerId=                            the L2 stub ledger
   ✎ dirty flushes are marked.
 - **L2 stub ledger**: every stub with its version (`MUTATED` badge once a
   dirty flush bumped it) and source→stub token compression.
-- Portal gains the "Enable V7 Context Virtualization" card. Nothing else in
-  the UI was touched beyond one nav link.
+- The on/off switch sits at the top of the profiler itself (`/mmu`, Prompt →
+  Context Optimizer in the navigation), next to what it changes.
 
 ## Tests (7 new; full suite 100/100 green)
 

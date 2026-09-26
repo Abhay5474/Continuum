@@ -193,35 +193,6 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
   const configured = new Set(creds.map((c) => c.provider));
 
-  // --- Context Optimizer (opt-in, OFF by default) ---
-  const [v7Enabled, setV7Enabled] = useState<boolean | null>(null);
-  useEffect(() => {
-    portal.v7.status().then((s) => setV7Enabled(!!s.enabled)).catch(() => setV7Enabled(false));
-  }, []);
-  const toggleV7 = async () => {
-    try {
-      const r = v7Enabled ? await portal.v7.disable() : await portal.v7.enable();
-      setV7Enabled(!!r.enabled);
-    } catch {
-      /* keep previous state */
-    }
-  };
-
-  // --- Consensus Verification (opt-in, OFF by default) ---
-  const [v6Enabled, setV6Enabled] = useState<boolean | null>(null);
-  const [v6Guide, setV6Guide] = useState(false);
-  useEffect(() => {
-    portal.v6.status().then((s) => setV6Enabled(!!s.enabled)).catch(() => setV6Enabled(false));
-  }, []);
-  const toggleV6 = async () => {
-    try {
-      const r = v6Enabled ? await portal.v6.disable() : await portal.v6.enable();
-      setV6Enabled(!!r.enabled);
-    } catch {
-      /* keep previous state */
-    }
-  };
-
   return (
     <div className="space-y-8">
       {/* Billing / Settings / Sign out live in the account menu in the header. */}
@@ -334,53 +305,6 @@ function Portal({ onLogout }: { onLogout: () => void }) {
             hint="On: requests go through your keys and fall back to the platform if they fail or are rate-limited. Off: requests use the platform's keys."
           />
         </div>
-      </div>
-
-      {/* Opt-in engines: each is one switch. What it does is behind the tip;
-          when to use it is behind a disclosure, drawn as two lists. */}
-      <div className="grid items-start gap-3 lg:grid-cols-2">
-        <div className="space-y-2">
-          <Switch
-            checked={!!v6Enabled}
-            busy={v6Enabled === null}
-            onChange={() => void toggleV6()}
-            label="Verification Engine"
-            hint="Runs each gateway request through a DAG of solver and verifier nodes with Bayesian conflict resolution. Every answer is checked, scored and auditable in the Execution Command Center. Response format unchanged."
-          />
-          <button onClick={() => setV6Guide(!v6Guide)} aria-expanded={v6Guide}
-            className="ml-1 text-[11.5px] text-slate-500 hover:text-slate-300">
-            {v6Guide ? "Hide" : "When to use it"}
-          </button>
-          {v6Guide && (
-            <div className="grid gap-3 rounded-[var(--r-lg)] border border-edge p-3 text-xs sm:grid-cols-2 animate-fade-up">
-              <div>
-                <div className="font-semibold text-emerald-300">✓ On for</div>
-                <ul className="mt-1 space-y-1 text-slate-400">
-                  <li>High-stakes outputs: SQL, infra config, payments</li>
-                  <li>Audit trails: finance, legal, healthcare</li>
-                  <li>Correctness over latency (seconds, not ms)</li>
-                  <li>Catching contradictions before execution</li>
-                </ul>
-              </div>
-              <div>
-                <div className="font-semibold text-rose-300">✕ Off for</div>
-                <ul className="mt-1 space-y-1 text-slate-400">
-                  <li>Latency-sensitive chat</li>
-                  <li>Creative, open-ended generation</li>
-                  <li>High-volume, low-risk traffic</li>
-                  <li>Already validated downstream</li>
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-        <Switch
-          checked={!!v7Enabled}
-          busy={v7Enabled === null}
-          onChange={() => void toggleV7()}
-          label="Context Optimizer"
-          hint="Pages long histories into semantic stubs backed by immutable event streams, prefetches what is relevant and resolves page faults mid-generation. Inspect it in the Context Memory Profiler."
-        />
       </div>
 
       {/* api keys */}

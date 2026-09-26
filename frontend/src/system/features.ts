@@ -69,7 +69,6 @@ export const FEATURES: Feature[] = [
       { to: "/workflows/console", label: "Run history" },
       { to: "/saga", label: "Compensation" },
       { to: "/replay", label: "Replay audit" },
-      { to: "/dag", label: "Verification" },
     ],
   },
 
@@ -97,9 +96,13 @@ export const FEATURES: Feature[] = [
     desc: "What the model is given to reason over, and what it remembers",
     views: [
       { to: "/context", label: "Transformers" },
-      { to: "/mmu", label: "Optimizer" },
       { to: "/memory", label: "Memory" },
     ],
+  },
+  {
+    name: "Context Optimizer",
+    desc: "Page long histories out of the window and back in",
+    views: [{ to: "/mmu", label: "Context Optimizer" }],
   },
   {
     name: "Semantic Cache",
@@ -108,6 +111,11 @@ export const FEATURES: Feature[] = [
   },
 
   /* ---- Reliability ------------------------------------------------ */
+  {
+    name: "Verification Engine",
+    desc: "Solve, verify and score every answer as a graph of agents",
+    views: [{ to: "/dag", label: "Verification Engine" }],
+  },
   {
     name: "Answer Assurance",
     desc: "Judging a finished answer, and acting on the verdict",

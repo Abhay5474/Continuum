@@ -97,7 +97,17 @@ export default function MmuProfiler() {
           </div>
           <p className="mt-1 text-[13px] text-slate-500">Keep the working set in the window · page out the rest</p>
         </div>
-        <FeatureToggle status={portal.v7.status} enable={portal.v7.enable} disable={portal.v7.disable} />
+        <FeatureToggle
+          label="Context Optimizer"
+          onText="Long histories are paged to stubs and faulted back in"
+          offText="The whole history is sent, oldest dropped first"
+          status={portal.v7.status}
+          enable={portal.v7.enable}
+          disable={portal.v7.disable}
+          guide="mmu-toggle"
+          useFor={["Long conversations and agent sessions", "Early facts that must survive (order ids, decisions)", "Token spend dominated by history"]}
+          skipFor={["Single-turn requests", "Short chats that fit the window", "Prompts you must send verbatim"]}
+        />
       </header>
 
       <div className="mt-6">

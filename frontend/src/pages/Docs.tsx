@@ -224,7 +224,7 @@ curl -X POST https://api.continuum.dev/api/portal/developer/workflows/definition
             <h2 className="text-2xl font-bold tracking-tight">Features</h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
               Every advanced capability is opt-in and off by default. Turn each on with a single
-              toggle in the portal — when off, the gateway behaves like a plain proxy.
+              switch on that feature's own page — when off, the gateway behaves like a plain proxy.
             </p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {[

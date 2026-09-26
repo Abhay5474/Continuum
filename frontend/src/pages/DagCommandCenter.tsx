@@ -90,13 +90,23 @@ export default function DagCommandCenter() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             <Chip glyph="check" tone="accent" size={28} />
-            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Verification</h1>
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Verification Engine</h1>
           </div>
           <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
             Claims solved in parallel · verified independently · resolved by Bayesian aggregation
           </p>
         </div>
-        <FeatureToggle status={portal.v6.status} enable={portal.v6.enable} disable={portal.v6.disable} />
+        <FeatureToggle
+          label="Verification Engine"
+          onText="Every gateway request is solved and verified as a graph"
+          offText="Gateway answers go out unverified"
+          status={portal.v6.status}
+          enable={portal.v6.enable}
+          disable={portal.v6.disable}
+          guide="dag-toggle"
+          useFor={["High-stakes outputs: SQL, infra config, payments", "Audit trails: finance, legal, healthcare", "Correctness over latency (seconds, not ms)", "Catching contradictions before execution"]}
+          skipFor={["Latency-sensitive chat", "Creative, open-ended generation", "High-volume, low-risk traffic", "Already validated downstream"]}
+        />
       </header>
 
       {runs.length === 0 ? (

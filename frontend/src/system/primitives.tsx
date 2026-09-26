@@ -438,7 +438,7 @@ const TRAVEL = 36 - 14 - 3 * 2 - 2;
  *       than staying where the finger left it and lying about the state.</li>
  * </ul>
  */
-function SwitchThumb({
+export function SwitchThumb({
   checked,
   disabled,
   label,

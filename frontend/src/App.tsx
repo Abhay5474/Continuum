@@ -26,8 +26,8 @@ type Group = { label: string; items: Item[] };
 
 const GROUPS: Group[] = [
   { label: "Traffic", items: featureItems(["Workflows", "Gateway", "Routing", "Traffic Control", "Model Cascade"]) },
-  { label: "Prompt", items: featureItems(["Pipelines", "Specialists", "Prompt Guard", "Context", "Semantic Cache"]) },
-  { label: "Reliability", items: featureItems(["Answer Assurance", "Loop Detection", "Decision Provenance", "Chaos Lab"]) },
+  { label: "Prompt", items: featureItems(["Pipelines", "Specialists", "Prompt Guard", "Context", "Context Optimizer", "Semantic Cache"]) },
+  { label: "Reliability", items: featureItems(["Verification Engine", "Answer Assurance", "Loop Detection", "Decision Provenance", "Chaos Lab"]) },
   { label: "Intelligence", items: featureItems(["Adaptive Policy"]) },
 ];
 
