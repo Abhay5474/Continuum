@@ -3,6 +3,7 @@ import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Chip } from "../system/hub";
+import { Donut } from "../system/charts";
 import type { CostReport, Meta, Stats, WorkflowSummary } from "../types";
 import StatusBadge from "../components/StatusBadge";
 import { SkeletonCards, SkeletonRows, EmptyState, ErrorState, Spinner, useToast, CodeBlock } from "../components/ui";
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [costs, setCosts] = useState<CostReport | null>(null);
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
+  const slowest = Math.max(1, ...workflows.map(runMs).filter(Number.isFinite));
   const [type, setType] = useState("CustomerAnalysis");
   const [customerId, setCustomerId] = useState("C-1001");
   const [busy, setBusy] = useState(false);
@@ -133,7 +135,10 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="divide-y divide-edge">
-              {workflows.map((w) => (
+              {/* Each row carries how long the run took, against the slowest in
+                  the list, so a stuck or unusually slow run stands out without
+                  opening it. */}
+              {workflows.map((w, wi) => (
                 <Link
                   key={w.workflowId}
                   to={`/workflows/${w.workflowId}`}
@@ -143,6 +148,7 @@ export default function Dashboard() {
                   <StatusBadge status={w.status} />
                   <span className="text-sm font-medium">{w.workflowType}</span>
                   <span className="font-mono text-xs text-slate-400">{w.workflowId.slice(0, 8)}</span>
+                  <RunLength w={w} slowest={slowest} delay={wi * 50} />
                   <span className="ml-auto text-xs text-slate-400">{w.currentSequence} events</span>
                 </Link>
               ))}
@@ -194,6 +200,18 @@ export default function Dashboard() {
                 <span>{costs?.totalTokens ?? 0}</span>
               </div>
             </div>
+            {(costs?.byProvider?.length ?? 0) > 0 && (
+              <div className="mt-3">
+                <Donut
+                  data={costs!.byProvider.map((p) => ({ key: p.provider, label: p.provider, value: p.tokens }))}
+                  size={104}
+                  thickness={12}
+                  centerValue={(costs?.totalTokens ?? 0).toLocaleString()}
+                  centerLabel="tokens"
+                  unit="tok"
+                />
+              </div>
+            )}
             <div className="mt-3 space-y-1">
               {costs?.byProvider.map((p) => (
                 <div key={p.provider} className="flex justify-between text-xs text-slate-400">
@@ -211,5 +229,26 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+const epoch = (t: unknown) => {
+  const n = typeof t === "number" ? t : Date.parse(String(t));
+  return n < 1e12 ? n * 1000 : n;
+};
+const runMs = (w: any) => Math.max(0, epoch(w.updatedAt) - epoch(w.createdAt));
+
+/** How long one run took, as a bar against the slowest run listed. */
+function RunLength({ w, slowest, delay }: { w: any; slowest: number; delay: number }) {
+  const ms = runMs(w);
+  if (!Number.isFinite(ms)) return null;
+  const tone = w.status === "FAILED" ? "var(--state-critical-ink)" : w.status === "RUNNING" ? "var(--state-active-ink)" : "var(--state-healthy-ink)";
+  return (
+    <span className="hidden items-center gap-2 sm:flex" title={`${(ms / 1000).toFixed(1)} s from start to last event`}>
+      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-edge">
+        <span className="grow-x block h-full rounded-full" style={{ width: `${Math.max(3, (ms / (slowest || 1)) * 100)}%`, background: tone, animationDelay: `${delay}ms` }} />
+      </span>
+      <span className="readout w-12 text-[11px] text-slate-400">{ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60000)} min`}</span>
+    </span>
   );
 }

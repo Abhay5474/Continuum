@@ -8,9 +8,12 @@ import { useOperator } from "../system/OperatorAccess";
 import { Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
+import GatewayResult from "../components/GatewayResult";
 import Tabs from "../system/Tabs";
 import { Morph, Spotlight } from "../system/motion";
 import { timeOf } from "../system/time";
+import { trafficSeries } from "../system/traffic";
+import { ChartFrame, Donut, Histogram, Scatter, foldTail, seriesColor } from "../system/charts";
 import { Select, Table, TH, TR, TD } from "../system/controls";
 
 /**
@@ -112,6 +115,7 @@ export default function GatewayDashboard() {
     () => requests.map((r) => r.latencyMs ?? 0).reverse(),
     [requests]
   );
+  const shape = useMemo(() => trafficSeries(requests), [requests]);
   const maxLatency = useMemo(
     () => Math.max(...requests.map((r) => r.latencyMs ?? 0), 1),
     [requests]
@@ -141,7 +145,7 @@ export default function GatewayDashboard() {
           glyph="activity"
           tone="violet"
           value={(stats?.totalRequests ?? 0).toLocaleString()}
-          series={arrivals}
+          series={arrivals.some((a) => a > 0) ? arrivals : shape.arrivals}
         />
         <Stat
           label="Success"
@@ -149,6 +153,8 @@ export default function GatewayDashboard() {
           unit="%"
           tone={successRate >= 0.99 ? "ok" : successRate >= 0.9 ? "warn" : "bad"}
           value={(successRate * 100).toFixed(1)}
+          series={shape.health}
+          hint="Rolling over the last five requests: a dip is a failover or a failure"
         />
         <Stat
           label="Absorbed failures"
@@ -173,8 +179,8 @@ export default function GatewayDashboard() {
           series={latencies}
           hint="The most recent request, over the shape of the last forty"
         />
-        <Stat label="Tokens" glyph="layers" tone="amber" value={(stats?.totalTokens ?? 0).toLocaleString()} />
-        <Stat label="Spend" glyph="coin" tone="orange" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} />
+        <Stat label="Tokens" glyph="layers" tone="amber" value={(stats?.totalTokens ?? 0).toLocaleString()} series={shape.tokens} hint="Tokens per request, over the recent ones" />
+        <Stat label="Spend" glyph="coin" tone="orange" value={`$${(stats?.totalCostUsd ?? 0).toFixed(5)}`} series={shape.cumulativeCost} hint="Spend accumulating across the recent requests" />
         <Stat
           label="Models available"
           glyph="chip"
@@ -191,6 +197,14 @@ export default function GatewayDashboard() {
       <Morph k={tab}>
         {tab === "flow" && (<>
       {/* ---- live request flow: the hero ---- */}
+      {requests.length >= 3 && (
+        <section className="mb-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Traffic shape · last {requests.length} requests</h2>
+          </div>
+          <TrafficShape requests={requests} />
+        </section>
+      )}
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Live request flow · newest first</h2>
@@ -554,12 +568,74 @@ export default function GatewayDashboard() {
         </div>
         {chatOut && (
           <Plane inset className="mt-2 max-h-[420px] overflow-y-auto p-3">
-            <DataView value={chatOut} />
+            <GatewayResult out={chatOut} />
           </Plane>
         )}
       </section>
         </>)}
       </Morph>
+    </div>
+  );
+}
+
+/**
+ * The overall shape of recent traffic, above the per-request feed: how latency
+ * is spread, which models carried it, and whether bigger requests are the slow
+ * ones. The feed answers "what happened to this request"; this answers "what is
+ * my traffic like".
+ */
+function TrafficShape({ requests }: { requests: any[] }) {
+  const lat = requests.map((r) => r.latencyMs ?? 0).sort((a, b) => a - b);
+  const q = (f: number) => lat[Math.min(lat.length - 1, Math.floor(f * lat.length))];
+  const p50 = q(0.5);
+  const p95 = q(0.95);
+  const bins = 8;
+  const hi = Math.max(1, lat[lat.length - 1]);
+  const step = Math.ceil(hi / bins) || 1;
+  const hist = Array.from({ length: bins }, (_, i) => {
+    const lo = i * step;
+    return {
+      label: `${lo}`,
+      value: lat.filter((v) => v >= lo && (i === bins - 1 ? true : v < lo + step)).length,
+      hint: `${lo}–${lo + step} ms`,
+      color: lo + step <= p50 ? "var(--state-healthy-ink)" : lo >= p95 ? "var(--state-warning-ink)" : "var(--series-1)",
+    };
+  });
+  const byModel = new Map<string, number>();
+  requests.forEach((r) => {
+    const k = `${r.chosenProvider ?? "?"} · ${r.chosenModel ?? "?"}`;
+    byModel.set(k, (byModel.get(k) ?? 0) + 1);
+  });
+  const mix = foldTail([...byModel.entries()].map(([k, v]) => ({ key: k, label: k, value: v })), 5);
+  const dot = (r: any) => (!r.success ? "var(--state-critical-ink)" : r.failoverCount ? "var(--state-warning-ink)" : seriesColor(0));
+  return (
+    <div className="mt-2 grid gap-3 lg:grid-cols-3">
+      <ChartFrame
+        title="Latency spread"
+        caption={`Half finish within ${p50} ms (green); the slowest 5% take ${p95} ms or more (amber).`}
+        data={hist.map((b) => ({ key: b.label, label: b.hint, value: b.value }))}
+        unit="requests"
+      >
+        <Histogram bins={hist} height={110} xLabel="ms" endLabel={`${bins * step}`} />
+      </ChartFrame>
+      <ChartFrame title="Which models answered" data={mix} unit="requests">
+        <Donut data={mix} size={120} centerValue={String(requests.length)} centerLabel="requests" />
+      </ChartFrame>
+      <ChartFrame
+        title="Size against speed"
+        caption="Each dot is a request. Amber needed failover; red failed."
+        data={requests.map((r) => ({ key: String(r.id), label: `req_${r.id} · ${r.tokens ?? 0} tok`, value: r.latencyMs ?? 0 }))}
+        unit="ms"
+      >
+        <Scatter
+          points={[...requests].reverse().map((r) => ({ x: r.tokens ?? 0, y: r.latencyMs ?? 0, color: dot(r), label: `req_${r.id}` }))}
+          xLabel="tokens"
+          yLabel="ms"
+          xFormat={(n) => String(Math.round(n))}
+          yFormat={(n) => String(Math.round(n))}
+          height={180}
+        />
+      </ChartFrame>
     </div>
   );
 }

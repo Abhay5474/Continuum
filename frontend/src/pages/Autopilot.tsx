@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Note } from "../system/primitives";
-import { Card, CardHead, Chip, Grid, Pill, type GlyphName, type Tone } from "../system/hub";
+import { StackedBar, BarChart } from "../system/charts";
+import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone } from "../system/hub";
 
 /**
  * Autopilot — beginner-friendly control plane UI. Reuses the developer session
@@ -15,6 +16,7 @@ export default function Autopilot() {
   const [canary, setCanary] = useState<any[]>([]);
   const [decisions, setDecisions] = useState<any[]>([]);
   const [bundles, setBundles] = useState<any[]>([]);
+  const [allVersions, setAllVersions] = useState(false);
   const [rollbacks, setRollbacks] = useState<any[]>([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -167,22 +169,37 @@ export default function Autopilot() {
             {recs.filter((r) => r.status === "PENDING").length === 0 && (
               <div className="text-xs text-slate-500">No pending recommendations. Autopilot is watching your traffic.</div>
             )}
+            {/* One card per distinct change. The same proposal filed again and
+                again is one decision to make, not a hundred: it shows how
+                often it was proposed and how its confidence moved. */}
             <div className="space-y-2">
-              {recs.filter((r) => r.status === "PENDING").map((r) => (
-                <div key={r.id} className="rounded-md border border-edge bg-ink p-3 transition-all">
-                  <div className="flex items-center gap-2">
+              {groupPending(recs).map(({ latest: r, repeats }, gi) => (
+                <div key={r.id} className="rise-in rounded-md border border-edge bg-ink p-3 transition-all" style={{ animationDelay: `${gi * 70}ms` }}>
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{r.title}</span>
                     <ConfidenceBadge value={r.confidence} />
+                    {repeats.length > 1 && <Pill tone="info">proposed {repeats.length}×</Pill>}
                     <div className="ml-auto flex gap-2">
                       <button onClick={() => act(() => portal.autopilot.accept(r.id))} disabled={busy}
                         className="rounded bg-emerald-700 px-3 py-1 text-xs text-white">Accept → canary</button>
-                      <button onClick={() => act(() => portal.autopilot.reject(r.id))} disabled={busy}
-                        className="rounded border border-edge px-3 py-1 text-xs">Dismiss</button>
+                      <button onClick={() => act(async () => { for (const x of repeats) await portal.autopilot.reject(x.id); })} disabled={busy}
+                        className="rounded border border-edge px-3 py-1 text-xs">{repeats.length > 1 ? `Dismiss all ${repeats.length}` : "Dismiss"}</button>
                     </div>
                   </div>
                   <Changes text={r.rationale} />
                   <div className="mt-1 text-xs text-slate-400">{r.rationale}</div>
                   {r.impact && <div className="mt-1 text-xs text-indigo-300">Impact: {r.impact}</div>}
+                  {repeats.length > 2 && (
+                    <div className="mt-2">
+                      <div className="flex items-baseline justify-between text-[11px] text-slate-500">
+                        <span>Confidence each time it was proposed</span>
+                        <span className="readout">
+                          {Math.round(Math.min(...repeats.map((x) => x.confidence ?? 0)) * 100)}–{Math.round(Math.max(...repeats.map((x) => x.confidence ?? 0)) * 100)}%
+                        </span>
+                      </div>
+                      <Spark points={[...repeats].reverse().map((x) => x.confidence ?? 0)} tone="info" height={30} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -211,18 +228,36 @@ export default function Autopilot() {
               {/* Versions as a line of dots, newest last: which were kept,
                   which were tried and rolled back, at a glance. */}
               {bundles.length > 0 && (
-                <div className="mb-3 flex flex-wrap items-center gap-1" role="img"
+                <div className="mb-3 flex min-w-0 flex-wrap items-center gap-1" role="img"
                      aria-label={bundles.map((b) => `v${b.version} ${b.status}`).join(", ")}>
-                  {[...bundles].reverse().map((b, i, all) => (
-                    <span key={b.id} className="flex items-center gap-1">
-                      <span className="h-3 w-3 rounded-full" title={`v${b.version} · ${b.status}`} style={{ background: bundleInk(b.status) }} />
-                      {i < all.length - 1 && <span className="h-px w-3 bg-slate-400/50" aria-hidden />}
-                    </span>
-                  ))}
+                  {bundles.length <= 30
+                    ? [...bundles].reverse().map((b, i, all) => (
+                        <span key={b.id} className="flex items-center gap-1">
+                          <span className="demo-pop h-3 w-3 rounded-full" title={`v${b.version} · ${b.status}`} style={{ background: bundleInk(b.status), animationDelay: `${i * 30}ms` }} />
+                          {i < all.length - 1 && <span className="h-px w-3 bg-slate-400/50" aria-hidden />}
+                        </span>
+                      ))
+                    : /* Too many for dots: one thin mark per version, a barcode of the policy's life. */
+                      <span className={`flex h-5 w-full min-w-0 items-stretch overflow-hidden rounded ${bundles.length > 120 ? "" : "gap-px"}`}>
+                        {[...bundles].reverse().map((b, i) => (
+                          <span key={b.id} className="demo-grow-y min-w-0 flex-1" title={`v${b.version} · ${b.status}`} style={{ background: bundleInk(b.status), animationDelay: `${Math.min(i * 4, 600)}ms` }} />
+                        ))}
+                      </span>}
+                </div>
+              )}
+              {bundles.length > 0 && (
+                <div className="mb-3">
+                  <StackedBar
+                    data={Object.entries(
+                      bundles.reduce((m: Record<string, number>, b) => ((m[b.status] = (m[b.status] ?? 0) + 1), m), {}),
+                    ).map(([k, v]) => ({ key: k, label: k.toLowerCase().replace(/_/g, " "), value: v as number, color: bundleInk(k) }))}
+                    height={22}
+                    unit="versions"
+                  />
                 </div>
               )}
               <ol className="space-y-1 text-sm">
-                {bundles.map((b) => (
+                {(allVersions ? bundles : bundles.slice(0, 8)).map((b) => (
                   <li key={b.id} className="flex items-center gap-2">
                     <StatusPill status={b.status} />
                     <span>v{b.version}</span>
@@ -230,8 +265,29 @@ export default function Autopilot() {
                   </li>
                 ))}
               </ol>
+              {bundles.length > 8 && (
+                <button
+                  onClick={() => setAllVersions((v) => !v)}
+                  className="mt-2 text-xs font-medium text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+                >
+                  {allVersions ? "Show the latest 8" : `Show all ${bundles.length} versions`}
+                </button>
+              )}
             </Panel>
             <Panel title="Decision log">
+              {decisions.length > 0 && (
+                <div className="mb-3">
+                  <BarChart
+                    data={Object.entries(
+                      decisions.reduce((m: Record<string, number>, d) => ((m[d.type] = (m[d.type] ?? 0) + 1), m), {}),
+                    )
+                      .map(([k, v]) => ({ key: k, label: k.toLowerCase().replace(/_/g, " "), value: v as number }))
+                      .sort((a, b) => b.value - a.value)}
+                    unit="decisions"
+                    height={16}
+                  />
+                </div>
+              )}
               <ol className="space-y-1 text-xs">
                 {decisions.slice(0, 12).map((d) => (
                   <li key={d.id} className="flex gap-2">
@@ -447,4 +503,20 @@ function Changes({ text }: { text?: string }) {
       ))}
     </div>
   );
+}
+
+/** Pending recommendations, one entry per distinct change, newest first. */
+function groupPending(recs: any[]) {
+  const groups = new Map<string, any[]>();
+  for (const r of recs) {
+    if (r.status !== "PENDING") continue;
+    const k = r.impact ?? r.rationale ?? String(r.id);
+    groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  return [...groups.values()]
+    .map((list) => {
+      const sorted = [...list].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+      return { latest: sorted[0], repeats: sorted };
+    })
+    .sort((a, b) => (b.latest.createdAt ?? 0) - (a.latest.createdAt ?? 0));
 }

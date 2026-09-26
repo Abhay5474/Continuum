@@ -209,8 +209,29 @@ public class BillingService {
         out.put("requestsThisPeriod", reqs);
         out.put("costThisPeriodUsd", usedCost);
         out.put("periodStart", since.toString());
+        out.put("daily", daily(developerId, since));
         out.put("plans", plans());
         return out;
+    }
+
+    /**
+     * Usage per day this period, for the month-to-date chart. Read-only and
+     * best effort: a database without date_trunc (the in-memory test one) just
+     * gets an empty list, and the page falls back to the totals.
+     */
+    private List<Map<String, Object>> daily(String developerId, Instant since) {
+        try {
+            return requests.dailyForDeveloperSince(developerId, since).stream().map(r -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("day", String.valueOf(r[0]));
+                m.put("tokens", ((Number) r[1]).longValue());
+                m.put("costUsd", ((Number) r[2]).doubleValue());
+                m.put("requests", ((Number) r[3]).longValue());
+                return m;
+            }).toList();
+        } catch (RuntimeException e) {
+            return List.of();
+        }
     }
 
     public List<Map<String, Object>> plans() {

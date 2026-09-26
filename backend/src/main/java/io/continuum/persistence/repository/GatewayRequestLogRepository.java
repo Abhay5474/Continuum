@@ -48,6 +48,13 @@ public interface GatewayRequestLogRepository extends JpaRepository<GatewayReques
     @Query("select coalesce(sum(g.tokens),0) from GatewayRequestLogEntity g where g.developerId = :dev")
     long totalTokensForDeveloper(String dev);
 
+    /** Tokens, cost and requests per UTC day since a timestamp: [day, tokens, cost, count]. */
+    @Query(value = "select cast(date_trunc('day', created_at at time zone 'UTC') as date) as d, " +
+                   "coalesce(sum(tokens),0), coalesce(sum(cost_usd),0), count(*) from gateway_requests " +
+                   "where developer_id = :dev and created_at >= :since group by 1 order by 1",
+           nativeQuery = true)
+    List<Object[]> dailyForDeveloperSince(String dev, java.time.Instant since);
+
     /** Tokens + cost + request count for a developer since a timestamp (billing period). */
     @Query("select coalesce(sum(g.tokens),0) from GatewayRequestLogEntity g " +
            "where g.developerId = :dev and g.createdAt >= :since")

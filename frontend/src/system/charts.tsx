@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 /**
@@ -959,6 +959,187 @@ export function BeforeAfter({
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The rendered width of a chart, so its text is drawn at real pixel size rather than scaled with the box. */
+function useWidth(fallback = 600) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(fallback);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(200, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w] as const;
+}
+
+/**
+ * Two measures per item, one dot each — for "does one depend on the other?".
+ *
+ * <p>A list shows each request's tokens and latency side by side, and the eye
+ * cannot compare forty pairs. Plotted, the relationship (or its absence) and
+ * the outliers are the first thing seen. Dots arrive one after another, oldest
+ * first, the way the requests did.
+ */
+export function Scatter({
+  points,
+  xLabel,
+  yLabel,
+  xFormat = fmt,
+  yFormat = fmt,
+  height = 200,
+}: {
+  points: { x: number; y: number; color?: string; label: string }[];
+  xLabel: string;
+  yLabel: string;
+  xFormat?: (n: number) => string;
+  yFormat?: (n: number) => string;
+  height?: number;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const [box, W] = useWidth();
+  if (points.length < 2) {
+    return <p className="text-sm text-slate-600">Not enough points yet — this fills in as requests arrive.</p>;
+  }
+  const H = height;
+  const pad = { l: 44, r: 12, t: 10, b: 28 };
+  const xMax = Math.max(...points.map((p) => p.x)) || 1;
+  const yMax = Math.max(...points.map((p) => p.y)) || 1;
+  const X = (v: number) => pad.l + (v / xMax) * (W - pad.l - pad.r);
+  const Y = (v: number) => H - pad.b - (v / yMax) * (H - pad.t - pad.b);
+  const h = hover === null ? null : points[hover];
+  return (
+    <div className="relative" ref={box}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${points.length} points: ${yLabel} against ${xLabel}`}>
+        {[0, 0.5, 1].map((f) => (
+          <g key={f}>
+            <line x1={pad.l} x2={W - pad.r} y1={Y(yMax * f)} y2={Y(yMax * f)} stroke={GRID} strokeDasharray={f ? "3 4" : undefined} />
+            <text x={pad.l - 6} y={Y(yMax * f) + 3} textAnchor="end" fontSize="10" fill="var(--text-3)">
+              {yFormat(yMax * f)}
+            </text>
+          </g>
+        ))}
+        {[0, 0.5, 1].map((f) => (
+          <text key={f} x={X(xMax * f)} y={H - pad.b + 14} textAnchor={f === 1 ? "end" : f ? "middle" : "start"} fontSize="10" fill="var(--text-3)">
+            {xFormat(xMax * f)}
+          </text>
+        ))}
+        <text x={W - pad.r} y={H - 2} textAnchor="end" fontSize="10" fill="var(--text-3)">
+          {xLabel} →
+        </text>
+        <text x={pad.l} y={pad.t - 1} fontSize="10" fill="var(--text-3)">
+          ↑ {yLabel}
+        </text>
+        {points.map((p, i) => (
+          <circle
+            key={i}
+            cx={X(p.x)}
+            cy={Y(p.y)}
+            r={hover === i ? 7 : 5}
+            fill={p.color ?? seriesColor(0)}
+            fillOpacity={hover === null || hover === i ? 0.85 : 0.3}
+            stroke="rgb(var(--card))"
+            strokeWidth="1.5"
+            className="scatter-dot"
+            style={{ animationDelay: `${Math.min(i * 25, 900)}ms`, transition: "r 200ms, fill-opacity 200ms" }}
+            onMouseEnter={() => setHover(i)}
+            onMouseLeave={() => setHover(null)}
+          >
+            <title>{p.label}</title>
+          </circle>
+        ))}
+      </svg>
+      {h && (
+        <div className="pointer-events-none absolute right-2 top-1 rounded-lg px-2 py-1 text-[11px]" style={{ background: "var(--wash-mute)", color: "var(--text-2)" }}>
+          {h.label} · {xFormat(h.x)} {xLabel} · {yFormat(h.y)} {yLabel}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A running total, where it is heading, and the line it must not cross.
+ *
+ * <p>For budgets and quotas the question is never "how much so far" but "will
+ * I run out, and when". The solid area is what happened; the dashed line
+ * carries today's pace to the end of the period; the limit is drawn across, and
+ * where the projection meets it is marked.
+ */
+export function ProjectionChart({
+  actual,
+  periodLength,
+  limit,
+  format = fmt,
+  unitLabel,
+  height = 170,
+}: {
+  /** Cumulative values, one per elapsed step (e.g. per day), starting at step 1. */
+  actual: number[];
+  periodLength: number;
+  limit?: number;
+  format?: (n: number) => string;
+  unitLabel: string;
+  height?: number;
+}) {
+  const id = useId();
+  const [box, W] = useWidth();
+  const H = height;
+  const pad = { l: 52, r: 14, t: 14, b: 24 };
+  const n = actual.length;
+  const last = n ? actual[n - 1] : 0;
+  const pace = n ? last / n : 0;
+  const projected = pace * periodLength;
+  const top = Math.max(limit ?? 0, projected, last, 1) * 1.08;
+  const X = (step: number) => pad.l + (step / periodLength) * (W - pad.l - pad.r);
+  const Y = (v: number) => H - pad.b - (v / top) * (H - pad.t - pad.b);
+  const pts = [[0, 0], ...actual.map((v, i) => [i + 1, v])];
+  const line = pts.map(([s, v], i) => `${i ? "L" : "M"}${X(s).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
+  const crossAt = limit && pace > 0 ? limit / pace : null;
+  return (
+    <div ref={box}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img"
+         aria-label={`${format(last)} ${unitLabel} so far; at this pace ${format(projected)} by the end of the period${limit ? ` against a limit of ${format(limit)}` : ""}`}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--series-1)" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="var(--series-1)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {[0, 0.5, 1].map((f) => (
+        <g key={f}>
+          <line x1={pad.l} x2={W - pad.r} y1={Y(top * f)} y2={Y(top * f)} stroke={GRID} strokeDasharray={f ? "3 4" : undefined} />
+          <text x={pad.l - 6} y={Y(top * f) + 3} textAnchor="end" fontSize="10" fill="var(--text-3)">{format(top * f)}</text>
+        </g>
+      ))}
+      {limit !== undefined && (
+        <g>
+          <line x1={pad.l} x2={W - pad.r} y1={Y(limit)} y2={Y(limit)} stroke="var(--state-critical-ink)" strokeWidth="1.5" strokeDasharray="6 4" />
+          <text x={W - pad.r} y={Y(limit) - 5} textAnchor="end" fontSize="10" fill="var(--state-critical-ink)">limit {format(limit)}</text>
+        </g>
+      )}
+      <path d={`${line} L${X(n)} ${Y(0)} L${X(0)} ${Y(0)} Z`} fill={`url(#${id})`} className="area-rise" />
+      <path d={line} fill="none" stroke="var(--series-1)" strokeWidth="2.5" strokeLinejoin="round" className="line-draw" pathLength={1} />
+      {n > 0 && (
+        <>
+          <line x1={X(n)} y1={Y(last)} x2={X(periodLength)} y2={Y(projected)} stroke="var(--series-1)" strokeWidth="2" strokeDasharray="5 5" opacity="0.7" className="fade-late" />
+          <circle cx={X(n)} cy={Y(last)} r="5" fill="var(--series-1)" stroke="rgb(var(--card))" strokeWidth="2" className="scatter-dot" style={{ animationDelay: "700ms" }} />
+          <text x={X(periodLength)} y={Y(projected) - 8} textAnchor="end" fontSize="10.5" fontWeight="600" fill="var(--text-2)" className="fade-late">
+            {format(projected)} projected
+          </text>
+        </>
+      )}
+      {crossAt && crossAt <= periodLength && (
+        <circle cx={X(crossAt)} cy={Y(limit!)} r="6" fill="none" stroke="var(--state-critical-ink)" strokeWidth="2" className="scatter-dot" style={{ animationDelay: "900ms" }} />
+      )}
+      <text x={X(0)} y={H - 6} fontSize="10" fill="var(--text-3)">start</text>
+      <text x={X(n)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--text-2)" fontWeight="600">today</text>
+      <text x={X(periodLength)} y={H - 6} textAnchor="end" fontSize="10" fill="var(--text-3)">end</text>
+    </svg>
     </div>
   );
 }

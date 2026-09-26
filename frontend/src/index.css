@@ -1091,6 +1091,26 @@ body::before {
     to { scale: 1; opacity: 0; }
   }
 
+  /* Chart arrivals. A line draws itself, the area under it rises into place,
+     dots drop in one by one, and what is projected fades in after what is
+     measured — measurement first, extrapolation second. */
+  .scatter-dot {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: demoPop var(--dur-elastic, 520ms) var(--ease-elastic, ease) both;
+  }
+  .line-draw {
+    stroke-dasharray: 1;
+    animation: lineDraw var(--dur-slow, 900ms) var(--ease-standard, ease) both;
+  }
+  @keyframes lineDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  .area-rise {
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: demoGrowY var(--dur-slow, 800ms) var(--ease-elastic, ease) both;
+  }
+  .fade-late { animation: fadeIn 500ms ease 650ms both; }
+
   /* An icon that turns — a chevron opening — rotates on a spring, so it
      arrives with the same small settle as the menu it belongs to. */
   .spin-to {

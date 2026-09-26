@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Note } from "../system/primitives";
 import { portal } from "../api";
-import { Chip } from "../system/hub";
+import { Chip, Pill } from "../system/hub";
+import { ProjectionChart } from "../system/charts";
 import { SkeletonRows, ErrorState, useToast, Spinner } from "../components/ui";
 
 /**
@@ -115,6 +116,8 @@ export default function Billing() {
         </div>
       </div>
 
+      <MonthToDate data={data} />
+
       {/* plans */}
       <div className="grid gap-4 sm:grid-cols-3">
         {plans.map((p) => {
@@ -189,6 +192,50 @@ export default function Billing() {
           ? ` Your current plan was applied by ${data.grantedBy}.`
           : ""}
       </p>
+    </div>
+  );
+}
+
+/**
+ * Month to date: the running total, where this pace lands by month end, and
+ * the plan's quota across it. The meter above says how full the bucket is; this
+ * says whether it will overflow, and roughly when.
+ */
+function MonthToDate({ data }: { data: any }) {
+  const start = new Date(data?.periodStart ?? Date.now());
+  const now = new Date();
+  const daysInMonth = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
+  const today = Math.min(daysInMonth, Math.max(1, Math.floor((now.getTime() - start.getTime()) / 86400000) + 1));
+  const byDay = new Map<number, number>();
+  (data?.daily ?? []).forEach((d: any) => byDay.set(new Date(d.day + "T00:00:00Z").getUTCDate(), d.tokens));
+  let run = 0;
+  const cumulative = Array.from({ length: today }, (_, i) => (run += byDay.get(i + 1) ?? 0));
+  // Without a daily breakdown, the total is all that is known: put it on today.
+  if (!byDay.size && data?.tokensUsed) cumulative[today - 1] = data.tokensUsed;
+  const used = cumulative[today - 1] ?? 0;
+  const quota = Number(data?.monthlyTokenQuota ?? 0);
+  const projected = (used / today) * daysInMonth;
+  const runsOutOn = quota > 0 && used > 0 ? Math.ceil(quota / (used / today)) : null;
+  const k = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(Math.round(n)));
+  const tight = quota > 0 && projected > quota;
+  return (
+    <div className="plane p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="text-sm font-semibold text-slate-100">Month to date</div>
+        <div className="flex flex-wrap gap-1.5">
+          <Pill tone="info">
+            day {today} of {daysInMonth}
+          </Pill>
+          <Pill tone={tight ? "bad" : "ok"}>
+            {tight
+              ? `at this pace the quota runs out around day ${runsOutOn}`
+              : `on pace for ${k(projected)} of ${k(quota)}`}
+          </Pill>
+        </div>
+      </div>
+      <div className="mt-3">
+        <ProjectionChart actual={cumulative} periodLength={daysInMonth} limit={quota || undefined} format={k} unitLabel="tokens" />
+      </div>
     </div>
   );
 }

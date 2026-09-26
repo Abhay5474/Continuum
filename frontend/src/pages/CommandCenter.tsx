@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ContinuumCore from "../system/ContinuumCore";
 import { useTelemetry } from "../system/useTelemetry";
+import { useRecentRequests } from "../system/traffic";
 import { Micro, StateDot, Trace, Meter, Note } from "../system/primitives";
 import { STATE } from "../system/tokens";
 import {
@@ -62,6 +63,7 @@ function trend(series: number[]): number | undefined {
  */
 export default function CommandCenter() {
   const t = useTelemetry();
+  const { series: recent } = useRecentRequests(60, 8000);
   const [selected, setSelected] = useState<string | null>(null);
 
   const sel = t.subsystems.find((s) => s.id === selected) ?? null;
@@ -162,7 +164,7 @@ export default function CommandCenter() {
               glyph="activity"
               tone="violet"
               value={t.headline.requests.toLocaleString()}
-              series={arrivals}
+              series={arrivals.some((a: number) => a > 0) ? arrivals : recent.arrivals}
               delta={reqTrend}
               deltaNote="vs the previous window"
             />
@@ -186,8 +188,10 @@ export default function CommandCenter() {
               glyph="coin"
               tone="amber"
               value={`$${t.headline.costUsd.toFixed(5)}`}
+              series={recent.cumulativeCost}
+              hint="Spend accumulating across your recent requests"
             />
-            <Stat label="Tokens" glyph="layers" tone="cyan" value={t.headline.tokens.toLocaleString()} />
+            <Stat label="Tokens" glyph="layers" tone="cyan" value={t.headline.tokens.toLocaleString()} series={recent.tokens} hint="Tokens per request, recent first to last" />
             <Stat label="Running" glyph="flow" tone="orange" value={t.headline.running} />
             <Stat label="Completed" glyph="check" tone="green" value={t.headline.completed} />
             <Stat

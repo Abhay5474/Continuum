@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { InfoTip, Switch } from "../system/primitives";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
-import { Chip } from "../system/hub";
+import { Chip, Spark, type Tone } from "../system/hub";
+import { useRecentRequests } from "../system/traffic";
 import { useToast, Spinner, CopyButton, CodeBlock } from "../components/ui";
-import DataView from "../system/DataView";
+import GatewayResult from "../components/GatewayResult";
 
 const PROVIDERS = ["gemini", "groq", "openai"];
 
@@ -101,6 +102,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
   const [keys, setKeys] = useState<any[]>([]);
   const [creds, setCreds] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
+  const { series: recent } = useRecentRequests(60, 8000);
   const [newKey, setNewKey] = useState("");
   const [verifyStatus, setVerifyStatus] = useState<Record<string, any>>({});
   const [secretInputs, setSecretInputs] = useState<Record<string, string>>({});
@@ -272,11 +274,11 @@ function Portal({ onLogout }: { onLogout: () => void }) {
 
       {/* analytics */}
       <div className="plane grid grid-cols-2 gap-x-8 gap-y-5 p-4 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat label="Requests" value={stats?.totalRequests ?? "—"} />
-        <Stat label="Success rate" value={stats ? `${Math.round(stats.successRate * 100)}%` : "—"} accent="text-emerald-300" />
+        <Stat label="Requests" value={stats?.totalRequests ?? "—"} series={recent.arrivals} tone="violet" />
+        <Stat label="Success rate" value={stats ? `${Math.round(stats.successRate * 100)}%` : "—"} accent="text-emerald-300" series={recent.health} tone="ok" />
         <Stat label="Failures prevented" value={stats?.failuresPrevented ?? "—"} accent="text-indigo-300" />
-        <Stat label="Tokens" value={stats?.totalTokens ?? "—"} />
-        <Stat label="Cost" value={stats ? `$${(stats.totalCostUsd ?? 0).toFixed(5)}` : "—"} />
+        <Stat label="Tokens" value={stats?.totalTokens ?? "—"} series={recent.tokens} tone="amber" />
+        <Stat label="Cost" value={stats ? `$${(stats.totalCostUsd ?? 0).toFixed(5)}` : "—"} series={recent.cumulativeCost} tone="orange" />
       </div>
 
       {/* credential vault */}
@@ -427,8 +429,8 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           {playBusy ? "Sending…" : "Send through gateway"}
         </button>
         {playOut ? (
-          <div className="mt-2 max-h-[420px] overflow-y-auto rounded border border-edge/60 bg-ink p-3 animate-fade-up">
-            <DataView value={playOut} />
+          <div className="mt-2 max-h-[640px] overflow-y-auto rounded border border-edge/60 bg-ink p-3 animate-fade-up">
+            <GatewayResult out={playOut} />
           </div>
         ) : (
           !playBusy && (
@@ -462,13 +464,18 @@ function OnboardStep({ n, title, done, children }: { n: number; title: string; d
  * eye learns to skip the band. The label carries the meaning and the value
  * only has to be findable.
  */
-function Stat({ label, value, accent }: { label: string; value: any; accent?: string }) {
+function Stat({ label, value, accent, series, tone }: { label: string; value: any; accent?: string; series?: number[]; tone?: Tone }) {
   return (
     <div className="min-w-0">
       <div className="micro truncate">{label}</div>
       <div className={`readout mt-1 text-[21px] leading-none tracking-tight ${accent ?? ""}`}>
         {value}
       </div>
+      {series && series.length > 1 && (
+        <div className="mt-2 opacity-90">
+          <Spark points={series} tone={tone} height={26} />
+        </div>
+      )}
     </div>
   );
 }
