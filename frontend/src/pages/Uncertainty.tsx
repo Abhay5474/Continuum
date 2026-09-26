@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Readout, Switch, Note } from "../system/primitives";
-import { ChartFrame, Histogram } from "../system/charts";
+import { ChartFrame, Histogram, seriesColor } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
 import { Segmented, Empty, Pill } from "../system/hub";
@@ -124,9 +124,14 @@ export default function Uncertainty() {
             }))}
           />
         </div>
-        <p className="mt-3 max-w-2xl text-xs leading-relaxed text-slate-500">
-          {MODES.find(([m]) => m === (status?.mode ?? "OFF"))?.[2]}
-        </p>
+        {/* What the position means, shown on ten requests: which of them get
+            sampled, and what each sampled one costs. */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+          <Coverage mode={status?.mode ?? "OFF"} samples={status?.samples ?? 3} />
+          <p className="min-w-0 max-w-md flex-1 text-xs leading-relaxed text-slate-500">
+            {MODES.find(([m]) => m === (status?.mode ?? "OFF"))?.[2]}
+          </p>
+        </div>
       </section>
 
       {/* ---- what it found ---- */}
@@ -171,9 +176,13 @@ export default function Uncertainty() {
               <Histogram
                 height={140}
                 xLabel="confidence"
+                endLabel={(status!.histogram[status!.histogram.length - 1]?.to ?? 1).toFixed(1)}
                 bins={status!.histogram.map((h) => ({
                   label: h.from.toFixed(1),
                   value: h.count,
+                  // Flagged bands in amber, so the share of traffic that comes
+                  // back marked "unsure" is a colour, not a sum.
+                  color: h.to <= status!.lowConfidence + 1e-9 ? "var(--state-warning-ink)" : "var(--state-healthy-ink)",
                   hint: `${h.count} answer${h.count === 1 ? "" : "s"} at confidence ${h.from.toFixed(1)}–${h.to.toFixed(1)}`,
                 }))}
               />
@@ -365,9 +374,11 @@ function Measurement({
         <ConfidenceDial value={row.confidence} low={low} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm text-slate-300">{row.prompt ?? "—"}</div>
-          <div className="mt-0.5 text-xs text-slate-500">
-            {row.samples} samples · {row.clusters} distinct meaning{row.clusters === 1 ? "" : "s"} ·{" "}
-            {row.model} · {dateTimeOf(row.createdAt)}
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <VoteStrip breakdown={breakdown} samples={row.samples} />
+            <span>
+              {row.clusters === 1 ? "all agree" : `${row.clusters} different answers`} · {row.model} · {dateTimeOf(row.createdAt)}
+            </span>
           </div>
         </div>
         {low && (
@@ -385,17 +396,23 @@ function Measurement({
           ) : (
             <div className="space-y-2">
               {breakdown.map((c, i) => (
-                <div key={i} className="flex min-w-0 gap-3">
-                  <div className="flex w-16 shrink-0 flex-col items-end">
-                    <span className="readout text-xs text-slate-300">
-                      {c.size}/{row.samples}
+                <div key={i} className="flex min-w-0 items-start gap-3">
+                  {/* One dot per sample: filled for the ones that gave this answer. */}
+                  <div className="flex shrink-0 flex-col items-start gap-1 pt-0.5" style={{ width: Math.max(64, row.samples * 11) }}>
+                    <span className="flex gap-[3px]" role="img" aria-label={`${c.size} of ${row.samples} samples`}>
+                      {Array.from({ length: row.samples }, (_, k) => (
+                        <span
+                          key={k}
+                          className="h-2 w-2 rounded-full"
+                          style={
+                            k < c.size
+                              ? { background: seriesColor(i) }
+                              : { boxShadow: "inset 0 0 0 1.2px rgb(var(--card-edge))" }
+                          }
+                        />
+                      ))}
                     </span>
-                    <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-edge/60">
-                      <div
-                        className={i === 0 ? "h-full bg-aurora/70" : "h-full bg-slate-500/60"}
-                        style={{ width: `${(c.share ?? 0) * 100}%` }}
-                      />
-                    </div>
+                    <span className="readout text-[10.5px] text-slate-500">{c.size} of {row.samples}</span>
                   </div>
                   <p className="min-w-0 flex-1 text-xs leading-relaxed text-slate-400 max-w-2xl">
                     {c.representative}
@@ -420,6 +437,78 @@ function Measurement({
   );
 }
 
+/**
+ * Every sample of one measurement, in a row, coloured by the answer it gave.
+ *
+ * <p>Agreement is the whole idea of the feature, and it is a picture: five of
+ * one colour is a settled answer, three and two is a split, five colours is a
+ * guess. Read before the number beside it.
+ */
+function VoteStrip({ breakdown, samples }: { breakdown: any[]; samples: number }) {
+  const cells: number[] = [];
+  breakdown.forEach((c, i) => {
+    for (let k = 0; k < (c.size ?? 0); k++) cells.push(i);
+  });
+  while (cells.length < samples) cells.push(-1);
+  return (
+    <span
+      className="inline-flex gap-[2px]"
+      role="img"
+      aria-label={breakdown.map((c) => c.size).join(" / ") + ` of ${samples} samples agreed`}
+    >
+      {cells.slice(0, Math.max(samples, cells.length)).map((ci, k) => (
+        <span
+          key={k}
+          className="h-3 w-[7px] rounded-[2px]"
+          style={ci < 0 ? { boxShadow: "inset 0 0 0 1px rgb(var(--card-edge))" } : { background: seriesColor(ci) }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Ten requests, and which of them a mode samples.
+ *
+ * <p>The four modes differ in exactly one thing — how much traffic pays the
+ * multiplier — so that is what is drawn: filled squares are sampled, each one
+ * costing the sample count in tokens.
+ */
+function Coverage({ mode, samples }: { mode: Mode; samples: number }) {
+  // Illustrative positions, the same every render: a mode's shape, not data.
+  const picked: Record<Mode, number[]> = {
+    OFF: [],
+    ON_DEMAND: [2, 7],
+    ADAPTIVE: [1, 4, 8],
+    ALWAYS: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  };
+  const on = new Set(picked[mode]);
+  const ink = mode === "ADAPTIVE" ? "var(--state-warning-ink)" : "var(--state-active-ink)";
+  return (
+    <div className="flex items-center gap-3" role="img"
+         aria-label={`${on.size} of every 10 requests sampled, each at ${samples} times the tokens`}>
+      <span className="flex gap-1">
+        {Array.from({ length: 10 }, (_, i) => (
+          <span
+            key={i}
+            className="grid h-4 w-4 place-items-center rounded-[4px] text-[8px] font-bold"
+            style={
+              on.has(i)
+                ? { background: ink, color: "rgb(255 255 255)" }
+                : { boxShadow: "inset 0 0 0 1px rgb(var(--card-edge))" }
+            }
+          >
+            {on.has(i) && mode === "ON_DEMAND" ? "✓" : ""}
+          </span>
+        ))}
+      </span>
+      <span className="readout whitespace-nowrap text-[11px] text-slate-400">
+        {on.size}/10 sampled{on.size > 0 ? ` · ×${samples} tokens each` : ""}
+      </span>
+    </div>
+  );
+}
+
 /** A small radial gauge — confidence reads faster as an arc than as a number. */
 function ConfidenceDial({ value, low }: { value: number; low: boolean }) {
   const r = 13;
@@ -438,7 +527,7 @@ function ConfidenceDial({ value, low }: { value: number; low: boolean }) {
           strokeWidth="3"
           strokeLinecap="round"
           strokeDasharray={`${filled} ${c}`}
-          className={low ? "text-amber-400" : "text-aurora"}
+          style={{ color: low ? "var(--state-warning-ink)" : "var(--state-healthy-ink)" }}
         />
       </svg>
       <span className="readout absolute inset-0 flex items-center justify-center text-[10px] text-slate-300">

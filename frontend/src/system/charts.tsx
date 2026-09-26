@@ -494,10 +494,14 @@ export function Histogram({
   bins,
   height = 120,
   xLabel,
+  endLabel,
 }: {
-  bins: { label: string; value: number; hint?: string }[];
+  /** {@code color} overrides the magnitude ramp — for bins whose position has a meaning (below a threshold, say). */
+  bins: { label: string; value: number; hint?: string; color?: string }[];
   height?: number;
   xLabel?: string;
+  /** The upper edge of the last bin; the labels are lower edges, so the axis would otherwise stop one bin short. */
+  endLabel?: string;
 }) {
   const top = Math.max(1, ...bins.map((b) => b.value));
   const total = bins.reduce((n, b) => n + b.value, 0);
@@ -512,7 +516,10 @@ export function Histogram({
 
   return (
     <div>
-      <div className="flex items-end gap-[3px]" style={{ height }}>
+      {/* Columns stretch to the chart's height: a bar's percentage height needs
+          a definite column to be a percentage of. With the columns sized to
+          their content, every bar resolved to zero and the chart drew empty. */}
+      <div className="flex items-stretch gap-[3px]" style={{ height }}>
         {bins.map((b, i) => {
           const frac = b.value / top;
           return (
@@ -527,7 +534,7 @@ export function Histogram({
                 className="w-full transition-[height] duration-700 ease-out"
                 style={{
                   height: `${Math.max(frac * 100, b.value > 0 ? 3 : 0)}%`,
-                  background: seqColor(frac),
+                  background: b.color ?? seqColor(frac),
                   borderRadius: "3px 3px 0 0",
                   maxWidth: 24,
                   marginInline: "auto",
@@ -546,7 +553,7 @@ export function Histogram({
       <div className="flex justify-between text-[10px] text-slate-600">
         <span>{bins[0]?.label}</span>
         {xLabel && <span className="text-slate-700">{xLabel}</span>}
-        <span>{bins[bins.length - 1]?.label}</span>
+        <span>{endLabel ?? bins[bins.length - 1]?.label}</span>
       </div>
     </div>
   );

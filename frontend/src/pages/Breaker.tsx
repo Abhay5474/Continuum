@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { Empty } from "../system/hub";
+import { Card, Empty, Pill, type Tone } from "../system/hub";
+import { Gauge } from "../system/viz";
 import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { dateTimeOf } from "../system/time";
@@ -239,9 +240,7 @@ export default function BreakerPage() {
           <div className="divide-y divide-edge/40">
             {events.map((e) => (
               <div key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 text-xs">
-                <span className={`shrink-0 font-medium uppercase tracking-wider ${kindColour(e.kind)}`}>
-                  {e.kind}
-                </span>
+                <Pill tone={kindTone(e.kind)} dot>{String(e.kind).toLowerCase().replace("_", " ")}</Pill>
                 <span className="shrink-0 text-slate-300">
                   {e.provider}/{e.model}
                 </span>
@@ -256,12 +255,45 @@ export default function BreakerPage() {
   );
 }
 
-function kindColour(kind: string) {
-  return kind === "TRIPPED" || kind === "REOPENED"
-    ? "text-rose-400"
-    : kind === "RECOVERED"
-      ? "text-emerald-400"
-      : "text-amber-400";
+function kindTone(kind: string): Tone {
+  return kind === "TRIPPED" || kind === "REOPENED" ? "bad" : kind === "RECOVERED" ? "ok" : "warn";
+}
+
+const STATES: { key: Breaker["state"]; label: string; sub: string; tone: Tone }[] = [
+  { key: "CLOSED", label: "Serving", sub: "traffic flows", tone: "ok" },
+  { key: "HALF_OPEN", label: "Testing", sub: "one probe let through", tone: "warn" },
+  { key: "OPEN", label: "Diverted", sub: "traffic sent elsewhere", tone: "bad" },
+];
+
+/**
+ * The breaker's three positions, with the one it is in lit.
+ *
+ * <p>A breaker is a switch with three positions, so it is drawn as one: the
+ * reader sees not only where it is but where it could go, which a single
+ * coloured dot beside the model name never said.
+ */
+function StateTrack({ state, learning }: { state: Breaker["state"]; learning: boolean }) {
+  return (
+    <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-500/10 p-1" role="img"
+         aria-label={learning ? "Learning its baseline; cannot trip yet" : `State: ${STATES.find((x) => x.key === state)?.label}`}>
+      {STATES.map((x) => {
+        const on = !learning && x.key === state;
+        return (
+          <div
+            key={x.key}
+            className={`min-w-0 rounded-lg px-2.5 py-1.5 transition-colors duration-300 ${on ? "glass-pill" : ""}`}
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: on ? `var(--state-${x.tone === "ok" ? "healthy" : x.tone === "warn" ? "warning" : "critical"}-ink)` : "rgb(var(--card-edge))" }} />
+              <span className={`truncate text-[12px] font-medium ${on ? "text-slate-100" : "text-slate-500"}`}>{x.label}</span>
+            </div>
+            <div className={`truncate pl-3.5 text-[10.5px] ${on ? "text-slate-400" : "text-slate-600"}`}>{x.sub}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
@@ -276,7 +308,7 @@ function BreakerCard({ b, busy, onReset }: { b: Breaker; busy: boolean; onReset:
   const probing = b.state === "HALF_OPEN";
 
   return (
-    <div>
+    <Card>
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -317,27 +349,51 @@ function BreakerCard({ b, busy, onReset }: { b: Breaker; busy: boolean; onReset:
         </button>
       </div>
 
-      {/* quality trace against the baseline */}
-      <div className="mt-3">
-        <QualityTrace trace={b.trace} baseline={b.baseline} />
+      <div className="mt-4">
+        <StateTrack state={b.state} learning={!b.warm} />
       </div>
 
-      {/* accumulated shortfall — this moves before the trip does */}
-      <div className="mt-3 flex items-center gap-3">
-        <span className="micro w-20 shrink-0">Pressure</span>
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-edge/60">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              b.pressure >= 1 ? "bg-rose-500" : b.pressure > 0.5 ? "bg-amber-500/80" : "bg-aurora/60"
-            }`}
-            style={{ width: `${Math.max(b.pressure > 0 ? 2 : 0, b.pressure * 100)}%` }}
+      <div className="mt-4 grid items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+        {/* Before it is warm there is nothing to trip on — so the dial shows
+            how far it has got learning what normal is. After, the dial is
+            pressure: accumulated shortfall against the trip point, which moves
+            before the trip does. */}
+        {!b.warm ? (
+          <Gauge
+            value={b.observations}
+            max={Math.max(1, b.warmup)}
+            display={`${b.observations}/${b.warmup}`}
+            label="Learning normal"
+            sub="answers observed"
+            tone="info"
+            size={140}
           />
+        ) : (
+          <Gauge
+            value={Math.round(Math.min(1, b.pressure) * 100)}
+            max={100}
+            display={`${Math.round(b.pressure * 100)}%`}
+            label="Pressure to trip"
+            sub={`${b.accumulated.toFixed(2)} shortfall accrued`}
+            warnAt={0.5}
+            badAt={0.9}
+            size={140}
+          />
+        )}
+        {/* quality trace against the baseline */}
+        <div className="min-w-0">
+          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <span className="micro">Answer quality · recent</span>
+            {b.baseline != null && (
+              <span className="flex items-center gap-1.5 text-[10.5px] text-slate-500">
+                <span className="inline-block h-0 w-4 border-t border-dashed border-slate-500" />normal {b.baseline.toFixed(2)}
+              </span>
+            )}
+          </div>
+          <QualityTrace trace={b.trace} baseline={b.baseline} />
         </div>
-        <span className="readout w-24 shrink-0 text-right text-xs text-slate-500">
-          {b.accumulated.toFixed(2)} accrued
-        </span>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -348,34 +404,48 @@ function BreakerCard({ b, busy, onReset }: { b: Breaker; busy: boolean; onReset:
  * what matters is whether it has moved below where it used to sit.
  */
 function QualityTrace({ trace, baseline }: { trace: number[]; baseline: number | null }) {
+  const clip = `below-${useId().replace(/:/g, "")}`;
   const w = 100;
-  const h = 28;
+  const h = 40;
   if (!trace || trace.length < 2) {
     return (
-      <div className="flex h-7 items-center rounded border border-dashed border-edge/60 px-2 text-[10px] text-slate-600">
+      <div className="flex h-16 items-center justify-center rounded-lg border border-dashed border-edge/60 px-2 text-[11px] text-slate-500">
         not enough history to draw
       </div>
     );
   }
   const step = w / (trace.length - 1);
-  const y = (v: number) => h - Math.max(0, Math.min(1, v)) * h;
-  const d = trace.map((v, i) => `${i === 0 ? "M" : "L"}${(i * step).toFixed(2)},${y(v).toFixed(2)}`).join(" ");
+  // Fitted to the data, floor to 1: quality lives near the top of 0–1, and on
+  // a full-range axis a real dip was a pixel. A gap under the lowest reading
+  // keeps a flat trace from reading as a floor.
+  const lo = Math.max(0, Math.min(...trace, baseline ?? 1) - 0.15);
+  const y = (v: number) => h - ((Math.max(lo, Math.min(1, v)) - lo) / (1 - lo || 1)) * h;
+  const pts = trace.map((v, i) => [i * step, y(v)] as const);
+  const d = pts.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px.toFixed(2)},${py.toFixed(2)}`).join(" ");
+  const by = baseline != null ? y(baseline) : null;
+  // The area between the trace and the baseline, clipped to below it: the
+  // shortfall the breaker is accumulating, as a shape.
+  const area = by != null ? `${d} L${w},${by} L0,${by} Z` : null;
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-7 w-full" aria-hidden="true">
-      {baseline != null && (
-        <line
-          x1="0"
-          x2={w}
-          y1={y(baseline)}
-          y2={y(baseline)}
-          stroke="currentColor"
-          strokeWidth="0.5"
-          strokeDasharray="2 2"
-          className="text-slate-500"
-        />
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-16 w-full" role="img"
+         aria-label={`Quality trace of ${trace.length} answers${baseline != null ? ` against a baseline of ${baseline.toFixed(2)}` : ""}`}>
+      <defs>
+        {by != null && (
+          <clipPath id={clip}>
+            <rect x="0" y={by} width={w} height={h - by} />
+          </clipPath>
+        )}
+      </defs>
+      {area && by != null && (
+        <path d={area} fill="var(--state-critical-ink)" opacity="0.18" clipPath={`url(#${clip})`} />
       )}
-      <path d={d} fill="none" stroke="currentColor" strokeWidth="1" className="text-aurora" vectorEffect="non-scaling-stroke" />
+      {by != null && (
+        <line x1="0" x2={w} y1={by} y2={by} stroke="rgb(100 116 139)" strokeWidth="1" strokeDasharray="3 3"
+              vectorEffect="non-scaling-stroke" />
+      )}
+      <path d={d} fill="none" stroke="var(--state-active-ink)" strokeWidth="1.6" vectorEffect="non-scaling-stroke"
+            strokeLinejoin="round" />
     </svg>
   );
 }

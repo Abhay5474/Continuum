@@ -24,6 +24,7 @@ export function Gauge({
   badAt = 0.9,
   invert = false,
   size = 150,
+  tone: forced,
 }: {
   value: number;
   max: number;
@@ -36,10 +37,12 @@ export function Gauge({
   /** For quantities where full is good (tokens left): the zones read from the other end. */
   invert?: boolean;
   size?: number;
+  /** A fixed colour, for progress rather than risk (a warm-up filling, say). */
+  tone?: Tone;
 }) {
   const f = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
   const risk = invert ? 1 - f : f;
-  const tone: Tone = max <= 0 ? "mute" : risk >= badAt ? "bad" : risk >= warnAt ? "warn" : "ok";
+  const tone: Tone = forced ?? (max <= 0 ? "mute" : risk >= badAt ? "bad" : risk >= warnAt ? "warn" : "ok");
   const r = 52;
   const len = Math.PI * r;
   return (
