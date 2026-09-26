@@ -42,6 +42,20 @@ public class AccountService {
     private final PasswordHasher passwordHasher;
     private final Mailer mailer;
 
+    /** Optional so unit tests can build the service by hand. */
+    private AccountErasure erasure;
+    private OperatorService operators;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setErasure(AccountErasure erasure) {
+        this.erasure = erasure;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOperators(@org.springframework.context.annotation.Lazy OperatorService operators) {
+        this.operators = operators;
+    }
+
     public AccountService(DeveloperRepository developers, DeveloperAuthRepository auth,
                           DeveloperApiKeyRepository apiKeys, GodModeConfigRepository godModeConfigs,
                           TeamInviteRepository invites, AccountMembershipRepository memberships,
@@ -105,6 +119,13 @@ public class AccountService {
         } catch (Exception e) {
             log.debug("api key cleanup: {}", e.getMessage());
         }
+        // Everything else the account owns, found from the schema — the request
+        // log, cache, memory, provenance, settings and the rest. See AccountErasure.
+        if (erasure != null) {
+            var removed = erasure.erase(developerId);
+            log.info("Erased {} rows across {} tables for developer {}",
+                    removed.values().stream().mapToInt(Integer::intValue).sum(), removed.size(), developerId);
+        }
         // Invites.
         safe(() -> invites.deleteByDeveloperId(developerId));
         // FK children of `developers` must go before the developer row.
@@ -117,6 +138,11 @@ public class AccountService {
         // Finally the developer identity.
         safe(() -> developers.deleteById(developerId));
         log.info("Account and data deleted for developer {}", developerId);
+        // Deleting the last operator must not leave the deployment with no way
+        // back in until a restart: a fresh setup code goes to the log now.
+        if (operators != null && !operators.anyOperator()) {
+            operators.newSetupCode();
+        }
     }
 
     // ---- team invites ----
