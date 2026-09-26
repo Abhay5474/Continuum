@@ -15,3 +15,4 @@ export * from "./hooks";
 export { installSurfaceLight } from "./surface";
 export { useLiquidIndicator } from "./indicator";
 export { installTooltips } from "./tooltip";
+export { installRipple } from "./ripple";

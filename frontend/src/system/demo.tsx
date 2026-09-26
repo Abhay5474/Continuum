@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Micro } from "./primitives";
 
@@ -45,6 +45,26 @@ export const DEMO_PATHS = new Set([
 
 export const hasDemo = (path: string) => DEMO_PATHS.has(path.replace(/\/+$/, "") || "/");
 
+/**
+ * One-shot continuity: the dialog grows out of the control that opened it.
+ * Its transform-origin is put on that control's centre before the first
+ * paint, and the .grow-from animation scales it up from there.
+ */
+export function useGrowFrom(ref: RefObject<HTMLElement>, from: Element | null) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const o = from?.getBoundingClientRect();
+    if (!o || (o.width === 0 && o.height === 0)) {
+      el.classList.add("pop-in");
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    el.style.transformOrigin = `${o.left + o.width / 2 - r.left}px ${o.top + o.height / 2 - r.top}px`;
+    el.classList.add("grow-from");
+  }, []);
+}
+
 const reducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -81,6 +101,7 @@ export function DemoButton({ path }: { path: string }) {
       {spec && (
         <DemoSheet
           spec={spec}
+          from={opener.current}
           onClose={() => {
             setSpec(null);
             opener.current?.focus();
@@ -93,7 +114,7 @@ export function DemoButton({ path }: { path: string }) {
 
 type Phase = "input" | "running" | "done" | "error";
 
-export function DemoSheet({ spec, onClose }: { spec: DemoSpec; onClose: () => void }) {
+export function DemoSheet({ spec, onClose, from = null }: { spec: DemoSpec; onClose: () => void; from?: Element | null }) {
   const [sample, setSample] = useState(0);
   const [phase, setPhase] = useState<Phase>("input");
   const [step, setStep] = useState(-1);
@@ -101,7 +122,9 @@ export function DemoSheet({ spec, onClose }: { spec: DemoSpec; onClose: () => vo
   const [error, setError] = useState<string | null>(null);
   const [runId, setRunId] = useState(0);
   const close = useRef<HTMLButtonElement>(null);
+  const sheet = useRef<HTMLElement>(null);
   const input = spec.samples[sample].input;
+  useGrowFrom(sheet, from);
 
   useEffect(() => {
     close.current?.focus();
@@ -166,11 +189,12 @@ export function DemoSheet({ spec, onClose }: { spec: DemoSpec; onClose: () => vo
         style={{ background: "rgb(var(--scrim) / 0.55)", backdropFilter: "blur(var(--blur-modal, 10px))" }}
       />
       <section
+        ref={sheet}
         role="dialog"
         aria-modal="true"
         aria-labelledby="demo-title"
         data-glass
-        className="glass-strong pop-in relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden"
+        className="glass-strong relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden"
         style={{ borderRadius: "var(--r-glass, 22px)" }}
       >
         <header className="flex items-start gap-3 border-b border-edge/70 px-5 py-4">

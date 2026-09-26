@@ -9,13 +9,14 @@ import SignIn from "./pages/SignIn";
 import { ToastProvider } from "./components/ui";
 import { NotFound, RouteError } from "./system/RouteError";
 import { OperatorProvider } from "./system/OperatorAccess";
-import { installMotionTokens, installSurfaceLight, installTooltips } from "./system/physics";
+import { installMotionTokens, installRipple, installSurfaceLight, installTooltips } from "./system/physics";
 
 // Before the first render, so the first frame already speaks the motion
 // language: every --ease-* and --dur-* the stylesheet reads comes from here.
 installMotionTokens();
 installSurfaceLight();
 installTooltips();
+installRipple();
 
 /**
  * A route whose page is downloaded when first visited. The public landing page

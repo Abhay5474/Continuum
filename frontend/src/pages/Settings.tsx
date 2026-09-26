@@ -420,8 +420,8 @@ function Operators() {
               >
                 <span
                   aria-hidden
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white"
-                  style={{ background: "var(--accent-strong)" }}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold"
+                  style={{ background: "var(--accent-wash)", color: "var(--accent-ink)" }}
                 >
                   {(o.name || o.email || "?").slice(0, 1).toUpperCase()}
                 </span>

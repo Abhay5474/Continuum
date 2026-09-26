@@ -967,7 +967,8 @@ body::before {
     animation: popIn var(--dur-elastic, 520ms) var(--ease-elastic, ease) both;
   }
   @keyframes popIn {
-    from { opacity: 0; scale: 0.9; translate: 0 10px; }
+    from { opacity: 0; scale: 0.9; translate: 0 10px; filter: blur(10px); }
+    60% { filter: blur(0); }
     40% { opacity: 1; }
     to { opacity: 1; scale: 1; translate: 0 0; }
   }
@@ -977,7 +978,7 @@ body::before {
     animation: riseIn var(--dur-elastic, 520ms) var(--ease-elastic, ease) both;
   }
   @keyframes riseIn {
-    from { opacity: 0; translate: 0 8px; scale: 0.97; }
+    from { opacity: 0; translate: 0 8px; scale: 0.97; filter: blur(4px); }
     to { opacity: 1; translate: 0 0; scale: 1; }
   }
 
@@ -1042,7 +1043,7 @@ body::before {
   .demo-stage[data-state="done"] .demo-bead { background: var(--state-healthy-ink); border-color: transparent; }
   .demo-stage[data-state="fail"] .demo-bead { background: var(--state-critical-ink); border-color: transparent; }
   /* Values arriving: bars grow from zero, marks pop, sliders travel. */
-  .demo-grow {
+  .demo-grow, .grow-x {
     transform-origin: left center;
     animation: demoGrow var(--dur-elastic, 600ms) var(--ease-elastic, ease) both;
   }
@@ -1056,6 +1057,39 @@ body::before {
   @keyframes demoPop { from { opacity: 0; scale: 0.4; } }
   .demo-slide { animation: demoSlide var(--dur-slow, 700ms) var(--ease-standard, ease) both; }
   @keyframes demoSlide { from { left: var(--from, 0%); opacity: 0; } }
+
+  /* One-shot continuity (OriginOS): a dialog grows out of the control that
+     opened it — its transform-origin is set to that control's centre — and
+     sharpens out of a blur as it lands, so the eye never loses its place. */
+  .grow-from {
+    animation: growFrom var(--dur-elastic, 560ms) var(--ease-elastic, ease) both;
+  }
+  @keyframes growFrom {
+    from { opacity: 0; scale: 0.18; filter: blur(14px); border-radius: 999px; }
+    35% { opacity: 1; }
+    70% { filter: blur(0); }
+  }
+
+  /* A gauge arriving sweeps up from zero to its value, once. */
+  /* backwards, not both: once it has swept, the arc is released to its
+     transition, so a later change of value still glides rather than jumps. */
+  .gauge-arc { animation: gaugeSweep var(--dur-slow, 800ms) var(--ease-elastic, ease) backwards; }
+  @keyframes gaugeSweep { from { stroke-dasharray: 0 var(--len); } }
+
+  /* Touch ripple (see physics/ripple.ts): a drop of light spreading from the
+     point pressed, the water-drop feedback of OriginOS. */
+  .ripple {
+    position: absolute;
+    border-radius: 999px;
+    pointer-events: none;
+    background: radial-gradient(circle, rgb(255 255 255 / 0.45) 0%, rgb(255 255 255 / 0.18) 45%, transparent 70%);
+    translate: -50% -50%;
+    animation: ripple 620ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  }
+  @keyframes ripple {
+    from { scale: 0; opacity: 1; }
+    to { scale: 1; opacity: 0; }
+  }
 
   /* An icon that turns — a chevron opening — rotates on a spring, so it
      arrives with the same small settle as the menu it belongs to. */

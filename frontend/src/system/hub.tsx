@@ -2149,8 +2149,9 @@ export function BarList({
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-edge">
             <div
-              className="h-full rounded-full transition-[width] duration-500 ease-out"
+              className="grow-x h-full rounded-full transition-[width] duration-500 ease-out"
               style={{
+                animationDelay: `${i * 60}ms`,
                 width: `${Math.max(2, Math.min(1, it.fraction) * 100)}%`,
                 background: toneInk(it.tone ?? hueAt(i)),
               }}

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { portal, hasOperator } from "../api";
 import { useRef } from "react";
+import { useGrowFrom } from "./demo";
 import { Micro } from "./primitives";
 
 /**
@@ -89,6 +90,10 @@ function ElevateDialog({ onClose, onDone }: { onClose: () => void; onDone: () =>
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  // Whatever had focus when the dialog was asked for is what opened it.
+  const [opener] = useState(() => document.activeElement);
+  useGrowFrom(form, opener && opener !== document.body ? opener : null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -176,8 +181,9 @@ function ElevateDialog({ onClose, onDone }: { onClose: () => void; onDone: () =>
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <form
+        ref={form}
         onSubmit={submit}
-        className="plane pop-in w-full max-w-md p-5"
+        className="plane w-full max-w-md p-5"
         role="dialog"
         aria-modal="true"
         aria-label="Operator access"

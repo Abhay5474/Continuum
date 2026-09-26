@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { toneInk, type Tone } from "./hub";
 
 /* ------------------------------------------------------------------ *
@@ -57,7 +57,8 @@ export function Gauge({
           strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={`${len * f} ${len}`}
-          style={{ transition: "stroke-dasharray var(--dur-standard, 400ms) var(--ease-standard, ease)" }}
+          className="gauge-arc"
+          style={{ transition: "stroke-dasharray var(--dur-standard, 400ms) var(--ease-standard, ease)", "--len": `${len}` } as CSSProperties}
         />}
         {/* the warning mark on the track */}
         {max > 0 && !forced && (
