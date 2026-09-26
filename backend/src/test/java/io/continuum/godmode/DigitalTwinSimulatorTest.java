@@ -55,6 +55,8 @@ class DigitalTwinSimulatorTest {
     private void givenBundle(long id, PolicyBundle bundle) {
         PolicyBundleEntity entity = mock(PolicyBundleEntity.class);
         when(bundles.entity(eq(id))).thenReturn(Optional.of(entity));
+        // Owned by the developer the tests simulate as; anyone else is refused.
+        when(bundles.owned(eq("dev-1"), eq(id))).thenReturn(Optional.of(entity));
         when(bundles.parse(entity)).thenReturn(bundle);
     }
 
@@ -141,5 +143,12 @@ class DigitalTwinSimulatorTest {
         assertTrue(cand.successes() > base.successes(),
                 "a strict verification threshold must detect more V2-injected hallucinations ("
                         + cand.successes() + " vs " + base.successes() + ")");
+    }
+
+    @Test
+    void anotherAccountsBundleCannotBeSimulated() {
+        givenBundle(2L, PolicyBundle.defaultFor(io.continuum.autopilot.model.AutopilotMode.BALANCED, List.of("reliable"), 0.02, 5000));
+        assertThrows(io.continuum.portal.RequestScope.NotFoundException.class,
+                () -> twin.simulate("dev-2", 2L, null, DigitalTwinSimulator.Scenario.HISTORICAL_REPLAY));
     }
 }
