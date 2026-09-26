@@ -169,8 +169,7 @@ public class SpecialistService {
     @Transactional(readOnly = true)
     public SpecialistEntity require(String developerId, Long id) {
         return repo.findByIdAndDeveloperId(id, developerId)
-                .orElseThrow(() -> new SpecialistConnectionService.InvalidConnectionException(
-                        "No such specialist."));
+                .orElseThrow(() -> new io.continuum.portal.RequestScope.NotFoundException("No such specialist."));
     }
 
     @Transactional

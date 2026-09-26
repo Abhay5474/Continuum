@@ -127,7 +127,7 @@ public class SpecialistConnectionService {
     @Transactional(readOnly = true)
     public SpecialistConnectionEntity require(String developerId, Long id) {
         return repo.findByIdAndDeveloperId(id, developerId)
-                .orElseThrow(() -> new InvalidConnectionException("No such connection."));
+                .orElseThrow(() -> new io.continuum.portal.RequestScope.NotFoundException("No such connection."));
     }
 
     /**

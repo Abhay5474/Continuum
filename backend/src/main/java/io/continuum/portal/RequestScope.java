@@ -65,6 +65,10 @@ public final class RequestScope {
         public NotFoundException() {
             super("Not found in this account.");
         }
+
+        public NotFoundException(String message) {
+            super(message);
+        }
     }
 
     /** Thrown when a caller reaches for another tenant's record. */

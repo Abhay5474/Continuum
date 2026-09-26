@@ -230,6 +230,13 @@ public class AutopilotService {
 
     @Transactional
     public AutopilotCanaryRunEntity startCanary(String developerId, Long candidateBundleId) {
+        // The bundle must be this account's. Nothing checked before: any tenant
+        // could start a canary on another's policy bundle — running that policy
+        // on its own traffic, flipping the owner's bundle to CANARY, and, when
+        // the pre-flight vetoed it, archiving the owner's bundle.
+        if (bundles.owned(developerId, candidateBundleId).isEmpty()) {
+            throw new io.continuum.portal.RequestScope.NotFoundException();
+        }
         // V5 God Mode digital-twin pre-flight (additive, gated): a candidate that
         // confidently regresses in offline replay never receives live traffic.
         // No preflight bean / God Mode off / non-veto ⇒ exact V4 path below.
@@ -405,9 +412,11 @@ public class AutopilotService {
 
     private AutopilotRecommendationEntity ownedRec(String developerId, Long recId) {
         AutopilotRecommendationEntity rec = recommendations.findById(recId)
-                .orElseThrow(() -> new IllegalArgumentException("No such recommendation"));
+                .orElseThrow(() -> new io.continuum.portal.RequestScope.NotFoundException("No such recommendation."));
         if (!rec.getDeveloperId().equals(developerId)) {
-            throw new IllegalArgumentException("Recommendation does not belong to this developer");
+            // The same answer as a missing one: which ids exist in other
+            // accounts is not something to reveal.
+            throw new io.continuum.portal.RequestScope.NotFoundException("No such recommendation.");
         }
         return rec;
     }

@@ -102,7 +102,7 @@ public class PortalDeveloperController {
         // Ensure the key belongs to this developer before revoking.
         boolean owned = developers.keysFor(dev(req)).stream().anyMatch(k -> k.getId().equals(keyId));
         if (!owned) {
-            return Map.of("revoked", false, "error", "not_found");
+            throw new io.continuum.portal.RequestScope.NotFoundException("No such key.");
         }
         return Map.of("revoked", developers.revokeKey(keyId));
     }

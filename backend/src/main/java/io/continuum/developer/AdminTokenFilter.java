@@ -65,8 +65,12 @@ public class AdminTokenFilter extends OncePerRequestFilter {
         }
         if (adminToken.isBlank()) {
             // Fail closed. An unconfigured admin token must never mean "anyone".
-            log.warn("CONTINUUM_ADMIN_TOKEN not set — admin endpoint {} refused", request.getRequestURI());
-            deny(response, "Admin access is not configured on this deployment.");
+            // Not a warning: operators normally arrive with an operator session,
+            // and a token-less deployment is the expected setup — logging every
+            // refused request as a WARN buried real problems.
+            log.debug("Admin endpoint {} refused: no operator session, no admin token configured",
+                    request.getRequestURI());
+            deny(response, "Admin endpoints need an operator session (Operator access in the console).");
             return;
         }
         String presented = request.getHeader("X-Admin-Token");

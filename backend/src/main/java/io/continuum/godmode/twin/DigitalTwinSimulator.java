@@ -84,8 +84,8 @@ public class DigitalTwinSimulator {
     @Transactional
     public GodModeSimulationEntity simulate(String developerId, Long candidateBundleId,
                                             Long baselineBundleId, Scenario scenario) {
-        PolicyBundle candidate = bundleOf(candidateBundleId);
-        PolicyBundle baseline = bundleOf(baselineBundleId);
+        PolicyBundle candidate = bundleOf(developerId, candidateBundleId);
+        PolicyBundle baseline = bundleOf(developerId, baselineBundleId);
         List<GatewayRequestLogEntity> history = requests
                 .findByDeveloperIdOrderByCreatedAtDesc(developerId, PageRequest.of(0, MAX_HISTORY))
                 .getContent();
@@ -256,12 +256,12 @@ public class DigitalTwinSimulator {
         return order.isEmpty() ? List.of("mock") : order;
     }
 
-    private PolicyBundle bundleOf(Long id) {
+    /** The caller's own bundle; another tenant's policy is not something to replay. */
+    private PolicyBundle bundleOf(String developerId, Long id) {
         if (id != null) {
-            var e = bundles.entity(id).orElse(null);
-            if (e != null) {
-                return bundles.parse(e);
-            }
+            var e = bundles.owned(developerId, id)
+                    .orElseThrow(io.continuum.portal.RequestScope.NotFoundException::new);
+            return bundles.parse(e);
         }
         return PolicyBundle.defaultFor(io.continuum.autopilot.model.AutopilotMode.BALANCED,
                 List.of(), 0, 0);

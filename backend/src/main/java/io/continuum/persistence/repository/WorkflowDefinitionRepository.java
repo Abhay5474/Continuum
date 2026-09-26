@@ -14,5 +14,5 @@ public interface WorkflowDefinitionRepository extends JpaRepository<WorkflowDefi
 
     List<WorkflowDefinitionEntity> findByDeveloperIdOrderByNameAscVersionDesc(String developerId);
 
-    void deleteByDeveloperIdAndName(String developerId, String name);
+    long deleteByDeveloperIdAndName(String developerId, String name);
 }

@@ -82,7 +82,7 @@ public class PipelineService {
                    String userPrompt) {
         long start = System.nanoTime();
         PipelineEntity p = repo.findByDeveloperIdAndName(developerId, pipelineName)
-                .orElseThrow(() -> new SpecialistConnectionService.InvalidConnectionException(
+                .orElseThrow(() -> new io.continuum.portal.RequestScope.NotFoundException(
                         "No pipeline called '" + pipelineName + "'."));
         if (!p.isEnabled()) {
             throw new SpecialistConnectionService.InvalidConnectionException(
@@ -405,8 +405,7 @@ public class PipelineService {
     @Transactional(readOnly = true)
     public PipelineEntity require(String developerId, Long id) {
         return repo.findByIdAndDeveloperId(id, developerId)
-                .orElseThrow(() -> new SpecialistConnectionService.InvalidConnectionException(
-                        "No such pipeline."));
+                .orElseThrow(() -> new io.continuum.portal.RequestScope.NotFoundException("No such pipeline."));
     }
 
     @Transactional

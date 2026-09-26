@@ -48,6 +48,12 @@ public class PolicyBundleService {
         return bundleId == null ? Optional.empty() : repo.findById(bundleId);
     }
 
+    /** A bundle, only if it belongs to {@code developerId}. */
+    @Transactional(readOnly = true)
+    public Optional<PolicyBundleEntity> owned(String developerId, Long bundleId) {
+        return entity(bundleId).filter(b -> java.util.Objects.equals(b.getDeveloperId(), developerId));
+    }
+
     @Transactional(readOnly = true)
     public Optional<PolicyBundle> bundle(Long bundleId) {
         return entity(bundleId).map(e -> json.read(e.getBundleJson(), PolicyBundle.class));

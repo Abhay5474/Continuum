@@ -70,7 +70,11 @@ public class DefinitionService {
 
     @Transactional
     public void delete(String developerId, String name) {
-        repo.deleteByDeveloperIdAndName(developerId, name);
+        // "deleted: true" for a name that was never there told a caller the
+        // opposite of what happened; a missing definition is a 404 like any other.
+        if (repo.deleteByDeveloperIdAndName(developerId, name) == 0) {
+            throw new io.continuum.portal.RequestScope.NotFoundException("No such workflow definition: " + name);
+        }
     }
 
     /**
@@ -101,7 +105,7 @@ public class DefinitionService {
         return (version == null
                 ? repo.findFirstByDeveloperIdAndNameOrderByVersionDesc(developerId, name)
                 : repo.findByDeveloperIdAndNameAndVersion(developerId, name, version))
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new io.continuum.portal.RequestScope.NotFoundException(
                         "No such workflow definition: " + name + (version == null ? "" : " v" + version)));
     }
 

@@ -38,21 +38,28 @@ public class MemoryController {
 
     @PostMapping("/store")
     public Map<String, Object> store(@RequestBody StoreRequest req, HttpServletRequest http) {
-        MemoryTier tier = req.tier() == null ? MemoryTier.EPISODIC : MemoryTier.valueOf(req.tier());
-        var saved = memory.store(scoped(http, req.scope()), tier, req.content(),
-                req.salience() == null ? 0.5 : req.salience());
+        // Checked here rather than left to the database: a missing content used
+        // to reach the NOT NULL constraint and come back as a 409 "conflict".
+        if (req.content() == null || req.content().isBlank()) {
+            throw new IllegalArgumentException("content is required");
+        }
+        if (req.content().length() > MAX_CONTENT) {
+            throw new IllegalArgumentException("content is limited to " + MAX_CONTENT + " characters");
+        }
+        var saved = memory.store(scoped(http, req.scope()), tierOf(req.tier()), req.content(),
+                req.salience() == null ? 0.5 : Math.max(0, Math.min(1, req.salience())));
         return Map.of("id", saved.getId(), "tier", saved.getTier().name());
     }
 
     @PostMapping("/retrieve")
     public List<MemoryService.RetrievedMemory> retrieve(@RequestBody RetrieveRequest req, HttpServletRequest http) {
-        return memory.retrieve(scoped(http, req.scope()), req.query(), req.topK() == null ? 5 : req.topK());
+        return memory.retrieve(scoped(http, req.scope()), req.query() == null ? "" : req.query(), topK(req.topK()));
     }
 
     @PostMapping("/context")
     public MemoryService.ContextResult context(@RequestBody ContextRequest req, HttpServletRequest http) {
-        return memory.buildContext(scoped(http, req.scope()), req.query(),
-                req.topK() == null ? 5 : req.topK(), req.maxChars() == null ? 2000 : req.maxChars());
+        return memory.buildContext(scoped(http, req.scope()), req.query() == null ? "" : req.query(),
+                topK(req.topK()), req.maxChars() == null ? 2000 : Math.max(100, Math.min(50_000, req.maxChars())));
     }
 
     @PostMapping("/compress")
@@ -71,6 +78,23 @@ public class MemoryController {
     @GetMapping("/{scope}")
     public List<MemoryEntryEntity> list(@PathVariable String scope, HttpServletRequest http) {
         return memory.list(scoped(http, scope));
+    }
+
+    private static final int MAX_CONTENT = 20_000;
+
+    private static int topK(Integer k) {
+        return k == null ? 5 : Math.max(1, Math.min(100, k));
+    }
+
+    private static MemoryTier tierOf(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return MemoryTier.EPISODIC;
+        }
+        try {
+            return MemoryTier.valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("tier must be one of " + java.util.Arrays.toString(MemoryTier.values()));
+        }
     }
 
     public record StoreRequest(String scope, String tier, String content, Double salience) {
