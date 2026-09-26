@@ -41,14 +41,25 @@ public class DeveloperAdminController {
      * recorded against whoever made it.
      */
     @PostMapping("/developers/{id}/plan")
-    public Map<String, Object> grantPlan(@PathVariable String id, @RequestBody GrantPlan req) {
+    public Map<String, Object> grantPlan(@PathVariable String id, @RequestBody GrantPlan req,
+                                         jakarta.servlet.http.HttpServletRequest http) {
+        // A missing account used to surface as a foreign-key "conflict".
+        if (developers.find(id).isEmpty()) {
+            throw new io.continuum.portal.RequestScope.NotFoundException();
+        }
         BillingService.Plan plan;
         try {
             plan = BillingService.Plan.valueOf(req.plan().toUpperCase());
         } catch (Exception e) {
             throw new IllegalArgumentException("Unknown plan: " + req.plan());
         }
-        var b = billing.grantPlan(id, plan, req.grantedBy());
+        // Recorded against the operator who made it. A name in the body is only
+        // believed from the shared admin token, which carries no identity.
+        Object actor = http.getAttribute(io.continuum.developer.AdminTokenFilter.ACTOR_ATTRIBUTE);
+        String grantedBy = actor != null
+                ? developers.find(String.valueOf(actor)).map(DeveloperEntity::getEmail).orElse(String.valueOf(actor))
+                : req.grantedBy();
+        var b = billing.grantPlan(id, plan, grantedBy);
         return Map.of("developerId", id, "plan", b.getPlan(), "planSource", b.getPlanSource(),
                 "grantedBy", b.getGrantedBy() == null ? "operator" : b.getGrantedBy(),
                 "monthlyTokenQuota", b.getMonthlyTokenQuota());
@@ -59,7 +70,17 @@ public class DeveloperAdminController {
 
     @PostMapping("/developers")
     public DeveloperEntity create(@RequestBody CreateDeveloper req) {
-        return developers.createDeveloper(req.name(), req.email());
+        // Blank names and addresses used to be accepted, leaving accounts that
+        // could never be told apart or reached.
+        String name = req.name() == null ? "" : req.name().strip();
+        String email = req.email() == null ? "" : req.email().strip();
+        if (name.isEmpty() || name.length() > 120) {
+            throw new IllegalArgumentException("A name of 1–120 characters is required.");
+        }
+        if (email.length() > 254 || !email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
+            throw new IllegalArgumentException("A valid email address is required.");
+        }
+        return developers.createDeveloper(name, email);
     }
 
     @GetMapping("/developers")

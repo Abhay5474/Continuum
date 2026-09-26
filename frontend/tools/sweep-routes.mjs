@@ -24,7 +24,7 @@ const ROUTES = [
   "/ai-chaos", "/memory", "/gateway", "/portal", "/billing", "/settings", "/autopilot",
   "/godmode", "/dag", "/mmu", "/guard", "/cache", "/cascade", "/confidence", "/quality",
   "/breaker", "/specialists", "/pipelines", "/admission", "/scheduling", "/cost-limits",
-  "/compression", "/context", "/counterfactual", "/loops", "/saga", "/provenance", "/docs",
+  "/compression", "/context", "/counterfactual", "/loops", "/saga", "/provenance", "/accounts", "/docs",
 ];
 
 const browser = await chromium.launch({

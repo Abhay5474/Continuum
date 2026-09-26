@@ -169,9 +169,10 @@ public class RoutingStrategyService {
      */
     @Transactional(readOnly = true)
     public Map<String, Object> comparison(String developerId, int limit) {
+        PageRequest page = PageRequest.of(0, Math.max(1, Math.min(5_000, limit)));
         List<RoutingStrategyDecisionEntity> rows = developerId == null
-                ? decisions.recentAll(PageRequest.of(0, limit))
-                : decisions.recentFor(developerId, PageRequest.of(0, limit));
+                ? decisions.recentAll(page)
+                : decisions.recentFor(developerId, page);
 
         long total = rows.size();
         long diverged = rows.stream().filter(RoutingStrategyDecisionEntity::isDiverged).count();

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { InfoTip, Switch } from "../system/primitives";
+import ApiExplorer, { RequestLog } from "../components/ApiExplorer";
 import { Link } from "react-router-dom";
 import { portal } from "../api";
 import { Chip, Spark, type Tone } from "../system/hub";
@@ -336,6 +337,10 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           {keys.length === 0 && <div className="text-xs text-slate-500">no keys yet — issue one above ↑</div>}
         </div>
       </div>
+
+      <ApiExplorer issuedKey={newKey || undefined} />
+
+      <RequestLog />
 
       {/* playground */}
       <div>

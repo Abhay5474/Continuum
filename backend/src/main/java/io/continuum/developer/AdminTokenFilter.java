@@ -32,6 +32,9 @@ public class AdminTokenFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(AdminTokenFilter.class);
 
+    /** The operator's account id, when the request came with an operator session. */
+    public static final String ACTOR_ATTRIBUTE = "continuum.admin.actor";
+
     private final String adminToken;
     private final ObjectMapper mapper;
     private final PortalSessionService sessions;
@@ -49,7 +52,12 @@ public class AdminTokenFilter extends OncePerRequestFilter {
             return false;
         }
         Optional<PortalSessionService.Session> s = sessions.verify(auth.substring(7).trim());
-        return s.isPresent() && s.get().role() == PortalSessionService.Role.OPERATOR;
+        if (s.isPresent() && s.get().role() == PortalSessionService.Role.OPERATOR) {
+            // Who is acting, so what they do can be recorded against them.
+            request.setAttribute(ACTOR_ATTRIBUTE, s.get().actor());
+            return true;
+        }
+        return false;
     }
 
     @Override

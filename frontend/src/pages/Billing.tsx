@@ -5,6 +5,8 @@ import { Chip, Pill } from "../system/hub";
 import { ProjectionChart } from "../system/charts";
 import { SkeletonRows, ErrorState, useToast, Spinner } from "../components/ui";
 
+const PENDING_KEY = "continuum.billing.pendingCheckout";
+
 /**
  * Billing & usage metering (mock Stripe). Shows the current plan, this month's
  * token usage vs quota with a live meter, and plan switching.
@@ -38,6 +40,51 @@ export default function Billing() {
       toast(`Switched to ${plan} plan`, "success");
     } catch (e: any) {
       toast(e?.message ?? "Could not change plan", "error");
+    } finally {
+      setSwitching(null);
+    }
+  };
+
+  // A paid upgrade is two steps: pay at the processor, then apply the plan
+  // against that payment's reference. The pending checkout survives a reload,
+  // since paying usually happens in another tab.
+  const [pending, setPending] = useState<{ plan: string; reference: string; url: string } | null>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null");
+    } catch {
+      return null;
+    }
+  });
+  const remember = (v: typeof pending) => {
+    setPending(v);
+    try {
+      v ? localStorage.setItem(PENDING_KEY, JSON.stringify(v)) : localStorage.removeItem(PENDING_KEY);
+    } catch {
+      /* private mode: the pending checkout lasts this visit only */
+    }
+  };
+  const startCheckout = async (plan: string) => {
+    setSwitching(plan);
+    try {
+      const c = await portal.checkout(plan);
+      remember({ plan, ...c });
+      window.open(c.url, "_blank", "noopener");
+    } catch (e: any) {
+      toast(e?.message ?? "Could not start checkout", "error");
+    } finally {
+      setSwitching(null);
+    }
+  };
+  const confirmPaid = async () => {
+    if (!pending) return;
+    setSwitching(pending.plan);
+    try {
+      const d = await portal.setPlan(pending.plan, pending.reference);
+      setData(d);
+      remember(null);
+      toast(`Upgraded to ${pending.plan}`, "success");
+    } catch (e: any) {
+      toast(e?.message ?? "That payment has not settled yet", "error");
     } finally {
       setSwitching(null);
     }
@@ -170,7 +217,7 @@ export default function Billing() {
               <button
                 disabled={current || blocked || switching === p.id}
                 title={blocked ? "No payment processor is configured on this deployment" : undefined}
-                onClick={() => changePlan(p.id)}
+                onClick={() => (isUpgrade ? startCheckout(p.id) : changePlan(p.id))}
                 className={`mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
                   current
                     ? "cursor-default border border-edge text-slate-500"
@@ -184,6 +231,23 @@ export default function Billing() {
           );
         })}
       </div>
+      {pending && (
+        <div role="status" className="plane flex flex-wrap items-center gap-3 px-4 py-3">
+          <Pill tone="info" dot>Checkout open</Pill>
+          <span className="min-w-0 flex-1 text-sm text-slate-300">
+            Upgrade to <b>{pending.plan}</b> is waiting on payment.{" "}
+            <a href={pending.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+              Open checkout
+            </a>
+          </span>
+          <button onClick={confirmPaid} disabled={switching === pending.plan} className="rounded-[var(--r-md)] bg-[color:var(--accent-strong)] px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-50">
+            I've paid — apply the plan
+          </button>
+          <button onClick={() => remember(null)} className="text-[12px] text-slate-500 hover:text-slate-300">
+            Cancel
+          </button>
+        </div>
+      )}
       <p className="text-center text-xs text-slate-600 max-w-2xl leading-relaxed">
         {data?.paymentConfigured
           ? `Payments are processed by ${data.paymentProvider}. Downgrades apply immediately.`

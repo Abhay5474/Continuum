@@ -30,7 +30,7 @@ const ROUTES = [
   "/specialists", "/pipelines", "/admission", "/scheduling", "/cost-limits",
   "/compression", "/context", "/counterfactual", "/loops", "/saga", "/provenance", "/docs",
   // "route>Tab" opens the route, then that tab: views that have no URL of their own.
-  "/workflows>Editor",
+  "/workflows>Editor", "/router>Decisions", "/router>Learning & hedging", "/accounts",
 ];
 
 /** Runs in the page: WCAG 2.1 contrast over a properly composited background. */
@@ -112,6 +112,11 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1360, height: 1000 } });
 await page.goto(BASE, { waitUntil: "domcontentloaded" });
 await page.evaluate((t) => localStorage.setItem("continuum.portal.session", t), TOKEN);
+// With an operator token the operator-only views are audited too (Accounts, and
+// the engine-wide controls enabled rather than disabled).
+if (process.env.CONTINUUM_OPERATOR) {
+  await page.evaluate((t) => localStorage.setItem("continuum.portal.operator", t), process.env.CONTINUUM_OPERATOR);
+}
 
 let failures = 0;
 for (const theme of ["dark", "light"]) {

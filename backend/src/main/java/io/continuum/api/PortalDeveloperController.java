@@ -168,7 +168,10 @@ public class PortalDeveloperController {
     @GetMapping("/requests")
     public List<GatewayRequestLogEntity> requests(HttpServletRequest req,
                                                   @RequestParam(defaultValue = "25") int limit) {
-        return logs.findByDeveloperIdOrderByCreatedAtDesc(dev(req), PageRequest.of(0, limit)).getContent();
+        // Bounded both ways: zero or a negative size used to fail the page
+        // request, and an enormous one read the whole log in one response.
+        int size = Math.max(1, Math.min(500, limit));
+        return logs.findByDeveloperIdOrderByCreatedAtDesc(dev(req), PageRequest.of(0, size)).getContent();
     }
 
     public record StoreCredential(String provider, String secret) {

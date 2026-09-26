@@ -61,6 +61,9 @@ const ACCOUNT: Item[] = [
   { to: "/settings", label: "Account Settings", desc: "Profile, team and security" },
 ];
 
+/** Shown to the operator only: every account on the deployment. */
+const OPERATOR_ACCOUNTS: Item = { to: "/accounts", label: "Accounts", desc: "Every account: plans, keys, provider credentials" };
+
 export default function App() {
   // Every console page sits on the wallpaper and its cards are liquid glass.
   useLiquidSurface();
@@ -221,7 +224,7 @@ export default function App() {
             render={(k) =>
               k === "account" ? (
                 <MenuItems
-                  items={ACCOUNT}
+                  items={operator ? [...ACCOUNT, OPERATOR_ACCOUNTS] : ACCOUNT}
                   footer={
                     <>
                       <button
@@ -271,7 +274,8 @@ export default function App() {
               <button
                 onClick={dropOperator}
                 title="Operator access is on. Click to drop it."
-                className="hidden items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-amber-300 hover:border-amber-400/60 sm:inline-flex"
+                className="hidden items-center gap-1.5 rounded-full border border-amber-500/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest hover:border-amber-400/60 sm:inline-flex"
+                style={{ background: "var(--wash-warn)", color: "var(--state-warning-ink)" }}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
                 Operator
@@ -324,7 +328,7 @@ export default function App() {
               <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
                 Account
               </div>
-              {ACCOUNT.map((i) => (
+              {(operator ? [...ACCOUNT, OPERATOR_ACCOUNTS] : ACCOUNT).map((i) => (
                 <MobileLink key={i.to} to={i.to} label={i.label} />
               ))}
               <MobileLink to="/docs" label="Docs" />

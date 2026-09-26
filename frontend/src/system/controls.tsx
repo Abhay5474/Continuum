@@ -1,4 +1,5 @@
-import type { ReactNode, SelectHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
+import type { ReactElement, ReactNode, SelectHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { toneInk, toneWash, type Tone } from "./hub";
 
 /**
@@ -202,12 +203,18 @@ export function Labelled({
   children: ReactNode;
   className?: string;
 }) {
+  // Without an id to point at, the label named nothing: a screen reader read
+  // the control unlabelled. A lone control child gets one.
+  const auto = useId();
+  const only = isValidElement(children) ? (children as ReactElement<{ id?: string }>) : null;
+  const target = htmlFor ?? only?.props.id ?? (only ? auto : undefined);
+  const control = only && !only.props.id && !htmlFor ? cloneElement(only, { id: auto }) : children;
   return (
     <div className={`min-w-0 ${className}`}>
-      <label htmlFor={htmlFor} className="micro block truncate">
+      <label htmlFor={target} className="micro block truncate">
         {label}
       </label>
-      <div className="mt-1.5">{children}</div>
+      <div className="mt-1.5">{control}</div>
       {hint && <p className="mt-1.5 max-w-xs text-[11px] leading-relaxed text-slate-500">{hint}</p>}
     </div>
   );
@@ -294,15 +301,38 @@ export function Table({
   children,
   minWidth,
   maxHeight,
+  label,
 }: {
   head: ReactNode;
   children: ReactNode;
   minWidth?: number;
   maxHeight?: number;
+  /** Names the table for a screen reader when it scrolls and so takes focus. */
+  label?: string;
 }) {
+  // A table taller or wider than its box scrolls, and a region that scrolls
+  // must be reachable from the keyboard — otherwise the rows past the fold
+  // exist only for a mouse. Focusable only when it actually overflows, so a
+  // short table is not an extra tab stop.
+  const box = useRef<HTMLDivElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const check = () => setScrolls(el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, []);
   return (
     <div
-      className="card overflow-auto rounded-[var(--r-lg)] border border-card-edge bg-card"
+      ref={box}
+      tabIndex={scrolls ? 0 : undefined}
+      role={scrolls ? "region" : undefined}
+      aria-label={scrolls ? label ?? "Table" : undefined}
+      className="card overflow-auto rounded-[var(--r-lg)] border border-card-edge bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--accent-edge)]"
       style={{ maxHeight }}
     >
       <table className="w-full border-collapse text-left" style={{ minWidth }}>

@@ -112,6 +112,11 @@ async function http<T>(path: string, init?: RequestInit, asOperator = false): Pr
     },
   });
   if (res.status === 401) {
+    // The admin API answers 401, not 403, to a developer session. That is a
+    // missing permission, not a lapsed sign-in, and must not sign the user out.
+    if (asOperator && token !== operatorToken()) {
+      throw new ForbiddenError("This needs operator access.", true);
+    }
     sessionRejected(token);
     throw new UnauthorizedError();
   }
@@ -381,6 +386,11 @@ export const portal = {
     rollbacks: () => portalHttp<any[]>("/api/portal/developer/autopilot/rollbacks", "GET"),
     decisions: () => portalHttp<any[]>("/api/portal/developer/autopilot/decisions?limit=30", "GET"),
     rollback: () => portalHttp<any>("/api/portal/developer/autopilot/rollback", "POST"),
+    activeBundle: () => portalHttp<any>("/api/portal/developer/autopilot/active-bundle", "GET"),
+    setProfile: (body: unknown) => portalHttp<any>("/api/portal/developer/autopilot/profile", "PUT", body),
+    startCanary: (bundleId: number) => portalHttp<any>(`/api/portal/developer/autopilot/canary/start/${bundleId}`, "POST"),
+    feedback: (body: { requestRef: string; score: number; comment?: string }) =>
+      portalHttp<any>("/api/portal/developer/autopilot/feedback", "POST", body),
   },
 
   // --- V5 God Mode ---
@@ -791,7 +801,12 @@ export const portal = {
 
   // --- Billing & usage ---
   billing: () => portalHttp<any>("/api/portal/developer/billing", "GET"),
-  setPlan: (plan: string) => portalHttp<any>("/api/portal/developer/billing/plan", "PUT", { plan }),
+  setPlan: (plan: string, paymentReference?: string) =>
+    portalHttp<any>("/api/portal/developer/billing/plan", "PUT", { plan, paymentReference }),
+  /** This account's gateway request log, newest first. */
+  requests: (limit = 25) => portalHttp<any[]>(`/api/portal/developer/requests?limit=${limit}`, "GET"),
+  /** Starts paying for an upgrade; the plan is applied once the returned reference has settled. */
+  checkout: (plan: string) => portalHttp<{ reference: string; url: string }>("/api/portal/developer/billing/checkout", "POST", { plan }),
 
   // --- Account & settings ---
   /** Ends every other session; this device carries on with the fresh one returned. */

@@ -91,6 +91,7 @@ const router = createBrowserRouter([
           { path: "loops", lazy: page(() => import("./pages/LoopGuard")) },
           { path: "saga", lazy: page(() => import("./pages/Saga")) },
           { path: "provenance", lazy: page(() => import("./pages/Provenance")) },
+          { path: "accounts", lazy: page(() => import("./pages/Accounts")) },
           { path: "*", element: <NotFound /> },
             ],
           },

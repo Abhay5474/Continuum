@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ActiveBundle, FeedbackForm, TargetsEditor } from "../components/AutopilotPanels";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Note } from "../system/primitives";
@@ -161,8 +162,19 @@ export default function Autopilot() {
                 className="mt-3 rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
                 Run optimization now
               </button>
+              <ActiveBundle key={status.activeBundleId} />
             </Panel>
           )}
+
+          {/* The targets were set once, in the wizard, with no way back to them. */}
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            <Panel title="Targets">
+              <TargetsEditor profile={status.profile} onSaved={refresh} />
+            </Panel>
+            <Panel title="Rate an answer">
+              <FeedbackForm />
+            </Panel>
+          </div>
 
           {/* recommendations */}
           <Panel title="Recommendations">
@@ -262,6 +274,16 @@ export default function Autopilot() {
                     <StatusPill status={b.status} />
                     <span>v{b.version}</span>
                     <span className="text-xs text-slate-500">{b.source}</span>
+                    {b.status === "CANDIDATE" && !status.canaryBundleId && (
+                      <button
+                        onClick={() => act(() => portal.autopilot.startCanary(b.id))}
+                        disabled={busy}
+                        className="ml-auto rounded-full border border-edge px-2.5 py-0.5 text-[11px] text-slate-400 hover:border-slate-500/60 hover:text-slate-200"
+                        title="Run this version on a slice of traffic now; it is kept only if it measures better"
+                      >
+                        Canary this
+                      </button>
+                    )}
                   </li>
                 ))}
               </ol>

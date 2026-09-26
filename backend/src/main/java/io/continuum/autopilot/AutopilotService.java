@@ -383,8 +383,9 @@ public class AutopilotService {
 
     @Transactional(readOnly = true)
     public List<AutopilotDecisionEntity> decisionLog(String developerId, int limit) {
+        // Bounded: an unbounded page size read the whole log in one response.
         return decisions.findByDeveloperIdOrderByCreatedAtDesc(developerId,
-                org.springframework.data.domain.PageRequest.of(0, limit)).getContent();
+                org.springframework.data.domain.PageRequest.of(0, Math.max(1, Math.min(500, limit)))).getContent();
     }
 
     public TelemetrySnapshot snapshot(String developerId) {

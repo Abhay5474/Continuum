@@ -24,12 +24,17 @@ const ROUTES = ["/dashboard", "/workflows", "/workflows/console", "/gateway", "/
   "/provenance", "/replay", "/chaos", "/ai-chaos", "/dag", "/autopilot", "/godmode", "/portal", "/billing",
   "/settings", "/nope-404",
   // "route>Tab" opens the route, then that tab: views that have no URL of their own.
-  "/workflows>Editor"];
+  "/workflows>Editor", "/router>Decisions", "/router>Learning & hedging", "/accounts"];
 
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
 await page.goto(BASE);
 await page.evaluate((t) => localStorage.setItem("continuum.portal.session", t), TOKEN);
+// With an operator token the operator-only views are audited too (Accounts, and
+// the engine-wide controls enabled rather than disabled).
+if (process.env.CONTINUUM_OPERATOR) {
+  await page.evaluate((t) => localStorage.setItem("continuum.portal.operator", t), process.env.CONTINUUM_OPERATOR);
+}
 const seen = new Map();
 for (const theme of ["light", "dark"]) {
   await page.evaluate((t) => (t === "dark" ? localStorage.setItem("continuum.theme.choice", "dark") : localStorage.removeItem("continuum.theme.choice")), theme);
