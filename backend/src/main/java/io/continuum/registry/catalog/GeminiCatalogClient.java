@@ -36,7 +36,7 @@ public class GeminiCatalogClient implements ProviderCatalogClient {
     /** A version-pinned id such as {@code gemini-2.0-flash-001}. */
     private static final Pattern PINNED = Pattern.compile("^(.+)-(\\d{3})$");
     /** Google's way of saying a model has no free quota for this project. */
-    private static final Pattern ZERO_QUOTA = Pattern.compile("limit:\\s*0\\b|\"quotaValue\"\\s*:\\s*\"0\"");
+    private static final Pattern ZERO_QUOTA = Pattern.compile("limit:\\s*0(?![\\d.])|\"quotaValue\"\\s*:\\s*\"0\"");
     private static final int MAX_PAGES = 3;
 
     private final LlmProperties.Provider config;

@@ -583,7 +583,11 @@ public class ModelCatalogService {
                 .filter(m -> m.isChat() && "live".equals(m.getSource()) && SAFE_ID.matcher(m.getModelName()).matches())
                 .filter(m -> m.getStatus() == ModelStatus.DISCOVERED
                         || (m.getStatus() == ModelStatus.ACTIVE && (m.getVerifiedAt() == null || m.getVerifiedAt().isBefore(stale)))
-                        || (m.getStatus() == ModelStatus.UNAVAILABLE && (m.getProbedAt() == null || m.getProbedAt().isBefore(stale))))
+                        // "No free quota" is re-tested at every check (and every Check now):
+                        // free tiers change, and a wrong verdict must not stand for a month.
+                        // The refusal is instant and costs no tokens.
+                        || (m.getStatus() == ModelStatus.UNAVAILABLE && (ProbeResult.Outcome.NOT_FREE.name().equals(m.getProbeOutcome())
+                                || m.getProbedAt() == null || m.getProbedAt().isBefore(stale))))
                 .sorted(priority(preferred))
                 .toList();
         int probed = 0, verified = 0, unusable = 0, softInARow = 0;

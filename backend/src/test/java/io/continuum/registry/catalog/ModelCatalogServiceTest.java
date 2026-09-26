@@ -243,6 +243,25 @@ class ModelCatalogServiceTest {
     }
 
     @Test
+    void aNoFreeQuotaVerdictIsRetestedAtTheNextCheckAndCorrectedWhenTheModelAnswers() {
+        gemini.configured = true;
+        gemini.listing("gemini-3.5-flash", "gemini-3.8-flash");
+        gemini.probes.put("gemini-3.8-flash", ProbeResult.of(ProbeResult.Outcome.NOT_FREE, "No free-tier quota"));
+        catalogue.runNow("MANUAL", "dev", List.of("gemini"), false);
+        assertThat(row("gemini-3.8-flash").getStatus()).isEqualTo(ModelStatus.UNAVAILABLE);
+
+        // Google puts 3.8 on the free tier; the next check, not a month later, sees it.
+        gemini.probes.remove("gemini-3.8-flash");
+        gemini.probed.clear();
+        clock.advance(Duration.ofMinutes(11));
+        catalogue.runNow("MANUAL", "dev", List.of("gemini"), false);
+
+        assertThat(gemini.probed).containsExactly("gemini-3.8-flash");
+        assertThat(row("gemini-3.8-flash").getStatus()).isEqualTo(ModelStatus.ACTIVE);
+        assertThat(row("gemini-3.8-flash").getVerifiedAt()).isNotNull();
+    }
+
+    @Test
     void aRetiredGeminiFlashIsReplacedByTheNewestFlashNotTheLite() {
         gemini.configured = true;
         gemini.listing("gemini-3.5-flash", "gemini-3.5-flash-lite");
