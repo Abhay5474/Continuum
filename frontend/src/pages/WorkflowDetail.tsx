@@ -5,7 +5,7 @@ import { Chip } from "../system/hub";
 import type { WorkflowDetail } from "../types";
 import StatusBadge from "../components/StatusBadge";
 import DataView from "../system/DataView";
-import { elapsed, humanMs, timeOf } from "../system/time";
+import { elapsed, humanMs, timeOf, toMillis } from "../system/time";
 import { Button } from "../system/controls";
 import { useToast } from "../components/ui";
 
@@ -261,8 +261,10 @@ export default function WorkflowDetailPage() {
         </div>
       )}
 
+      <RunTimeline events={detail.events} names={stepNames} />
+
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 card rounded-lg border border-edge bg-panel">
+        <div className="min-w-0 lg:col-span-2 card rounded-lg border border-edge bg-panel">
           <div className="border-b border-edge px-4 py-3 font-medium">Event Timeline</div>
           <ol className="relative space-y-0">
             {detail.events.map((e, i) => (
@@ -324,6 +326,85 @@ export default function WorkflowDetailPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The run as a timeline: one row per step, on one clock.
+ *
+ * <p>The event list says what happened in order; this says how the run spent
+ * its time — which step waited, which ran long, which failed and was retried
+ * — the shape a list of seventeen timestamps hides. Built only from the
+ * events: scheduled → started is the wait (faint), started → finished is the
+ * work (solid), and a step still running reaches to the last event seen.
+ */
+function RunTimeline({ events, names }: { events: any[]; names: Record<number, string> }) {
+  type Step = { seq: number; scheduled?: number; started?: number; ended?: number; failed?: boolean; attempts: number; type?: string };
+  const steps = new Map<number, Step>();
+  let t0 = Infinity;
+  let t1 = -Infinity;
+  for (const e of events ?? []) {
+    const t = toMillis(e.createdAt);
+    if (t == null) continue;
+    t0 = Math.min(t0, t);
+    t1 = Math.max(t1, t);
+    const p: any = unwrap(e.payload);
+    const seq = p?.commandSeq;
+    if (seq == null) continue;
+    const st: Step = steps.get(seq) ?? { seq, attempts: 0 };
+    if (e.eventType === "ACTIVITY_SCHEDULED" && st.scheduled == null) st.scheduled = t;
+    if (!st.type && p?.activityType) st.type = String(p.activityType);
+    if (e.eventType === "ACTIVITY_STARTED") {
+      st.attempts += 1;
+      if (st.started == null) st.started = t;
+    }
+    if (e.eventType === "ACTIVITY_COMPLETED") { st.ended = t; st.failed = false; }
+    if (e.eventType === "ACTIVITY_FAILED") { st.ended = t; st.failed = true; }
+    steps.set(seq, st);
+  }
+  const rows = [...steps.values()].sort((a, b) => (a.scheduled ?? a.started ?? 0) - (b.scheduled ?? b.started ?? 0));
+  if (rows.length === 0 || !Number.isFinite(t0)) return null;
+  const span = Math.max(1, t1 - t0);
+  const x = (t: number) => ((t - t0) / span) * 100;
+  const ms = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}s` : `${Math.round(n)}ms`);
+  return (
+    <div className="card rounded-lg border border-edge bg-panel p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="font-medium">Run timeline</div>
+        <span className="flex flex-wrap items-center gap-3 text-[10.5px] text-slate-500">
+          <span className="flex items-center gap-1"><span className="h-2 w-4 rounded-sm" style={{ background: "rgb(var(--card-edge))" }} />waiting</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-4 rounded-sm" style={{ background: "var(--state-healthy-ink)" }} />ran</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-4 rounded-sm" style={{ background: "var(--state-critical-ink)" }} />failed</span>
+          <span className="readout">{ms(span)} total</span>
+        </span>
+      </div>
+      <ol className="mt-3 space-y-1.5">
+        {rows.map((r) => {
+          const sched = r.scheduled ?? r.started ?? t0;
+          const start = r.started ?? sched;
+          const end = r.ended ?? t1;
+          const running = r.ended == null;
+          const ink = running ? "var(--state-active-ink)" : r.failed ? "var(--state-critical-ink)" : "var(--state-healthy-ink)";
+          return (
+            <li key={r.seq} className="grid items-center gap-x-3 sm:grid-cols-[150px_minmax(0,1fr)_64px]">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate font-mono text-[11.5px] text-slate-300">{names[r.seq] ?? r.type ?? `step ${r.seq}`}</span>
+                {r.attempts > 1 && (
+                  <span className="shrink-0 rounded-full px-1.5 text-[9.5px] font-semibold" style={{ background: "var(--wash-warn)", color: "var(--state-warning-ink)" }}
+                        title={`${r.attempts} attempts`}>×{r.attempts}</span>
+                )}
+              </span>
+              <span className="relative h-3.5 rounded" style={{ background: "rgb(var(--card-rule) / .5)" }}>
+                <span className="absolute inset-y-1 rounded-sm" style={{ left: `${x(sched)}%`, width: `${Math.max(0, x(start) - x(sched))}%`, background: "rgb(var(--card-edge))" }} />
+                <span className="absolute inset-y-0 rounded" style={{ left: `${x(start)}%`, width: `max(3px, ${x(end) - x(start)}%)`, background: ink, opacity: 0.85,
+                        backgroundImage: running ? "repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / .4) 4px 7px)" : undefined }} />
+              </span>
+              <span className="readout hidden text-right text-[10.5px] text-slate-500 sm:block">{running ? "running" : ms(end - start)}</span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
