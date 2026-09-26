@@ -60,7 +60,7 @@ export function Gauge({
           style={{ transition: "stroke-dasharray var(--dur-standard, 400ms) var(--ease-standard, ease)" }}
         />}
         {/* the warning mark on the track */}
-        {max > 0 && (
+        {max > 0 && !forced && (
           <path
             d={tick(invert ? 1 - warnAt : warnAt)}
             stroke="rgb(var(--card-edge))"

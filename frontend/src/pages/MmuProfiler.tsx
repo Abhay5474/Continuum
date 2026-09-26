@@ -132,6 +132,18 @@ export default function MmuProfiler() {
           label="Working-set assembly"
           hint="Off by default — eviction is positional, oldest paged out first. With it on, what stays resident is scored against the request being answered now, so an order number stated in message three survives a question asked in message forty."
         />
+        {/* The score's make-up as the two weights it is. */}
+        <div className="mt-3 max-w-md" role="img" aria-label="What stays resident: 70% relevance to the current request, 30% recency">
+          <div className="micro mb-1.5">What decides what stays in the window</div>
+          <div className="flex h-7 overflow-hidden rounded-lg text-[11px] font-medium">
+            <span className="flex items-center justify-center" style={{ width: "70%", background: "color-mix(in srgb, var(--state-active-ink) 22%, transparent)", color: "var(--state-active-ink)" }}>
+              relevance to this request · 70%
+            </span>
+            <span className="flex flex-1 items-center justify-center" style={{ background: "color-mix(in srgb, var(--state-warning-ink) 22%, transparent)", color: "var(--state-warning-ink)" }}>
+              recency · 30%
+            </span>
+          </div>
+        </div>
         <Explain title="How the score works">
           <p>
             0.7 × relevance to the current request + 0.3 × recency. Relevance outweighs recency

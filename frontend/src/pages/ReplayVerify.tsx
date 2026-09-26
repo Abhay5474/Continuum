@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
-import { Chip } from "../system/hub";
+import { Card, Chip, Pill } from "../system/hub";
+import { Gauge } from "../system/viz";
 import { Readout, StateDot, InfoTip } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
@@ -112,13 +113,13 @@ export default function ReplayVerify() {
                 }}
                 className="flex w-full items-center gap-x-4 px-1 py-2 text-left text-[11px] transition-colors hover:bg-edge/40"
               >
-                <StateDot
-                  state={r.status === "FAILED" ? "critical" : r.status === "RUNNING" ? "active" : "healthy"}
-                  size={6}
-                />
                 <span className="readout w-16 shrink-0 text-slate-600">{timeOf(r.createdAt)}</span>
                 <span className="w-40 shrink-0 truncate text-slate-300">{r.workflowType}</span>
-                <span className="w-20 shrink-0 text-slate-500">{r.status}</span>
+                <span className="w-24 shrink-0">
+                  <Pill tone={r.status === "FAILED" ? "bad" : r.status === "RUNNING" ? "info" : r.status === "COMPLETED" ? "ok" : "mute"} dot>
+                    {String(r.status).toLowerCase()}
+                  </Pill>
+                </span>
                 <span className="ml-auto truncate font-mono text-[10px] text-slate-600">{r.workflowId}</span>
               </button>
             ))}
@@ -137,14 +138,25 @@ export default function ReplayVerify() {
 
       {report && verdict && (
         <>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <StateDot state={verdict.state} />
+          <Card className="flex flex-wrap items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              {(report.verifiedActivities ?? 0) > 0 ? (
+                <Gauge
+                  value={report.passed ?? 0}
+                  max={Math.max(1, report.verifiedActivities ?? 0)}
+                  display={`${report.passed ?? 0}/${report.verifiedActivities ?? 0}`}
+                  label="reproduced"
+                  tone={(report.failed ?? 0) > 0 ? "bad" : "ok"}
+                  size={130}
+                />
+              ) : (
+                <StateDot state={verdict.state} />
+              )}
               <div>
-                <div className="text-sm font-semibold" style={{ color: STATE[verdict.state].ink }}>
+                <div className="text-[15px] font-semibold" style={{ color: STATE[verdict.state].ink }}>
                   {verdict.label}
                 </div>
-                <p className="mt-0.5 max-w-xl text-xs text-slate-500">{verdict.blurb}</p>
+                <p className="mt-0.5 max-w-md text-xs text-slate-500">{verdict.blurb}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
@@ -155,7 +167,7 @@ export default function ReplayVerify() {
               <Readout label="Diverged" value={report.failed ?? 0} size="sm"
                 state={report.failed ? "critical" : "idle"} />
             </div>
-          </div>
+          </Card>
 
           {/* Scores exist only for model calls. Absent is shown as absent. */}
           {report.replayConfidence != null && (
@@ -180,7 +192,17 @@ export default function ReplayVerify() {
                   {divergences.length === 0 ? "every step resolves identically" : `${divergences.length} differ`}
                 </span>
               </div>
-              <div className="mt-1 divide-y divide-edge/40">
+              {/* Every step in order, as a square: where a run stops
+                  reproducing is a colour change, found before reading a row. */}
+              <div className="mt-2 flex flex-wrap gap-1" role="img"
+                   aria-label={`${det.checks.length - divergences.length} of ${det.checks.length} steps replay identically`}>
+                {det.checks.map((c: any, i: number) => (
+                  <span key={`sq-${c.stepId}-${i}`} title={`${c.stepId} · ${c.matched ? "matches" : "differs"}`}
+                        className="h-4 w-4 rounded-[4px]"
+                        style={{ background: c.matched ? "var(--state-healthy-ink)" : "var(--state-critical-ink)", opacity: c.matched ? 0.75 : 1 }} />
+                ))}
+              </div>
+              <div className="mt-2 divide-y divide-edge/40">
                 {det.checks.map((c: any, i: number) => (
                   <div key={`${c.stepId}-${i}`} className="py-2 text-[11px]">
                     <div className="flex flex-wrap items-baseline gap-x-3">
@@ -212,8 +234,16 @@ export default function ReplayVerify() {
                     <div className="flex flex-wrap items-baseline gap-x-3">
                       <StateDot state={it.passed ? "healthy" : "critical"} size={6} />
                       <span className="readout text-slate-500">seq {it.commandSeq}</span>
-                      <span className="readout text-slate-500">overall {it.overallScore?.toFixed(3)}</span>
-                      <span className="text-slate-600">{it.explanation}</span>
+                      {it.overallScore != null && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="relative h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "rgb(var(--card-rule))" }}>
+                            <span className="absolute inset-y-0 left-0 rounded-full"
+                                  style={{ width: `${Math.max(0, Math.min(1, it.overallScore)) * 100}%`, background: it.passed ? "var(--state-healthy-ink)" : "var(--state-critical-ink)" }} />
+                          </span>
+                          <span className="readout text-slate-500">{it.overallScore.toFixed(2)} alike</span>
+                        </span>
+                      )}
+                      <Scores text={it.explanation} />
                     </div>
                     <div className="mt-2 grid gap-2 pl-5 md:grid-cols-2">
                       <Diff label="recorded" value={it.historicalOutput} tone={STATE.idle.color} />
@@ -253,4 +283,31 @@ function Diff({ label, value, tone }: { label: string; value?: string; tone: str
 /** Null means "not measured", which must never render as 0%. */
 function pct(v: number | null | undefined) {
   return v == null ? "—" : `${(v * 100).toFixed(0)}%`;
+}
+
+/**
+ * "similarity=1.0, intent=1.0, tools=n/a" as chips: each dimension named once,
+ * its value beside it, and one that was not applicable visibly set apart.
+ */
+function Scores({ text }: { text?: string }) {
+  const pairs = [...String(text ?? "").matchAll(/([a-zA-Z_]+)=([^,\s]+)/g)].map((m) => [m[1], m[2]] as const);
+  if (pairs.length === 0) return <span className="text-slate-600">{text}</span>;
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {pairs.map(([k, v]) => {
+        const n = Number(v);
+        const na = Number.isNaN(n);
+        return (
+          <span key={k} className="rounded-full px-1.5 py-px text-[10px]"
+                style={{
+                  background: na ? "transparent" : n >= 0.8 ? "var(--wash-ok)" : n >= 0.5 ? "var(--wash-warn)" : "var(--wash-bad)",
+                  color: na ? "var(--text-3)" : n >= 0.8 ? "var(--state-healthy-ink)" : n >= 0.5 ? "var(--state-warning-ink)" : "var(--state-critical-ink)",
+                  boxShadow: na ? "inset 0 0 0 1px rgb(var(--card-edge))" : undefined,
+                }}>
+            {k} {na ? "n/a" : n.toFixed(2)}
+          </span>
+        );
+      })}
+    </span>
+  );
 }
