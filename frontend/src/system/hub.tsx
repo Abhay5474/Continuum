@@ -500,7 +500,8 @@ export function Card({
       // catches its light, gives under a press. A read-only card doing the same
       // would be claiming to be clickable.
       data-surface={interactive ? "" : undefined}
-      className={`relative border bg-card shadow-card ${
+      data-selected={selected ? "" : undefined}
+      className={`card relative border bg-card shadow-card ${
         pad ? "p-4" : ""
       } ${interactive ? "cursor-pointer hover:border-slate-500/40 hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}
       style={{

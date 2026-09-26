@@ -111,6 +111,26 @@ export function firstSentence(text: string): string {
   return (m ? m[0] : text).trim();
 }
 
+/**
+ * Turns the current page's cards into liquid glass while it is mounted.
+ *
+ * <p>Sets {@code data-liquid} on the document root; the stylesheet gives the
+ * page a wallpaper to refract and every {@code Card} the glass material. A
+ * counter rather than a flag, so two mounted users (a page and its guide
+ * preview, say) do not switch it off under each other.
+ */
+let liquidUsers = 0;
+export function useLiquidSurface() {
+  useEffect(() => {
+    liquidUsers += 1;
+    document.documentElement.setAttribute("data-liquid", "");
+    return () => {
+      liquidUsers -= 1;
+      if (liquidUsers === 0) document.documentElement.removeAttribute("data-liquid");
+    };
+  }, []);
+}
+
 export function PageHeader({
   title,
   subtitle,

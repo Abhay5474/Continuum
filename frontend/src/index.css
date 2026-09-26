@@ -1105,6 +1105,124 @@ body::before {
   [data-glass]::after { display: none; }
 }
 
+/* ======================== Liquid cards (trial) ===============================
+   Opt-in per page: a page that calls useLiquidSurface() sets data-liquid on
+   <html>. The page then gets a wallpaper (glass reads as glass only when there
+   is colour behind it to bend) and its cards become panes of liquid glass:
+   a frosted fill brighter at the top, a specular rim that is brightest on the
+   upper-left edge, a thickness highlight along the bottom, and a soft lift.
+
+   The fill stays dense enough that text on it keeps the contrast an opaque
+   card had — this is a material, not see-through paper. */
+:root {
+  --lq-wall-a: 0.15;
+  --lq-fill-hi: 28 33 45;
+  --lq-fill-lo: 14 17 24;
+  --lq-fill-a-hi: 0.74;
+  --lq-fill-a-lo: 0.64;
+  --lq-rim-hi: 0.30;
+  --lq-rim-mid: 0.05;
+  --lq-rim-lo: 0.14;
+  --lq-thick: 0.05;
+  --lq-glint: 0.06;
+  --lq-hair: 255 255 255;
+  --lq-hair-a: 0.05;
+  --lq-shadow: 0 1px 1px rgba(0, 0, 0, 0.35), 0 14px 36px -16px rgba(0, 0, 0, 0.75);
+}
+:root[data-theme="light"] {
+  --lq-wall-a: 0.42;
+  --lq-fill-hi: 255 255 255;
+  --lq-fill-lo: 255 255 255;
+  --lq-fill-a-hi: 0.70;
+  --lq-fill-a-lo: 0.44;
+  --lq-glint: 0.55;
+  --lq-rim-hi: 1;
+  --lq-rim-mid: 0.35;
+  --lq-rim-lo: 0.75;
+  --lq-thick: 0.85;
+  --lq-hair: 30 41 72;
+  --lq-hair-a: 0.07;
+  --lq-shadow: 0 1px 2px rgba(30, 41, 72, 0.05), 0 14px 34px -16px rgba(30, 41, 72, 0.24);
+}
+
+/* The wallpaper: the ambient field grows from a strip under the header into
+   the whole viewport. Still fixed, still one paint. */
+:root[data-liquid] body::before {
+  height: 100%;
+  background:
+    radial-gradient(42% 46% at 6% 8%, rgb(240 78 62 / calc(var(--lq-wall-a) * 0.75)), transparent 70%),
+    radial-gradient(40% 50% at 52% 0%, rgb(99 102 241 / calc(var(--lq-wall-a) * 0.8)), transparent 72%),
+    radial-gradient(38% 48% at 98% 18%, rgb(20 184 166 / calc(var(--lq-wall-a) * 0.8)), transparent 70%),
+    radial-gradient(46% 44% at 18% 78%, rgb(59 130 246 / calc(var(--lq-wall-a) * 0.7)), transparent 72%),
+    radial-gradient(40% 46% at 86% 88%, rgb(168 85 247 / calc(var(--lq-wall-a) * 0.7)), transparent 70%),
+    radial-gradient(30% 30% at 58% 56%, rgb(251 191 36 / calc(var(--lq-wall-a) * 0.45)), transparent 70%);
+}
+
+:root[data-liquid] .card {
+  background-color: transparent;
+  background-image:
+    radial-gradient(90% 55% at 0% 0%, rgb(255 255 255 / var(--lq-glint)), transparent 62%),
+    linear-gradient(165deg,
+      rgb(var(--lq-fill-hi) / var(--lq-fill-a-hi)) 0%,
+      rgb(var(--lq-fill-lo) / var(--lq-fill-a-lo)) 100%);
+  -webkit-backdrop-filter: blur(22px) saturate(1.9);
+  backdrop-filter: blur(22px) saturate(1.9);
+  border-color: transparent;
+  border-radius: 22px !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / var(--lq-rim-hi)),
+    inset 0 -14px 22px -20px rgb(255 255 255 / var(--lq-thick)),
+    0 0 0 1px rgb(var(--lq-hair) / var(--lq-hair-a)),
+    var(--lq-shadow);
+}
+:root[data-liquid] .card:not([data-selected]) { border-color: transparent !important; }
+/* The rim: a one-pixel ring whose light runs round the edge — bright where the
+   light source is (top left), dim along the sides, catching again at the
+   bottom right like the far edge of a lens. */
+:root[data-liquid] .card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(140deg,
+      rgb(255 255 255 / var(--lq-rim-hi)) 0%,
+      rgb(255 255 255 / var(--lq-rim-mid)) 28%,
+      rgb(255 255 255 / calc(var(--lq-rim-mid) * 0.5)) 62%,
+      rgb(255 255 255 / var(--lq-rim-lo)) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+:root[data-liquid] .card[data-surface]:hover {
+  background-image:
+    radial-gradient(90% 55% at 0% 0%, rgb(255 255 255 / var(--lq-glint)), transparent 62%),
+    linear-gradient(165deg,
+      rgb(var(--lq-fill-hi) / calc(var(--lq-fill-a-hi) + 0.08)) 0%,
+      rgb(var(--lq-fill-lo) / calc(var(--lq-fill-a-lo) + 0.08)) 100%);
+}
+/* Smoked glass is a shade lighter than the opaque card it replaces, so the
+   muted inks lift by the same shade to keep their contrast on it. */
+:root[data-liquid]:not([data-theme="light"]) .card :is(.text-slate-500, .text-slate-600, .text-slate-700) {
+  color: rgb(132 147 169);
+}
+/* Wells and inner rows sit on the pane, so they go translucent with it rather
+   than punching opaque holes through the glass. */
+:root[data-liquid] .card .well { background: rgb(var(--lq-fill-lo) / 0.35); }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-liquid] .card { background-image: none; background-color: rgb(var(--card)); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-liquid] .card {
+    background-image: none;
+    background-color: rgb(var(--card));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* A tooltip is smoked glass in both themes — a label has to stand out from
    whatever it floats over, so it is the one glass that inverts. */
 .physics-tip {
