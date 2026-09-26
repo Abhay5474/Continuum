@@ -175,10 +175,25 @@ public class AutopilotService {
             return;
         }
 
+        // One pending proposal at a time. The loop runs every cycle, and it used
+        // to file the same change again each time: an account left alone for a
+        // day collected hundreds of identical "pending" recommendations, each
+        // with its own candidate bundle. The same change still waiting is left
+        // as it is; a different one replaces what was waiting.
+        String impact = summarizeImpact(proposal);
+        List<AutopilotRecommendationEntity> pending = recommendations.findByDeveloperIdAndStatus(developerId, "PENDING");
+        if (pending.stream().anyMatch(r -> java.util.Objects.equals(r.getImpact(), impact))) {
+            record(developerId, "SKIP", "Same proposal is still waiting for review. " + proposal.rationale(), null,
+                    config.getActiveBundleId(), proposal.confidence());
+            return;
+        }
+        pending.forEach(r -> r.setStatus("SUPERSEDED"));
+        recommendations.saveAll(pending);
+
         PolicyBundleEntity candidate = bundles.create(developerId, proposal.candidate(), PolicyStatus.CANDIDATE,
                 config.getActiveBundleId(), "AUTOPILOT", proposal.rationale());
         recommendations.save(new AutopilotRecommendationEntity(developerId,
-                "Proposed policy update", proposal.rationale(), summarizeImpact(proposal),
+                "Proposed policy update", proposal.rationale(), impact,
                 candidate.getId(), proposal.confidence()));
         record(developerId, "PROPOSE", proposal.rationale(), detail(proposal), candidate.getId(), proposal.confidence());
 
