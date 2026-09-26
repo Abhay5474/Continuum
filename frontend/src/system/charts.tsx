@@ -458,7 +458,7 @@ export function Donut({
               y={size / 2 - 2}
               textAnchor="middle"
               className="readout"
-              style={{ fill: "rgb(226 232 240)", fontSize: 20, fontWeight: 600 }}
+              style={{ fill: "rgb(var(--topo-text))", fontSize: 20, fontWeight: 600 }}
             >
               {centerValue}
             </text>
@@ -893,6 +893,7 @@ export function BeforeAfter({
   after,
   unit,
   goodDirection = "down",
+  format = fmt,
 }: {
   beforeLabel?: string;
   afterLabel?: string;
@@ -900,33 +901,36 @@ export function BeforeAfter({
   after: number;
   unit?: string;
   goodDirection?: "up" | "down";
+  /** How a value is written on its bar; money wants more places than a count. */
+  format?: (n: number) => string;
 }) {
-  const top = Math.max(before, after, 1);
+  // Scaled to the larger of the two, not to at least 1: a pair of costs in
+  // fractions of a dollar drew as two empty tracks against a floor of one.
+  const top = Math.max(before, after) || 1;
   const improved = goodDirection === "down" ? after < before : after > before;
   const delta = before > 0 ? (after - before) / before : 0;
   const accent = improved ? "var(--div-pos)" : "var(--div-neg)";
 
+  // The value sits beside its bar, not on it: printed over a saturated fill it
+  // lost its contrast exactly when the bar was longest.
   const row = (label: string, value: number, color: string) => (
     <div className="flex items-center gap-2">
       <span className="w-16 shrink-0 text-right text-xs text-slate-500">{label}</span>
-      <div className="relative h-6 min-w-0 flex-1">
-        <div className="absolute inset-0 rounded-[3px]" style={{ background: GRID }} aria-hidden />
+      <div className="relative h-5 min-w-0 flex-1">
+        <div className="absolute inset-0 rounded-[4px]" style={{ background: GRID }} aria-hidden />
         <div
           className="absolute inset-y-0 left-0 transition-[width] duration-700 ease-out"
           style={{
             width: `${(value / top) * 100}%`,
             background: color,
-            borderRadius: "0 4px 4px 0",
+            borderRadius: 4,
           }}
         />
-        <span
-          className="readout pointer-events-none absolute inset-y-0 right-2 flex items-center text-[11px] text-slate-200"
-          style={{ textShadow: "0 0 3px var(--chart-surface)" }}
-        >
-          {fmt(value)}
-          {unit ? <span className="ml-0.5 text-slate-500">{unit}</span> : null}
-        </span>
       </div>
+      <span className="readout w-20 shrink-0 text-[11.5px] text-slate-300">
+        {format(value)}
+        {unit ? <span className="ml-0.5 text-slate-500">{unit}</span> : null}
+      </span>
     </div>
   );
 

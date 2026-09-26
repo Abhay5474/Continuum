@@ -68,6 +68,12 @@ export function Scene({
     };
   }, []);
 
+  const arrive: React.CSSProperties = {
+    opacity: t,
+    transform: `translate3d(0, ${(1 - t) * 22}px, 0)`,
+    willChange: "opacity, transform",
+  };
+
   const align =
     side === "right"
       ? "ml-auto text-left"
@@ -80,23 +86,13 @@ export function Scene({
   if (aside) {
     return (
       <section ref={ref} className="relative flex min-h-screen items-center px-6 py-24 sm:px-10">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to bottom, transparent, rgb(var(--ink) / 0.72) 16%, rgb(var(--ink) / 0.72) 84%, transparent)",
-            opacity: t,
-          }}
-        />
-        <div
-          className="relative mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2"
-          style={{
-            opacity: t,
-            transform: `translate3d(0, ${(1 - t) * 22}px, 0)`,
-            willChange: "opacity, transform",
-          }}
-        >
-          <div className={side === "right" ? "lg:order-2" : ""}>
+        {/* Above the near field (z-20), so drifting particles pass behind the
+            glass instead of across the words. */}
+        {/* The fade is applied to each pane, not to this grid: an ancestor with
+            opacity becomes the pane's backdrop root, and the glass would then
+            frost nothing — the field would show through it sharp. */}
+        <div className="relative z-30 mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2">
+          <div className={`scene-pane glass ${side === "right" ? "lg:order-2" : ""}`} data-glass="" style={arrive}>
             <div className="flex items-baseline gap-3">
               <span className="readout text-[11px] font-medium tracking-[0.3em] text-aurora">{index}</span>
               <span className="h-px w-8 bg-edge" />
@@ -108,7 +104,7 @@ export function Scene({
             <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-slate-400">{body}</p>
             {children && <div className="mt-7">{children}</div>}
           </div>
-          <div className={side === "right" ? "lg:order-1" : ""}>{aside}</div>
+          <div className={side === "right" ? "lg:order-1" : ""} style={arrive}>{aside}</div>
         </div>
       </section>
     );
@@ -119,22 +115,12 @@ export function Scene({
       ref={ref}
       className="relative flex min-h-screen items-center px-6 py-24 sm:px-10"
     >
-      {/* A soft scrim on the text side only. The field stays fully visible
-          where there is nothing to read, and the copy never has to compete
-          with a moving node for contrast. */}
+      {/* The copy floats on a pane of glass above the field. The field stays
+          fully visible around it, and the words never compete with a moving
+          node for contrast — the near particles pass behind the pane. */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 w-full sm:max-w-3xl"
-        style={{
-          [side === "right" ? "right" : "left"]: 0,
-          background:
-            side === "center"
-              ? "radial-gradient(58% 54% at 50% 50%, rgb(var(--ink) / 0.9), rgb(var(--ink) / 0.6) 62%, transparent 82%)"
-              : `linear-gradient(to ${side === "right" ? "left" : "right"}, rgb(var(--ink) / 0.8), rgb(var(--ink) / 0.45) 55%, transparent 88%)`,
-          opacity: t,
-        }}
-      />
-      <div
-        className={`relative w-full max-w-xl ${align}`}
+        className={`scene-pane glass relative z-30 w-full max-w-xl ${align}`}
+        data-glass=""
         style={{
           opacity: t,
           // A small rise, scaled by the same curve — enough to feel like arrival,
@@ -172,11 +158,11 @@ export function Scene({
  */
 export function Facts({ items }: { items: [string, string][] }) {
   return (
-    <dl className="flex flex-wrap gap-x-12 gap-y-5 border-t border-edge/70 pt-5">
+    <dl className="grid gap-2 sm:grid-cols-3">
       {items.map(([k, v]) => (
-        <div key={k}>
-          <dt className="text-[9px] uppercase tracking-[0.3em] text-slate-600">{k}</dt>
-          <dd className="readout mt-1.5 text-[15px] font-medium text-slate-200">{v}</dd>
+        <div key={k} className="scene-fact">
+          <dt className="text-[9px] uppercase tracking-[0.3em] text-slate-500">{k}</dt>
+          <dd className="readout mt-1.5 text-[14px] font-medium leading-snug text-slate-200">{v}</dd>
         </div>
       ))}
     </dl>

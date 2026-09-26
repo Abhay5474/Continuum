@@ -11,17 +11,14 @@ import {
   Empty,
   Facts,
   Ghost,
-  Hop,
-  KindMark,
   Rail,
-  Route,
   Row,
   Pill,
   RowSkeleton,
-  Stage,
   Stat,
   Stats,
 } from "../system/hub";
+import { Mechanism } from "../system/viz";
 import { Select } from "../system/controls";
 
 /**
@@ -53,11 +50,16 @@ type Status = {
   entries: number;
 };
 
-/** Named bands, because 0.92 means nothing without its consequence. */
-const BANDS: [number, string, string][] = [
-  [0.85, "Loose", "Catches more rewordings. Some answers will be near misses."],
-  [0.92, "Balanced", "Serves clear rephrasings only. The recommended setting."],
-  [0.98, "Strict", "Essentially identical prompts. Fewest hits, no surprises."],
+/**
+ * Named bands, because 0.92 means nothing without its consequence — and the
+ * consequence is clearest as a pair of prompts the band would treat as one
+ * question. At Loose the pair is related but not the same question, which is
+ * exactly the risk the band carries.
+ */
+const BANDS: [number, string, string, [string, string], boolean][] = [
+  [0.85, "Loose", "Catches more rewordings. Some answers will be near misses.", ["reset my password", "I can't log in"], false],
+  [0.92, "Balanced", "Serves clear rephrasings only. The recommended setting.", ["summarise the refund policy", "summarize our refund policy"], true],
+  [0.98, "Strict", "Essentially identical prompts. Fewest hits, no surprises.", ["What is 2+2?", "what is 2 + 2"], true],
 ];
 
 /**
@@ -146,23 +148,58 @@ export default function SemanticCache() {
         subtitle="Serve repeated questions without a provider call"
       />
 
-      {/* Where the cache sits. It is the one stage on the path that can end a
-          request early, and that is worth drawing rather than describing. */}
-      <div className="mt-6">
-        <Route>
-          <Stage label="a prompt" sub="from your app" />
-          <Hop />
-          <Stage
-            label="Semantic cache"
-            sub={on ? (total > 0 ? `${savedPct}% answered here` : "warming up") : "off"}
-            state={on ? "on" : "off"}
-            mark={<KindMark kind="conversation" size={26} />}
-            selected
-          />
-          <Hop label={total > 0 ? `${100 - savedPct}% carry on` : undefined} />
-          <Stage label="the provider" sub="only for a genuine miss" />
-        </Route>
-      </div>
+      {/* What the cache does to a prompt, drawn with the traffic on it: every
+          prompt either ends here with a stored answer or carries on to a
+          provider, and the thicker line is the way most of them went. */}
+      <Card className="mt-6" guide="cache-mechanism">
+        <Mechanism
+          summary={
+            on
+              ? `Of ${total} prompts, ${status?.hits ?? 0} were answered from the cache and ${status?.misses ?? 0} went to a provider.`
+              : "The cache is off: every prompt goes to a provider."
+          }
+          nodes={[
+            { id: "in", col: 0, span: 2, role: "end", glyph: "app", label: "Your prompts", sub: "through the gateway", value: total },
+            {
+              id: "cache",
+              col: 1,
+              span: 2,
+              role: "core",
+              glyph: "cache",
+              tone: "ok",
+              off: !on,
+              label: "Semantic cache",
+              sub: on ? `same meaning ≥ ${threshold.toFixed(2)}` : "off — nothing is matched",
+            },
+            {
+              id: "hit",
+              col: 2,
+              row: 0,
+              glyph: "check",
+              tone: "green",
+              off: !on,
+              label: "Answered from cache",
+              sub: status?.costSaved ? `${money(status.costSaved)} not spent` : "no provider call",
+              value: status?.hits ?? 0,
+            },
+            {
+              id: "miss",
+              col: 2,
+              row: 1,
+              glyph: "model",
+              tone: "blue",
+              label: "Sent to a provider",
+              sub: on ? "answer stored for next time" : "every prompt",
+              value: status?.misses ?? 0,
+            },
+          ]}
+          links={[
+            { from: "in", to: "cache", weight: total },
+            { from: "cache", to: "hit", weight: status?.hits ?? 0, tone: "green", off: !on, label: on && total > 0 ? `${savedPct}%` : undefined },
+            { from: "cache", to: "miss", weight: status?.misses ?? 0, tone: "blue", label: on && total > 0 ? `${100 - savedPct}%` : undefined },
+          ]}
+        />
+      </Card>
 
       <div className="mt-7" data-guide="cache-toggle">
         <Switch
@@ -191,7 +228,7 @@ export default function SemanticCache() {
         </div>
 
         <div data-guide="cache-stats">
-        <Stats>
+        <Stats cols={2}>
           <Stat
             label="Tokens saved"
             glyph="spark"
@@ -242,7 +279,7 @@ export default function SemanticCache() {
             />
           </div>
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
-            {BANDS.map(([value, name, note]) => {
+            {BANDS.map(([value, name, note, [x, y], same]) => {
               const active = Math.abs(threshold - value) < 0.005;
               return (
                 <button
@@ -252,6 +289,8 @@ export default function SemanticCache() {
                     run(() => portal.cache.configure({ similarityThreshold: value }), `Threshold set to ${name}`)
                   }
                   className="min-w-0 flex-1 basis-48 text-left transition-opacity disabled:opacity-50"
+                  data-tip={note}
+                  aria-label={`${name}, ${value.toFixed(2)}: ${note}`}
                 >
                   <div className="flex items-baseline gap-2">
                     <span
@@ -262,7 +301,16 @@ export default function SemanticCache() {
                     </span>
                     <span className="readout text-[11px] text-slate-600">{value.toFixed(2)}</span>
                   </div>
-                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">{note}</p>
+                  {/* What this band would call "the same question". */}
+                  <div className="mt-1.5 flex flex-col gap-1" aria-hidden>
+                    <span className="self-start rounded-full bg-slate-500/10 px-2 py-0.5 text-[11px] text-slate-400">“{x}”</span>
+                    <span className="flex items-center gap-1.5 pl-2 text-[10.5px] font-medium"
+                          style={{ color: same ? "var(--state-healthy-ink)" : "var(--state-warning-ink)" }}>
+                      <span className="text-[13px] leading-none">≈</span>
+                      {same ? "same question" : "matched — a different question?"}
+                    </span>
+                    <span className="self-start rounded-full bg-slate-500/10 px-2 py-0.5 text-[11px] text-slate-400">“{y}”</span>
+                  </div>
                   <span
                     className="mt-1.5 block h-[2px] w-full rounded-full transition-opacity duration-200"
                     style={{ background: "var(--accent)", opacity: active ? 1 : 0 }}

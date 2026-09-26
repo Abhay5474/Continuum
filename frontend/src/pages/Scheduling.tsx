@@ -3,7 +3,8 @@ import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain, Empty } from "../system/hub";
+import { Card, Explain, Empty, Pill, toneInk, type Tone } from "../system/hub";
+import { Mechanism } from "../system/viz";
 import { Select, Table, TH, TR, TD } from "../system/controls";
 
 /**
@@ -116,6 +117,8 @@ export default function Scheduling() {
   const promoted = providers.reduce((n, p) => n + p.promoted, 0);
   const aged = providers.reduce((n, p) => n + p.aged, 0);
   const missed = providers.reduce((n, p) => n + p.missedDeadline, 0);
+  const ordered = providers.reduce((n, p) => n + p.ordered, 0);
+  const on = !!status?.enabled;
 
   return (
     <section className="space-y-8">
@@ -153,6 +156,52 @@ export default function Scheduling() {
           hint="Could not have finished in time, so the slot went to something that could."
         />
       </div>
+
+      {/* The scheduler's job, drawn: when requests are waiting for a full
+          provider, it decides who gets the next free slot — by band, then
+          deadline, then how long each has waited — and refuses what could not
+          finish in time anyway. */}
+      <Card guide="scheduling-mechanism">
+        <Mechanism
+          summary={`${ordered} requests were ordered for a slot, ${promoted} of them ahead of earlier arrivals; ${aged} were lifted by waiting and ${missed} refused on deadline.`}
+          nodes={[
+            { id: "in", col: 0, span: 3, role: "end", glyph: "queue", label: "Waiting for a slot", sub: "only while a provider is full", value: waiting },
+            {
+              id: "core",
+              col: 1,
+              span: 3,
+              role: "core",
+              tone: "violet",
+              glyph: "list",
+              off: !on,
+              label: "Scheduler",
+              sub: on ? "band → deadline → time waited" : "off — first come, first served",
+            },
+            { id: "next", col: 2, row: 0, tone: "green", glyph: "check", label: "Next free slot", sub: `${promoted} jumped the queue`, value: ordered, off: !on },
+            {
+              id: "aged",
+              col: 2,
+              row: 1,
+              tone: "blue",
+              glyph: "up",
+              label: "Lifted by waiting",
+              sub: `+1 band per ${status?.agingStepSeconds ?? 120}s, up to 2`,
+              value: aged,
+              off: !on,
+            },
+            { id: "late", col: 2, row: 2, tone: "red", glyph: "block", label: "Refused on deadline", sub: "422 — could not finish in time", value: missed, off: !on },
+            { id: "prov", col: 3, row: 0, span: 2, role: "end", glyph: "model", label: "The provider" },
+          ]}
+          links={[
+            { from: "in", to: "core", weight: waiting + ordered + missed },
+            { from: "core", to: "next", weight: ordered, tone: "green", off: !on },
+            { from: "core", to: "aged", weight: aged, tone: "blue", off: !on },
+            { from: "core", to: "late", weight: missed, tone: "red", off: !on },
+            { from: "next", to: "prov", weight: ordered, tone: "green", off: !on },
+            { from: "aged", to: "prov", weight: aged, tone: "blue", off: !on },
+          ]}
+        />
+      </Card>
 
       <div className="space-y-3">
         <Switch
@@ -252,28 +301,7 @@ export default function Scheduling() {
           Order them
         </button>
 
-        {planned && (
-          <ol className="space-y-1.5">
-            {planned.map((d) => (
-              <li
-                key={d.id}
-                className={`flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-md border p-2 ${
-                  d.runnable ? "border-edge" : "border-rose-500/40 bg-rose-500/5"
-                }`}
-              >
-                <span className="readout w-6 shrink-0 text-xs text-slate-500">
-                  {d.runnable ? `#${d.rank + 1}` : "—"}
-                </span>
-                <span className="font-mono text-xs text-slate-200">{d.id}</span>
-                <span
-                  className={`text-[11px] ${d.runnable ? "text-slate-500" : "text-rose-400"}`}
-                >
-                  {d.reason}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
+        {planned && <PlanTimeline planned={planned} rows={rows} />}
       </div>
 
       {status === null ? (
@@ -333,6 +361,103 @@ export default function Scheduling() {
         </button>
       )}
     </section>
+  );
+}
+
+const BAND_TONE: Record<string, Tone> = { INTERACTIVE: "blue", NORMAL: "green", BATCH: "mute" };
+
+/**
+ * The scheduler's answer as a timeline, not a list.
+ *
+ * <p>Each runnable task is a bar laid end to end in the order it was given, as
+ * if one slot served them in turn; its deadline is a mark on its own row. A
+ * refused task is drawn from "now" at its full length, and the reason it was
+ * refused is visible without reading anything: the bar runs past its mark.
+ */
+function PlanTimeline({ planned, rows }: { planned: Decision[]; rows: Row[] }) {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const runnable = planned.filter((d) => d.runnable).sort((a, b) => a.rank - b.rank);
+  const refused = planned.filter((d) => !d.runnable);
+  let t = 0;
+  const bars = [
+    ...runnable.map((d) => {
+      const r = byId.get(d.id);
+      const est = r?.estimateSeconds ?? 0;
+      const start = t;
+      t += est;
+      return { d, r, start, end: start + est };
+    }),
+    ...refused.map((d) => {
+      const r = byId.get(d.id);
+      return { d, r, start: 0, end: r?.estimateSeconds ?? 0 };
+    }),
+  ];
+  // Scaled to the work, not to the furthest deadline: a ten-minute deadline
+  // beside four-second tasks would shrink every bar to a sliver. A deadline
+  // past the edge is written at the edge instead of drawn.
+  const workEnd = Math.max(1, ...bars.map((b) => b.end));
+  const horizon =
+    Math.max(
+      workEnd,
+      ...bars.map((b) => (b.r?.deadlineSeconds != null && b.r.deadlineSeconds <= workEnd * 2 ? b.r.deadlineSeconds : 0)),
+    ) * 1.15;
+  const x = (v: number) => `${Math.min(100, (v / horizon) * 100)}%`;
+  return (
+    <Card>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="micro">One slot, in the order given</span>
+        <span className="flex items-center gap-3 text-[10.5px] text-slate-500">
+          <span className="flex items-center gap-1"><span className="h-2 w-4 rounded-sm" style={{ background: toneInk("blue"), opacity: 0.7 }} />runs</span>
+          <span className="flex items-center gap-1"><span className="h-3 w-px" style={{ background: "var(--state-critical-ink)" }} />deadline</span>
+        </span>
+      </div>
+      <ol className="mt-3 space-y-2.5">
+        {bars.map(({ d, r, start, end }) => {
+          const tone = BAND_TONE[r?.priority ?? "NORMAL"] ?? "mute";
+          const deadline = r?.deadlineSeconds ?? null;
+          return (
+            <li key={d.id} className="grid items-center gap-x-3 gap-y-1 sm:grid-cols-[190px_minmax(0,1fr)]">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="readout w-6 shrink-0 text-[11px] text-slate-500">{d.runnable ? `#${d.rank + 1}` : "—"}</span>
+                <span className="truncate font-mono text-[11.5px] text-slate-200">{d.id}</span>
+                <Pill tone={tone}>{(r?.priority ?? "").toLowerCase()}</Pill>
+              </div>
+              <div className="min-w-0">
+                <div className="relative h-5 rounded-md" style={{ background: "rgb(var(--card-rule))" }}>
+                  <span
+                    className="absolute inset-y-0.5 rounded"
+                    style={{
+                      left: x(start),
+                      width: `calc(${x(end)} - ${x(start)})`,
+                      minWidth: 3,
+                      background: d.runnable ? toneInk(tone === "mute" ? "blue" : tone) : "var(--state-critical-ink)",
+                      opacity: d.runnable ? 0.7 : 0.35,
+                      backgroundImage: d.runnable ? undefined : "repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / .35) 4px 7px)",
+                    }}
+                    title={`${start}s → ${end}s`}
+                  />
+                  {deadline != null && deadline < horizon && (
+                    <span className="absolute -inset-y-1 w-[2px] rounded" style={{ left: x(deadline), background: "var(--state-critical-ink)" }}
+                          title={`deadline ${deadline}s`} />
+                  )}
+                  {deadline != null && deadline >= horizon && (
+                    <span className="readout absolute inset-y-0 right-1.5 flex items-center text-[10px] text-slate-500">due {deadline}s →</span>
+                  )}
+                </div>
+                <div className={`mt-0.5 text-[10.5px] ${d.runnable ? "text-slate-500" : ""}`}
+                     style={d.runnable ? undefined : { color: "var(--state-critical-ink)" }}>
+                  {d.reason}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="mt-2 flex justify-between pl-0 text-[10px] text-slate-500 sm:pl-[202px]">
+        <span>now</span>
+        <span>{Math.round(horizon)}s</span>
+      </div>
+    </Card>
   );
 }
 

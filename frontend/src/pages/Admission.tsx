@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { Meter, PageHeader, Readout, Switch, Note } from "../system/primitives";
-import { BarChart, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
+import { BarChart, BeforeAfter, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain, Empty } from "../system/hub";
+import { Card, CardHead, Explain, Empty } from "../system/hub";
+import { Gauge, Mechanism } from "../system/viz";
 
 /**
  * Congestion-controlled admission.
@@ -81,6 +82,10 @@ export default function Admission() {
   const totalAdmitted = providers.reduce((n, p) => n + p.admitted, 0);
   const totalQueued = providers.reduce((n, p) => n + p.queued, 0);
   const inFlight = providers.reduce((n, p) => n + p.inFlight, 0);
+  const total = totalAdmitted + totalQueued + totalShed;
+  const on = !!status?.enabled;
+  // The shedding decision is taken on the busiest provider's utilisation.
+  const utilisation = providers.reduce((m, p) => Math.max(m, p.limit > 0 ? p.inFlight / p.limit : 0), 0);
 
   return (
     <section className="space-y-8">
@@ -109,6 +114,41 @@ export default function Admission() {
         />
       </div>
 
+      {/* What admission does to a request: it is let through, made to wait a
+          moment for a slot, or refused on the spot — and the lines are as thick
+          as the traffic that went each way. */}
+      <Card guide="admission-mechanism">
+        <Mechanism
+          summary={`Of ${total} requests, ${totalAdmitted} were admitted, ${totalQueued} waited for a slot and ${totalShed} were refused.`}
+          nodes={[
+            { id: "in", col: 0, span: 3, role: "end", glyph: "app", label: "Requests", sub: "with a criticality", value: total },
+            {
+              id: "gate",
+              col: 1,
+              span: 3,
+              role: "core",
+              tone: "blue",
+              glyph: "gauge",
+              off: !on,
+              label: "Admission",
+              sub: on ? `limit learned from latency · waits ≤ ${status?.queueMs ?? 250}ms` : "off — all straight through",
+            },
+            { id: "ok", col: 2, row: 0, tone: "green", glyph: "check", label: "Admitted", sub: "a slot was free", value: totalAdmitted },
+            { id: "wait", col: 2, row: 1, tone: "amber", glyph: "clock", label: "Queued briefly", sub: "waited for a slot", value: totalQueued, off: !on },
+            { id: "shed", col: 2, row: 2, tone: "red", glyph: "block", label: "Shed", sub: "429 + Retry-After, at once", value: totalShed, off: !on },
+            { id: "prov", col: 3, row: 0, span: 2, role: "end", glyph: "model", label: "The provider", sub: "never overloaded" },
+          ]}
+          links={[
+            { from: "in", to: "gate", weight: total },
+            { from: "gate", to: "ok", weight: totalAdmitted, tone: "green" },
+            { from: "gate", to: "wait", weight: totalQueued, tone: "amber", off: !on },
+            { from: "gate", to: "shed", weight: totalShed, tone: "red", off: !on },
+            { from: "ok", to: "prov", weight: totalAdmitted, tone: "green" },
+            { from: "wait", to: "prov", weight: totalQueued, tone: "amber", off: !on },
+          ]}
+        />
+      </Card>
+
       <div className="space-y-3">
         <Switch
           checked={!!status?.enabled}
@@ -136,23 +176,9 @@ export default function Admission() {
 
       <div>
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">How importance decides who is refused first</h2>
-        <div className="mt-2 space-y-2">
-          {Object.entries(status?.sheddingPoints ?? {}).map(([name, point]) => (
-            <div key={name} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="micro w-24 shrink-0">{name}</span>
-              <div className="min-w-0 flex-1">
-                <Meter
-                  value={Math.min(1, point / 1.3)}
-                  state={name === "BACKGROUND" ? "degraded" : name === "CRITICAL" ? "healthy" : "active"}
-                  height={5}
-                />
-              </div>
-              <span className="readout w-28 shrink-0 text-right text-xs text-slate-400">
-                sheds at {Math.round(point * 100)}%
-              </span>
-            </div>
-          ))}
-        </div>
+        <Card className="mt-3">
+          <ShedScale points={status?.sheddingPoints ?? {}} utilisation={utilisation} on={on} />
+        </Card>
         <Note className="mt-2">
           Set <span className="readout">criticality</span> on the request. Anything unrecognised
           reads as <span className="readout">NORMAL</span>, never as background.
@@ -213,12 +239,33 @@ function ProviderCard({ p }: { p: ProviderState }) {
   );
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="text-sm font-medium text-slate-200">{p.provider}</span>
-        <span className="micro">{p.samples} samples</span>
-        {p.drops > 0 && <span className="micro text-rose-400">{p.drops} backoffs</span>}
-        <span className="flex-1" />
+    <Card className="space-y-4">
+      <CardHead glyph="model" tone="blue" title={p.provider}
+                sub={`${p.samples} samples${p.drops > 0 ? ` · ${p.drops} backoffs` : ""}`} />
+
+      <div className="grid items-center gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
+        {/* In flight against the limit it was measured to have: the one
+            reading the refusal decision is taken on. */}
+        <Gauge
+          value={p.inFlight}
+          max={Math.max(1, p.limit)}
+          display={`${p.inFlight}/${p.limit}`}
+          label="In flight / limit"
+          sub={`peak ${p.peakInFlight}`}
+        />
+        {/* Congestion is latency rising above its best — drawn as two lengths,
+            because that ratio is what brings the limit down. */}
+        <div className="min-w-0">
+          <div className="micro mb-2">Latency against its best</div>
+          <BeforeAfter
+            beforeLabel="Best"
+            afterLabel="Latest"
+            before={Math.round(p.minRttMs)}
+            after={Math.round(p.lastRttMs)}
+            unit="ms"
+            goodDirection="down"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -320,6 +367,80 @@ function ProviderCard({ p }: { p: ProviderState }) {
           ? `Latest latency is ${(p.lastRttMs / Math.max(1, p.minRttMs)).toFixed(1)}× the best seen, so the limit is coming down — before this provider starts refusing anything.`
           : "Latency is close to the best seen, so there is no queue building at the provider and the limit can grow when the traffic justifies it."}
       </p>
+    </Card>
+  );
+}
+
+/**
+ * Where each importance class starts being refused, on one utilisation axis.
+ *
+ * <p>Three separate meters said three numbers; one axis says the order. The
+ * needle is the busiest provider's load right now, so "are we refusing
+ * anything, and whose" is read off where the needle sits among the marks.
+ */
+function ShedScale({
+  points,
+  utilisation,
+  on,
+}: {
+  points: Record<string, number>;
+  utilisation: number;
+  on: boolean;
+}) {
+  const marks = Object.entries(points).sort((a, b) => a[1] - b[1]);
+  const top = Math.max(1.4, ...marks.map(([, v]) => v + 0.1));
+  const x = (v: number) => `${(Math.min(v, top) / top) * 100}%`;
+  const tones = ["var(--state-warning-ink)", "var(--state-degraded-ink)", "var(--state-critical-ink)"];
+  const refusing = marks.filter(([, v]) => utilisation >= v).map(([k]) => k.toLowerCase());
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="micro">Load on the busiest provider</span>
+        <span className="readout text-[12px]" style={{ color: refusing.length ? "var(--state-degraded-ink)" : "var(--state-healthy-ink)" }}>
+          {Math.round(utilisation * 100)}%{" "}
+          <span className="text-slate-500">
+            {!on ? "· admission off" : refusing.length ? `· refusing ${refusing.join(", ")}` : "· everything served"}
+          </span>
+        </span>
+      </div>
+      <div className="relative mt-9 h-3 rounded-full" style={{ background: "rgb(var(--card-rule))" }}>
+        {/* the zones: served, then each class refused in turn */}
+        {marks.map(([k, v], i) => (
+          <span
+            key={k}
+            className="absolute inset-y-0 rounded-r-full"
+            style={{
+              left: x(v),
+              right: 0,
+              background: tones[Math.min(i, tones.length - 1)],
+              opacity: 0.22,
+            }}
+            aria-hidden
+          />
+        ))}
+        <span className="absolute inset-y-0 left-0 rounded-l-full" style={{ width: x(marks[0]?.[1] ?? top), background: "var(--state-healthy-ink)", opacity: 0.22 }} aria-hidden />
+        {marks.map(([k, v], i) => (
+          <span key={`m-${k}`} className="absolute -top-8 flex -translate-x-1/2 flex-col items-center" style={{ left: x(v) }}>
+            <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: tones[Math.min(i, tones.length - 1)] }}>
+              {k.toLowerCase()}
+            </span>
+            <span className="readout text-[10px] text-slate-500">{Math.round(v * 100)}%</span>
+            <span className="mt-0.5 h-[22px] w-px" style={{ background: tones[Math.min(i, tones.length - 1)] }} aria-hidden />
+          </span>
+        ))}
+        {/* the needle */}
+        <span
+          className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] transition-[left] duration-500 ease-out"
+          style={{ left: x(utilisation), borderColor: "rgb(var(--card))", background: "var(--accent)", boxShadow: "0 0 0 1px var(--accent-edge), 0 2px 6px rgba(0,0,0,.2)" }}
+          aria-label={`Current load ${Math.round(utilisation * 100)}%`}
+          role="img"
+        />
+      </div>
+      <div className="relative mt-2 h-4 text-[10px] text-slate-500">
+        <span className="absolute left-0">idle</span>
+        <span className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: x(1) }}>limit</span>
+        <span className="absolute right-0">{Math.round(top * 100)}%</span>
+      </div>
     </div>
   );
 }

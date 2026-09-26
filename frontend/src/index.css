@@ -1276,6 +1276,75 @@ body::before {
   }
 }
 
+/* ======================== Mechanism diagrams ================================
+   Boxes are small sheets on the pane they sit in; the feature itself carries
+   the accent. Lines are drawn in ink at low opacity with dots of full ink
+   travelling along them, so the direction of traffic is visible without an
+   arrowhead on every line. */
+:root { --mech-line: rgb(148 163 184); --mech-line-off: rgb(100 116 139 / 0.5); }
+:root[data-theme="light"] { --mech-line: rgb(71 85 105); --mech-line-off: rgb(100 116 139 / 0.45); }
+.mech-node {
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgb(var(--glass-tint) / 0.62);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--glass-rim) / calc(var(--glass-rim-a) * 0.9)),
+    0 0 0 1px rgb(var(--glass-edge) / calc(var(--glass-edge-a) * 1.3)),
+    0 6px 16px -12px rgba(15, 23, 42, 0.35);
+}
+.mech-core {
+  background:
+    linear-gradient(var(--mech-core, var(--accent-wash)), var(--mech-core, var(--accent-wash))),
+    rgb(var(--glass-tint) / 0.7);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--glass-rim) / var(--glass-rim-a)),
+    0 0 0 1.5px color-mix(in srgb, var(--mech-core-ink, var(--accent)) 45%, transparent),
+    0 10px 26px -14px color-mix(in srgb, var(--mech-core-ink, var(--accent)) 70%, transparent);
+}
+.mech-off {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgb(var(--glass-edge) / calc(var(--glass-edge-a) * 2));
+  border: 1px dashed rgb(100 116 139 / 0.45);
+}
+.mech-selected { box-shadow: inset 0 0 0 1.5px var(--accent-edge), 0 0 0 3px var(--accent-wash); }
+.mech-tag {
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--topo-label, 100 116 139));
+  background: rgb(var(--glass-tint) / 0.92);
+  box-shadow: 0 0 0 1px rgb(var(--glass-edge) / calc(var(--glass-edge-a) * 1.4));
+}
+@keyframes mech-flow { from { stroke-dashoffset: 16.1; } to { stroke-dashoffset: 0; } }
+.mech-flow {
+  animation: mech-flow 1.1s linear infinite;
+  animation-play-state: paused;
+}
+.mech[data-live] .mech-flow { animation-play-state: running; }
+@media (prefers-reduced-motion: reduce) {
+  .mech-flow { display: none; }
+}
+
+/* ======================== Landing panes =====================================
+   The front door's copy sits on glass above the moving field. Here the blur
+   earns its cost: there is a live canvas behind the pane, and frosting it is
+   what keeps the words legible while the field keeps moving. */
+.scene-pane {
+  position: relative;
+  border-radius: 28px;
+  padding: 28px;
+}
+@media (min-width: 640px) { .scene-pane { padding: 36px 40px; } }
+.scene-fact {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgb(var(--glass-tint) / 0.5);
+  box-shadow: inset 0 1px 0 rgb(var(--glass-rim) / calc(var(--glass-rim-a) * 0.9)),
+    0 0 0 1px rgb(var(--glass-edge) / var(--glass-edge-a));
+}
+
 /* A tooltip is smoked glass in both themes — a label has to stand out from
    whatever it floats over, so it is the one glass that inverts. */
 .physics-tip {

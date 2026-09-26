@@ -4,20 +4,21 @@ import { portal } from "../api";
 import { Meter, PageHeader, Switch, Note, InfoTip } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
 import {
+  Card,
+  CardHead,
   Dot,
   Explain,
   Empty,
   Ghost,
-  Hop,
   KindMark,
   Rail,
-  Route,
   Row,
   RowSkeleton,
-  Stage,
   Stat,
   Stats,
 } from "../system/hub";
+import { Mechanism } from "../system/viz";
+import { BeforeAfter } from "../system/charts";
 import { Select } from "../system/controls";
 
 /**
@@ -125,34 +126,86 @@ export default function Cascade() {
         subtitle="Cheap model first · strong model only when needed"
       />
 
-      {/* The ladder, as a path. Two tiers and a judge between them is the whole
-          feature, and it is a shape rather than a paragraph. */}
-      <div className="mt-6">
-        <Route>
-          <Stage label="a request" sub="from your app" />
-          <Hop />
-          <Stage
-            label={status?.cheapTier?.model ?? "cheap tier"}
-            sub="every request starts here"
-            state={status?.enabled ? "on" : "off"}
-            mark={<KindMark kind="classification" size={26} />}
-          />
-          <Hop label="judged" />
-          <Stage
-            label={status?.strongTier?.model ?? "strong tier"}
-            sub={
-              (status?.requests ?? 0) > 0
-                ? `${Math.round((status?.escalationRate ?? 0) * 100)}% climb here`
-                : "only on a failed judgement"
-            }
-            state={status?.enabled ? "on" : "off"}
-            mark={<KindMark kind="classification" size={26} />}
-            selected
-          />
-          <Hop />
-          <Stage label="your app" sub="one answer, either way" />
-        </Route>
-      </div>
+      {/* The whole feature, drawn with its traffic: every request starts on the
+          cheap model, a judge reads the answer, and only a failed judgement
+          climbs to the strong model. The thick line is where most went. */}
+      <Card className="mt-6" guide="cascade-mechanism">
+        <Mechanism
+          summary={`Of ${status?.requests ?? 0} requests, ${accepted} were accepted from the cheap model and ${
+            status?.escalated ?? 0
+          } escalated to the strong model.`}
+          nodes={[
+            { id: "in", col: 0, span: 2, role: "end", glyph: "app", label: "Your requests", value: status?.requests ?? 0 },
+            {
+              id: "cheap",
+              col: 1,
+              span: 2,
+              role: "core",
+              tone: "green",
+              glyph: "model",
+              off: !status?.enabled,
+              label: status?.cheapTier?.model ?? "Cheap model",
+              sub: status?.cheapTier ? `$${status.cheapTier.costPer1k.toFixed(5)} / 1k · tries first` : "tries first",
+            },
+            {
+              id: "judge",
+              col: 2,
+              span: 2,
+              role: "core",
+              tone: "violet",
+              glyph: "scale",
+              off: !status?.enabled,
+              label: "Judge",
+              sub: `accepts at ≥ ${(status?.threshold ?? 0.75).toFixed(2)}`,
+            },
+            {
+              id: "ok",
+              col: 3,
+              row: 0,
+              tone: "green",
+              glyph: "check",
+              label: "Accepted",
+              sub: "cheap answer was good",
+              value: accepted,
+              off: !status?.enabled,
+            },
+            {
+              id: "up",
+              col: 3,
+              row: 1,
+              tone: "amber",
+              glyph: "up",
+              label: status?.strongTier?.model ?? "Strong model",
+              sub: status?.strongTier ? `$${status.strongTier.costPer1k.toFixed(5)} / 1k · on failure` : "on failure",
+              value: status?.escalated ?? 0,
+              off: !status?.enabled,
+            },
+            { id: "app", col: 4, span: 2, role: "end", glyph: "app", label: "Your app", sub: "one answer either way" },
+          ]}
+          links={[
+            { from: "in", to: "cheap", weight: status?.requests ?? 0 },
+            { from: "cheap", to: "judge", weight: status?.requests ?? 0 },
+            {
+              from: "judge",
+              to: "ok",
+              weight: accepted,
+              tone: "green",
+              off: !status?.enabled,
+              label: (status?.requests ?? 0) > 0 ? `${Math.round((accepted / (status?.requests || 1)) * 100)}%` : "pass",
+            },
+            {
+              from: "judge",
+              to: "up",
+              weight: status?.escalated ?? 0,
+              tone: "amber",
+              off: !status?.enabled,
+              label: (status?.requests ?? 0) > 0 ? `${Math.round((status?.escalationRate ?? 0) * 100)}%` : "fail",
+            },
+            { from: "ok", to: "app", weight: accepted, tone: "green", off: !status?.enabled },
+            { from: "up", to: "app", weight: status?.escalated ?? 0, tone: "amber", off: !status?.enabled },
+          ]}
+        />
+      </Card>
 
       {status && !status.available && (
         <p
@@ -224,6 +277,22 @@ export default function Cascade() {
             />
           </Stats>
         </div>
+
+        {status && status.requests > 0 && (
+          <Card className="mt-4">
+            <CardHead glyph="coin" tone="green" title="Spend, with and without the cascade"
+                      sub="Same requests, priced two ways" />
+            <div className="mt-3 max-w-xl">
+              <BeforeAfter
+                beforeLabel="Strong only"
+                afterLabel="Cascade"
+                before={status.strongOnlySpend}
+                after={status.spend}
+                format={(n) => (n > 0 && n < 0.0001 ? "<$0.0001" : `$${n.toFixed(4)}`)}
+              />
+            </div>
+          </Card>
+        )}
 
         {status && status.requests > 0 && (
           <p

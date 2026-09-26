@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { CodeBlock, ThemeToggle } from "../components/ui";
 import { Magnetic } from "../system/motion";
+import { BrandMark } from "../system/brand";
+import { useLiquidSurface } from "../system/primitives";
 import World from "../world/World";
 import IntroVideo from "../components/IntroVideo";
 import { Facts, Scene } from "../world/Scene";
@@ -24,6 +26,7 @@ import LoadDemo from "../world/demos/LoadDemo";
  * is described that the console cannot show you.
  */
 export default function Landing() {
+  useLiquidSurface();
   return (
     <div className="relative">
       <World />
@@ -32,7 +35,7 @@ export default function Landing() {
       {/* ---------- ENTRY ---------- */}
       <section className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center">
         <div className="animate-fade-up">
-          <div className="inline-flex items-center gap-2 rounded-full border border-edge/80 bg-panel/40 px-3 py-1 text-[11px] tracking-wide text-slate-400 backdrop-blur-sm">
+          <div className="glass inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] tracking-wide text-slate-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-stream-dot" />
             Event-sourced · deterministic replay · exactly-once
           </div>
@@ -60,7 +63,7 @@ export default function Landing() {
             </Magnetic>
             <Link
               to="/docs"
-              className="rounded-lg border border-edge px-6 py-3 text-sm font-medium text-slate-200 transition-colors hover:border-neon/50 hover:text-neon"
+              className="glass press rounded-lg px-6 py-3 text-sm font-medium text-slate-200 transition-colors hover:text-neon"
             >
               Read the docs
             </Link>
@@ -269,7 +272,7 @@ export default function Landing() {
             </Magnetic>
             <Link
               to="/dashboard"
-              className="rounded-lg border border-edge px-6 py-3 text-sm font-medium text-slate-300 transition-colors hover:border-neon/50 hover:text-neon"
+              className="glass press rounded-lg px-6 py-3 text-sm font-medium text-slate-300 transition-colors hover:text-neon"
             >
               Open the console
             </Link>
@@ -277,9 +280,9 @@ export default function Landing() {
         </div>
       </Scene>
 
-      <footer className="relative border-t border-edge/60 bg-ink/60 backdrop-blur-sm">
+      <footer className="glass-bar relative z-30">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-8 text-xs text-slate-500">
-          <span className="font-semibold text-slate-300">⟳ Continuum</span>
+          <span className="flex items-center gap-2 font-semibold text-slate-300"><BrandMark size={18} /> Continuum</span>
           <span>Durable execution for AI systems</span>
           <div className="ml-auto flex gap-4">
             <Link to="/docs" className="hover:text-slate-300">Docs</Link>
@@ -294,12 +297,10 @@ export default function Landing() {
 
 function LandingHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-edge/40 bg-ink/50 backdrop-blur-md">
+    <header className="glass-bar sticky top-0 z-40">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
         <Link to="/" className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-aurora to-neon text-lg font-bold text-ink shadow-glow-sm">
-            ⟳
-          </span>
+          <BrandMark size={30} />
           <span className="text-lg font-semibold tracking-tight text-slate-100">Continuum</span>
         </Link>
         <nav className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">

@@ -11,6 +11,7 @@ import { guideFor } from "./system/guides";
 import { FEATURES } from "./system/features";
 import FeatureTabs from "./system/FeatureTabs";
 import { useLiquidSurface } from "./system/primitives";
+import { BrandMark } from "./system/brand";
 
 /**
  * Console shell.
@@ -176,17 +177,7 @@ export default function App() {
       <header className="glass-bar sticky top-0 z-30">
         <div ref={navRef} onKeyDown={onMenuKey} className="relative mx-auto flex max-w-[1200px] items-center gap-2 px-5 py-2.5">
           <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">
-            <span
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px]"
-              style={{ background: "var(--accent-strong)", color: "var(--accent-on)" }}
-              aria-hidden
-            >
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                   strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.15" />
-                <path d="M13.7 1.9v3.4h-3.4" />
-              </svg>
-            </span>
+            <BrandMark />
             <span className="hidden text-[14.5px] font-semibold tracking-tight text-slate-100 sm:block">
               Continuum
             </span>
