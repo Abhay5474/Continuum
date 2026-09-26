@@ -38,7 +38,9 @@ public class GodModeController {
 
     private GodModeConfigEntity requireEnabled(HttpServletRequest req) {
         return godMode.configIfEnabled(dev(req))
-                .orElseThrow(() -> new IllegalStateException("God Mode is not enabled"));
+                // 409, not 500: the request is fine, the feature is off.
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT, "God Mode is not enabled"));
     }
 
     @GetMapping("/status")
