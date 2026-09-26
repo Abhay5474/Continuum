@@ -909,7 +909,7 @@ export function BeforeAfter({
   const top = Math.max(before, after) || 1;
   const improved = goodDirection === "down" ? after < before : after > before;
   const delta = before > 0 ? (after - before) / before : 0;
-  const accent = improved ? "var(--div-pos)" : "var(--div-neg)";
+  const accent = before === after ? MUTED : improved ? "var(--div-pos)" : "var(--div-neg)";
 
   // The value sits beside its bar, not on it: printed over a saturated fill it
   // lost its contrast exactly when the bar was longest.
@@ -940,16 +940,18 @@ export function BeforeAfter({
       {row(afterLabel, after, accent)}
       <div className="flex items-center gap-2 pt-0.5">
         <span className="w-16 shrink-0" aria-hidden />
-        <span
-          className="readout text-xs"
-          style={{ color: improved ? "var(--state-healthy-ink)" : "var(--state-degraded-ink)" }}
-        >
-          {delta >= 0 ? "+" : "−"}
-          {Math.abs(delta * 100).toFixed(1)}%{" "}
-          <span className="text-slate-600">
-            {improved ? "smaller" : goodDirection === "down" ? "larger" : "smaller"}
+        {before === after ? (
+          <span className="readout text-xs text-slate-500">no change</span>
+        ) : (
+          <span
+            className="readout text-xs"
+            style={{ color: improved ? "var(--state-healthy-ink)" : "var(--state-degraded-ink)" }}
+          >
+            {delta >= 0 ? "+" : "−"}
+            {Math.abs(delta * 100).toFixed(1)}%{" "}
+            <span className="text-slate-600">{after < before ? "smaller" : "larger"}</span>
           </span>
-        </span>
+        )}
       </div>
     </div>
   );

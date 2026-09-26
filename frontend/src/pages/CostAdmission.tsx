@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { Meter, PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
+import { PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
 import { BarChart, ChartFrame, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain, Empty } from "../system/hub";
+import { Explain, Empty, Pill } from "../system/hub";
+import { Gauge } from "../system/viz";
 
 /**
  * Cost-aware admission.
@@ -244,19 +245,31 @@ export default function CostAdmission() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Meter
-                    value={Math.max(0, Math.min(1, c.requestShare))}
-                    state={!tokenBound ? "degraded" : "active"}
-                    label={`Request allowance (${status.requestsPerMin}/min)`}
-                    height={6}
-                  />
-                  <Meter
-                    value={Math.max(0, Math.min(1, c.tokenShare))}
-                    state={tokenBound ? "degraded" : "active"}
-                    label={`Token allowance (${status.tokensPerMin.toLocaleString()}/min)`}
-                    height={6}
-                  />
+                {/* The two buckets side by side; the fuller one is what limits
+                    this caller, and it says so. */}
+                <div className="flex flex-wrap items-start justify-center gap-x-10 gap-y-4 sm:justify-start">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <Gauge
+                      value={Math.round(Math.max(0, Math.min(1, c.requestShare)) * 100)}
+                      max={100}
+                      display={`${Math.round(Math.max(0, c.requestShare) * 100)}%`}
+                      label="Request allowance"
+                      sub={`${status.requestsPerMin}/min`}
+                      size={132}
+                    />
+                    {!tokenBound && <Pill tone="warn" dot>limiting</Pill>}
+                  </div>
+                  <div className="flex flex-col items-center gap-1.5">
+                    <Gauge
+                      value={Math.round(Math.max(0, Math.min(1, c.tokenShare)) * 100)}
+                      max={100}
+                      display={`${Math.round(Math.max(0, c.tokenShare) * 100)}%`}
+                      label="Token allowance"
+                      sub={`${status.tokensPerMin.toLocaleString()}/min`}
+                      size={132}
+                    />
+                    {tokenBound && <Pill tone="warn" dot>limiting</Pill>}
+                  </div>
                 </div>
 
                 <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">

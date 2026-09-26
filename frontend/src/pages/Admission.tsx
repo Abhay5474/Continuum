@@ -5,7 +5,7 @@ import { Meter, PageHeader, Readout, Switch, Note } from "../system/primitives";
 import { BarChart, BeforeAfter, ChartFrame, SeriesChart, StackedBar, foldTail } from "../system/charts";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Card, CardHead, Explain, Empty } from "../system/hub";
-import { Gauge, Mechanism } from "../system/viz";
+import { Gauge } from "../system/viz";
 
 /**
  * Congestion-controlled admission.
@@ -82,7 +82,6 @@ export default function Admission() {
   const totalAdmitted = providers.reduce((n, p) => n + p.admitted, 0);
   const totalQueued = providers.reduce((n, p) => n + p.queued, 0);
   const inFlight = providers.reduce((n, p) => n + p.inFlight, 0);
-  const total = totalAdmitted + totalQueued + totalShed;
   const on = !!status?.enabled;
   // The shedding decision is taken on the busiest provider's utilisation.
   const utilisation = providers.reduce((m, p) => Math.max(m, p.limit > 0 ? p.inFlight / p.limit : 0), 0);
@@ -113,41 +112,6 @@ export default function Admission() {
           hint="Refused deliberately, lowest importance first."
         />
       </div>
-
-      {/* What admission does to a request: it is let through, made to wait a
-          moment for a slot, or refused on the spot — and the lines are as thick
-          as the traffic that went each way. */}
-      <Card guide="admission-mechanism">
-        <Mechanism
-          summary={`Of ${total} requests, ${totalAdmitted} were admitted, ${totalQueued} waited for a slot and ${totalShed} were refused.`}
-          nodes={[
-            { id: "in", col: 0, span: 3, role: "end", glyph: "app", label: "Requests", sub: "with a criticality", value: total },
-            {
-              id: "gate",
-              col: 1,
-              span: 3,
-              role: "core",
-              tone: "blue",
-              glyph: "gauge",
-              off: !on,
-              label: "Admission",
-              sub: on ? `limit learned from latency · waits ≤ ${status?.queueMs ?? 250}ms` : "off — all straight through",
-            },
-            { id: "ok", col: 2, row: 0, tone: "green", glyph: "check", label: "Admitted", sub: "a slot was free", value: totalAdmitted },
-            { id: "wait", col: 2, row: 1, tone: "amber", glyph: "clock", label: "Queued briefly", sub: "waited for a slot", value: totalQueued, off: !on },
-            { id: "shed", col: 2, row: 2, tone: "red", glyph: "block", label: "Shed", sub: "429 + Retry-After, at once", value: totalShed, off: !on },
-            { id: "prov", col: 3, row: 0, span: 2, role: "end", glyph: "model", label: "The provider", sub: "never overloaded" },
-          ]}
-          links={[
-            { from: "in", to: "gate", weight: total },
-            { from: "gate", to: "ok", weight: totalAdmitted, tone: "green" },
-            { from: "gate", to: "wait", weight: totalQueued, tone: "amber", off: !on },
-            { from: "gate", to: "shed", weight: totalShed, tone: "red", off: !on },
-            { from: "ok", to: "prov", weight: totalAdmitted, tone: "green" },
-            { from: "wait", to: "prov", weight: totalQueued, tone: "amber", off: !on },
-          ]}
-        />
-      </Card>
 
       <div className="space-y-3">
         <Switch

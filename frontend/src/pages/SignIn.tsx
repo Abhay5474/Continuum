@@ -4,7 +4,6 @@ import { portal } from "../api";
 import { Spinner, ThemeToggle, useToast } from "../components/ui";
 import { BrandMark } from "../system/brand";
 import { useLiquidSurface } from "../system/primitives";
-import { Mechanism } from "../system/viz";
 
 /**
  * Standalone sign-in / sign-up page. Console data is tenant-scoped, so every
@@ -77,8 +76,7 @@ export default function SignIn() {
       </header>
 
       <main className="flex flex-1 items-center justify-center px-4 py-12">
-        <div className="grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[minmax(0,1fr)_384px]">
-        <div className="w-full max-w-sm justify-self-center lg:order-2">
+        <div className="w-full max-w-sm">
           <h1 className="text-center text-2xl font-bold tracking-tight">
             {mode === "signup" ? "Create your account" : "Sign in to Continuum"}
           </h1>
@@ -154,38 +152,6 @@ export default function SignIn() {
           <p className="mt-4 text-center text-xs text-slate-500">
             <Link to="/" className="hover:text-slate-300">← Back to home</Link>
           </p>
-        </div>
-
-        {/* What is behind the door, drawn: one endpoint in front of every
-            model, and the three things it does to a request. Seen once here,
-            the console's own diagrams read as more of the same picture. */}
-        <section className="plane p-5 sm:p-6 lg:order-1" aria-labelledby="signin-what">
-          <h2 id="signin-what" className="text-[15px] font-semibold tracking-tight text-slate-100">
-            One endpoint in front of every model
-          </h2>
-          <p className="mt-1 text-[12.5px] text-slate-500">Send the request you already send. Continuum decides what happens next.</p>
-          <div className="mt-5">
-            <Mechanism
-              summary="Your app sends one request to Continuum, which answers it from cache, routes it to the best provider with failover, or blocks it if it is unsafe."
-              nodes={[
-                { id: "app", col: 0, span: 3, role: "end", glyph: "app", label: "Your app", sub: "one OpenAI-style call" },
-                { id: "c", col: 1, span: 3, role: "core", tone: "accent", glyph: "loop", label: "Continuum", sub: "guard · cache · route · verify" },
-                { id: "cache", col: 2, row: 0, tone: "green", glyph: "cache", label: "Answered from cache", sub: "no provider call" },
-                { id: "best", col: 2, row: 1, tone: "blue", glyph: "model", label: "Best provider", sub: "fails over if one is down" },
-                { id: "block", col: 2, row: 2, tone: "red", glyph: "shield", label: "Blocked if unsafe", sub: "PII and injections stopped" },
-              ]}
-              links={[
-                { from: "app", to: "c", weight: 10 },
-                { from: "c", to: "cache", weight: 3, tone: "green" },
-                { from: "c", to: "best", weight: 6, tone: "blue" },
-                { from: "c", to: "block", weight: 1, tone: "red" },
-              ]}
-              minNodeWidth={120}
-              maxNodeWidth={200}
-              narrowAt={440}
-            />
-          </div>
-        </section>
         </div>
       </main>
     </div>

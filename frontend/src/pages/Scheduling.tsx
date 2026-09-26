@@ -4,7 +4,6 @@ import { portal } from "../api";
 import { PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
 import { Card, Explain, Empty, Pill, toneInk, type Tone } from "../system/hub";
-import { Mechanism } from "../system/viz";
 import { Select, Table, TH, TR, TD } from "../system/controls";
 
 /**
@@ -117,8 +116,6 @@ export default function Scheduling() {
   const promoted = providers.reduce((n, p) => n + p.promoted, 0);
   const aged = providers.reduce((n, p) => n + p.aged, 0);
   const missed = providers.reduce((n, p) => n + p.missedDeadline, 0);
-  const ordered = providers.reduce((n, p) => n + p.ordered, 0);
-  const on = !!status?.enabled;
 
   return (
     <section className="space-y-8">
@@ -156,52 +153,6 @@ export default function Scheduling() {
           hint="Could not have finished in time, so the slot went to something that could."
         />
       </div>
-
-      {/* The scheduler's job, drawn: when requests are waiting for a full
-          provider, it decides who gets the next free slot — by band, then
-          deadline, then how long each has waited — and refuses what could not
-          finish in time anyway. */}
-      <Card guide="scheduling-mechanism">
-        <Mechanism
-          summary={`${ordered} requests were ordered for a slot, ${promoted} of them ahead of earlier arrivals; ${aged} were lifted by waiting and ${missed} refused on deadline.`}
-          nodes={[
-            { id: "in", col: 0, span: 3, role: "end", glyph: "queue", label: "Waiting for a slot", sub: "only while a provider is full", value: waiting },
-            {
-              id: "core",
-              col: 1,
-              span: 3,
-              role: "core",
-              tone: "violet",
-              glyph: "list",
-              off: !on,
-              label: "Scheduler",
-              sub: on ? "band → deadline → time waited" : "off — first come, first served",
-            },
-            { id: "next", col: 2, row: 0, tone: "green", glyph: "check", label: "Next free slot", sub: `${promoted} jumped the queue`, value: ordered, off: !on },
-            {
-              id: "aged",
-              col: 2,
-              row: 1,
-              tone: "blue",
-              glyph: "up",
-              label: "Lifted by waiting",
-              sub: `+1 band per ${status?.agingStepSeconds ?? 120}s, up to 2`,
-              value: aged,
-              off: !on,
-            },
-            { id: "late", col: 2, row: 2, tone: "red", glyph: "block", label: "Refused on deadline", sub: "422 — could not finish in time", value: missed, off: !on },
-            { id: "prov", col: 3, row: 0, span: 2, role: "end", glyph: "model", label: "The provider" },
-          ]}
-          links={[
-            { from: "in", to: "core", weight: waiting + ordered + missed },
-            { from: "core", to: "next", weight: ordered, tone: "green", off: !on },
-            { from: "core", to: "aged", weight: aged, tone: "blue", off: !on },
-            { from: "core", to: "late", weight: missed, tone: "red", off: !on },
-            { from: "next", to: "prov", weight: ordered, tone: "green", off: !on },
-            { from: "aged", to: "prov", weight: aged, tone: "blue", off: !on },
-          ]}
-        />
-      </Card>
 
       <div className="space-y-3">
         <Switch

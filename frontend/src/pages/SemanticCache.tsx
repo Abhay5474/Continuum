@@ -11,14 +11,17 @@ import {
   Empty,
   Facts,
   Ghost,
+  Hop,
+  KindMark,
   Rail,
+  Route,
   Row,
   Pill,
   RowSkeleton,
+  Stage,
   Stat,
   Stats,
 } from "../system/hub";
-import { Mechanism } from "../system/viz";
 import { Select } from "../system/controls";
 
 /**
@@ -148,58 +151,23 @@ export default function SemanticCache() {
         subtitle="Serve repeated questions without a provider call"
       />
 
-      {/* What the cache does to a prompt, drawn with the traffic on it: every
-          prompt either ends here with a stored answer or carries on to a
-          provider, and the thicker line is the way most of them went. */}
-      <Card className="mt-6" guide="cache-mechanism">
-        <Mechanism
-          summary={
-            on
-              ? `Of ${total} prompts, ${status?.hits ?? 0} were answered from the cache and ${status?.misses ?? 0} went to a provider.`
-              : "The cache is off: every prompt goes to a provider."
-          }
-          nodes={[
-            { id: "in", col: 0, span: 2, role: "end", glyph: "app", label: "Your prompts", sub: "through the gateway", value: total },
-            {
-              id: "cache",
-              col: 1,
-              span: 2,
-              role: "core",
-              glyph: "cache",
-              tone: "ok",
-              off: !on,
-              label: "Semantic cache",
-              sub: on ? `same meaning ≥ ${threshold.toFixed(2)}` : "off — nothing is matched",
-            },
-            {
-              id: "hit",
-              col: 2,
-              row: 0,
-              glyph: "check",
-              tone: "green",
-              off: !on,
-              label: "Answered from cache",
-              sub: status?.costSaved ? `${money(status.costSaved)} not spent` : "no provider call",
-              value: status?.hits ?? 0,
-            },
-            {
-              id: "miss",
-              col: 2,
-              row: 1,
-              glyph: "model",
-              tone: "blue",
-              label: "Sent to a provider",
-              sub: on ? "answer stored for next time" : "every prompt",
-              value: status?.misses ?? 0,
-            },
-          ]}
-          links={[
-            { from: "in", to: "cache", weight: total },
-            { from: "cache", to: "hit", weight: status?.hits ?? 0, tone: "green", off: !on, label: on && total > 0 ? `${savedPct}%` : undefined },
-            { from: "cache", to: "miss", weight: status?.misses ?? 0, tone: "blue", label: on && total > 0 ? `${100 - savedPct}%` : undefined },
-          ]}
-        />
-      </Card>
+      {/* Where the cache sits. It is the one stage on the path that can end a
+          request early, and that is worth drawing rather than describing. */}
+      <div className="mt-6">
+        <Route>
+          <Stage label="a prompt" sub="from your app" />
+          <Hop />
+          <Stage
+            label="Semantic cache"
+            sub={on ? (total > 0 ? `${savedPct}% answered here` : "warming up") : "off"}
+            state={on ? "on" : "off"}
+            mark={<KindMark kind="conversation" size={26} />}
+            selected
+          />
+          <Hop label={total > 0 ? `${100 - savedPct}% carry on` : undefined} />
+          <Stage label="the provider" sub="only for a genuine miss" />
+        </Route>
+      </div>
 
       <div className="mt-7" data-guide="cache-toggle">
         <Switch
