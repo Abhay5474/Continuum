@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { portal } from "../api";
 import { Meter, PageHeader, Readout, Switch, Note } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain, Empty } from "../system/hub";
+import { Card, CardHead, Explain, Empty } from "../system/hub";
+import { BeforeAfter, seriesColor } from "../system/charts";
+
+/** A modelled share is drawn hatched: the same colour, visibly not solid. */
+const HATCH = "repeating-linear-gradient(135deg, transparent 0 3px, rgb(255 255 255 / .55) 3px 6px)";
 import { Select } from "../system/controls";
 
 /**
@@ -191,6 +195,24 @@ export default function Counterfactual() {
               </Select>
             </label>
           ) : (
+            <div className="space-y-4">
+            {/* The policy being defined, drawn on the axis it splits. */}
+            <div className="max-w-xl" role="img" aria-label={`Complexity below ${at} goes to ${below}, otherwise ${above}`}>
+              <div className="relative flex h-8 overflow-hidden rounded-lg text-[11px] font-medium">
+                <span className="flex items-center justify-center truncate px-2" style={{ width: `${Math.max(0, Math.min(1, at)) * 100}%`, background: "color-mix(in srgb, var(--series-1) 20%, transparent)", color: "var(--series-1)" }}>
+                  {below}
+                </span>
+                <span className="flex flex-1 items-center justify-center truncate px-2" style={{ background: "color-mix(in srgb, var(--series-2) 20%, transparent)", color: "var(--series-2)" }}>
+                  {above}
+                </span>
+                <span className="absolute inset-y-0 w-0.5" style={{ left: `${Math.max(0, Math.min(1, at)) * 100}%`, background: "var(--accent)" }} />
+              </div>
+              <div className="relative mt-1 h-4 text-[10px] text-slate-500">
+                <span className="absolute left-0">simple · 0</span>
+                <span className="readout absolute -translate-x-1/2" style={{ left: `${Math.max(0, Math.min(1, at)) * 100}%`, color: "var(--accent-ink)" }}>{at.toFixed(2)}</span>
+                <span className="absolute right-0">1 · complex</span>
+              </div>
+            </div>
             <div className="flex flex-wrap items-end gap-3">
               <label className="text-xs text-slate-500">
                 <span className="micro block">complexity below</span>
@@ -227,6 +249,7 @@ export default function Counterfactual() {
                 </Select>
               </label>
             </div>
+            </div>
           )}
 
           <button
@@ -246,6 +269,19 @@ export default function Counterfactual() {
         <>
           <div className="space-y-3">
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Result — {report.policy}</h2>
+            <Card>
+              <CardHead glyph="coin" tone={report.delta <= 0 ? "green" : "orange"} title="Spend, as run and as replayed"
+                        sub={`${report.requests} requests`} />
+              <div className="mt-3 max-w-xl">
+                <BeforeAfter
+                  beforeLabel="As run"
+                  afterLabel="Candidate"
+                  before={report.actualCost}
+                  after={report.estimatedCost}
+                  format={(n) => usd(n)}
+                />
+              </div>
+            </Card>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <Readout label="Actually spent" value={usd(report.actualCost)} size="sm" />
               <Readout
@@ -256,7 +292,7 @@ export default function Counterfactual() {
               />
               <Readout
                 label="Difference"
-                value={`${report.delta >= 0 ? "+" : ""}${usd(report.delta)}`}
+                value={`${report.delta >= 0 ? "+" : "−"}${usd(Math.abs(report.delta))}`}
                 size="sm"
                 state={report.delta < 0 ? "healthy" : report.delta > 0 ? "degraded" : "idle"}
               />
@@ -272,6 +308,21 @@ export default function Counterfactual() {
               label="Requests where the candidate agrees with what actually ran"
               height={8}
             />
+            {/* The candidate's cost, split into what is known and what is
+                estimated — the one thing a blended figure would hide. */}
+            {report.estimatedCost > 0 && (
+              <div className="max-w-xl">
+                <div className="flex h-4 overflow-hidden rounded-full" role="img"
+                     aria-label={`Measured ${usd(report.measuredCandidateCost)}, modelled ${usd(report.modelledCandidateCost)}`}>
+                  <span style={{ width: `${(report.measuredCandidateCost / (report.measuredCandidateCost + report.modelledCandidateCost || 1)) * 100}%`, background: "var(--state-healthy-ink)" }} />
+                  <span className="flex-1" style={{ background: "var(--state-warning-ink)", backgroundImage: HATCH }} />
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-x-4 text-[10.5px] text-slate-500">
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-3 rounded-sm" style={{ background: "var(--state-healthy-ink)" }} />measured — it happened</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-3 rounded-sm" style={{ background: "var(--state-warning-ink)", backgroundImage: HATCH }} />modelled — an estimate</span>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <Readout
                 label="Measured"
@@ -293,9 +344,15 @@ export default function Counterfactual() {
 
           <div className="space-y-2">
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Where the candidate would have sent traffic</h2>
-            {report.lines.map((l) => (
-              <div key={l.arm} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className="font-mono text-xs text-slate-300">{l.arm}</span>
+            {report.lines.map((l, i) => (
+              <div key={l.arm} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="w-40 truncate font-mono text-xs text-slate-300">{l.arm}</span>
+                {/* Requests this model would take: solid where measured, hatched where modelled. */}
+                <span className="flex h-3 min-w-[6rem] flex-1 overflow-hidden rounded-full" style={{ background: "rgb(var(--card-rule))", maxWidth: 360 }}
+                      role="img" aria-label={`${l.measuredRequests} of ${l.requests} measured`}>
+                  <span style={{ width: `${(l.requests / Math.max(1, report.requests)) * (l.measuredRequests / Math.max(1, l.requests)) * 100}%`, background: seriesColor(i) }} />
+                  <span style={{ width: `${(l.requests / Math.max(1, report.requests)) * (1 - l.measuredRequests / Math.max(1, l.requests)) * 100}%`, background: seriesColor(i), backgroundImage: HATCH }} />
+                </span>
                 <span className="micro">{l.requests} requests</span>
                 <span className="readout text-xs text-slate-400">{usd(l.cost)}</span>
                 <span

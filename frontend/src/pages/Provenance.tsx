@@ -4,7 +4,7 @@ import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Readout, Switch, Note } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
-import { Explain } from "../system/hub";
+import { BarList, Card, CardHead, Explain, Pill, toneInk, type Tone } from "../system/hub";
 
 /**
  * Decision provenance.
@@ -24,16 +24,22 @@ type Node = {
   latencyMs: number;
 };
 
-const STAGE_TONE: Record<string, string> = {
-  ADMISSION: "text-amber-400",
-  CACHE: "text-emerald-400",
-  ROUTE: "text-aurora",
-  PROVIDER: "text-indigo-400",
-  CASCADE: "text-amber-400",
-  QUALITY: "text-emerald-400",
-  REPAIR: "text-amber-400",
-  OUTPUT: "text-slate-300",
+/** One hue per stage, so a stage looks the same in the waterfall, the cost strip and the counts. */
+const STAGE_TONE: Record<string, Tone> = {
+  FIREWALL: "red",
+  CONTEXT: "pink",
+  CACHE: "cyan",
+  ADMISSION: "amber",
+  COMPLEXITY: "mute",
+  ROUTE: "blue",
+  PROVIDER: "violet",
+  CASCADE: "orange",
+  QUALITY: "cyan",
+  REPAIR: "pink",
+  OUTPUT: "green",
 };
+const stageTone = (s: string): Tone => STAGE_TONE[s] ?? "mute";
+const stageName = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
 export default function Provenance() {
   const toast = useToast();
@@ -149,6 +155,26 @@ export default function Provenance() {
         </Explain>
       </div>
 
+      {/* Where decisions are being made, across everything recorded. */}
+      {Object.keys(byStage).length > 0 && (
+        <Card>
+          <CardHead glyph="list" tone="blue" title="Decisions by stage" sub="Across every recorded request" />
+          <div className="mt-4 max-w-xl">
+            <BarList
+              items={Object.entries(byStage)
+                .sort((a, b) => b[1] - a[1])
+                .map(([k, v]) => ({
+                  key: k,
+                  label: stageName(k),
+                  note: `${v}`,
+                  fraction: v / Math.max(1, ...Object.values(byStage)),
+                  tone: stageTone(k),
+                }))}
+            />
+          </div>
+        </Card>
+      )}
+
       <Degradation />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_1fr]">
@@ -192,33 +218,7 @@ export default function Provenance() {
                 </span>
               </div>
 
-              <div className="space-y-1.5">
-                {nodes.map((n) => (
-                  <div
-                    key={n.seq}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-edge/60 px-3 py-2"
-                  >
-                    <span className={`micro w-24 shrink-0 ${STAGE_TONE[n.stage] ?? "text-slate-500"}`}>
-                      {n.stage}
-                    </span>
-                    <span className="shrink-0 text-sm text-slate-200">{n.choice}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{n.reason}</span>
-                    {n.latencyMs > 0 && (
-                      <span className="readout shrink-0 text-xs text-slate-500">{n.latencyMs}ms</span>
-                    )}
-                    {n.costDelta !== 0 && (
-                      <span className="readout shrink-0 text-xs text-amber-400">
-                        ${n.costDelta.toFixed(6)}
-                      </span>
-                    )}
-                    {n.alternatives && (
-                      <span className="w-full text-xs text-slate-600">
-                        not chosen: {n.alternatives}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <Waterfall nodes={nodes} />
 
               <button
                 onClick={() =>
@@ -247,6 +247,90 @@ export default function Provenance() {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * A request's decisions as a waterfall.
+ *
+ * <p>Each decision is a row on one time axis: where it started (after the ones
+ * before it) and how long it took, so where a slow request spent its time is
+ * a shape rather than a column of milliseconds to add up. Cost, where a
+ * decision spent money, is a strip underneath split the same way.
+ */
+function Waterfall({ nodes }: { nodes: Node[] }) {
+  const sorted = [...nodes].sort((a, b) => a.seq - b.seq);
+  const total = Math.max(1, sorted.reduce((t, n) => t + Math.max(0, n.latencyMs), 0));
+  let at = 0;
+  const rows = sorted.map((n) => {
+    const start = at;
+    at += Math.max(0, n.latencyMs);
+    return { n, start };
+  });
+  const costs = sorted.filter((n) => n.costDelta > 0);
+  const costTotal = costs.reduce((t, n) => t + n.costDelta, 0);
+  return (
+    <Card>
+      <ol className="space-y-2.5">
+        {rows.map(({ n, start }) => (
+          <li key={n.seq} className="grid items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
+            <div className="flex min-w-0 items-center gap-2">
+              <Pill tone={stageTone(n.stage)}>{stageName(n.stage)}</Pill>
+              <span className="truncate text-[12.5px] text-slate-200" title={n.reason}>{n.choice}</span>
+            </div>
+            <div className="min-w-0">
+              <div className="relative h-4 rounded" style={{ background: "rgb(var(--card-rule))" }}>
+                {n.latencyMs > 0 ? (
+                  <span
+                    className="absolute inset-y-0 rounded"
+                    style={{
+                      left: `${(start / total) * 100}%`,
+                      width: `max(3px, ${(n.latencyMs / total) * 100}%)`,
+                      background: toneInk(stageTone(n.stage)),
+                      opacity: 0.8,
+                    }}
+                    title={`${n.latencyMs}ms`}
+                  />
+                ) : (
+                  <span className="absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                        style={{ left: `${(start / total) * 100}%`, background: toneInk(stageTone(n.stage)) }} title="instant" />
+                )}
+              </div>
+              <div className="mt-0.5 flex flex-wrap gap-x-3 text-[10.5px] text-slate-500">
+                <span className="truncate">{n.reason}</span>
+                {n.latencyMs > 0 && <span className="readout">{n.latencyMs}ms</span>}
+                {n.costDelta !== 0 && <span className="readout" style={{ color: "var(--state-warning-ink)" }}>${n.costDelta.toFixed(6)}</span>}
+                {n.alternatives && <span>not chosen: {n.alternatives}</span>}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-2 flex justify-between text-[10px] text-slate-500 sm:pl-[16rem]">
+        <span>0ms</span>
+        <span>{total}ms</span>
+      </div>
+      {costTotal > 0 && (
+        <div className="mt-4 border-t border-edge/50 pt-3">
+          <div className="micro mb-1.5">Where the cost went</div>
+          <div className="flex h-3 overflow-hidden rounded-full" role="img"
+               aria-label={costs.map((n) => `${stageName(n.stage)} $${n.costDelta.toFixed(6)}`).join(", ")}>
+            {costs.map((n) => (
+              <span key={n.seq} style={{ width: `${(n.costDelta / costTotal) * 100}%`, background: toneInk(stageTone(n.stage)) }}
+                    title={`${stageName(n.stage)} · $${n.costDelta.toFixed(6)}`} />
+            ))}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[10.5px] text-slate-500">
+            {costs.map((n) => (
+              <span key={n.seq} className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-sm" style={{ background: toneInk(stageTone(n.stage)) }} />
+                {stageName(n.stage)} <span className="readout">${n.costDelta.toFixed(6)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -326,9 +410,7 @@ function Degradation() {
         <div className="space-y-1">
           {recent.slice(0, 6).map((e, i) => (
             <div key={i} className="flex flex-wrap items-center gap-x-3 rounded-md border border-edge/60 px-3 py-1.5">
-              <span className={`micro w-16 shrink-0 ${e.rung === "CACHED" ? "text-amber-400" : "text-rose-400"}`}>
-                {e.rung}
-              </span>
+              <Pill tone={e.rung === "CACHED" ? "warn" : "bad"} dot>{e.rung === "CACHED" ? "served a past answer" : "nothing to serve"}</Pill>
               <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{e.reason}</span>
             </div>
           ))}
