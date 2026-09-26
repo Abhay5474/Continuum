@@ -146,6 +146,17 @@ class LogTransformerTest {
     }
 
     @Test
+    @DisplayName("ids inside key=value pairs and short-prefixed ids are masked")
+    void masksKeyValueAndPrefixedIds() {
+        assertThat(LogTransformer.templateOf("payment-svc Timeout calling ledger after 3000ms (request_id=r1000)"))
+                .isEqualTo(LogTransformer.templateOf("payment-svc Timeout calling ledger after 2950ms (request_id=r1396)"));
+        assertThat(LogTransformer.templateOf("refund failed for ord-48213"))
+                .isEqualTo(LogTransformer.templateOf("refund failed for ord-10077"));
+        // Words that merely contain a digit stay: they are part of the shape.
+        assertThat(LogTransformer.templateOf("falling back to http2")).contains("http2");
+    }
+
+    @Test
     @DisplayName("correlation ids that appear on several lines are grouped")
     void groupsCorrelationIds() {
         String log = """

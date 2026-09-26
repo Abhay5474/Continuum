@@ -94,6 +94,11 @@ public class LogTransformer implements ContextTransformer {
                     Pattern.CASE_INSENSITIVE),                                       // durations/sizes
             Pattern.compile("/[\\w./\\-]{2,}"),                                      // paths and URLs
             Pattern.compile("\"[^\"]{0,120}\""),                                     // quoted values
+            // The value of a key=value pair (request_id=r1000, user=bob). Before
+            // this, one id per line made every line its own "pattern", and a
+            // single repeated timeout was reported as forty distinct shapes.
+            Pattern.compile("(?<==)[^\\s,;)\\]}]+"),
+            Pattern.compile("\\b[A-Za-z]+[-_]?\\d{3,}\\w*\\b"),                      // ids like r1000, ord-4821
             Pattern.compile("\\b\\d+\\b"));                                          // bare numbers
 
     @Override
