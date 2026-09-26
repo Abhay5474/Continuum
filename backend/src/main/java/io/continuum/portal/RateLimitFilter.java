@@ -89,7 +89,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static boolean isCredentialRoute(String path) {
         return path.endsWith("/login") || path.endsWith("/signup")
-                || path.endsWith("/account/password") || path.contains("/operator/login");
+                || path.endsWith("/account/password") || path.contains("/operator/login")
+                || path.endsWith("/operator/elevate") || path.endsWith("/operator/claim");
     }
 
     /**

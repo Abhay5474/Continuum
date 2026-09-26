@@ -81,6 +81,32 @@ public class PortalSessionService {
         this.revocations = revocations;
     }
 
+    /** Subject of every OPERATOR session; the person holding it is the actor. */
+    public static final String OPERATOR_SUBJECT = "operator";
+
+    /** Operator sessions are step-up sessions: short, and re-earned with a password. */
+    public static final long OPERATOR_TTL_SECONDS = 30 * 60;
+
+    /** Who currently holds the operator role; absent in unit tests. */
+    private java.util.function.Predicate<String> operatorGrants;
+
+    public void setOperatorGrants(java.util.function.Predicate<String> operatorGrants) {
+        this.operatorGrants = operatorGrants;
+    }
+
+    /**
+     * An OPERATOR session held by a person rather than by whoever knows the
+     * shared admin token. It lasts {@link #OPERATOR_TTL_SECONDS}, and stops
+     * working as soon as that person's grant is revoked, their password changes
+     * or they sign out everywhere.
+     */
+    public String issueOperator(String developerId) {
+        long expiry = Instant.now().getEpochSecond() + OPERATOR_TTL_SECONDS;
+        String payload = Role.OPERATOR.name() + ":" + OPERATOR_SUBJECT + ":" + expiry + ":" + developerId;
+        String p = b64(payload.getBytes(StandardCharsets.UTF_8));
+        return p + "." + b64(hmac(p));
+    }
+
     public String issue(String subject, Role role) {
         return issue(subject, role, Instant.now(), subject);
     }
@@ -147,6 +173,16 @@ public class PortalSessionService {
         if (role == Role.DEVELOPER && revocations != null
                 && revocations.revoked(actor, f[1], expiry - DEFAULT_TTL_SECONDS)) {
             return Optional.empty(); // signed out everywhere, password changed, or account deleted
+        }
+        // A person's operator session is only as good as their grant and their
+        // password. (A token-login session names no person: actor == subject.)
+        if (role == Role.OPERATOR && !actor.equals(f[1])) {
+            if (operatorGrants == null || !operatorGrants.test(actor)) {
+                return Optional.empty();
+            }
+            if (revocations != null && revocations.revoked(actor, expiry - OPERATOR_TTL_SECONDS)) {
+                return Optional.empty();
+            }
         }
         return Optional.of(new Session(f[1], role, expiry, actor));
     }

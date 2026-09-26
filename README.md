@@ -208,9 +208,8 @@ Every console API is authenticated and tenant-scoped. Two rules hold throughout:
    not accept a `developerId` parameter — it is resolved from the signed-in
    session, so one account cannot name another and read its data. Reaching for a
    record owned by someone else returns `403`.
-2. **Everything fails closed.** With no `CONTINUUM_ADMIN_TOKEN` configured the
-   admin surface and operator login are unavailable rather than open. Developers
-   onboard through `POST /api/portal/developer/signup`.
+2. **Everything fails closed.** Nothing engine-wide is reachable without an
+   operator session. Developers onboard through `POST /api/portal/developer/signup`.
 
 What each role sees:
 
@@ -218,7 +217,27 @@ What each role sees:
 |------|-------|
 | Anonymous | Landing page, docs, `/api/meta` only |
 | `DEVELOPER` | Their own workflows, traces, stats, memory, usage and keys |
-| `OPERATOR` | Engine-wide state (requires `CONTINUUM_ADMIN_TOKEN`) |
+| `OPERATOR` | Engine-wide state — a role on a person's account (see below) |
+
+### Operator access, without a shared secret
+
+The operator role belongs to people, not to whoever knows a token:
+
+- **First operator.** While nobody holds the role, the server prints a one-time
+  130-bit setup code to its own log at start-up (valid 24 h, single use, only its
+  SHA-256 is kept in memory). Signed in, open *Account → Operator access* and enter
+  it. Reading the server log is the proof of ownership.
+- **Everyday use.** Operators re-enter their password to get a 30-minute operator
+  session, held beside their normal session. A stolen everyday session is not an
+  operator session.
+- **Revocation.** Removing someone's grant, changing their password or signing out
+  everywhere ends their operator sessions at once (other servers within 15 s).
+- **Delegation.** Operators add and remove operators by email under *Settings →
+  Operators*, confirming with their password. The last operator cannot be removed.
+- **Break-glass.** `CONTINUUM_ADMIN_TOKEN` still works (`X-Admin-Token`, or
+  *Use admin token* in the dialog) if it is set; it is no longer needed.
+
+Attempts at the setup code and password step-up are rate limited per person.
 
 Workflows carry an owning `developer_id` (nullable — rows created before this and
 internal system workflows have none and are operator-visible only). Memory scopes

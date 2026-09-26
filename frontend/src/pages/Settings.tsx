@@ -6,6 +6,7 @@ import { Chip, Ghost, Pill } from "../system/hub";
 import { Table, TH, TR, TD } from "../system/controls";
 import { useToast, Spinner, CopyButton } from "../components/ui";
 import { dateTimeOf, dateOf } from "../system/time";
+import { useOperator } from "../system/OperatorAccess";
 
 /**
  * Account & settings: change password / email, manage API keys (name, last-used,
@@ -321,6 +322,8 @@ export default function Settings() {
         )}
       </Section>
 
+      <Operators />
+
       {/* danger zone — the owner's alone: a member deleting "their" account
           used to delete the account they had been invited into. */}
       {me?.member ? (
@@ -345,6 +348,138 @@ export default function Settings() {
       </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Who operates this deployment. Operator access is a role on a person's account
+ * rather than a shared secret, so it is granted and removed here, by name.
+ */
+function Operators() {
+  const toast = useToast();
+  const { operator: elevated, request } = useOperator();
+  const [status, setStatus] = useState<Awaited<ReturnType<typeof portal.operatorStatus>> | null>(null);
+  const [list, setList] = useState<Awaited<ReturnType<typeof portal.operatorGrants>>>([]);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = () =>
+    portal
+      .operatorStatus()
+      .then((s) => {
+        setStatus(s);
+        if (s.operator) portal.operatorGrants().then(setList).catch(() => {});
+      })
+      .catch(() => setStatus(null));
+  useEffect(() => {
+    load();
+  }, [elevated]);
+
+  const act = async (key: string, fn: () => Promise<unknown>, done: string) => {
+    setBusy(key);
+    try {
+      await fn();
+      toast(done, "success");
+      setEmail("");
+      setPassword("");
+      load();
+    } catch (e: any) {
+      toast(e?.message ?? "That did not work.", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (!status) return null;
+
+  return (
+    <Section title="Operators" subtitle="People who can change settings that apply to every tenant">
+      {!status.operator ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Pill tone={status.anyOperator ? "mute" : "warn"}>
+            {status.anyOperator ? "You are not an operator" : "No operator yet"}
+          </Pill>
+          {!status.anyOperator && status.setupOpen && (
+            <button
+              onClick={request}
+              className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-slate-200 hover:border-slate-500/60"
+            >
+              Claim with setup code
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {list.map((o, i) => (
+              <li
+                key={o.developerId}
+                className="rise-in flex min-w-0 items-center gap-3 rounded-xl border border-edge/70 bg-slate-500/[0.05] p-3"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <span
+                  aria-hidden
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white"
+                  style={{ background: "var(--accent-strong)" }}
+                >
+                  {(o.name || o.email || "?").slice(0, 1).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-slate-200">{o.name || o.email}</div>
+                  <div className="truncate text-xs text-slate-500">
+                    {o.email} · since {dateOf(o.grantedAt)}
+                  </div>
+                </div>
+                {list.length > 1 && (
+                  <button
+                    onClick={() =>
+                      password
+                        ? act(o.developerId, () => portal.revokeOperator(o.developerId, password), "Operator access removed")
+                        : toast("Enter your password below first.", "error")
+                    }
+                    disabled={busy !== null}
+                    aria-label={`Remove ${o.email}`}
+                    className="rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:border-rose-500/70 disabled:opacity-50"
+                  >
+                    {busy === o.developerId ? <Spinner /> : "Remove"}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="colleague@example.com"
+              aria-label="Email to make an operator"
+              type="email"
+              className="min-w-0 flex-1 field"
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+              aria-label="Your password, to confirm"
+              type="password"
+              autoComplete="current-password"
+              className="min-w-0 flex-1 field sm:max-w-[12rem]"
+            />
+            <button
+              onClick={() => act("grant", () => portal.grantOperator(email.trim(), password), "Operator added")}
+              disabled={busy !== null || !email || !password}
+              className="flex items-center gap-2 rounded-lg bg-[color:var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {busy === "grant" && <Spinner />} Add operator
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Changes need your password. The last operator can't be removed.
+          </p>
+        </>
+      )}
+    </Section>
   );
 }
 

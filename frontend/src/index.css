@@ -959,6 +959,28 @@ body::before {
     to { scale: 1; opacity: 1; }
   }
 
+  /* A dialog arriving, OriginOS-style: it grows out of a slightly smaller,
+     slightly lower copy of itself and overshoots a hair before settling, so it
+     reads as lifted onto the page rather than switched on. */
+  .pop-in {
+    transform-origin: 50% 60%;
+    animation: popIn var(--dur-elastic, 520ms) var(--ease-elastic, ease) both;
+  }
+  @keyframes popIn {
+    from { opacity: 0; scale: 0.9; translate: 0 10px; }
+    40% { opacity: 1; }
+    to { opacity: 1; scale: 1; translate: 0 0; }
+  }
+
+  /* One item of a list arriving; give each an animation-delay to stagger. */
+  .rise-in {
+    animation: riseIn var(--dur-elastic, 520ms) var(--ease-elastic, ease) both;
+  }
+  @keyframes riseIn {
+    from { opacity: 0; translate: 0 8px; scale: 0.97; }
+    to { opacity: 1; translate: 0 0; scale: 1; }
+  }
+
   /* An icon that turns — a chevron opening — rotates on a spring, so it
      arrives with the same small settle as the menu it belongs to. */
   .spin-to {

@@ -296,12 +296,52 @@ export const portal = {
   // Held alongside the developer session rather than replacing it; see
   // operatorToken() above for why.
   hasOperator,
+  /** Break-glass path: the server's CONTINUUM_ADMIN_TOKEN. */
   async elevate(token: string) {
     const r = await portalHttp<any>("/api/portal/operator/login", "POST", { token });
     localStorage.setItem(OPERATOR_KEY, r.sessionToken);
     return r;
   },
   dropOperator: () => localStorage.removeItem(OPERATOR_KEY),
+  /** When the held operator session lapses, in epoch ms; null when none is held. */
+  operatorExpiresAt(): number | null {
+    const t = operatorToken();
+    if (!t) return null;
+    try {
+      const payload = atob(t.split(".")[0].replace(/-/g, "+").replace(/_/g, "/"));
+      return Number(payload.split(":")[2]) * 1000 || null;
+    } catch {
+      return null;
+    }
+  },
+
+  // Operator access on a person's account: no shared secret needed.
+  operatorStatus: () =>
+    portalHttp<{ operator: boolean; anyOperator: boolean; setupOpen: boolean; sessionMinutes: number }>(
+      "/api/portal/developer/operator/status",
+      "GET",
+    ),
+  async operatorElevate(password: string) {
+    const r = await portalHttp<any>("/api/portal/developer/operator/elevate", "POST", { password });
+    localStorage.setItem(OPERATOR_KEY, r.sessionToken);
+    return r;
+  },
+  async operatorClaim(code: string) {
+    const r = await portalHttp<any>("/api/portal/developer/operator/claim", "POST", { code });
+    localStorage.setItem(OPERATOR_KEY, r.sessionToken);
+    return r;
+  },
+  operatorGrants: () =>
+    portalHttp<{ developerId: string; name: string; email: string; grantedBy: string; grantedAt: string }[]>(
+      "/api/portal/developer/operator/grants",
+      "GET",
+    ),
+  grantOperator: (email: string, password: string) =>
+    portalHttp<any>("/api/portal/developer/operator/grants", "POST", { email, password }),
+  revokeOperator: (developerId: string, password: string) =>
+    portalHttp<any>(`/api/portal/developer/operator/grants/${encodeURIComponent(developerId)}/revoke`, "POST", {
+      password,
+    }),
 
   /** Escape hatch for portal-scoped reads that have no dedicated helper. */
   get: <T>(path: string) => portalHttp<T>(path, "GET"),

@@ -145,4 +145,29 @@ class PortalSessionServiceTest {
         assertEquals("dev_9", session.actor());
         assertTrue(session.isOwner());
     }
+
+    @Test
+    void personalOperatorSessionLastsOnlyWhileTheGrantDoes() {
+        PortalSessionService s = new PortalSessionService("unit-test-master");
+        String token = s.issueOperator("dev_op");
+        assertTrue(s.verify(token).isEmpty(), "with no grant registry, a personal operator session is refused");
+
+        java.util.Set<String> granted = new java.util.HashSet<>(java.util.Set.of("dev_op"));
+        s.setOperatorGrants(granted::contains);
+        var session = s.verify(token).orElseThrow();
+        assertEquals(PortalSessionService.Role.OPERATOR, session.role());
+        assertEquals(PortalSessionService.OPERATOR_SUBJECT, session.subject());
+        assertEquals("dev_op", session.actor());
+
+        granted.clear();
+        assertTrue(s.verify(token).isEmpty(), "revoking the grant ends the session");
+    }
+
+    @Test
+    void tokenLoginOperatorSessionIsUnaffectedByGrants() {
+        PortalSessionService s = new PortalSessionService("unit-test-master");
+        s.setOperatorGrants(id -> false);
+        String token = s.issue(PortalSessionService.OPERATOR_SUBJECT, PortalSessionService.Role.OPERATOR);
+        assertTrue(s.verify(token).isPresent());
+    }
 }
