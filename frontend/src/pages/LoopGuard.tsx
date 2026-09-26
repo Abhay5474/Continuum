@@ -3,7 +3,8 @@ import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { Meter, PageHeader, Plane, Readout, Switch, Note, InfoTip } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
-import { Explain, Segmented, Empty } from "../system/hub";
+import { Explain, Segmented, Empty, Pill } from "../system/hub";
+import { seriesColor } from "../system/charts";
 
 /**
  * Agent loop detection.
@@ -226,6 +227,8 @@ export default function LoopGuard() {
           className="w-full font-mono field"
         />
 
+        <StepBeads steps={draft.split("\n").map((x) => x.trim()).filter(Boolean)} looping={verdict?.looping} />
+
         <div className="flex flex-wrap items-center gap-3">
           <button
             disabled={busy || !status?.enabled}
@@ -247,14 +250,18 @@ export default function LoopGuard() {
                 : "border-emerald-500/40 bg-emerald-500/5"
             }`}
           >
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="readout text-sm font-medium text-slate-100">
-                {verdict.looping ? verdict.kind : "NO LOOP"}
-              </span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Pill tone={verdict.looping ? "bad" : "ok"} dot>
+                {verdict.looping ? humanKind(verdict.kind) : "no loop — making progress"}
+              </Pill>
               {verdict.looping && (
-                <span className="micro">confidence {Number(verdict.confidence).toFixed(2)}</span>
+                <span className="flex min-w-[10rem] items-center gap-2">
+                  <span className="micro">confidence</span>
+                  <span className="w-24"><Meter value={Math.max(0, Math.min(1, Number(verdict.confidence)))} state="critical" height={5} /></span>
+                  <span className="readout text-[11px] text-slate-400">{Number(verdict.confidence).toFixed(2)}</span>
+                </span>
               )}
-              {verdict.halted && <span className="micro text-rose-400">run would be stopped</span>}
+              {verdict.halted && <Pill tone="bad">run would be stopped</Pill>}
             </div>
             <p className="mt-1 text-xs text-slate-400 max-w-2xl leading-relaxed">{verdict.reason}</p>
             {Array.isArray(verdict.evidence) && verdict.evidence.length > 0 && (
@@ -299,10 +306,10 @@ export default function LoopGuard() {
         <div className="space-y-2">
           {events.map((e, i) => (
             <Plane key={i} className="space-y-2 p-3">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="readout text-sm text-slate-200">{e.kind}</span>
-                <span className="micro">step {e.stepIndex}</span>
-                {e.halted && <span className="micro text-rose-400">stopped the run</span>}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Pill tone={KIND_STATE[e.kind] === "critical" ? "bad" : "warn"} dot>{humanKind(e.kind)}</Pill>
+                <span className="micro">at step {e.stepIndex}</span>
+                {e.halted && <Pill tone="bad">stopped the run</Pill>}
                 <span className="flex-1" />
                 <span className="micro">{new Date(e.at).toLocaleTimeString()}</span>
               </div>
@@ -330,5 +337,71 @@ export default function LoopGuard() {
         </button>
       )}
     </section>
+  );
+}
+
+/** A series hue deepened so a white letter on it keeps its contrast. */
+function beadInk(i: number) {
+  return `color-mix(in srgb, ${seriesColor(i)} 72%, black)`;
+}
+
+function humanKind(kind: string) {
+  const k = String(kind ?? "").toUpperCase();
+  return k === "REPETITION" ? "repeating one step" : k === "OSCILLATION" ? "alternating between plans" : k === "PARAPHRASE" ? "rewording the same step" : k.toLowerCase();
+}
+
+/**
+ * The steps as beads: one letter and colour per distinct step.
+ *
+ * <p>A loop is a shape in a sequence, and the shape is what a person
+ * recognises — A A A is stuck, A B A B is going round, A B C is working. The
+ * letters come from the steps themselves as written, so the pattern updates as
+ * the sequence is edited, before anything is sent.
+ */
+function StepBeads({ steps, looping }: { steps: string[]; looping?: boolean }) {
+  if (steps.length === 0) return null;
+  const ids = new Map<string, number>();
+  const seq = steps.map((raw) => {
+    const key = raw.toLowerCase().replace(/\s+/g, " ");
+    if (!ids.has(key)) ids.set(key, ids.size);
+    return ids.get(key)!;
+  });
+  const letter = (i: number) => String.fromCharCode(65 + (i % 26));
+  const legend = [...ids.entries()];
+  return (
+    <div className="plane p-4" aria-label={`Pattern ${seq.map(letter).join(" ")}`} role="img">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {seq.map((id, i) => (
+          <span key={i} className="flex items-center gap-1.5">
+            <span
+              className="grid h-8 w-8 place-items-center rounded-full text-[12px] font-semibold"
+              style={{
+                // Set, not the class: the light theme remaps text-white to ink.
+                color: "#fff",
+                background: beadInk(id),
+                boxShadow: looping ? "0 0 0 2px var(--wash-bad)" : undefined,
+              }}
+              title={steps[i]}
+            >
+              {letter(id)}
+            </span>
+            {i < seq.length - 1 && <span className="h-px w-2.5 bg-slate-400/60" aria-hidden />}
+          </span>
+        ))}
+        <span className="ml-2 text-[11px] text-slate-500">
+          {ids.size === seq.length ? "every step different" : `${seq.length} steps, ${ids.size} distinct`}
+        </span>
+      </div>
+      <ul className="mt-3 grid gap-1 sm:grid-cols-2">
+        {legend.map(([text, id]) => (
+          <li key={id} className="flex min-w-0 items-center gap-2 text-[11.5px] text-slate-400">
+            <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full text-[9px] font-bold" style={{ color: "#fff", background: beadInk(id) }}>
+              {letter(id)}
+            </span>
+            <span className="truncate font-mono">{text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
