@@ -309,16 +309,15 @@ export function BarChart({
                   borderRadius: "0 4px 4px 0",
                 }}
               />
-              {/* Direct label, always visible — this is the relief the light
-                  surface's contrast exception requires, and it saves a hover. */}
-              <span
-                className="readout pointer-events-none absolute inset-y-0 right-2 flex items-center text-[11px] text-slate-300"
-                style={{ textShadow: "0 0 3px var(--chart-surface)" }}
-              >
-                {fmt(d.value)}
-                {unit ? <span className="ml-0.5 text-slate-500">{unit}</span> : null}
-              </span>
             </div>
+            {/* Direct label, always visible — this is the relief the light
+                surface's contrast exception requires, and it saves a hover.
+                Beside the bar, not on it: printed over the fill it lost its
+                contrast on exactly the longest bar. */}
+            <span className="readout w-16 shrink-0 text-[11px] text-slate-300">
+              {fmt(d.value)}
+              {unit ? <span className="ml-0.5 text-slate-500">{unit}</span> : null}
+            </span>
           </div>
         );
       })}
