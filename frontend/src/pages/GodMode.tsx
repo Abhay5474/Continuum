@@ -213,7 +213,7 @@ export default function GodMode() {
           {tab === "memory" && (
             <>
           {/* ================= 1 · MEMORY ================= */}
-          <section>
+          <section className="plane p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <Micro>Memory · context pressure drives every decision</Micro>
               <span className="micro">
@@ -277,8 +277,8 @@ export default function GodMode() {
           {tab === "policy" && (
             <>
           {/* ================= 2 · POLICY ================= */}
-          <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div>
+          <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="plane p-5">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <Micro>MemAct policy · what the engine believes about each action</Micro>
                 <label className="flex items-center gap-1.5 text-[10px] text-slate-500">
@@ -313,7 +313,7 @@ export default function GodMode() {
             </div>
 
             {/* decision ledger */}
-            <div>
+            <div className="plane p-5">
               <Micro>Decision ledger</Micro>
 
               <div className="mt-2 max-h-[340px] space-y-px overflow-y-auto pr-1">
@@ -352,7 +352,7 @@ export default function GodMode() {
           {tab === "twin" && (
             <>
           {/* ================= 3 · DIGITAL TWIN ================= */}
-          <section>
+          <section className="plane p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
               <Micro>Digital twin · prove a policy change before it sees traffic</Micro>
               <label className="flex items-center gap-1.5 text-[10px] text-slate-500">
@@ -414,7 +414,7 @@ export default function GodMode() {
           {tab === "graph" && (
             <>
           {/* ================= 4 · EXPERIENCE GRAPH ================= */}
-          <section>
+          <section className="plane p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <Micro>Experience graph · what generalised into reusable knowledge</Micro>
               <span className="micro">node size is utility · ring is times used</span>
@@ -436,7 +436,7 @@ export default function GodMode() {
           {tab === "ops" && (
             <>
           {/* ================= operations ================= */}
-          <section>
+          <section className="plane p-5">
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Operations</h2>
             <div className="mt-2 grid gap-4 lg:grid-cols-3">
               <div>
@@ -557,15 +557,19 @@ function Tabs({
     ["ops", "Controls"],
   ] as const;
   return (
-    <div className="flex flex-wrap gap-1 border-b border-edge/60">
+    <div className="flex flex-wrap gap-1 border-b border-edge/60" role="tablist" aria-label="Adaptive policy sections">
       {items.map(([k, label]) => (
         <button
           key={k}
+          role="tab"
+          aria-selected={tab === k}
           onClick={() => setTab(k)}
-          className="-mb-px border-b-2 px-3 py-2 text-xs font-medium transition-colors"
+          className={`-mb-px border-b-2 px-3 py-2 text-xs font-medium transition-colors ${tab === k ? "" : "text-slate-500 hover:text-slate-300"}`}
           style={{
             borderColor: tab === k ? STATE.active.color : "transparent",
-            color: tab === k ? "rgb(226 232 240)" : undefined,
+            // Theme-aware ink: a fixed light grey here made the selected tab
+            // vanish on the light theme.
+            color: tab === k ? "rgb(var(--topo-text))" : undefined,
           }}
         >
           {label}
