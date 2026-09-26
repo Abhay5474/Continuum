@@ -501,12 +501,12 @@ export function Card({
       // would be claiming to be clickable.
       data-surface={interactive ? "" : undefined}
       data-selected={selected ? "" : undefined}
-      className={`card relative border bg-card shadow-card ${
+      className={`card relative border bg-card shadow-card ${selected ? "" : "border-card-edge"} ${
         pad ? "p-4" : ""
       } ${interactive ? "cursor-pointer hover:border-slate-500/40 hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}
       style={{
         borderRadius: "var(--r-lg)",
-        borderColor: selected ? "var(--accent-edge)" : "rgb(var(--card-edge))",
+        borderColor: selected ? "var(--accent-edge)" : undefined,
       }}
     >
       {children}
@@ -607,8 +607,8 @@ export function Section({
 export function Rail({ children }: { children: ReactNode }) {
   return (
     <div
-      className="overflow-hidden border bg-card shadow-card"
-      style={{ borderRadius: "var(--r-lg)", borderColor: "rgb(var(--card-edge))" }}
+      className="card overflow-hidden border border-card-edge bg-card shadow-card"
+      style={{ borderRadius: "var(--r-lg)" }}
     >
       <div className="divide-y divide-[color:rgb(var(--card-rule))]">{children}</div>
     </div>

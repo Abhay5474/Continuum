@@ -195,8 +195,8 @@ export function ChartFrame({
   const [table, setTable] = useState(false);
   return (
     <div
-      className="space-y-3 border bg-card p-4 shadow-card"
-      style={{ borderRadius: "var(--r-lg)", borderColor: "rgb(var(--card-edge))" }}
+      className="card space-y-3 border border-card-edge bg-card p-4 shadow-card"
+      style={{ borderRadius: "var(--r-lg)" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-100">{title}</h2>

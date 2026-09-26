@@ -38,7 +38,7 @@ export default function Autopilot() {
 
   if (!signedIn) {
     return (
-      <div className="mx-auto max-w-lg rounded-lg border border-edge bg-panel p-6 text-center">
+      <div className="mx-auto max-w-lg card rounded-lg border border-edge bg-panel p-6 text-center">
         <div className="text-2xl">🧭</div>
         <h1 className="mt-2 text-[22px] font-semibold tracking-tight">Autopilot</h1>
         <Note className="mt-1">
@@ -273,7 +273,7 @@ function Wizard({ onEnable, onCancel, busy }: {
     setProviders((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
 
   return (
-    <div className="rounded-lg border border-indigo-500/40 bg-panel p-5">
+    <div className="card rounded-lg border border-indigo-500/40 bg-panel p-5">
       <div className="flex items-center gap-2">
         <div className="font-medium">Set up Autopilot</div>
         <span className="text-xs text-slate-400">Step {step} of 3</span>

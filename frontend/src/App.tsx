@@ -10,6 +10,7 @@ import { GuideButton } from "./system/guide";
 import { guideFor } from "./system/guides";
 import { FEATURES } from "./system/features";
 import FeatureTabs from "./system/FeatureTabs";
+import { useLiquidSurface } from "./system/primitives";
 
 /**
  * Console shell.
@@ -59,6 +60,8 @@ const ACCOUNT: Item[] = [
 ];
 
 export default function App() {
+  // Every console page sits on the wallpaper and its cards are liquid glass.
+  useLiquidSurface();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);

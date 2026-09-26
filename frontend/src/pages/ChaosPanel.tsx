@@ -76,7 +76,7 @@ export default function ChaosPanel() {
 
       {msg && <div className="text-sm text-emerald-300">{msg}</div>}
 
-      <div className="rounded-lg border border-edge bg-panel p-4">
+      <div className="card rounded-lg border border-edge bg-panel p-4">
         <div className="mb-2 text-sm font-medium">Current chaos state</div>
         <DataView value={state} />
       </div>
@@ -86,7 +86,7 @@ export default function ChaosPanel() {
 
 function Card({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-edge bg-panel p-4">
+    <div className="card rounded-lg border border-edge bg-panel p-4">
       <div className="font-medium">{title}</div>
       <div className="mb-3 text-xs text-slate-400">{desc}</div>
       <div className="flex flex-wrap gap-2">{children}</div>

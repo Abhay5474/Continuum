@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ContinuumCore from "../system/ContinuumCore";
 import { useTelemetry } from "../system/useTelemetry";
-import { Micro, StateDot, Trace, Meter, Note, useLiquidSurface } from "../system/primitives";
+import { Micro, StateDot, Trace, Meter, Note } from "../system/primitives";
 import { STATE } from "../system/tokens";
 import {
   Allocation,
@@ -61,7 +61,6 @@ function trend(series: number[]): number | undefined {
  * node in the topology focuses this whole screen on that subsystem.
  */
 export default function CommandCenter() {
-  useLiquidSurface();
   const t = useTelemetry();
   const [selected, setSelected] = useState<string | null>(null);
 

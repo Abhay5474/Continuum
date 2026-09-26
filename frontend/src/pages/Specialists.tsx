@@ -439,8 +439,9 @@ export default function Specialists() {
                         data-surface=""
                         aria-pressed={selected}
                         onClick={() => setSel({ kind: "catalogue", id: e.id })}
-                        className="relative flex min-w-0 items-start gap-3 rounded-[var(--r-lg)] border bg-card p-3.5 text-left shadow-card"
-                        style={{ borderColor: selected ? "var(--accent-edge)" : "rgb(var(--card-edge))" }}
+                        className={`card relative flex min-w-0 items-start gap-3 rounded-[var(--r-lg)] border bg-card p-3.5 text-left shadow-card ${selected ? "" : "border-card-edge"}`}
+                        data-selected={selected ? "" : undefined}
+                        style={{ borderColor: selected ? "var(--accent-edge)" : undefined }}
                       >
                         <KindMark kind={kind} size={30} />
                         <span className="min-w-0 flex-1">

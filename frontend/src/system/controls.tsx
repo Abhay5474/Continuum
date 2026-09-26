@@ -302,13 +302,13 @@ export function Table({
 }) {
   return (
     <div
-      className="overflow-auto rounded-[var(--r-lg)] border"
-      style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))", maxHeight }}
+      className="card overflow-auto rounded-[var(--r-lg)] border border-card-edge bg-card"
+      style={{ maxHeight }}
     >
       <table className="w-full border-collapse text-left" style={{ minWidth }}>
         <thead
-          className="sticky top-0 z-10"
-          style={{ background: "rgb(var(--card))", boxShadow: "inset 0 -1px 0 rgb(var(--card-rule))" }}
+          className="table-head sticky top-0 z-10 bg-card"
+          style={{ boxShadow: "inset 0 -1px 0 rgb(var(--card-rule))" }}
         >
           {head}
         </thead>

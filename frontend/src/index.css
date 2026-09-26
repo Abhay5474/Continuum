@@ -1105,15 +1105,27 @@ body::before {
   [data-glass]::after { display: none; }
 }
 
-/* ======================== Liquid cards (trial) ===============================
-   Opt-in per page: a page that calls useLiquidSurface() sets data-liquid on
-   <html>. The page then gets a wallpaper (glass reads as glass only when there
-   is colour behind it to bend) and its cards become panes of liquid glass:
-   a frosted fill brighter at the top, a specular rim that is brightest on the
-   upper-left edge, a thickness highlight along the bottom, and a soft lift.
+/* ======================== Liquid cards ======================================
+   The console shell calls useLiquidSurface(), which sets data-liquid on <html>.
+   Every console page then sits on a wallpaper (glass reads as glass only when
+   there is colour behind it to bend) and its boxes — Card, .plane, and the
+   hand-built boxes tagged .card — become panes of liquid glass: a frosted fill
+   brighter at the top, a glint at the top-left, a specular rim that is
+   brightest on the upper-left edge, a thickness highlight along the bottom,
+   and a soft lift.
+
+   No backdrop blur on the panes. Behind them there is only the wallpaper — a
+   field of soft gradients that a blur leaves unchanged — so the blur bought
+   nothing you could see and cost every scrolled frame a re-render of each
+   pane's backdrop: measured, it doubled frame time on a page of seventeen.
+   Translucency, rim and glint are what read as glass here, and they are free.
+   The one place something sharp passes behind glass (rows under a sticky
+   table head) keeps its blur.
 
    The fill stays dense enough that text on it keeps the contrast an opaque
-   card had — this is a material, not see-through paper. */
+   card had — this is a material, not see-through paper. Measured against the
+   rendered pixels, not the tokens, because a gradient over a wallpaper has no
+   single background colour to compute from. */
 :root {
   --lq-wall-a: 0.15;
   --lq-fill-hi: 28 33 45;
@@ -1130,7 +1142,7 @@ body::before {
   --lq-shadow: 0 1px 1px rgba(0, 0, 0, 0.35), 0 14px 36px -16px rgba(0, 0, 0, 0.75);
 }
 :root[data-theme="light"] {
-  --lq-wall-a: 0.42;
+  --lq-wall-a: 0.36;
   --lq-fill-hi: 255 255 255;
   --lq-fill-lo: 255 255 255;
   --lq-fill-a-hi: 0.70;
@@ -1150,7 +1162,7 @@ body::before {
 :root[data-liquid] body::before {
   height: 100%;
   background:
-    radial-gradient(42% 46% at 6% 8%, rgb(240 78 62 / calc(var(--lq-wall-a) * 0.75)), transparent 70%),
+    radial-gradient(40% 46% at 0% 34%, rgb(240 78 62 / calc(var(--lq-wall-a) * 0.7)), transparent 70%),
     radial-gradient(40% 50% at 52% 0%, rgb(99 102 241 / calc(var(--lq-wall-a) * 0.8)), transparent 72%),
     radial-gradient(38% 48% at 98% 18%, rgb(20 184 166 / calc(var(--lq-wall-a) * 0.8)), transparent 70%),
     radial-gradient(46% 44% at 18% 78%, rgb(59 130 246 / calc(var(--lq-wall-a) * 0.7)), transparent 72%),
@@ -1158,16 +1170,13 @@ body::before {
     radial-gradient(30% 30% at 58% 56%, rgb(251 191 36 / calc(var(--lq-wall-a) * 0.45)), transparent 70%);
 }
 
-:root[data-liquid] .card {
+:root[data-liquid] :is(.card, .plane) {
   background-color: transparent;
   background-image:
     radial-gradient(90% 55% at 0% 0%, rgb(255 255 255 / var(--lq-glint)), transparent 62%),
     linear-gradient(165deg,
       rgb(var(--lq-fill-hi) / var(--lq-fill-a-hi)) 0%,
       rgb(var(--lq-fill-lo) / var(--lq-fill-a-lo)) 100%);
-  -webkit-backdrop-filter: blur(22px) saturate(1.9);
-  backdrop-filter: blur(22px) saturate(1.9);
-  border-color: transparent;
   border-radius: 22px !important;
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / var(--lq-rim-hi)),
@@ -1175,11 +1184,18 @@ body::before {
     0 0 0 1px rgb(var(--lq-hair) / var(--lq-hair-a)),
     var(--lq-shadow);
 }
-:root[data-liquid] .card:not([data-selected]) { border-color: transparent !important; }
+/* The rim is drawn by an absolutely placed ring, so every pane positions it —
+   except one that is already placed some other way. */
+:root[data-liquid] :is(.card, .plane):not(.absolute, .fixed, .sticky) { position: relative; }
+/* The neutral hairline gives way to the rim; an accent edge (a selected card,
+   an indigo "in flight" panel, the current plan) stays, since it carries
+   meaning the rim does not. */
+:root[data-liquid] .plane,
+:root[data-liquid] .card:is(.border-edge, .border-card-edge) { border-color: transparent; }
 /* The rim: a one-pixel ring whose light runs round the edge — bright where the
    light source is (top left), dim along the sides, catching again at the
    bottom right like the far edge of a lens. */
-:root[data-liquid] .card::after {
+:root[data-liquid] :is(.card, .plane)::after {
   content: "";
   position: absolute;
   inset: -1px;
@@ -1195,6 +1211,11 @@ body::before {
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
+/* A pane that clips its overflow would clip a ring laid over its border, so
+   there the ring sits one pixel inside. */
+:root[data-liquid] :is(.card, .plane):is(.overflow-hidden, .overflow-auto, .overflow-x-auto, .overflow-y-auto)::after {
+  inset: 0;
+}
 :root[data-liquid] .card[data-surface]:hover {
   background-image:
     radial-gradient(90% 55% at 0% 0%, rgb(255 255 255 / var(--lq-glint)), transparent 62%),
@@ -1202,21 +1223,53 @@ body::before {
       rgb(var(--lq-fill-hi) / calc(var(--lq-fill-a-hi) + 0.08)) 0%,
       rgb(var(--lq-fill-lo) / calc(var(--lq-fill-a-lo) + 0.08)) 100%);
 }
+/* Glass on glass: a pane inside a pane is a thinner sheet laid on the first —
+   a lighter fill, a smaller corner and almost no lift. */
+:root[data-liquid] :is(.card, .plane) :is(.card, .plane) {
+  background-image: linear-gradient(165deg,
+      rgb(var(--lq-fill-hi) / calc(var(--lq-fill-a-hi) * 0.55)) 0%,
+      rgb(var(--lq-fill-lo) / calc(var(--lq-fill-a-lo) * 0.45)) 100%);
+  border-radius: 16px !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / calc(var(--lq-rim-hi) * 0.8)),
+    0 0 0 1px rgb(var(--lq-hair) / calc(var(--lq-hair-a) * 0.9)),
+    0 4px 14px -10px rgba(30, 41, 72, 0.18);
+}
+/* A sticky table head rides over the rows as they scroll, so it is a strip of
+   the same glass rather than an opaque bar across the pane. */
+:root[data-liquid] .card .table-head {
+  background-color: rgb(var(--lq-fill-hi) / calc(var(--lq-fill-a-hi) + 0.12));
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+}
 /* Smoked glass is a shade lighter than the opaque card it replaces, so the
    muted inks lift by the same shade to keep their contrast on it. */
-:root[data-liquid]:not([data-theme="light"]) .card :is(.text-slate-500, .text-slate-600, .text-slate-700) {
-  color: rgb(132 147 169);
+:root[data-liquid]:not([data-theme="light"]) :is(.card, .plane) :is(.text-slate-500, .text-slate-600, .text-slate-700, .micro) {
+  color: rgb(140 155 177);
 }
-/* Wells and inner rows sit on the pane, so they go translucent with it rather
-   than punching opaque holes through the glass. */
-:root[data-liquid] .card .well { background: rgb(var(--lq-fill-lo) / 0.35); }
+/* On paper the faint and accent inks drop a shade for the same reason: panes
+   and page are tinted by the wallpaper, never quite the white each ink was
+   measured on, and a label on a 10% wash loses more than one on white. */
+:root[data-liquid][data-theme="light"] {
+  --accent-ink: #A12514;
+  --state-healthy-ink: #025A40;
+  --state-warning-ink: #7A3C06;
+}
+:root[data-liquid][data-theme="light"] main :is(.text-slate-600, [class*="text-slate-600/"]) { color: rgb(80 94 116); }
+:root[data-liquid][data-theme="light"] main :is(.text-amber-300, .text-amber-400, [class*="text-amber-300/"], [class*="text-amber-400/"]) {
+  color: rgb(150 64 6);
+}
+/* Wells sit on the pane, so they go translucent with it rather than punching
+   opaque holes through the glass. */
+:root[data-liquid] :is(.card, .plane) .well { background: rgb(var(--lq-fill-lo) / 0.35); }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root[data-liquid] .card { background-image: none; background-color: rgb(var(--card)); }
+  :root[data-liquid] .card .table-head { background-color: rgb(var(--card)); }
 }
 @media (prefers-reduced-transparency: reduce) {
-  :root[data-liquid] .card {
-    background-image: none;
+  :root[data-liquid] body::before { display: none; }
+  :root[data-liquid] :is(.card, .plane) { background-image: none; background-color: rgb(var(--card)); }
+  :root[data-liquid] .card .table-head {
     background-color: rgb(var(--card));
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

@@ -127,7 +127,7 @@ export default function Billing() {
           return (
             <div
               key={p.id}
-              className={`rounded-xl border p-5 transition-all ${current ? "border-aurora/50 bg-aurora/5 shadow-glow-sm" : "border-edge bg-panel/60 hover:-translate-y-1 hover:border-aurora/30"}`}
+              className={`card rounded-xl border p-5 transition-all ${current ? "border-aurora/50 bg-aurora/5 shadow-glow-sm" : "border-edge bg-panel/60 hover:-translate-y-1 hover:border-aurora/30"}`}
             >
               <div className="flex items-center justify-between">
                 <div className="text-sm font-bold">{p.id}</div>

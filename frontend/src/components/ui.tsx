@@ -102,12 +102,8 @@ export function ErrorState({
 }) {
   return (
     <div
-      className="flex flex-col items-center justify-center border px-6 py-12 text-center animate-fade-up"
-      style={{
-        borderRadius: "var(--r-lg)",
-        borderColor: "rgb(var(--card-edge))",
-        background: "rgb(var(--card))",
-      }}
+      className="card flex flex-col items-center justify-center border border-card-edge bg-card px-6 py-12 text-center animate-fade-up"
+      style={{ borderRadius: "var(--r-lg)" }}
     >
       <span
         aria-hidden
@@ -186,7 +182,13 @@ export function CodeBlock({
         <span className="text-[10px] uppercase tracking-widest text-slate-500">{language ?? "code"}</span>
         <CopyButton text={code} />
       </div>
-      <pre className="overflow-x-auto p-3 text-xs leading-relaxed text-slate-300">
+      {/* Focusable: a snippet wider than its box scrolls, and a keyboard has to
+          be able to reach what is past the edge. */}
+      <pre
+        tabIndex={0}
+        aria-label={`${language ?? "code"} snippet`}
+        className="overflow-x-auto p-3 text-xs leading-relaxed text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-edge)]"
+      >
         <code>{code}</code>
       </pre>
     </div>

@@ -10,7 +10,7 @@ import { Select } from "../system/controls";
 
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
-    <div className="rounded-lg border border-edge bg-panel p-4 transition-all hover:border-aurora/30">
+    <div className="card rounded-lg border border-edge bg-panel p-4 transition-all hover:border-aurora/30">
       <div className="text-xs uppercase tracking-wide text-slate-400">{label}</div>
       <div className={`mt-1 text-2xl font-semibold ${accent ?? ""}`}>{value}</div>
     </div>
@@ -71,10 +71,10 @@ export default function Dashboard() {
       <div className="space-y-8">
         <SkeletonCards />
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="min-w-0 rounded-lg border border-edge bg-panel p-4 lg:col-span-2">
+          <div className="min-w-0 card rounded-lg border border-edge bg-panel p-4 lg:col-span-2">
             <SkeletonRows rows={5} />
           </div>
-          <div className="rounded-lg border border-edge bg-panel p-4">
+          <div className="card rounded-lg border border-edge bg-panel p-4">
             <SkeletonRows rows={4} />
           </div>
         </div>
@@ -111,7 +111,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="min-w-0 rounded-lg border border-edge bg-panel lg:col-span-2">
+        <div className="min-w-0 card rounded-lg border border-edge bg-panel lg:col-span-2">
           <div className="flex items-center border-b border-edge px-4 py-3">
             <span className="font-medium">Workflows</span>
             {error && <span className="ml-auto text-xs text-rose-400">reconnecting…</span>}
@@ -151,7 +151,7 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-lg border border-edge bg-panel p-4">
+          <div className="card rounded-lg border border-edge bg-panel p-4">
             <div className="font-medium">Start a workflow</div>
             <label className="mt-3 block text-xs text-slate-400">Type</label>
             <Select
@@ -182,7 +182,7 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div className="rounded-lg border border-edge bg-panel p-4">
+          <div className="card rounded-lg border border-edge bg-panel p-4">
             <div className="font-medium">Cost & Tokens</div>
             <div className="mt-2 text-sm">
               <div className="flex justify-between">

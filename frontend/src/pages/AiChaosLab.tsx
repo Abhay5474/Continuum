@@ -58,7 +58,7 @@ export default function AiChaosLab() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-lg border border-edge bg-panel p-4">
+        <div className="lg:col-span-2 card rounded-lg border border-edge bg-panel p-4">
           <div className="mb-3 font-medium">Failure injectors (probability per LLM call)</div>
           <div className="space-y-3">
             {FAILURE_TYPES.map((t) => (
@@ -90,7 +90,7 @@ export default function AiChaosLab() {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-lg border border-edge bg-panel p-4">
+          <div className="card rounded-lg border border-edge bg-panel p-4">
             <div className="font-medium">Survival metrics</div>
             <div className="mt-2 space-y-1 text-sm">
               <Row label="Total injections" value={metrics?.totalInjections ?? 0} />
@@ -104,7 +104,7 @@ export default function AiChaosLab() {
               />
             </div>
           </div>
-          <div className="rounded-lg border border-edge bg-panel p-4">
+          <div className="card rounded-lg border border-edge bg-panel p-4">
             <div className="font-medium">By type</div>
             <div className="mt-2 space-y-1 text-xs text-slate-400">
               {Object.entries(metrics?.injectionsByType ?? {}).map(([k, v]) => (
@@ -118,7 +118,7 @@ export default function AiChaosLab() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-edge bg-panel">
+      <div className="card rounded-lg border border-edge bg-panel">
         <div className="border-b border-edge px-4 py-2 font-medium">Recent injections</div>
         <div className="divide-y divide-edge text-sm">
           {events.map((e) => (

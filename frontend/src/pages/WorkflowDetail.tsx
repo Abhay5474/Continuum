@@ -235,7 +235,7 @@ export default function WorkflowDetailPage() {
       )}
 
       {healing?.healed && (
-        <div className="rounded-lg border border-indigo-500/40 bg-panel p-4 transition-colors duration-300">
+        <div className="card rounded-lg border border-indigo-500/40 bg-panel p-4 transition-colors duration-300">
           <div className="text-sm font-medium">Paradox Resolution Ledger (this instance)</div>
           <div className="mt-1 text-xs text-slate-400">
             This workflow survived a code-graph change: the replay engine virtualized the structural
@@ -262,7 +262,7 @@ export default function WorkflowDetailPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-lg border border-edge bg-panel">
+        <div className="lg:col-span-2 card rounded-lg border border-edge bg-panel">
           <div className="border-b border-edge px-4 py-3 font-medium">Event Timeline</div>
           <ol className="relative space-y-0">
             {detail.events.map((e, i) => (
@@ -330,7 +330,7 @@ export default function WorkflowDetailPage() {
 
 function Panel({ title, children }: { title: string; children: import("react").ReactNode }) {
   return (
-    <div className="rounded-lg border border-edge bg-panel">
+    <div className="card rounded-lg border border-edge bg-panel">
       <div className="border-b border-edge px-4 py-2 text-sm font-medium">{title}</div>
       <div className="px-4 py-2">{children}</div>
     </div>

@@ -285,7 +285,7 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           Provider keys
           <InfoTip text="Your own LLM provider keys. Encrypted with AES-256-GCM, decrypted only in memory at call time, and never shown again after saving." />
         </h2>
-        <div className="mt-3 overflow-x-auto rounded-xl border p-3 shadow-card" style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}>
+        <div className="card mt-3 overflow-x-auto rounded-xl border border-card-edge bg-card p-3 shadow-card">
         <table className="w-full min-w-[420px] text-sm">
           <thead className="text-xs text-slate-400">
             <tr className="text-left"><th className="py-2">Provider</th><th>API Key (write-only)</th><th>Status</th><th>Actions</th></tr>
