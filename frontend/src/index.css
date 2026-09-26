@@ -981,6 +981,82 @@ body::before {
     to { opacity: 1; translate: 0 0; scale: 1; }
   }
 
+  /* ---- live demos ------------------------------------------------------ */
+  .demo-button {
+    background: linear-gradient(135deg, var(--accent-strong), color-mix(in srgb, var(--accent-strong) 70%, #8b5cf6));
+    box-shadow: 0 6px 18px -8px var(--accent-strong);
+  }
+  .demo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--wash-mute);
+    color: var(--text-2, inherit);
+  }
+  .demo-badge-live { background: var(--wash-ok); color: var(--state-healthy-ink); }
+  .demo-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: currentColor;
+    animation: liveDot 1.6s ease-in-out infinite;
+  }
+  @keyframes liveDot {
+    0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+    50% { box-shadow: 0 0 0 4px transparent; opacity: 0.55; }
+  }
+  .demo-scrim { animation: fadeIn var(--dur-fade, 250ms) var(--ease-fade, ease) both; }
+  @keyframes fadeIn { from { opacity: 0; } }
+  .demo-shimmer {
+    background: linear-gradient(90deg, var(--wash-mute) 0%, rgb(148 163 184 / 0.28) 50%, var(--wash-mute) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  .demo-stage { color: var(--text-3, #94a3b8); transition: color var(--dur-fade, 250ms) var(--ease-fade, ease); }
+  .demo-stage[data-state="now"], .demo-stage[data-state="done"] { color: var(--text-1, inherit); }
+  .demo-bead {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: 999px;
+    border: 1.5px solid var(--edge-strong, rgb(148 163 184 / 0.5));
+    color: #fff;
+    transition: background var(--dur-standard, 400ms) var(--ease-standard, ease),
+      border-color var(--dur-standard, 400ms) var(--ease-standard, ease),
+      scale var(--dur-elastic, 500ms) var(--ease-elastic, ease);
+  }
+  .demo-stage[data-state="now"] .demo-bead {
+    border-color: var(--accent-strong);
+    scale: 1.2;
+    box-shadow: 0 0 0 4px var(--accent-wash);
+    animation: beadPulse 900ms ease-in-out infinite;
+  }
+  @keyframes beadPulse { 50% { box-shadow: 0 0 0 7px transparent; } }
+  .demo-stage[data-state="done"] .demo-bead { background: var(--state-healthy-ink); border-color: transparent; }
+  .demo-stage[data-state="fail"] .demo-bead { background: var(--state-critical-ink); border-color: transparent; }
+  /* Values arriving: bars grow from zero, marks pop, sliders travel. */
+  .demo-grow {
+    transform-origin: left center;
+    animation: demoGrow var(--dur-elastic, 600ms) var(--ease-elastic, ease) both;
+  }
+  @keyframes demoGrow { from { scale: 0 1; } }
+  .demo-grow-y {
+    transform-origin: center bottom;
+    animation: demoGrowY var(--dur-elastic, 600ms) var(--ease-elastic, ease) both;
+  }
+  @keyframes demoGrowY { from { scale: 1 0; } }
+  .demo-pop { animation: demoPop var(--dur-elastic, 520ms) var(--ease-elastic, ease) both; }
+  @keyframes demoPop { from { opacity: 0; scale: 0.4; } }
+  .demo-slide { animation: demoSlide var(--dur-slow, 700ms) var(--ease-standard, ease) both; }
+  @keyframes demoSlide { from { left: var(--from, 0%); opacity: 0; } }
+
   /* An icon that turns — a chevron opening — rotates on a spring, so it
      arrives with the same small settle as the menu it belongs to. */
   .spin-to {

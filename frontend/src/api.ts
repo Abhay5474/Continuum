@@ -674,6 +674,32 @@ export const portal = {
   },
 
   // --- Context transformers: application data -> canonical LLM context ---
+  /** The engine's pure components on sample input; see DemoController. Nothing is stored. */
+  demo: {
+    firewall: (text: string) =>
+      portalHttp<{
+        sanitized: string;
+        redactions: { category: string; count: number }[];
+        injectionScore: number;
+        blocked: boolean;
+        injectionHits: string[];
+      }>("/api/portal/developer/demo/firewall", "POST", { text }),
+    compress: (text: string, ratio: number) =>
+      portalHttp<{ text: string; originalTokens: number; compressedTokens: number; protectedSpans: number; achievedRatio: number }>(
+        "/api/portal/developer/demo/compress",
+        "POST",
+        { text, ratio },
+      ),
+    similarity: (prompt: string, candidates: string[]) =>
+      portalHttp<{ text: string; score: number }[]>("/api/portal/developer/demo/similarity", "POST", { prompt, candidates }),
+    loops: (steps: string[], progress?: boolean[]) =>
+      portalHttp<{ kind: string; looping: boolean; at: number; confidence: number; reason: string; evidence: string[] }>(
+        "/api/portal/developer/demo/loops",
+        "POST",
+        { steps, progress },
+      ),
+  },
+
   context: {
     capabilities: () =>
       portalHttp<any[]>("/api/portal/developer/context/capabilities", "GET"),

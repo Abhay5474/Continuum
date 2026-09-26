@@ -7,6 +7,7 @@ import { portal } from "./api";
 import { ThemeToggle } from "./components/ui";
 import { useOperator } from "./system/OperatorAccess";
 import { GuideButton } from "./system/guide";
+import { DemoButton, hasDemo } from "./system/demo";
 import { guideFor } from "./system/guides";
 import { FEATURES } from "./system/features";
 import FeatureTabs from "./system/FeatureTabs";
@@ -257,6 +258,7 @@ export default function App() {
                 than on each page means a feature cannot ship without one being
                 noticed as missing, and it is always in the same place. */}
             {guide && <GuideButton guide={guide} guideKey={location.pathname} />}
+            {hasDemo(location.pathname) && <DemoButton key={location.pathname} path={location.pathname} />}
             <Link
               to="/docs"
               className="hidden rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:text-slate-200 lg:block"
