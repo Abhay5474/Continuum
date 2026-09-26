@@ -288,7 +288,7 @@ function AccountDetail({ id }: { id: string }) {
               <tr>
                 <TH>Provider</TH>
                 <TH>Stored</TH>
-                <TH align="right"> </TH>
+                <TH align="right"><span className="sr-only">Actions</span></TH>
               </tr>
             }
           >

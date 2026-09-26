@@ -8,6 +8,8 @@ import io.continuum.chaos.ChaosMonkey;
 import io.continuum.config.LlmProperties;
 import io.continuum.provider.HttpJson;
 import io.continuum.provider.LlmProvider;
+import io.continuum.provider.ModelUnavailableException;
+import io.continuum.registry.catalog.ModelResolver;
 import io.continuum.provider.model.ImagePart;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.LlmResponse;
@@ -40,6 +42,10 @@ import java.util.Set;
 @Component
 public class GeminiProvider implements LlmProvider {
 
+    /** Used only when nothing is configured and the catalogue has nothing usable yet. */
+    static final String FALLBACK_MODEL = "gemini-3.5-flash";
+    private static final java.util.regex.Pattern SAFE_MODEL = java.util.regex.Pattern.compile("[A-Za-z0-9._/:-]{1,120}");
+
     /**
      * JSON Schema keywords Gemini's OpenAPI-subset schema rejects outright.
      * OpenAI clients send them routinely — {@code additionalProperties: false}
@@ -61,6 +67,31 @@ public class GeminiProvider implements LlmProvider {
     @Override
     public String name() {
         return "gemini";
+    }
+
+    /** Which model a request runs on; see {@link ModelResolver}. Absent in unit tests. */
+    private ModelResolver resolver;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setModelResolver(ModelResolver resolver) {
+        this.resolver = resolver;
+    }
+
+    /**
+     * The model for this request: the catalogue's choice when it has one (the
+     * default for a request naming none, the replacement for a retired name),
+     * else the configured model, else the built-in fallback. Never a name that
+     * could change the URL it is put into.
+     */
+    String modelFor(LlmRequest request) {
+        String model = resolver != null ? resolver.resolve(name(), request.model()) : request.model();
+        if (model == null || model.isBlank()) {
+            model = config.getModel() == null || config.getModel().isBlank() ? FALLBACK_MODEL : config.getModel();
+        }
+        if (!SAFE_MODEL.matcher(model).matches()) {
+            throw new IllegalArgumentException("Not a model name: " + model);
+        }
+        return model;
     }
 
     @Override
@@ -85,13 +116,24 @@ public class GeminiProvider implements LlmProvider {
             throw new RuntimeException("CHAOS: Gemini is down");
         }
         String apiKey = (apiKeyOverride != null && !apiKeyOverride.isBlank()) ? apiKeyOverride : config.getApiKey();
-        String model = request.model() != null ? request.model() : config.getModel();
+        String model = modelFor(request);
 
         // The key goes in a header. On the query string it is part of the URL,
         // and a URL is what ends up in exception messages and access logs.
         String url = config.getBaseUrl() + "/v1beta/models/" + model + ":generateContent";
-        JsonNode resp = http.post(url, buildBody(http.mapper(), request),
-                new String[]{"x-goog-api-key", apiKey}, 30);
+        JsonNode resp;
+        try {
+            resp = http.post(url, buildBody(http.mapper(), request), new String[]{"x-goog-api-key", apiKey}, 30);
+        } catch (HttpJson.HttpStatusException e) {
+            // Said about the model rather than the request: tell the router, which tells the catalogue.
+            if (io.continuum.registry.catalog.GeminiCatalogClient.gone(e.status(), e.body())) {
+                throw new ModelUnavailableException(name(), model, ModelUnavailableException.Reason.GONE, e);
+            }
+            if (io.continuum.registry.catalog.GeminiCatalogClient.noFreeQuota(e.status(), e.body())) {
+                throw new ModelUnavailableException(name(), model, ModelUnavailableException.Reason.NOT_FREE, e);
+            }
+            throw e;
+        }
         return parse(resp, request, model);
     }
 

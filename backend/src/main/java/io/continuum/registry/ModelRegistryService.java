@@ -20,6 +20,12 @@ import java.util.Set;
  * models become ACTIVE, net-new live-only models enter as DISCOVERED (never
  * auto-activated), and models that vanish from a provider are marked DEPRECATED
  * (model disappearance handling). Only ACTIVE models are eligible for routing.
+ *
+ * <p>Groq and Gemini are no longer discovered here: their curated lists
+ * re-asserted every name as ACTIVE on each run, so a model the provider had
+ * retired could never leave the registry. They are read from the providers'
+ * own model lists by {@code ModelCatalogService}; this reconciles the built-in
+ * mock provider.
  */
 @Service
 public class ModelRegistryService {
@@ -29,6 +35,10 @@ public class ModelRegistryService {
     private final ModelRepository repo;
     private final List<ModelDiscoveryProvider> discoveries;
     private final Json json;
+
+    /** Optional so the registry has no hard dependency on the catalogue. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<io.continuum.registry.catalog.ModelResolver> resolver;
 
     public ModelRegistryService(ModelRepository repo, List<ModelDiscoveryProvider> discoveries, Json json) {
         this.repo = repo;
@@ -99,14 +109,28 @@ public class ModelRegistryService {
         return repo.findAll();
     }
 
+    /**
+     * The models requests may be routed to: ACTIVE, chat, and not set aside
+     * because a live request was just told it is gone. Providers list speech,
+     * safety and embedding models too; routing a chat request to one is a
+     * guaranteed failure, and each failure is a request against the quota.
+     */
     @Transactional(readOnly = true)
     public List<ModelEntity> active() {
-        return repo.findByStatus(ModelStatus.ACTIVE);
+        return routable(repo.findByStatus(ModelStatus.ACTIVE));
     }
 
     @Transactional(readOnly = true)
     public List<ModelEntity> activeFor(String provider) {
-        return repo.findByProviderAndStatus(provider, ModelStatus.ACTIVE);
+        return routable(repo.findByProviderAndStatus(provider, ModelStatus.ACTIVE));
+    }
+
+    private List<ModelEntity> routable(List<ModelEntity> rows) {
+        io.continuum.registry.catalog.ModelResolver r = resolver == null ? null : resolver.getIfAvailable();
+        return rows.stream()
+                .filter(ModelEntity::isChat)
+                .filter(m -> r == null || !r.isQuarantined(m.getProvider(), m.getModelName()))
+                .toList();
     }
 
     public ModelCapabilities capabilitiesOf(ModelEntity m) {

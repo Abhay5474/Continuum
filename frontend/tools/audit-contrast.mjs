@@ -30,7 +30,7 @@ const ROUTES = [
   "/specialists", "/pipelines", "/admission", "/scheduling", "/cost-limits",
   "/compression", "/context", "/counterfactual", "/loops", "/saga", "/provenance", "/docs",
   // "route>Tab" opens the route, then that tab: views that have no URL of their own.
-  "/workflows>Editor", "/router>Decisions", "/router>Learning & hedging", "/accounts",
+  "/workflows>Editor", "/router>Decisions", "/router>Learning & hedging", "/accounts", "/models",
 ];
 
 /** Runs in the page: WCAG 2.1 contrast over a properly composited background. */

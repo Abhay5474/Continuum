@@ -36,10 +36,20 @@ public class CostPredictor {
     }
 
     private String modelFor(String provider) {
+        // The model requests actually run on — the catalogue's current default —
+        // rather than the name in configuration, which may have been retired.
+        io.continuum.registry.catalog.ModelResolver r = resolver == null ? null : resolver.getIfAvailable();
+        String chosen = r == null ? null : r.defaultFor(provider);
+        if (chosen != null) {
+            return chosen;
+        }
         return switch (provider) {
             case "gemini" -> props.getGemini().getModel();
             case "groq" -> props.getGroq().getModel();
             default -> provider;
         };
     }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<io.continuum.registry.catalog.ModelResolver> resolver;
 }

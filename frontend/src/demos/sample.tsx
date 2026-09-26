@@ -1139,6 +1139,114 @@ const godmode: DemoSpec<Signal[], { setting: string; from: string; to: string }[
   ),
 };
 
+/* ---------------- Models: a retirement caught -------------------------- */
+
+type Known = { id: string; seen: boolean; isDefault?: boolean };
+type Listed = { id: string; kind: "chat" | "speech" | "safety"; preview?: boolean; answers: "ok" | "no-free-quota" };
+type Row = { id: string; outcome: "retired" | "in use" | "not free" | "not for chat"; note: string };
+const models: DemoSpec<{ known: Known[]; listed: Listed[] }, { rows: Row[]; defaultModel: string; replaced: string; lists: number; tests: number }> = {
+  title: "Model catalogue check",
+  live: false,
+  samples: [
+    {
+      label: "Groq retires Llama 3.3",
+      input: {
+        known: [
+          { id: "llama-3.3-70b-versatile", seen: false, isDefault: true },
+          { id: "llama-3.1-8b-instant", seen: false },
+        ],
+        listed: [
+          { id: "openai/gpt-oss-120b", kind: "chat", answers: "ok" },
+          { id: "openai/gpt-oss-20b", kind: "chat", answers: "ok" },
+          { id: "qwen/qwen3.6-27b", kind: "chat", preview: true, answers: "ok" },
+          { id: "whisper-large-v3", kind: "speech", answers: "ok" },
+          { id: "meta-llama/llama-guard-4-12b", kind: "safety", answers: "ok" },
+        ],
+      },
+    },
+    {
+      label: "Gemini ships 3.8, 3.5 goes",
+      input: {
+        known: [
+          { id: "gemini-3.5-flash", seen: true, isDefault: true },
+          { id: "gemini-3.5-flash-lite", seen: true },
+        ],
+        listed: [
+          { id: "gemini-3.5-flash-lite", kind: "chat", answers: "ok" },
+          { id: "gemini-3.8-flash", kind: "chat", answers: "ok" },
+          { id: "gemini-3.9-pro-preview", kind: "chat", preview: true, answers: "no-free-quota" },
+        ],
+      },
+    },
+  ],
+  steps: ["Read the provider's model list", "Retire what it no longer lists", "Test each new chat model once", "Choose the default and the replacement"],
+  run: ({ known, listed }) => {
+    const ids = new Set(listed.map((l) => l.id));
+    const rows: Row[] = [];
+    for (const k of known) {
+      if (!ids.has(k.id)) rows.push({ id: k.id, outcome: "retired", note: k.seen ? "missing from two lists in a row" : "never in the provider's list" });
+    }
+    let tests = 0;
+    for (const l of listed) {
+      if (l.kind !== "chat") {
+        rows.push({ id: l.id, outcome: "not for chat", note: `${l.kind} model — catalogued, never tested or routed` });
+        continue;
+      }
+      if (known.some((k) => k.id === l.id)) {
+        rows.push({ id: l.id, outcome: "in use", note: "still listed" });
+        continue;
+      }
+      tests++;
+      rows.push(l.answers === "ok"
+        ? { id: l.id, outcome: "in use", note: `answered a test call${l.preview ? " · preview, so never the default while a stable one works" : ""}` }
+        : { id: l.id, outcome: "not free", note: "quota limit 0 on the free key" });
+    }
+    const old = known.find((k) => k.isDefault)!.id;
+    const fam = (id: string) => id.replace(/\d+(\.\d+)*/g, "#");
+    const usable = listed.filter((l) => l.kind === "chat" && l.answers === "ok" && !l.preview).map((l) => l.id);
+    const size = (id: string) => Number(id.match(/(\d+)b\b/)?.[1] ?? 50);
+    const stillThere = usable.includes(old);
+    const pick = stillThere
+      ? old
+      : usable.find((id) => fam(id) === fam(old)) ?? [...usable].sort((a, b) => size(b) - size(a))[0];
+    return done({ rows, defaultModel: pick, replaced: stillThere ? "" : old, lists: 1, tests });
+  },
+  Input: ({ input }) => (
+    <div className="space-y-2 text-[12px]">
+      <div className="text-slate-500">Known before the check</div>
+      {input.known.map((k) => (
+        <div key={k.id} className="font-mono text-slate-300">{k.id}{k.isDefault ? "  (default)" : ""}</div>
+      ))}
+      <div className="pt-1 text-slate-500">What the provider now lists</div>
+      {input.listed.map((l) => (
+        <div key={l.id} className="font-mono text-slate-300">{l.id}</div>
+      ))}
+    </div>
+  ),
+  Output: ({ output }) => {
+    const tone: Record<Row["outcome"], Tone> = { retired: "bad", "in use": "ok", "not free": "warn", "not for chat": "mute" };
+    return (
+      <div className="space-y-4">
+        {output.replaced ? (
+          <Verdict tone="violet" sub={`requests naming ${output.replaced} now go here`}>Default → {output.defaultModel}</Verdict>
+        ) : (
+          <Verdict tone="ok" sub="the working default is kept; a newer model is not a reason to switch">Default stays {output.defaultModel}</Verdict>
+        )}
+        <ul className="space-y-1.5">
+          {output.rows.map((r, i) => (
+            <li key={r.id} className="demo-pop flex flex-wrap items-baseline gap-2 text-[12px]" style={{ animationDelay: `${i * 70}ms` }}>
+              <Pill tone={tone[r.outcome]}>{r.outcome}</Pill>
+              <span className="font-mono text-slate-200">{r.id}</span>
+              <span className="text-slate-500">{r.note}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="text-[11.5px] text-slate-500">Cost: {output.lists} list request, {output.tests} test call{output.tests === 1 ? "" : "s"}.</div>
+      </div>
+    );
+  },
+};
+
 export const SAMPLE: Record<string, DemoSpec> = {
   "/gateway": gateway,
   "/autopilot": autopilot,
@@ -1162,4 +1270,5 @@ export const SAMPLE: Record<string, DemoSpec> = {
   "/chaos": chaos,
   "/ai-chaos": aiChaos,
   "/godmode": godmode,
+  "/models": models,
 };

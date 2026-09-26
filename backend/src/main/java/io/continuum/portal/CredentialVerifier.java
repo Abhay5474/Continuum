@@ -29,15 +29,24 @@ public class CredentialVerifier {
         this.router = router;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<io.continuum.registry.catalog.ModelResolver> resolver;
+
     public Result verify(String developerId, String provider) {
         String key = vault.decrypt(developerId, provider).orElse(null);
         if (key == null) {
             return new Result(false, "No credential stored for " + provider);
         }
-        // Pick the cheapest active model for this provider as a lightweight probe.
-        String model = registry.activeFor(provider).stream()
-                .min((a, b) -> Integer.compare(a.getContextWindow(), b.getContextWindow()))
-                .map(ModelEntity::getModelName).orElse(null);
+        // Probe with the provider's current default — the model the catalogue has
+        // seen answer — falling back to any active model for this provider.
+        io.continuum.registry.catalog.ModelResolver r = resolver == null ? null : resolver.getIfAvailable();
+        String preferred = r == null ? null : r.defaultFor(provider);
+        List<ModelEntity> active = registry.activeFor(provider);
+        String model = preferred != null && active.stream().anyMatch(m -> m.getModelName().equals(preferred))
+                ? preferred
+                : active.stream()
+                        .min((a, b) -> Integer.compare(a.getContextWindow(), b.getContextWindow()))
+                        .map(ModelEntity::getModelName).orElse(preferred);
         if (model == null) {
             return new Result(false, "No active model registered for " + provider);
         }

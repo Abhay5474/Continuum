@@ -23,8 +23,15 @@ public class ModelRegistryController {
 
     private final ModelRegistryService registry;
 
-    public ModelRegistryController(ModelRegistryService registry) {
+    private final io.continuum.registry.catalog.ModelCatalogService catalogue;
+    private final io.continuum.registry.catalog.ModelResolver resolver;
+
+    public ModelRegistryController(ModelRegistryService registry,
+                                   io.continuum.registry.catalog.ModelCatalogService catalogue,
+                                   io.continuum.registry.catalog.ModelResolver resolver) {
         this.registry = registry;
+        this.catalogue = catalogue;
+        this.resolver = resolver;
     }
 
     @GetMapping
@@ -37,17 +44,25 @@ public class ModelRegistryController {
         return registry.active();
     }
 
+    /**
+     * Re-run discovery: the built-in models, and a catalogue check of the real
+     * providers (the same check as "Check now", with the same cooldown).
+     */
     @PostMapping("/discover")
     public Map<String, Object> discover(HttpServletRequest req) {
         requireOperator(req);
-        return Map.of("changes", registry.discoverAll());
+        int changes = registry.discoverAll();
+        var start = catalogue.requestCheck("operator");
+        return Map.of("changes", changes, "check", start.outcome().name(), "message", start.message());
     }
 
     @PostMapping("/{id}/status")
     public ModelEntity transition(@PathVariable Long id, @RequestParam ModelStatus status,
                                   HttpServletRequest req) {
         requireOperator(req);
-        return registry.transition(id, status);
+        ModelEntity m = registry.transition(id, status);
+        resolver.refresh();
+        return m;
     }
 
     private static void requireOperator(HttpServletRequest req) {

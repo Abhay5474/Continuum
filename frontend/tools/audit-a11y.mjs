@@ -24,7 +24,7 @@ const ROUTES = ["/dashboard", "/workflows", "/workflows/console", "/gateway", "/
   "/provenance", "/replay", "/chaos", "/ai-chaos", "/dag", "/autopilot", "/godmode", "/portal", "/billing",
   "/settings", "/nope-404",
   // "route>Tab" opens the route, then that tab: views that have no URL of their own.
-  "/workflows>Editor", "/router>Decisions", "/router>Learning & hedging", "/accounts"];
+  "/workflows>Editor", "/router>Decisions", "/router>Learning & hedging", "/accounts", "/models"];
 
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });

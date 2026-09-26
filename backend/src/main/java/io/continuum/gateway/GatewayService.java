@@ -45,6 +45,11 @@ import java.util.Map;
 @Service
 public class GatewayService {
 
+    /** Most model attempts one request may make before giving up. */
+    static final int MAX_MODEL_ATTEMPTS = 6;
+    /** Most models of one provider one request may try. */
+    static final int MAX_MODELS_PER_PROVIDER = 3;
+
     private static final Logger log = LoggerFactory.getLogger(GatewayService.class);
 
     private final RequestNormalizer normalizer;
@@ -547,10 +552,24 @@ public class GatewayService {
         // refuses for all of them: trying each cost a round trip apiece and
         // delayed a failover that was going to happen anyway.
         java.util.Set<String> rejectedCredential = new java.util.HashSet<>();
+        // Bounded. The chain lists every routable model, and with whole provider
+        // catalogues that can be dozens: a request that fails everywhere must
+        // not turn into dozens of calls against the free quota. The bounds match
+        // the worst case before the catalogue (two models per provider).
+        int attempts = 0;
+        Map<String, Integer> perProvider = new HashMap<>();
         for (ModelFallbackPolicy.ModelCandidate c : chain) {
             if (rejectedCredential.contains(c.provider())) {
                 continue;
             }
+            if (attempts >= MAX_MODEL_ATTEMPTS) {
+                break;
+            }
+            if (perProvider.getOrDefault(c.provider(), 0) >= MAX_MODELS_PER_PROVIDER) {
+                continue;
+            }
+            attempts++;
+            perProvider.merge(c.provider(), 1, Integer::sum);
             // withModel, not a fresh four-argument request: rebuilding it that way
             // silently dropped the caller's tools and response_format, so a
             // tool-calling client got prose back and could not tell why.

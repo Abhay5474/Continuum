@@ -297,6 +297,32 @@ export const GUIDES: Record<string, Guide> = {
     ],
   },
 
+  "/models": {
+    title: "the model catalogue",
+    summary:
+      "Every model Groq and Gemini offer, read from their own model lists, tested before use, and replaced when retired.",
+    steps: [
+      {
+        title: "Where this comes from",
+        body: "Each provider's own model list, read through its API — not a web page. A model a provider lists is tested with one tiny request before anything is sent to it; only then is it used.",
+      },
+      {
+        title: "What \"free\" means here",
+        body: "Your keys are declared free-tier, so a model that answers a test call on them is free to use. A model with no free quota says so with a limit of zero, and is marked not usable. Nothing relies on a label that may be out of date.",
+      },
+      {
+        title: "Check now",
+        target: '[data-guide="models-check"]',
+        body: "Checks run by themselves every ten days, counted from the last successful one, so a day the server was off is caught up rather than missed. The button runs one now: a single list request per provider and a handful of test calls, one check at a time, at most once every ten minutes.",
+      },
+      {
+        title: "When a model is retired",
+        body: "If a live request is told a model no longer exists, it is set aside at once and the request is retried on the replacement. One list request confirms it; requests still naming the old model go to the new one. The timeline at the bottom records every change.",
+        caution: "Gemini's free tier lets Google use what you send to improve its products. Read the provider's terms, linked on each provider card, before sending anything sensitive.",
+      },
+    ],
+  },
+
   "/mmu": {
     title: "the Context Optimizer",
     summary:

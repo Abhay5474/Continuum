@@ -11,8 +11,10 @@ public class LlmProperties {
     /** Ordered failover chain by provider name, e.g. [gemini, groq, mock]. */
     private List<String> failoverOrder = List.of("gemini", "groq", "mock");
 
+    // Last-resort names, used only when nothing is configured and the catalogue
+    // has no usable model yet. The catalogue decides the real default.
     private final Provider gemini = new Provider("gemini-3.5-flash", "https://generativelanguage.googleapis.com");
-    private final Provider groq = new Provider("llama-3.3-70b-versatile", "https://api.groq.com/openai/v1");
+    private final Provider groq = new Provider("openai/gpt-oss-120b", "https://api.groq.com/openai/v1");
 
     public List<String> getFailoverOrder() {
         return failoverOrder;
@@ -32,8 +34,27 @@ public class LlmProperties {
 
     public static class Provider {
         private String apiKey = "";
+        /**
+         * A preferred model, not a requirement. The catalogue uses it while the
+         * provider lists it and it answers; when the provider retires it, requests
+         * move to the catalogue's replacement instead of failing. Blank: let the
+         * catalogue choose.
+         */
         private String model;
         private String baseUrl;
+        /**
+         * The key is on the provider's free tier, so a model that answers it is
+         * free to use. Declared, because no provider API says which tier a key is on.
+         */
+        private boolean freeTier = true;
+
+        public boolean isFreeTier() {
+            return freeTier;
+        }
+
+        public void setFreeTier(boolean freeTier) {
+            this.freeTier = freeTier;
+        }
 
         public Provider(String model, String baseUrl) {
             this.model = model;

@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.continuum.config.LlmProperties;
 import io.continuum.provider.HttpJson;
 import io.continuum.provider.LlmProvider;
+import io.continuum.provider.ModelUnavailableException;
+import io.continuum.registry.catalog.ModelResolver;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.LlmResponse;
 import io.continuum.provider.model.ImagePart;
@@ -27,6 +29,10 @@ import java.util.List;
 @Component
 public class GroqProvider implements LlmProvider {
 
+    /** Used only when nothing is configured and the catalogue has nothing usable yet. */
+    static final String FALLBACK_MODEL = "openai/gpt-oss-120b";
+    private static final java.util.regex.Pattern SAFE_MODEL = java.util.regex.Pattern.compile("[A-Za-z0-9._/:-]{1,120}");
+
     private final LlmProperties.Provider config;
     private final HttpJson http;
 
@@ -38,6 +44,31 @@ public class GroqProvider implements LlmProvider {
     @Override
     public String name() {
         return "groq";
+    }
+
+    /** Which model a request runs on; see {@link ModelResolver}. Absent in unit tests. */
+    private ModelResolver resolver;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setModelResolver(ModelResolver resolver) {
+        this.resolver = resolver;
+    }
+
+    /**
+     * The model for this request: the catalogue's choice when it has one (the
+     * default for a request naming none, the replacement for a retired name),
+     * else the configured model, else the built-in fallback. Never a name that
+     * could change the URL it is put into.
+     */
+    String modelFor(LlmRequest request) {
+        String model = resolver != null ? resolver.resolve(name(), request.model()) : request.model();
+        if (model == null || model.isBlank()) {
+            model = config.getModel() == null || config.getModel().isBlank() ? FALLBACK_MODEL : config.getModel();
+        }
+        if (!SAFE_MODEL.matcher(model).matches()) {
+            throw new IllegalArgumentException("Not a model name: " + model);
+        }
+        return model;
     }
 
     @Override
@@ -58,7 +89,7 @@ public class GroqProvider implements LlmProvider {
     @Override
     public LlmResponse complete(LlmRequest request, String apiKeyOverride) throws Exception {
         String apiKey = (apiKeyOverride != null && !apiKeyOverride.isBlank()) ? apiKeyOverride : config.getApiKey();
-        String model = request.model() != null ? request.model() : config.getModel();
+        String model = modelFor(request);
         ObjectMapper m = http.mapper();
         ObjectNode body = m.createObjectNode();
         body.put("model", model);
@@ -104,8 +135,16 @@ public class GroqProvider implements LlmProvider {
         }
 
         String url = config.getBaseUrl() + "/chat/completions";
-        JsonNode resp = http.post(url, body,
-                new String[]{"Authorization", "Bearer " + apiKey}, 30);
+        JsonNode resp;
+        try {
+            resp = http.post(url, body, new String[]{"Authorization", "Bearer " + apiKey}, 30);
+        } catch (HttpJson.HttpStatusException e) {
+            // Said about the model rather than the request: tell the router, which tells the catalogue.
+            if (io.continuum.registry.catalog.GroqCatalogClient.gone(e.status(), e.body())) {
+                throw new ModelUnavailableException(name(), model, ModelUnavailableException.Reason.GONE, e);
+            }
+            throw e;
+        }
 
         JsonNode msgNode = resp.path("choices").path(0).path("message");
         String text = msgNode.path("content").asText("");

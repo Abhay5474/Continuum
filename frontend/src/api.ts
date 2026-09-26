@@ -174,6 +174,33 @@ export const api = {
    */
   opPost: <T>(path: string, body?: unknown) =>
     http<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, true),
+  /** The model catalogue: every model each provider lists, verified, retired and replaced. */
+  models: {
+    catalog: () => http<any>("/api/models/catalog"),
+    checkState: () => http<any>("/api/models/check"),
+    events: (limit = 60) => http<any[]>(`/api/models/events?limit=${limit}`),
+    runs: (limit = 10) => http<any[]>(`/api/models/runs?limit=${limit}`),
+    /**
+     * "Check now". The server answers 202 when it starts, 409 while one runs and
+     * 429 during the cooldown; the last two are answers, not failures, so the
+     * body comes back either way.
+     */
+    check: async (): Promise<{ status: number; body: any }> => {
+      const token = sessionToken();
+      const res = await fetch(`${BASE}/api/models/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      let body: any = null;
+      try {
+        body = await res.json();
+      } catch {
+        /* no body */
+      }
+      return { status: res.status, body };
+    },
+    pin: (provider: string, model: string | null) => http<any>("/api/models/pin", { method: "POST", body: JSON.stringify({ provider, model }) }, true),
+  },
   /** Reads that return more to the operator (the whole engine) than to an account. */
   opGet: <T>(path: string) => http<T>(path, undefined, true),
   opDelete: <T>(path: string) => http<T>(path, { method: "DELETE" }, true),

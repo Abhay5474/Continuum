@@ -57,6 +57,11 @@ export const FEATURES: Feature[] = [
     ],
   },
   {
+    name: "Models",
+    desc: "Every free model Groq and Gemini offer, verified and kept current",
+    views: [{ to: "/models", label: "Models" }],
+  },
+  {
     name: "Model Cascade",
     desc: "Cheap model first, escalate only when needed",
     views: [{ to: "/cascade", label: "Model Cascade" }],

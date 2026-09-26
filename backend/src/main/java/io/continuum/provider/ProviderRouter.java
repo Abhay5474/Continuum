@@ -102,10 +102,76 @@ public class ProviderRouter {
                 record(m -> m.recordFailure(name, ms));
                 log.warn("Provider '{}' failed: {} — trying next in chain", name, e.getMessage());
                 last = new RuntimeException("Provider '" + name + "' failed: " + e.getMessage(), e);
+                if (e instanceof ModelUnavailableException gone) {
+                    LlmResponse retried = onModelUnavailable(request, provider, overrideKey, gone);
+                    if (retried != null) {
+                        return retried;
+                    }
+                }
             }
         }
         throw new RuntimeException("All providers in failover chain failed", last);
     }
+
+    /**
+     * The provider said the model is gone, or has no free quota for this key.
+     *
+     * <p>Reported to the catalogue only when it was the platform's key: a
+     * developer's own key may simply lack access, which says nothing about the
+     * model for anyone else. Then one retry on the same provider, on the model
+     * the catalogue now resolves to — so a retirement costs one extra call on
+     * one request instead of failing every request until someone edits the
+     * configuration. Never more than one: a second failure goes on down the chain.
+     */
+    private LlmResponse onModelUnavailable(LlmRequest request, LlmProvider provider, String overrideKey,
+                                           ModelUnavailableException gone) {
+        io.continuum.registry.catalog.ModelCatalogService catalogue = catalogue();
+        io.continuum.registry.catalog.ModelResolver resolver = resolver();
+        if (overrideKey == null && catalogue != null) {
+            try {
+                catalogue.reportUnavailable(gone.provider(), gone.model(),
+                        gone.reason() == ModelUnavailableException.Reason.GONE, gone.getMessage());
+            } catch (RuntimeException e) {
+                log.debug("Could not report {}/{}: {}", gone.provider(), gone.model(), e.getMessage());
+            }
+        }
+        if (resolver == null || overrideKey != null) {
+            return null;
+        }
+        String next = resolver.defaultFor(provider.name());
+        if (next == null || next.equals(gone.model())) {
+            return null;
+        }
+        long start = System.nanoTime();
+        try {
+            LlmResponse response = provider.complete(request.withModel(next), null);
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            double cost = provider.estimateCost(response.model(), response.promptTokens(), response.completionTokens());
+            record(m -> m.recordSuccess(provider.name(), ms, response.promptTokens(), response.completionTokens(), cost));
+            log.warn("'{}' was unavailable on {}; answered by {} instead", gone.model(), provider.name(), next);
+            return response;
+        } catch (Exception e) {
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            record(m -> m.recordFailure(provider.name(), ms));
+            log.warn("Retry on {} with {} also failed: {}", provider.name(), next, e.getMessage());
+            return null;
+        }
+    }
+
+    private io.continuum.registry.catalog.ModelCatalogService catalogue() {
+        return catalogueProvider == null ? null : catalogueProvider.getIfAvailable();
+    }
+
+    private io.continuum.registry.catalog.ModelResolver resolver() {
+        return resolverProvider == null ? null : resolverProvider.getIfAvailable();
+    }
+
+    /** Optional: the router works without a catalogue (unit tests, and before it has started). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ObjectProvider<io.continuum.registry.catalog.ModelCatalogService> catalogueProvider;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ObjectProvider<io.continuum.registry.catalog.ModelResolver> resolverProvider;
 
     private void record(java.util.function.Consumer<ProviderMetrics> action) {
         ProviderMetrics m = metrics.getIfAvailable();

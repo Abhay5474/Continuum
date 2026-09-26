@@ -40,7 +40,7 @@ export const DEMO_PATHS = new Set([
   "/gateway", "/router", "/autopilot", "/counterfactual", "/admission", "/scheduling", "/cost-limits",
   "/cascade", "/workflows", "/workflows/console", "/saga", "/replay", "/dag", "/pipelines", "/specialists",
   "/guard", "/compression", "/context", "/mmu", "/memory", "/cache", "/quality", "/confidence", "/breaker",
-  "/loops", "/provenance", "/chaos", "/ai-chaos", "/godmode",
+  "/loops", "/provenance", "/chaos", "/ai-chaos", "/godmode", "/models",
 ]);
 
 export const hasDemo = (path: string) => DEMO_PATHS.has(path.replace(/\/+$/, "") || "/");

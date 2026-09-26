@@ -92,6 +92,7 @@ const router = createBrowserRouter([
           { path: "saga", lazy: page(() => import("./pages/Saga")) },
           { path: "provenance", lazy: page(() => import("./pages/Provenance")) },
           { path: "accounts", lazy: page(() => import("./pages/Accounts")) },
+          { path: "models", lazy: page(() => import("./pages/Models")) },
           { path: "*", element: <NotFound /> },
             ],
           },
