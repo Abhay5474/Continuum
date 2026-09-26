@@ -29,6 +29,8 @@ const ROUTES = [
   "/mmu", "/guard", "/cache", "/cascade", "/confidence", "/quality", "/breaker",
   "/specialists", "/pipelines", "/admission", "/scheduling", "/cost-limits",
   "/compression", "/context", "/counterfactual", "/loops", "/saga", "/provenance", "/docs",
+  // "route>Tab" opens the route, then that tab: views that have no URL of their own.
+  "/workflows>Editor",
 ];
 
 /** Runs in the page: WCAG 2.1 contrast over a properly composited background. */
@@ -115,7 +117,9 @@ let failures = 0;
 for (const theme of ["dark", "light"]) {
   const seen = new Set();
   for (const route of ROUTES) {
-    await page.goto(BASE + route, { waitUntil: "networkidle" }).catch(() => {});
+    const [path, tab] = route.split(">");
+    await page.goto(BASE + path, { waitUntil: "networkidle" }).catch(() => {});
+    if (tab) await page.getByRole("tab", { name: tab, exact: true }).first().click().catch(() => {});
     await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
     await page.waitForTimeout(700);
     for (const f of await page.evaluate(AUDIT)) {

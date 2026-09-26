@@ -22,7 +22,9 @@ const ROUTES = ["/dashboard", "/workflows", "/workflows/console", "/gateway", "/
   "/context", "/mmu", "/memory", "/guard", "/cache", "/cascade", "/confidence", "/quality", "/breaker",
   "/admission", "/scheduling", "/cost-limits", "/compression", "/counterfactual", "/loops", "/saga",
   "/provenance", "/replay", "/chaos", "/ai-chaos", "/dag", "/autopilot", "/godmode", "/portal", "/billing",
-  "/settings", "/nope-404"];
+  "/settings", "/nope-404",
+  // "route>Tab" opens the route, then that tab: views that have no URL of their own.
+  "/workflows>Editor"];
 
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
@@ -32,7 +34,9 @@ const seen = new Map();
 for (const theme of ["light", "dark"]) {
   await page.evaluate((t) => (t === "dark" ? localStorage.setItem("continuum.theme.choice", "dark") : localStorage.removeItem("continuum.theme.choice")), theme);
   for (const route of ROUTES) {
-    await page.goto(BASE + route, { waitUntil: "networkidle" }).catch(() => {});
+    const [path, tab] = route.split(">");
+    await page.goto(BASE + path, { waitUntil: "networkidle" }).catch(() => {});
+    if (tab) await page.getByRole("tab", { name: tab, exact: true }).first().click().catch(() => {});
     await page.waitForTimeout(400);
     await page.addScriptTag({ content: AXE });
     const found = await page.evaluate(async () => {

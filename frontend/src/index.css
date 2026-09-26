@@ -274,7 +274,6 @@
    classes (flex-1, w-full) alone — those are the caller's business, the box is
    not. Matches the `Input` component exactly, on the same tokens. */
 .field {
-  height: var(--h-lg);
   border-radius: var(--r-md);
   border: 1px solid rgb(var(--card-edge));
   background: rgb(var(--card));
@@ -289,8 +288,13 @@
 .field:hover:not(:disabled) { border-color: rgb(100 116 139 / 0.5); }
 .field:focus { border-color: var(--accent-edge); }
 .field:disabled { opacity: 0.5; cursor: not-allowed; }
-/* A textarea is a field that grows, so it opts out of the fixed height. */
-textarea.field { height: auto; padding-top: 8px; padding-bottom: 8px; line-height: 1.55; }
+/* The fixed height is for single-line fields only. A textarea sizes itself
+   from its rows or from the height its caller asks for. It used to be given
+   `height: auto` here, which — being more specific than a utility class —
+   overrode every textarea's own height: the workflow editor's 460px editing
+   area rendered two lines tall. */
+.field:not(textarea) { height: var(--h-lg); }
+textarea.field { padding-top: 8px; padding-bottom: 8px; line-height: 1.55; min-height: 64px; }
 
 /* ---- control geometry ----------------------------------------------------
    One scale, so a button, a select and an input standing next to each other
@@ -1110,6 +1114,16 @@ body::before {
     animation: demoGrowY var(--dur-slow, 800ms) var(--ease-elastic, ease) both;
   }
   .fade-late { animation: fadeIn 500ms ease 650ms both; }
+
+  /* Workflow graph: nodes land one after another, edges draw in behind them. */
+  .wf-node {
+    animation: demoPop var(--dur-elastic, 520ms) var(--ease-elastic, ease) both;
+    transition: border-color var(--dur-fade, 250ms) var(--ease-fade, ease),
+      box-shadow var(--dur-standard, 400ms) var(--ease-standard, ease),
+      translate var(--dur-elastic, 520ms) var(--ease-elastic, ease);
+  }
+  @media (hover: hover) { .wf-node:hover { translate: 0 -2px; } }
+  .wf-edge { stroke-dasharray: none; animation: fadeIn 500ms ease 200ms both; }
 
   /* An icon that turns — a chevron opening — rotates on a spring, so it
      arrives with the same small settle as the menu it belongs to. */

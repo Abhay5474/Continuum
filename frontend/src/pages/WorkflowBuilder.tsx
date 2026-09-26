@@ -8,6 +8,7 @@ import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
 import { Morph } from "../system/motion";
 import { timeOf } from "../system/time";
+import WorkflowEditor, { TEMPLATES } from "../components/WorkflowEditor";
 
 /**
  * Author and run durable workflows.
@@ -24,55 +25,7 @@ const TABS = [
   ["runs", "Runs"],
 ] as const;
 
-const STARTER = `{
-  "description": "Reserve stock and charge in parallel, then confirm",
-  "steps": [
-    {
-      "id": "reserve",
-      "call": {
-        "method": "POST",
-        "url": "https://api.example.com/reserve",
-        "body": { "sku": "\${input.sku}", "qty": "\${input.qty}" }
-      },
-      "retries": 3,
-      "timeoutSeconds": 30
-    },
-    {
-      "id": "charge",
-      "call": {
-        "method": "POST",
-        "url": "https://api.example.com/charge",
-        "body": { "amount": "\${input.amount}" }
-      }
-    },
-    {
-      "id": "cool-off",
-      "type": "WAIT",
-      "waitSeconds": 5,
-      "dependsOn": ["charge"]
-    },
-    {
-      "id": "confirm",
-      "dependsOn": ["reserve", "cool-off"],
-      "condition": "\${steps.charge.paid} == true",
-      "call": {
-        "method": "POST",
-        "url": "https://api.example.com/confirm",
-        "body": { "hold": "\${steps.reserve.holdId}" }
-      }
-    }
-  ],
-  "onComplete": { "url": "https://api.example.com/webhooks/done" }
-}`;
-
-type Step = {
-  id: string;
-  type?: string;
-  dependsOn?: string[];
-  condition?: string;
-  waitSeconds?: number;
-  call?: { url?: string; method?: string };
-};
+const STARTER = JSON.stringify(TEMPLATES[0].spec, null, 2);
 
 /** What a finished run actually did, read back from its own recorded history. */
 type RunFacts = {
@@ -128,17 +81,6 @@ export default function WorkflowBuilder() {
     return visibleInterval(refresh, 5000);
   }, []);
 
-  // Parsed locally so the graph preview and errors are immediate, before publish.
-  const parsed = useMemo(() => {
-    try {
-      const o = JSON.parse(source);
-      return { spec: o as { steps?: Step[]; onComplete?: any }, err: null as string | null };
-    } catch (e: any) {
-      return { spec: null, err: e.message as string };
-    }
-  }, [source]);
-
-  const layers = useMemo(() => computeLayers(parsed.spec?.steps ?? []), [parsed.spec]);
 
   const inputValid = useMemo(() => {
     if (!runInput.trim()) return true;
@@ -150,21 +92,26 @@ export default function WorkflowBuilder() {
     }
   }, [runInput]);
 
-  const publish = async () => {
+  const publish = async (): Promise<boolean> => {
     setError(null);
     setNote(null);
-    if (!parsed.spec) {
-      setError(parsed.err);
-      return;
+    let spec: unknown;
+    try {
+      spec = JSON.parse(source);
+    } catch (e: any) {
+      setError(e?.message ?? "The definition is not valid JSON");
+      return false;
     }
     setBusy(true);
     try {
-      const r = await portal.defs.publish(name, parsed.spec);
+      const r = await portal.defs.publish(name, spec);
       setNote(`Published ${r.name} v${r.version}`);
       refresh();
+      return true;
     } catch (e: any) {
       // The server validates the graph; surface its reason verbatim.
       setError(e?.message ?? "Publish failed");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -283,35 +230,56 @@ export default function WorkflowBuilder() {
                 </button>
               </div>
             ) : (
-              <div className="divide-y divide-edge/40">
-                {latest.map((d) => (
-                  <div key={d.name} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5 text-[11px]">
-                    <StateDot state="healthy" size={6} />
-                    <span className="min-w-0 flex-1">
-                      <span className="text-sm font-medium text-slate-200">{d.name}</span>
-                      {d.description && <span className="ml-2 text-slate-500">{d.description}</span>}
-                    </span>
-                    <span className="readout text-slate-500">v{d.version}</span>
-                    <span className="readout text-slate-600">{d.steps} steps</span>
-                    <button onClick={() => load(d.name)}
-                      className="rounded border border-edge px-2 py-1 hover:border-aurora/50">Edit</button>
-                    <button onClick={() => run(d.name)} disabled={busy || !inputValid}
-                      className="rounded bg-[color:var(--accent-strong)] px-2.5 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50">
-                      Run
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete every version of ${d.name}?`)) {
-                          portal.defs.remove(d.name).then(refresh);
-                        }
-                      }}
-                      className="rounded border px-2 py-1"
-                      style={{ borderColor: `${STATE.critical.color}44`, color: STATE.critical.ink }}
-                    >
-                      Delete
-                    </button>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {latest.map((d, i) => (
+                  <div key={d.name} className="card rise-in flex flex-col gap-3 rounded-2xl border border-card-edge bg-card p-4 shadow-card" style={{ animationDelay: `${i * 50}ms` }}>
+                    <div className="flex items-start gap-3">
+                      <Chip glyph="flow" tone="accent" size={32} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-mono text-[14px] font-semibold text-slate-100">{d.name}</div>
+                        <div className="mt-0.5 line-clamp-2 text-[12px] text-slate-500">{d.description || "No description"}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[11px]">
+                      <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-slate-300">v{d.version}</span>
+                      <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-slate-300">{d.steps} step{d.steps === 1 ? "" : "s"}</span>
+                      <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-slate-300">
+                        {runs.filter((r) => facts[r.workflowId]?.definition === d.name).length} runs
+                      </span>
+                    </div>
+                    <div className="mt-auto flex gap-2">
+                      <button onClick={() => run(d.name)} disabled={busy || !inputValid}
+                        className="rounded-[var(--r-md)] bg-[color:var(--accent-strong)] px-3.5 py-1.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50">
+                        Run
+                      </button>
+                      <button onClick={() => load(d.name)}
+                        className="rounded-[var(--r-md)] border border-edge px-3.5 py-1.5 text-[13px] font-medium text-slate-200 hover:border-slate-500/60">
+                        Open in editor
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete every version of ${d.name}?`)) {
+                            portal.defs.remove(d.name).then(refresh);
+                          }
+                        }}
+                        className="ml-auto rounded-[var(--r-md)] border px-3 py-1.5 text-[13px]"
+                        style={{ borderColor: `${STATE.critical.color}44`, color: STATE.critical.ink }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
+                <button
+                  onClick={() => {
+                    setName("my-workflow");
+                    setSource(STARTER);
+                    setTab("editor");
+                  }}
+                  className="grid min-h-[150px] place-items-center rounded-2xl border border-dashed border-edge text-[13px] font-medium text-slate-400 hover:border-slate-500/60 hover:text-slate-200"
+                >
+                  + New workflow
+                </button>
               </div>
             )}
 
@@ -319,105 +287,19 @@ export default function WorkflowBuilder() {
         )}
 
         {tab === "editor" && (
-          <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div>
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="min-w-0 flex-1">
-                  <Micro>Name</Micro>
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="mt-1 w-full font-mono field"
-                  />
-                </div>
-                <button
-                  onClick={publish}
-                  disabled={busy || !!parsed.err}
-                  className="rounded bg-[color:var(--accent-strong)] px-4 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-                >
-                  {busy ? "Publishing…" : "Publish version"}
-                </button>
-              </div>
-
-              <div className="mt-2 flex items-baseline justify-between">
-                <Micro>Definition</Micro>
-                <span className="text-[10px]" style={{ color: parsed.err ? STATE.critical.ink : STATE.healthy.ink }}>
-                  {parsed.err ? `invalid JSON — ${parsed.err}` : "valid JSON"}
-                </span>
-              </div>
-              <textarea
-                aria-label="Workflow definition (JSON)"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                spellCheck={false}
-                className="mt-1 h-[460px] w-full font-mono text-[11px] leading-relaxed field"
-                style={{ borderColor: parsed.err ? `${STATE.critical.color}55` : "rgb(var(--edge))" }}
-              />
-            </div>
-
-            <aside className="space-y-4">
-              <div>
-                <Micro>Execution plan</Micro>
-                <p className="mt-0.5 text-[10px] text-slate-600">
-                  steps in a layer run in parallel · layers run in order
-                </p>
-                {layers.error ? (
-                  <div className="mt-2 rounded border px-2 py-1.5 text-[11px]"
-                    style={{ borderColor: `${STATE.critical.color}55`, color: STATE.critical.ink }}>
-                    {layers.error}
-                  </div>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    {layers.layers.map((layer, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="readout mt-1 w-4 shrink-0 text-[10px] text-slate-600">{i + 1}</span>
-                        <div className="flex flex-1 flex-wrap gap-1">
-                          {layer.map((s) => (
-                            <span
-                              key={s.id}
-                              title={s.condition ? `if ${s.condition}` : undefined}
-                              className="rounded border px-1.5 py-0.5 text-[10px]"
-                              style={{
-                                borderColor: `${stepColor(s)}55`,
-                                color: stepColor(s),
-                              }}
-                            >
-                              {s.id}
-                              {s.type === "WAIT" && ` · wait ${s.waitSeconds ?? "?"}s`}
-                              {s.condition ? " · if" : ""}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    {parsed.spec?.onComplete && (
-                      <div className="flex items-start gap-2">
-                        <span className="readout mt-1 w-4 shrink-0 text-[10px] text-slate-600">→</span>
-                        <span className="rounded border border-edge px-1.5 py-0.5 text-[10px] text-slate-400">
-                          callback
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Micro>Reference</Micro>
-                <dl className="mt-1.5 space-y-1 text-[10px] text-slate-500">
-                  <Ref k="${input.field}" v="value the run was started with" />
-                  <Ref k="${steps.id.field}" v="an earlier step's response body" />
-                  <Ref k="condition" v="e.g. ${steps.risk.score} > 0.8" />
-                  <Ref k="type: WAIT" v="durable timer, waitSeconds" />
-                  <Ref k="dependsOn" v="ordering; independent steps parallelise" />
-                  <Ref k="onComplete" v="callback instead of polling" />
-                </dl>
-                <Link to="/docs" className="mt-2 inline-block text-[10px] text-neon hover:underline">
-                  Full reference →
-                </Link>
-              </div>
-            </aside>
-          </section>
+          <WorkflowEditor
+            name={name}
+            setName={setName}
+            source={source}
+            setSource={setSource}
+            busy={busy}
+            runInput={runInput}
+            setRunInput={setRunInput}
+            onPublish={() => void publish()}
+            onPublishAndRun={async () => {
+              if (await publish()) await run(name);
+            }}
+          />
         )}
 
         {tab === "runs" && (
@@ -544,53 +426,5 @@ function duration(ms: number | null) {
   return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-function Ref({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex gap-2">
-      <dt className="w-32 shrink-0 font-mono text-slate-400">{k}</dt>
-      <dd>{v}</dd>
-    </div>
-  );
-}
 
-function stepColor(s: Step) {
-  if (s.type === "WAIT") return STATE.warning.color;
-  if (s.condition) return STATE.active.color;
-  return STATE.healthy.color;
-}
 
-/**
- * Mirrors the engine's layering so the author sees the real execution plan
- * before publishing, including cycles the server would reject.
- */
-function computeLayers(steps: Step[]): { layers: Step[][]; error: string | null } {
-  if (!Array.isArray(steps) || steps.length === 0) {
-    return { layers: [], error: null };
-  }
-  const ids = new Set(steps.map((s) => s?.id));
-  const done = new Set<string>();
-  const layers: Step[][] = [];
-  let guard = 0;
-
-  while (done.size < steps.length) {
-    if (guard++ > 200) return { layers, error: "Too many layers." };
-    const layer = steps.filter(
-      (s) => s?.id && !done.has(s.id) && (s.dependsOn ?? []).every((d) => done.has(d))
-    );
-    if (layer.length === 0) {
-      const unknown = steps
-        .filter((s) => !done.has(s?.id))
-        .flatMap((s) => (s.dependsOn ?? []).filter((d) => !ids.has(d)));
-      return {
-        layers,
-        error: unknown.length
-          ? `Unknown dependency: ${unknown[0]}`
-          : "Steps form a dependency cycle.",
-      };
-    }
-    layer.sort((a, b) => String(a.id).localeCompare(String(b.id)));
-    layer.forEach((s) => done.add(s.id));
-    layers.push(layer);
-  }
-  return { layers, error: null };
-}
