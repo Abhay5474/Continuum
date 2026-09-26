@@ -18,6 +18,14 @@ public class DeveloperService {
     private final DeveloperApiKeyRepository keys;
     private final ApiKeyHasher hasher;
 
+    /** Optional so unit tests can build the service by hand. */
+    private io.continuum.portal.EmailLock emailLock;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setEmailLock(io.continuum.portal.EmailLock emailLock) {
+        this.emailLock = emailLock;
+    }
+
     public DeveloperService(DeveloperRepository developers, DeveloperApiKeyRepository keys, ApiKeyHasher hasher) {
         this.developers = developers;
         this.keys = keys;
@@ -26,6 +34,14 @@ public class DeveloperService {
 
     @Transactional
     public DeveloperEntity createDeveloper(String name, String email) {
+        // The admin path never checked at all, so it could mint a second
+        // account for an address that already had one.
+        if (emailLock != null) {
+            emailLock.lock(email);
+        }
+        if (email != null && developers.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("An account with this email already exists");
+        }
         return developers.save(new DeveloperEntity(name, email));
     }
 

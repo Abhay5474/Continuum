@@ -25,6 +25,14 @@ public class PortalService {
     private final PortalSessionService sessions;
     private final RateLimiter limiter;
 
+    /** Optional so unit tests can build the service by hand. */
+    private io.continuum.portal.EmailLock emailLock;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setEmailLock(io.continuum.portal.EmailLock emailLock) {
+        this.emailLock = emailLock;
+    }
+
     /** Attempts per account: a short burst, then five a minute. */
     static final int LOGIN_BURST = 10;
     static final double LOGIN_PER_MINUTE = 5;
@@ -58,10 +66,13 @@ public class PortalService {
         if (email == null || email.isBlank() || password == null || password.length() < 6) {
             throw new IllegalArgumentException("Email and a password of at least 6 characters are required");
         }
+        if (emailLock != null) {
+            emailLock.lock(email); // check-then-insert, made atomic per address
+        }
         if (developers.existsByEmailIgnoreCase(email)) {
             throw new IllegalArgumentException("An account with this email already exists");
         }
-        DeveloperEntity dev = developers.save(new DeveloperEntity(name == null ? email : name, email));
+        DeveloperEntity dev = developers.save(new DeveloperEntity(name == null ? email : name, email.trim()));
         auth.save(new DeveloperAuthEntity(dev.getId(), passwordHasher.hash(password)));
         return new LoginResult(dev.getId(), dev.getName(), dev.getEmail(),
                 sessions.issue(dev.getId(), PortalSessionService.Role.DEVELOPER));

@@ -43,6 +43,14 @@ public class AccountService {
     private final Mailer mailer;
 
     /** Optional so unit tests can build the service by hand. */
+    private io.continuum.portal.EmailLock emailLock;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setEmailLock(io.continuum.portal.EmailLock emailLock) {
+        this.emailLock = emailLock;
+    }
+
+    /** Optional so unit tests can build the service by hand. */
     private AccountErasure erasure;
     private OperatorService operators;
 
@@ -204,6 +212,9 @@ public class AccountService {
             throw new IllegalArgumentException("A password of at least 6 characters is required");
         }
         TeamInviteEntity invite = usableInvite(token);
+        if (emailLock != null) {
+            emailLock.lock(invite.getEmail());
+        }
         if (developers.existsByEmailIgnoreCase(invite.getEmail())) {
             throw new IllegalArgumentException("That email already has a Continuum account");
         }
