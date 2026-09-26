@@ -16,4 +16,9 @@ public interface ReplayVerificationReportRepository extends JpaRepository<Replay
     Page<ReplayVerificationReportEntity> findByDeveloperIdOrderByCreatedAtDesc(String developerId, Pageable pageable);
 
     long countByPassed(boolean passed);
+
+    /** Mean replay fidelity for one provider, computed by the database; null when there are no reports. */
+    @org.springframework.data.jpa.repository.Query(
+            "select avg(r.overallScore) from ReplayVerificationReportEntity r where r.freshProvider = :provider")
+    Double meanScoreFor(@org.springframework.data.repository.query.Param("provider") String provider);
 }

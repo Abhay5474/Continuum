@@ -43,17 +43,13 @@ public class QualityPredictor {
         return new Quality(quality, confidence, basis);
     }
 
+    /**
+     * Averaged by the database. This runs for every provider on every routed
+     * request, and it used to load the whole replay-report table into memory
+     * each time to average one provider's rows — a cost that grew with history.
+     */
     private Double meanFidelity(String provider) {
-        var all = reports.findAll();
-        double sum = 0;
-        int n = 0;
-        for (var r : all) {
-            if (provider.equals(r.getFreshProvider())) {
-                sum += r.getOverallScore();
-                n++;
-            }
-        }
-        return n == 0 ? null : sum / n;
+        return provider == null ? null : reports.meanScoreFor(provider);
     }
 
     private static double round(double v) {
