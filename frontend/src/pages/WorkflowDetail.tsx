@@ -265,7 +265,16 @@ export default function WorkflowDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="min-w-0 lg:col-span-2 card rounded-lg border border-edge bg-panel">
-          <div className="border-b border-edge px-4 py-3 font-medium">Event Timeline</div>
+          <div className="flex items-center border-b border-edge px-4 py-3">
+            <span className="font-medium">Event Timeline</span>
+            <button
+              onClick={() => void exportEvents(detail.summary.workflowId)}
+              className="ml-auto rounded-full border border-edge px-2.5 py-0.5 text-[11.5px] text-slate-400 hover:border-slate-500/60 hover:text-slate-200"
+              title="Download this run's event log as JSON — the record replay and recovery are built from"
+            >
+              Export log
+            </button>
+          </div>
           <ol className="relative space-y-0">
             {detail.events.map((e, i) => (
               <EventRow
@@ -579,4 +588,15 @@ function headline(p: any, stepNames: Record<number, string> = {}): string | null
   }
   if (p.workflowType) return p.workflowType;
   return null;
+}
+
+/** Downloads the run's event log as JSON: the record replay and crash recovery are built from. */
+async function exportEvents(workflowId: string) {
+  const events = await api.get<unknown[]>(`/api/workflows/${encodeURIComponent(workflowId)}/events`);
+  const url = URL.createObjectURL(new Blob([JSON.stringify(events, null, 2)], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${workflowId}-events.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -24,6 +24,7 @@ public class MetaController {
     private final ProviderRouter router;
     private final WorkflowInstanceRepository instances;
     private final DeliveryRecorder deliveries;
+    private final io.continuum.persistence.repository.OutboxRepository outbox;
     private final WorkflowQueryService query;
     // Optional: absent when this process runs with workers disabled.
     private final java.util.Optional<io.continuum.core.engine.ActivityWorker> activityWorker;
@@ -31,13 +32,15 @@ public class MetaController {
     public MetaController(WorkflowRegistry workflows, ProviderRouter router,
                           WorkflowInstanceRepository instances, DeliveryRecorder deliveries,
                           WorkflowQueryService query,
-                          java.util.Optional<io.continuum.core.engine.ActivityWorker> activityWorker) {
+                          java.util.Optional<io.continuum.core.engine.ActivityWorker> activityWorker,
+                          io.continuum.persistence.repository.OutboxRepository outbox) {
         this.workflows = workflows;
         this.router = router;
         this.instances = instances;
         this.deliveries = deliveries;
         this.query = query;
         this.activityWorker = activityWorker;
+        this.outbox = outbox;
     }
 
     @GetMapping("/meta")
@@ -82,8 +85,25 @@ public class MetaController {
             failed = instances.countByDeveloperIdAndStatus(dev, WorkflowStatus.FAILED);
             cancelled = instances.countByDeveloperIdAndStatusAndErrorStartingWith(dev, WorkflowStatus.FAILED, prefix);
         }
+        if (dev == null) {
+            return new StatsView(running + completed + failed, running, completed, failed,
+                    deliveries.totalDeliveries(), deliveries.duplicates(), cancelled);
+        }
+        // A developer's own deliveries. The recorder is engine-wide, and its
+        // duplicate list names other tenants' idempotency keys (which carry
+        // their run ids), so it is filtered to runs this account owns.
+        java.util.Map<String, String> runOfKey = new java.util.HashMap<>();
+        for (DeliveryRecorder.Delivery d : deliveries.deliveries()) {
+            if (d.workflowId() != null) {
+                runOfKey.put(d.idempotencyKey(), d.workflowId());
+            }
+        }
+        List<String> dups = deliveries.duplicates();
+        java.util.Set<String> mine = ownedBy(dev, dups.stream().map(runOfKey::get).toList());
+        List<String> ownDups = dups.stream().filter(k -> mine.contains(runOfKey.get(k))).toList();
+        long sent = outbox.countSentForDeveloper(dev);
         return new StatsView(running + completed + failed, running, completed, failed,
-                deliveries.totalDeliveries(), deliveries.duplicates(), cancelled);
+                (int) Math.min(Integer.MAX_VALUE, sent), ownDups, cancelled);
     }
 
     @GetMapping("/costs")
@@ -93,15 +113,39 @@ public class MetaController {
     }
 
     /**
-     * The outbox delivery log. It is engine-wide and carries payloads, with no
-     * tenant on each record, so only the operator may read it; it used to be
-     * anonymous.
+     * The outbox delivery log, newest first. The operator sees the whole
+     * engine's; a developer sees the deliveries made by their own runs. It used
+     * to be anonymous, then operator-only because records carried no tenant;
+     * each now carries the run it came from, so it can be scoped instead.
      */
     @GetMapping("/deliveries")
     public ResponseEntity<List<DeliveryRecorder.Delivery>> deliveries(HttpServletRequest http) {
-        if (!RequestScope.isOperator(http)) {
+        List<DeliveryRecorder.Delivery> all = new java.util.ArrayList<>(deliveries.deliveries());
+        java.util.Collections.reverse(all);
+        if (RequestScope.isOperator(http) && RequestScope.developerId(http) == null) {
+            return ResponseEntity.ok(all);
+        }
+        String dev = RequestScope.developerId(http);
+        if (dev == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok(deliveries.deliveries());
+        java.util.Set<String> mine = ownedBy(dev, all.stream().map(DeliveryRecorder.Delivery::workflowId).toList());
+        return ResponseEntity.ok(all.stream().filter(d -> d.workflowId() != null && mine.contains(d.workflowId())).toList());
+    }
+
+    /** Of these run ids, the ones that belong to {@code dev}. One query, whatever the count. */
+    private java.util.Set<String> ownedBy(String dev, java.util.Collection<String> workflowIds) {
+        java.util.Set<String> ids = new java.util.HashSet<>(workflowIds);
+        ids.remove(null);
+        java.util.Set<String> mine = new java.util.HashSet<>();
+        if (ids.isEmpty()) {
+            return mine;
+        }
+        instances.findAllById(ids).forEach(w -> {
+            if (dev.equals(w.getDeveloperId())) {
+                mine.add(w.getWorkflowId());
+            }
+        });
+        return mine;
     }
 }

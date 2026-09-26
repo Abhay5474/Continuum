@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { api, BASE } from "../api";
 import { useToast } from "../components/ui";
-import { Chip, Stat, Stats } from "../system/hub";
+import { Chip, Segmented, Stat, Stats } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
@@ -49,12 +49,20 @@ export default function GatewayDashboard() {
   const [chatOut, setChatOut] = useState<any | null>(null);
   const [sending, setSending] = useState(false);
 
+  // The registry can be read whole or as just what the router may use now.
+  const [activeOnly, setActiveOnly] = useState(false);
+  const activeOnlyRef = useRef(false);
+  activeOnlyRef.current = activeOnly;
+  useEffect(() => {
+    api.get<any[]>(activeOnly ? "/api/models/active" : "/api/models").then(setModels).catch(() => {});
+  }, [activeOnly]);
+
   const refresh = () => {
     api.get<any>("/api/gateway/stats").then((s) => {
       setStats(s);
       setSeries((prev) => [...prev, s?.totalRequests ?? 0].slice(-40));
     }).catch(() => {});
-    api.get<any[]>("/api/models").then(setModels).catch(() => {});
+    api.get<any[]>(activeOnlyRef.current ? "/api/models/active" : "/api/models").then(setModels).catch(() => {});
     api.get<any[]>("/api/gateway/requests?limit=40").then(setRequests).catch(() => {});
     api.get<any[]>("/api/gateway/health").then(setHealth).catch(() => {});
     api.get<any>("/api/gateway/healing/status").then(setHealing).catch(() => {});
@@ -463,6 +471,15 @@ export default function GatewayDashboard() {
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Model registry &amp; lifecycle</h2>
+          <span className="ml-auto" />
+          <Segmented
+            value={activeOnly ? "active" : "all"}
+            onChange={(v) => setActiveOnly(v === "active")}
+            options={[
+              { value: "all", label: "All models" },
+              { value: "active", label: "Routable now" },
+            ]}
+          />
           {operator ? (
             <button
               onClick={() => api.opPost("/api/models/discover").then(refresh)}

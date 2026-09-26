@@ -31,6 +31,6 @@ public class EmailSink implements OutboxSink {
     public void deliver(OutboxEntity message) throws Exception {
         chaos.maybeFailSink(destination());
         log.info("📧 EMAIL sent (key={}): {}", message.getIdempotencyKey(), message.getPayload());
-        recorder.record(destination(), message.getIdempotencyKey(), message.getPayload());
+        recorder.record(destination(), message.getIdempotencyKey(), message.getPayload(), message.getWorkflowId());
     }
 }

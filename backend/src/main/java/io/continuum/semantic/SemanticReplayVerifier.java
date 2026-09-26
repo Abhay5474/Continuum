@@ -128,6 +128,9 @@ public class SemanticReplayVerifier {
                     cmp.similarityScore(), cmp.intentScore(), cmp.toolConsistencyScore(),
                     cmp.structuredCompatibilityScore(), cmp.constraintScore(), cmp.overallScore(),
                     cmp.passed(), cmp.method(), cmp.explanation());
+            // Stamped with the run's owner: without it the per-account history
+            // (the drift trends a developer sees) came back empty for everyone.
+            report.setDeveloperId(instance.getDeveloperId());
             items.add(reports.save(report));
         }
 

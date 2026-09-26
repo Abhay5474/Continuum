@@ -5,6 +5,7 @@ import { Gauge } from "../system/viz";
 import { Readout, StateDot, InfoTip } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
 import { timeOf } from "../system/time";
+import { ReplayTrends, RunReports } from "../components/ReplayHistory";
 
 /**
  * Replay verification.
@@ -261,7 +262,20 @@ export default function ReplayVerify() {
               them verifiable.
             </div>
           )}
+          <RunReports workflowId={report.workflowId ?? workflowId} />
+          <button onClick={() => setReport(null)} className="text-[12px] text-slate-500 hover:text-slate-300">
+            ← Back to recent runs and drift history
+          </button>
         </>
+      )}
+
+      {!report && (
+        <ReplayTrends
+          onOpen={(id) => {
+            setWorkflowId(id);
+            run(id);
+          }}
+        />
       )}
     </div>
   );

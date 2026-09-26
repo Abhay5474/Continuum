@@ -23,4 +23,12 @@ public interface OutboxRepository extends JpaRepository<OutboxEntity, Long> {
     Optional<OutboxEntity> findByIdempotencyKey(String idempotencyKey);
 
     List<OutboxEntity> findByWorkflowIdOrderByCreatedAtAsc(String workflowId);
+
+    /** Messages delivered on behalf of one account's runs. */
+    @Query(value = """
+            SELECT count(*) FROM outbox o
+            JOIN workflow_instances w ON w.workflow_id = o.workflow_id
+            WHERE w.developer_id = :dev AND o.status = 'SENT'
+            """, nativeQuery = true)
+    long countSentForDeveloper(@Param("dev") String dev);
 }

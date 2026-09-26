@@ -8,6 +8,7 @@ import type { CostReport, Meta, Stats, WorkflowSummary } from "../types";
 import StatusBadge from "../components/StatusBadge";
 import { SkeletonCards, SkeletonRows, EmptyState, ErrorState, Spinner, useToast, CodeBlock } from "../components/ui";
 import { Select } from "../system/controls";
+import DeliveriesPanel from "../components/DeliveriesPanel";
 
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
@@ -228,6 +229,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <DeliveriesPanel />
     </div>
   );
 }

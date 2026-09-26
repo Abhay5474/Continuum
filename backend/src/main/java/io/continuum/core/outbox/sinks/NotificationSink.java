@@ -31,6 +31,6 @@ public class NotificationSink implements OutboxSink {
     public void deliver(OutboxEntity message) throws Exception {
         chaos.maybeFailSink(destination());
         log.info("🔔 NOTIFICATION delivered (key={}): {}", message.getIdempotencyKey(), message.getPayload());
-        recorder.record(destination(), message.getIdempotencyKey(), message.getPayload());
+        recorder.record(destination(), message.getIdempotencyKey(), message.getPayload(), message.getWorkflowId());
     }
 }

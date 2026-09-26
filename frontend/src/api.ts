@@ -169,6 +169,9 @@ export const api = {
    */
   opPost: <T>(path: string, body?: unknown) =>
     http<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, true),
+  /** Reads that return more to the operator (the whole engine) than to an account. */
+  opGet: <T>(path: string) => http<T>(path, undefined, true),
+  opDelete: <T>(path: string) => http<T>(path, { method: "DELETE" }, true),
 };
 
 // --- V3 developer portal: session-token auth (stored client-side) ---

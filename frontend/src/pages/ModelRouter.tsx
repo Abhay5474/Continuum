@@ -8,6 +8,7 @@ import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
 import { Morph } from "../system/motion";
 import { Select, Table, TH, TR, TD, Tag } from "../system/controls";
+import { BanditWhatIf, DecisionsLog, HedgingPolicy } from "../components/RoutingPanels";
 
 /**
  * Routing — the provider network.
@@ -44,6 +45,7 @@ const seriesColor = (i: number) => SERIES[i % SERIES.length];
 
 const RT_TABS = [
   ["network", "Dispatch"],
+  ["decisions", "Decisions"],
   ["learning", "Learning & hedging"],
   ["probe", "Probe"],
 ] as const;
@@ -53,7 +55,7 @@ export default function ModelRouter() {
   // the operator's to change. Shown either way — but a disabled control that
   // explains itself is only half an answer, so each one also offers the way in.
   const { operator, request: unlock } = useOperator();
-  const [tab, setTab] = useState<"network" | "learning" | "probe">("network");
+  const [tab, setTab] = useState<"network" | "decisions" | "learning" | "probe">("network");
   const [routing, setRouting] = useState<any | null>(null);
   const [providers, setProviders] = useState<any[]>([]);
   const [health, setHealth] = useState<any[]>([]);
@@ -110,6 +112,15 @@ export default function ModelRouter() {
     () => [...providers].sort((a, b) => (b.calls ?? 0) - (a.calls ?? 0)),
     [providers]
   );
+  // Everything the bandit holds a belief about, plus whatever has carried traffic.
+  const banditProviders = useMemo(() => {
+    const names = new Set<string>(ranked.map((p) => p.provider));
+    Object.values(bandit?.byContext ?? {}).forEach((row: any) =>
+      (Array.isArray(row) ? row : Object.keys(row ?? {})).forEach((x: any) => names.add(typeof x === "string" ? x : x?.provider)),
+    );
+    names.delete(undefined as any);
+    return [...names].filter(Boolean).sort();
+  }, [ranked, bandit]);
   const colorOf = useMemo(() => {
     const m = new Map<string, string>();
     ranked.forEach((p, i) => m.set(p.provider, seriesColor(i)));
@@ -287,8 +298,10 @@ export default function ModelRouter() {
       )}
 
         </>)}
-        {tab === "learning" && (<>
+        {tab === "decisions" && <DecisionsLog colorOf={(p) => colorOf.get(p) ?? seriesColor(colorOf.size)} />}
+        {tab === "learning" && (<div className="space-y-8">
       <LearningLedger comparison={comparison} strategy={routing?.strategy} />
+      <BanditWhatIf providers={banditProviders} colorOf={(p) => colorOf.get(p) ?? seriesColor(banditProviders.indexOf(p))} />
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ---- bandit beliefs ---- */}
         <section>
@@ -369,10 +382,11 @@ export default function ModelRouter() {
           ) : (
             <Plane className="mt-3 p-6 text-center text-xs text-slate-500">No hedging metrics yet.</Plane>
           )}
+          <HedgingPolicy state={hedging} operator={operator} onSaved={refresh} />
         </section>
       </div>
 
-        </>)}
+        </div>)}
         {tab === "probe" && (<>
       {/* ---- routing probe ---- */}
       <section>
