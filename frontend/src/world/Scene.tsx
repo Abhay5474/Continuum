@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  * One beat of the scroll narrative.
  *
  * <p>A scene occupies a full viewport of scroll and holds text against one side,
- * leaving the other side of the frame to the world behind it. It fades in as it
+ * with its instrument, when it has one, on the other. It fades in as it
  * arrives and out as it leaves, so the copy behaves like the camera passing a
  * label rather than a section that starts and stops.
  *
@@ -152,7 +152,7 @@ export function Scene({
 /**
  * A line of hard numbers under a scene.
  *
- * <p>Deliberately plain. The world behind is doing the expressive work; the
+ * <p>Deliberately plain. The instruments are doing the expressive work; the
  * measurements should read as instrument output, and a claim in a glowing box
  * is less believable than the same claim set quietly.
  */

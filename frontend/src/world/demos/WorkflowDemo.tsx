@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import DemoFrame, { DemoButton, DemoToggle } from "./DemoFrame";
-import { pulse } from "../activity";
 import { useDemo } from "./useDemo";
 
 /**
@@ -130,7 +129,6 @@ export default function WorkflowDemo() {
             step.state = "retrying";
             step.t = 34 * step.attempt;
             say(s, `${step.id} failed 503 · retry ${step.attempt} after backoff`);
-            pulse(0.4);
           } else if (step.faultKind === "4xx") {
             // A decision, not a blip: settled on the first attempt.
             step.state = "failed";
@@ -138,7 +136,6 @@ export default function WorkflowDemo() {
           } else {
             step.state = "done";
             say(s, `${step.id} completed`);
-            pulse(0.18);
           }
         }
       }
@@ -278,7 +275,6 @@ export default function WorkflowDemo() {
               s.crashed = true;
               say(s, "engine killed · in-flight work lost");
               // The loudest thing that can happen to a run.
-              pulse(1.2);
               force((n) => n + 1);
             }}
           >

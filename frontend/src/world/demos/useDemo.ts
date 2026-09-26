@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { demoStarted, demoStopped } from "../activity";
 
 /**
  * The loop behind an interactive explainer.
@@ -81,15 +80,11 @@ export function useDemo<S>(handle: DemoHandle<S>) {
     const start = () => {
       if (running || reduced) return;
       running = true;
-      // Tell the world it is background now, so it can give up half its frames
-      // to the thing the visitor is actually interacting with.
-      demoStarted();
       raf = requestAnimationFrame(frame);
     };
     const stop = () => {
       if (!running) return;
       running = false;
-      demoStopped();
       cancelAnimationFrame(raf);
     };
 

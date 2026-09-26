@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import DemoFrame, { DemoButton } from "./DemoFrame";
-import { pulse } from "../activity";
 import { clamp, seeded, useDemo } from "./useDemo";
 
 /**
@@ -130,7 +129,6 @@ export default function RoutingDemo() {
           else {
             p.served++;
             s.spend += p.costPer1k;
-            pulse(0.05);
           }
         }
       }
@@ -236,7 +234,6 @@ export default function RoutingDemo() {
               onClick={() => {
                 p.down = !p.down;
                 // Taking a provider out is a system-wide event, not a local one.
-                pulse(0.9);
                 force((n) => n + 1);
               }}
             >

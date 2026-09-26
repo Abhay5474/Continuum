@@ -3,7 +3,6 @@ import { CodeBlock, ThemeToggle } from "../components/ui";
 import { Magnetic } from "../system/motion";
 import { BrandMark } from "../system/brand";
 import { useLiquidSurface } from "../system/primitives";
-import World from "../world/World";
 import IntroVideo from "../components/IntroVideo";
 import { Facts, Scene } from "../world/Scene";
 import ContextMmuDemo from "../world/demos/ContextMmuDemo";
@@ -15,11 +14,10 @@ import LoadDemo from "../world/demos/LoadDemo";
 /**
  * The front door.
  *
- * <p>Not a stack of sections. A single spatial system sits behind the whole page
- * and reorganises as you scroll — scattered systems resolving into a fabric,
- * the fabric becoming an execution graph, the graph becoming a memory
- * hierarchy, and so on — while the copy names what you are looking at. Scenes
- * do not each bring their own graphic; there is one world in seven states.
+ * <p>Each scene is a pane of glass over the page's wallpaper, beside a working
+ * instrument you can drive. There is deliberately no animated background: it
+ * competed with the instruments for attention and followed the pointer while
+ * people were trying to read.
  *
  * <p>The claims here are the ones the system can actually back: durable
  * execution, exactly-once effects, deterministic replay, failover. No capability
@@ -29,7 +27,6 @@ export default function Landing() {
   useLiquidSurface();
   return (
     <div className="relative">
-      <World />
       <LandingHeader />
 
       {/* ---------- ENTRY ---------- */}
