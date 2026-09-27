@@ -318,4 +318,11 @@ class OpenAiCompatTest {
     private OpenAiDtos.ChatCompletionRequest parse(String body) throws Exception {
         return json.readValue(body, OpenAiDtos.ChatCompletionRequest.class);
     }
+
+    @org.junit.jupiter.api.Test
+    void aStreamedFirewallRefusalIsNotReportedAsAnOutage() {
+        String[] kind = OpenAiCompatController.kindOf(
+                new io.continuum.firewall.PromptFirewallService.BlockedException("blocked"));
+        org.assertj.core.api.Assertions.assertThat(kind).containsExactly("invalid_request_error", "request_blocked");
+    }
 }

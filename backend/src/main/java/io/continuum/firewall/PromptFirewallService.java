@@ -89,13 +89,14 @@ public class PromptFirewallService {
                 String excerpt = excerpt(r.sanitized());
                 if (r.blocked()) {
                     record(developerId, "INBOUND", "PROMPT_INJECTION", "BLOCKED", 1,
-                            "score=" + r.injectionScore() + " matched: " + String.join("; ", r.injectionHits()), excerpt);
-                    throw new BlockedException("Request blocked: prompt-injection attempt detected ("
-                            + String.join("; ", r.injectionHits()) + ")");
+                            String.format("risk %.2f · found: %s", r.injectionScore(), String.join(", ", r.injectionHits())), excerpt);
+                    throw new BlockedException("Request blocked by the Prompt Firewall: the prompt looks like a "
+                            + "prompt-injection attempt (" + String.join(", ", r.injectionHits()) + "). "
+                            + "It was not sent to any model.");
                 }
                 if (r.injectionScore() > 0) {
                     record(developerId, "INBOUND", "PROMPT_INJECTION", "FLAGGED", r.injectionHits().size(),
-                            "score=" + r.injectionScore() + " matched: " + String.join("; ", r.injectionHits()), excerpt);
+                            String.format("risk %.2f · found: %s", r.injectionScore(), String.join(", ", r.injectionHits())), excerpt);
                 }
                 for (PromptFirewall.Match m : r.redactions()) {
                     record(developerId, "INBOUND", m.category(), "REDACTED", m.count(),

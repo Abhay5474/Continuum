@@ -101,16 +101,23 @@ public final class PromptFirewall {
 
     /** Prompt-injection / jailbreak signatures with a severity weight in [0,1]. */
     private static final List<InjectionSig> INJECTION = List.of(
-            new InjectionSig("ignore (?:all |any )?(?:previous|prior|above|earlier) (?:instructions|prompts|rules)", 0.9),
-            new InjectionSig("disregard (?:all |the )?(?:previous|prior|above|system) (?:instructions|prompt|rules)", 0.9),
-            new InjectionSig("forget (?:everything|all|your) (?:instructions|previous|rules)", 0.8),
-            new InjectionSig("you are (?:now|actually) (?:a |an )?(?:different|new|unrestricted|dan|jailbroken)", 0.85),
-            new InjectionSig("(?:enable|enter|activate) (?:developer|dan|god|jailbreak|unrestricted) mode", 0.85),
-            new InjectionSig("(?:reveal|print|show|repeat|leak) (?:your |the )?(?:system prompt|instructions|initial prompt)", 0.8),
-            new InjectionSig("do anything now", 0.7),
-            new InjectionSig("ignore your (?:guidelines|programming|training|safety)", 0.85),
-            new InjectionSig("pretend (?:you are|to be) (?:not |un)?(?:bound|restricted|an ai)", 0.6),
-            new InjectionSig("<\\|im_(?:start|end)\\|>|\\[INST]|###\\s*system", 0.6));
+            new InjectionSig("override of earlier instructions",
+                    "ignore (?:all |any )?(?:previous|prior|above|earlier) (?:instructions|prompts|rules)", 0.9),
+            new InjectionSig("override of earlier instructions",
+                    "disregard (?:all |the )?(?:previous|prior|above|system) (?:instructions|prompt|rules)", 0.9),
+            new InjectionSig("request to forget instructions",
+                    "forget (?:everything|all|your) (?:instructions|previous|rules)", 0.8),
+            new InjectionSig("persona switch",
+                    "you are (?:now|actually) (?:a |an )?(?:different|new|unrestricted|dan|jailbroken)", 0.85),
+            new InjectionSig("jailbreak mode",
+                    "(?:enable|enter|activate) (?:developer|dan|god|jailbreak|unrestricted) mode", 0.85),
+            new InjectionSig("system prompt extraction",
+                    "(?:reveal|print|show|repeat|leak) (?:your |the )?(?:system prompt|instructions|initial prompt)", 0.8),
+            new InjectionSig("\"do anything now\" jailbreak", "do anything now", 0.7),
+            new InjectionSig("request to ignore safety rules",
+                    "ignore your (?:guidelines|programming|training|safety)", 0.85),
+            new InjectionSig("unrestricted role-play", "pretend (?:you are|to be) (?:not |un)?(?:bound|restricted|an ai)", 0.6),
+            new InjectionSig("injected chat-format markers", "<\\|im_(?:start|end)\\|>|\\[INST]|###\\s*system", 0.6));
 
     private static final double BLOCK_THRESHOLD = 0.8;
 
@@ -145,7 +152,9 @@ public final class PromptFirewall {
         for (InjectionSig sig : INJECTION) {
             if (sig.pattern.matcher(lower).find()) {
                 injectionScore = Math.max(injectionScore, sig.weight);
-                hits.add(sig.label());
+                if (!hits.contains(sig.label())) {
+                    hits.add(sig.label());
+                }
             }
         }
         boolean blocked = blockOnInjection && injectionScore >= BLOCK_THRESHOLD;
@@ -191,9 +200,10 @@ public final class PromptFirewall {
         return sum % 10 == 0;
     }
 
+    /** A signature; {@code label} is what a person is told was found, never the regex. */
     private record InjectionSig(String label, Pattern pattern, double weight) {
-        InjectionSig(String regex, double weight) {
-            this(regex, Pattern.compile(regex), weight);
+        InjectionSig(String label, String regex, double weight) {
+            this(label, Pattern.compile(regex), weight);
         }
     }
 }

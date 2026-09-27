@@ -15,11 +15,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Semantic cache — answer a repeated question without paying for it twice.
@@ -120,7 +122,12 @@ public class SemanticCacheService {
                     best = e;
                 }
             }
-            if (best != null && bestScore >= cfg.getSimilarityThreshold()) {
+            // Word overlap cannot see the details that change an answer: one-
+            // character numbers are not even tokens ("what is 2+2" and "what is
+            // 3+3" scored 1.00), and "can I" and "can't I" differ only by an
+            // apostrophe. A near match must agree on its numbers and negations.
+            if (best != null && bestScore >= cfg.getSimilarityThreshold()
+                    && sameSpecifics(prompt, best.getPromptText())) {
                 return Optional.of(serve(cfg, best, bestScore, false));
             }
 
@@ -235,6 +242,34 @@ public class SemanticCacheService {
                     return m;
                 })
                 .toList();
+    }
+
+    private static final java.util.regex.Pattern NUMBER = java.util.regex.Pattern.compile("\\d+(?:[.,]\\d+)*");
+    private static final Set<String> NEGATIONS = Set.of("not", "no", "never", "none", "nor", "without",
+            "cannot", "can't", "cant", "don't", "dont", "doesn't", "doesnt", "didn't", "didnt", "isn't", "isnt",
+            "aren't", "arent", "wasn't", "wasnt", "weren't", "werent", "won't", "wont", "shouldn't", "shouldnt",
+            "wouldn't", "wouldnt", "couldn't", "couldnt", "mustn't", "neither");
+
+    /** The numbers and negations in a prompt: what word overlap misses and an answer depends on. */
+    static List<String> specifics(String text) {
+        List<String> out = new ArrayList<>();
+        if (text == null) {
+            return out;
+        }
+        var m = NUMBER.matcher(text);
+        while (m.find()) {
+            out.add(m.group());
+        }
+        for (String w : text.toLowerCase(java.util.Locale.ROOT).replace('’', '\'').split("[^a-z']+")) {
+            if (NEGATIONS.contains(w)) {
+                out.add("¬");
+            }
+        }
+        return out;
+    }
+
+    static boolean sameSpecifics(String a, String b) {
+        return specifics(a).equals(specifics(b));
     }
 
     private static String clip(String s, int max) {

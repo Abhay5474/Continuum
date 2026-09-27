@@ -254,8 +254,9 @@ public class OpenAiCompatController {
                 // never mistake this for.
                 log.warn("Stream failed for developer {}: {}", developerId, e.getMessage());
                 try {
+                    String[] kind = kindOf(e);
                     send(emitter, translator.write(OpenAiDtos.ErrorEnvelope.of(
-                            "server_error", String.valueOf(e.getMessage()), null)));
+                            kind[0], String.valueOf(e.getMessage()), kind[1])));
                     send(emitter, "[DONE]");
                 } catch (Exception ignored) {
                     // The client is gone; nothing left to tell.
@@ -300,6 +301,33 @@ public class OpenAiCompatController {
     /** Carries {@link GatewayDtos.ChatResponse#requestId()}, on success and on failure. */
     static final String REQUEST_ID_HEADER = "X-Continuum-Request-Id";
 
+    /**
+     * The OpenAI error type and code for a failure, for a stream's error frame:
+     * the same classification the status-code path makes, so a streaming
+     * client can tell a firewall refusal or a missing key from an outage.
+     */
+    static String[] kindOf(Throwable e) {
+        if (e instanceof io.continuum.firewall.PromptFirewallService.BlockedException) {
+            return new String[] {"invalid_request_error", "request_blocked"};
+        }
+        if (e instanceof io.continuum.gateway.GatewayService.NoProviderException) {
+            return new String[] {"api_error", "no_provider"};
+        }
+        if (e instanceof io.continuum.gateway.GatewayService.SetupException) {
+            return new String[] {"api_error", "not_set_up"};
+        }
+        if (e instanceof io.continuum.admission.CostAdmissionService.CostLimitedException) {
+            return new String[] {"rate_limit_error", "cost_limited"};
+        }
+        if (e instanceof io.continuum.admission.AdmissionService.SheddedException) {
+            return new String[] {"rate_limit_error", "capacity"};
+        }
+        if (e instanceof io.continuum.scheduling.SchedulerService.DeadlineUnreachableException) {
+            return new String[] {"invalid_request_error", "deadline_unreachable"};
+        }
+        return new String[] {"server_error", "upstream_unavailable"};
+    }
+
     private ResponseEntity<OpenAiDtos.ErrorEnvelope> errorResponse(RuntimeException e) {
         String message = e.getMessage() == null ? "Upstream failure." : e.getMessage();
         if (e instanceof io.continuum.admission.CostAdmissionService.CostLimitedException c) {
@@ -315,6 +343,12 @@ public class OpenAiCompatController {
         if (e instanceof io.continuum.scheduling.SchedulerService.DeadlineUnreachableException) {
             return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(OpenAiDtos.ErrorEnvelope.of("invalid_request_error", message, "deadline_unreachable"));
+        }
+        if (e instanceof io.continuum.firewall.PromptFirewallService.BlockedException) {
+            // A refusal by the account's own firewall, not an upstream outage:
+            // retrying it can only be refused again.
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(OpenAiDtos.ErrorEnvelope.of("invalid_request_error", message, "request_blocked"));
         }
         if (e instanceof io.continuum.gateway.GatewayService.SetupException) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)

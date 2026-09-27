@@ -278,4 +278,13 @@ class SemanticCacheServiceTest {
         @Override public <S extends SemanticCacheSettingEntity> boolean exists(org.springframework.data.domain.Example<S> ex) { throw new UnsupportedOperationException(); }
         @Override public <S extends SemanticCacheSettingEntity, R> R findBy(org.springframework.data.domain.Example<S> ex, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> fn) { throw new UnsupportedOperationException(); }
     }
+
+    @Test
+    void questionsThatDifferOnlyInANumberOrANegationAreNotTheSameQuestion() {
+        org.assertj.core.api.Assertions.assertThat(SemanticCacheService.sameSpecifics("what is 2+2", "what is 3+3")).isFalse();
+        org.assertj.core.api.Assertions.assertThat(SemanticCacheService.sameSpecifics(
+                "can I give aspirin to a dog", "can't I give aspirin to a dog")).isFalse();
+        org.assertj.core.api.Assertions.assertThat(SemanticCacheService.sameSpecifics(
+                "How do I reset my password?", "how can I reset my password")).isTrue();
+    }
 }
