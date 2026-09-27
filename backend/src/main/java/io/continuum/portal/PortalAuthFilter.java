@@ -28,6 +28,13 @@ public class PortalAuthFilter extends OncePerRequestFilter {
     private final PortalSessionService sessions;
     private final ObjectMapper mapper;
 
+    /** The only routes under /api/portal/developer that need no session. */
+    static final java.util.Set<String> OPEN = java.util.Set.of(
+            "/api/portal/developer/login",
+            "/api/portal/developer/signup",
+            "/api/portal/developer/account/invites/preview",
+            "/api/portal/developer/account/invites/accept");
+
     public PortalAuthFilter(PortalSessionService sessions, ObjectMapper mapper) {
         this.sessions = sessions;
         this.mapper = mapper;
@@ -40,11 +47,11 @@ public class PortalAuthFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
             return;
         }
-        String path = request.getRequestURI();
+        String path = request.getRequestURI().substring(request.getContextPath().length());
         // Open routes: anyone can sign up or log in — and an invitee has no
-        // session yet, so accepting an invite cannot require one.
-        if (path.endsWith("/login") || path.endsWith("/signup")
-                || path.contains("/invites/accept") || path.contains("/invites/preview")) {
+        // session yet, so accepting an invite cannot require one. Matched
+        // exactly: "ends with /login" also opened any route that happened to.
+        if (OPEN.contains(path)) {
             chain.doFilter(request, response);
             return;
         }

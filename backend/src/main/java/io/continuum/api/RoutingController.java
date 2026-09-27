@@ -86,10 +86,10 @@ public class RoutingController {
      * tenant's traffic; reads stay open so a developer can see what they are on.
      */
     @PostMapping("/enable")
+    @io.continuum.portal.OperatorOnly
     public Map<String, Object> enable(@RequestParam(defaultValue = "true") boolean enabled,
                                       @RequestParam(required = false) RoutingMode mode,
                                       HttpServletRequest req) {
-        requireOperator(req);
         state.setEnabled(enabled);
         if (mode != null) {
             state.setMode(mode);
@@ -104,9 +104,9 @@ public class RoutingController {
      * contextual bandit act on what it has been observing all along.
      */
     @PostMapping("/strategy")
+    @io.continuum.portal.OperatorOnly
     public Map<String, Object> setStrategy(@RequestParam ModelRoutingState.Strategy strategy,
                                            HttpServletRequest req) {
-        requireOperator(req);
         state.setStrategy(strategy);
         return getState();
     }
@@ -125,8 +125,8 @@ public class RoutingController {
     }
 
     @PostMapping("/mode")
+    @io.continuum.portal.OperatorOnly
     public Map<String, Object> setMode(@RequestParam RoutingMode mode, HttpServletRequest req) {
-        requireOperator(req);
         state.setMode(mode);
         return getState();
     }
@@ -158,11 +158,6 @@ public class RoutingController {
                 .getContent();
     }
 
-    private static void requireOperator(HttpServletRequest req) {
-        if (!RequestScope.isOperator(req)) {
-            throw new RequestScope.ForbiddenException();
-        }
-    }
 
     public record SelectRequest(String systemPrompt, String userPrompt, RoutingMode mode, Integer maxTokens) {
     }

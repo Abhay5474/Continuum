@@ -46,6 +46,7 @@ public class HedgingController {
 
     /** Full adaptive policy control (p95-trigger + rate cap), faithful to The Tail at Scale. */
     @PostMapping("/policy/adaptive")
+    @io.continuum.portal.OperatorOnly
     public Map<String, Object> adaptivePolicy(@RequestParam(defaultValue = "true") boolean adaptive,
                                               @RequestParam(defaultValue = "0.05") double hedgeRateCap,
                                               @RequestParam(defaultValue = "800") long thresholdMs,
@@ -53,33 +54,27 @@ public class HedgingController {
                                               @RequestParam(defaultValue = "1") int maxHedges,
                                               @RequestParam(required = false) Double budgetUsd,
                                               HttpServletRequest req) {
-        requireOperator(req);
         hedging.setPolicy(new HedgingPolicy(thresholdMs, maxHedges, budgetUsd,
                 adaptive, hedgeRateCap, minThresholdMs));
         return state();
     }
 
     @PostMapping("/enable")
+    @io.continuum.portal.OperatorOnly
     public Map<String, Object> enable(@RequestParam(defaultValue = "true") boolean enabled,
                                       HttpServletRequest req) {
-        requireOperator(req);
         hedging.setEnabled(enabled);
         return state();
     }
 
     @PostMapping("/policy")
+    @io.continuum.portal.OperatorOnly
     public Map<String, Object> policy(@RequestParam long thresholdMs,
                                       @RequestParam(defaultValue = "1") int maxHedges,
                                       @RequestParam(required = false) Double budgetUsd,
                                       HttpServletRequest req) {
-        requireOperator(req);
         hedging.setPolicy(new HedgingPolicy(thresholdMs, maxHedges, budgetUsd));
         return state();
     }
 
-    private static void requireOperator(HttpServletRequest req) {
-        if (!RequestScope.isOperator(req)) {
-            throw new RequestScope.ForbiddenException();
-        }
-    }
 }

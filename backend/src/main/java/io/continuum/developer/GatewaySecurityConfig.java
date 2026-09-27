@@ -65,15 +65,11 @@ public class GatewaySecurityConfig {
             PortalSessionService sessions, ObjectMapper mapper) {
         FilterRegistrationBean<ConsoleAuthFilter> reg = new FilterRegistrationBean<>();
         reg.setFilter(new ConsoleAuthFilter(sessions, mapper));
-        reg.addUrlPatterns(
-                "/api/workflows/*", "/api/workflows",
-                "/api/stats", "/api/costs", "/api/deliveries", "/api/engine/capacity",
-                "/api/gateway/stats", "/api/gateway/requests", "/api/gateway/health",
-                "/api/gateway/healing/*",
-                "/api/dag/*", "/api/mmu/*", "/api/memory/*",
-                "/api/replay/*", "/api/routing/*", "/api/hedging/*",
-                "/api/chaos/*", "/api/chaos", "/api/ai-chaos/*", "/api/ai-chaos",
-                "/api/models/*", "/api/models");
+        // Everything under /api, not a list of known paths: a controller added
+        // at a new path is signed-in-only from its first commit. The few paths
+        // that answer to another credential, or to nobody, are named in
+        // ConsoleAuthFilter.EXEMPT.
+        reg.addUrlPatterns("/api/*");
         reg.setOrder(1);
         return reg;
     }

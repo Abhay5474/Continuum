@@ -38,12 +38,43 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
     public static final String DEVELOPER_ID_ATTRIBUTE = PortalAuthFilter.DEVELOPER_ID_ATTRIBUTE;
     public static final String OPERATOR_ATTRIBUTE = "continuum.console.operator";
 
+    /**
+     * The /api paths this filter does not guard, and who guards them instead.
+     * Anything not listed needs a console session — deny by default. Exact
+     * paths, or prefixes ending in "/".
+     */
+    public static final java.util.List<String> EXEMPT = java.util.List.of(
+            // Public: build info and liveness for the landing page.
+            "/api/meta", "/api/health",
+            // PortalAuthFilter (developer session), with sign-up and sign-in public.
+            "/api/portal/",
+            // AdminTokenFilter (operator session or admin token).
+            "/api/admin/",
+            // ApiKeyAuthenticationFilter: called by programs with an API key.
+            "/api/gateway/chat", "/api/gateway/pipeline/", "/api/gateway/context/transform");
+
+    /** True when {@code path} is on the exempt list. */
+    public static boolean exempt(String path) {
+        for (String e : EXEMPT) {
+            if (e.endsWith("/") ? path.startsWith(e) : path.equals(e) || path.equals(e + "/")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private final PortalSessionService sessions;
     private final ObjectMapper mapper;
 
     public ConsoleAuthFilter(PortalSessionService sessions, ObjectMapper mapper) {
         this.sessions = sessions;
         this.mapper = mapper;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return exempt(path);
     }
 
     @Override

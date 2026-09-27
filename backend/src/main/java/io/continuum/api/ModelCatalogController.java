@@ -146,10 +146,8 @@ public class ModelCatalogController {
 
     /** Pin a provider's default, or clear the pin with {@code model: null}. Operator only. */
     @PostMapping("/pin")
+    @io.continuum.portal.OperatorOnly
     public Map<String, Object> pin(@RequestBody PinRequest body, HttpServletRequest req) {
-        if (!RequestScope.isOperator(req)) {
-            throw new RequestScope.ForbiddenException();
-        }
         String model = body.model() == null || body.model().isBlank() ? null : body.model().trim();
         catalogue.pin(body.provider(), model, RequestScope.developerId(req));
         return Map.of("provider", body.provider(), "defaultModel", String.valueOf(resolver.defaultFor(body.provider())));

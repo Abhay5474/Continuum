@@ -49,25 +49,20 @@ public class ModelRegistryController {
      * providers (the same check as "Check now", with the same cooldown).
      */
     @PostMapping("/discover")
+    @io.continuum.portal.OperatorOnly
     public Map<String, Object> discover(HttpServletRequest req) {
-        requireOperator(req);
         int changes = registry.discoverAll();
         var start = catalogue.requestCheck("operator");
         return Map.of("changes", changes, "check", start.outcome().name(), "message", start.message());
     }
 
     @PostMapping("/{id}/status")
+    @io.continuum.portal.OperatorOnly
     public ModelEntity transition(@PathVariable Long id, @RequestParam ModelStatus status,
                                   HttpServletRequest req) {
-        requireOperator(req);
         ModelEntity m = registry.transition(id, status);
         resolver.refresh();
         return m;
     }
 
-    private static void requireOperator(HttpServletRequest req) {
-        if (!RequestScope.isOperator(req)) {
-            throw new RequestScope.ForbiddenException();
-        }
-    }
 }
