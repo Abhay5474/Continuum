@@ -2,7 +2,7 @@ package io.continuum.gateway.openai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.continuum.gateway.GatewayDtos;
-import io.continuum.provider.mock.MockProvider;
+import io.continuum.testsupport.FakeLlmProvider;
 import io.continuum.provider.model.ImagePart;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.LlmResponse;
@@ -233,8 +233,8 @@ class OpenAiCompatTest {
     }
 
     @Test
-    void mockProviderCallsAToolWhenOneIsOffered() throws Exception {
-        var provider = new MockProvider();
+    void theTestProviderCallsAToolWhenOneIsOffered() throws Exception {
+        var provider = new FakeLlmProvider();
         var req = new LlmRequest("mock-1", List.of(Message.user("weather in Paris")), 100, 0.2,
                 List.of(new ToolSpec("get_weather", "w",
                         Map.of("type", "object", "properties",
@@ -253,16 +253,16 @@ class OpenAiCompatTest {
     }
 
     @Test
-    void mockProviderRespectsToolChoiceNone() throws Exception {
-        var provider = new MockProvider();
+    void theTestProviderRespectsToolChoiceNone() throws Exception {
+        var provider = new FakeLlmProvider();
         var req = new LlmRequest("mock-1", List.of(Message.user("x")), 100, 0.2,
                 List.of(new ToolSpec("f", "d", Map.of())), "none", null);
         assertThat(provider.complete(req).toolCalls()).isEmpty();
     }
 
     @Test
-    void mockProviderReturnsJsonWhenAskedFor() throws Exception {
-        var provider = new MockProvider();
+    void theTestProviderReturnsJsonWhenAskedFor() throws Exception {
+        var provider = new FakeLlmProvider();
         var req = new LlmRequest("mock-1", List.of(Message.user("assess")), 100, 0.2,
                 null, null, new ResponseFormat("json_object", null));
         String content = provider.complete(req).content();
@@ -272,7 +272,7 @@ class OpenAiCompatTest {
 
     @Test
     void imagesSurviveTheWholeWayToTheProvider() throws Exception {
-        var provider = new MockProvider();
+        var provider = new FakeLlmProvider();
         var withImage = new Message(Role.USER, "describe", null,
                 List.of(new ImagePart("https://x/a.png", null)), null);
         var resp = provider.complete(new LlmRequest("mock-1", List.of(withImage), 100, 0.2));

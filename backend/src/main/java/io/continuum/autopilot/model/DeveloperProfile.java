@@ -17,6 +17,6 @@ public record DeveloperProfile(
 
     public static DeveloperProfile beginnerDefault() {
         return new DeveloperProfile("My AI App", "reliable, cost-aware responses",
-                0.02, 5000, List.of("gemini", "groq", "mock"), List.of(), AutopilotMode.BALANCED);
+                0.02, 5000, List.of("gemini", "groq"), List.of(), AutopilotMode.BALANCED);
     }
 }

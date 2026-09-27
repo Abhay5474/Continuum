@@ -89,6 +89,7 @@ public class ProviderRouter {
             }
             long start = System.nanoTime();
             try {
+                injectChaos(name);
                 LlmResponse response = provider.complete(request, overrideKey);
                 long ms = (System.nanoTime() - start) / 1_000_000;
                 double cost = provider.estimateCost(response.model(), response.promptTokens(), response.completionTokens());
@@ -155,6 +156,7 @@ public class ProviderRouter {
             };
             long start = System.nanoTime();
             try {
+                injectChaos(name);
                 LlmResponse response = provider.stream(request, overrideKey, counting);
                 long ms = (System.nanoTime() - start) / 1_000_000;
                 double cost = provider.estimateCost(response.model(), response.promptTokens(), response.completionTokens());
@@ -190,6 +192,23 @@ public class ProviderRouter {
             }
         }
         throw new RuntimeException("All providers in failover chain failed", last);
+    }
+
+    /** Fault injection (Chaos Lab); absent in plain unit tests. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.continuum.chaos.ChaosMonkey chaos;
+
+    /**
+     * A provider failure injected on purpose, for the tenant (or operator) that
+     * armed it. Applied here, before any provider is called, so it reaches Groq
+     * and Gemini alike; it used to live inside the mock provider only, and so
+     * did nothing on a real deployment.
+     */
+    private void injectChaos(String provider) {
+        if (chaos != null && chaos.shouldFailProviderCall()) {
+            throw new io.continuum.chaos.ChaosMonkey.SimulatedProviderFailure(
+                    "'" + provider + "': injected failure (Chaos Lab)");
+        }
     }
 
     /** True when the thread was interrupted, or the failure was the interruption itself. */

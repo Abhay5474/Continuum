@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * What the gateway does on each of its paths, end to end on the mock provider:
+ * What the gateway does on each of its paths, end to end on the test provider:
  * plain, cached, cascaded, gated, measured, hedged, firewalled, consensus,
  * tools, streamed, and failing. Every path writes its request log row.
  *
@@ -92,13 +92,13 @@ class GatewayIT extends PostgresIT {
         GatewayDtos.ChatResponse r = chat("What is a durable workflow?");
 
         answered(r);
-        assertThat(r.provider()).isEqualTo("mock");
+        assertThat(r.provider()).isEqualTo("fake");
         assertThat(r.failovers()).isZero();
         assertThat(r.routingReason()).isNotBlank();
         List<Map<String, Object>> rows = log();
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).get("success")).isEqualTo(true);
-        assertThat(rows.get(0).get("chosen_provider")).isEqualTo("mock");
+        assertThat(rows.get(0).get("chosen_provider")).isEqualTo("fake");
         assertThat(r.requestId()).isEqualTo("req_" + jdbc.queryForObject(
                 "SELECT max(id) FROM gateway_requests WHERE developer_id = ?", Long.class, dev));
     }
@@ -175,7 +175,7 @@ class GatewayIT extends PostgresIT {
         GatewayDtos.ChatResponse r = chat("Plan a three step migration");
 
         answered(r);
-        assertThat(r.provider()).isEqualTo("mock");
+        assertThat(r.provider()).isEqualTo("fake");
         assertThat(r.routingReason()).doesNotContain("consensus DAG");
     }
 
@@ -201,6 +201,42 @@ class GatewayIT extends PostgresIT {
         answered(r);
         assertThat(pieces.size()).isGreaterThan(1);
         assertThat(String.join("", pieces)).isEqualTo(r.response());
+    }
+
+    @Autowired io.continuum.testsupport.FakeLlmProvider fake;
+
+    @Test
+    void withNoProviderSetUpTheRequestSaysSoInsteadOfBlamingUpstream() {
+        fake.setAvailable(false);
+        try {
+            assertThatThrownBy(() -> chat("Anyone there?"))
+                    .isInstanceOf(GatewayService.NoProviderException.class)
+                    .hasMessageContaining("GROQ_API_KEY");
+        } finally {
+            fake.setAvailable(true);
+        }
+    }
+
+    @Test
+    void theAnswerIsAlsoInOpenAisShapeForClientsWrittenForIt() {
+        GatewayDtos.ChatResponse r = chat("Say hello");
+
+        assertThat(r.getChoices()).hasSize(1);
+        assertThat(((Map<?, ?>) r.getChoices().get(0).get("message")).get("content")).isEqualTo(r.response());
+    }
+
+    @Test
+    void theFirewallRedactsAPinAndACardNumberBeforeTheProviderSeesThemAndLogsOnlyTheRedactedText() {
+        firewall.setEnabled(dev, true);
+        GatewayDtos.ChatResponse r = chat("my credit card number is 8349573945734 and my debit card pin is 7849");
+
+        answered(r);
+        assertThat(r.response()).doesNotContain("8349573945734").doesNotContain("7849");
+        List<Map<String, Object>> events = jdbc.queryForList(
+                "SELECT category, excerpt FROM firewall_events WHERE developer_id = ? ORDER BY id", dev);
+        assertThat(events).extracting(e -> e.get("category")).contains("CARD_NUMBER", "CREDENTIAL");
+        assertThat(events).allSatisfy(e -> assertThat((String) e.get("excerpt"))
+                .doesNotContain("8349573945734").doesNotContain("7849").contains("[REDACTED_"));
     }
 
     @Test

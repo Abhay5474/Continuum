@@ -1,5 +1,10 @@
 # Output verification — does the advice match the findings?
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** Phase 6 shipped · **Migration:** `V28__output_verification.sql`
 **Default: OFF**, per pipeline, including every pipeline that already exists.
 

@@ -1,5 +1,10 @@
 # Adaptive Consensus
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #7 · **Migration:** `V31__adaptive_consensus.sql`
 **Default: OFF** for every tenant. With it off, confidence measurement draws
 exactly the configured k, as it always has.

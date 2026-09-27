@@ -22,7 +22,7 @@ type Profile = {
   mode: string;
 };
 
-const PROVIDERS = ["gemini", "groq", "openai", "mock"];
+const PROVIDERS = ["gemini", "groq", "openai"];
 const MODES = ["BALANCED", "LOW_COST", "LOW_LATENCY", "HIGH_QUALITY", "SAFETY_FIRST"];
 
 /* ------------------------------------------------------------------ *

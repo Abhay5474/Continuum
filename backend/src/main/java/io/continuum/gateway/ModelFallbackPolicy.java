@@ -80,7 +80,6 @@ public class ModelFallbackPolicy {
             case "flagship", "pro", "versatile" -> 3;
             case "flash" -> 2;
             case "instant", "lite", "flash-lite" -> 1;
-            case "mock" -> 0;
             default -> 1;
         };
     }

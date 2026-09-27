@@ -1,4 +1,4 @@
-package io.continuum.provider.mock;
+package io.continuum.testsupport;
 
 import io.continuum.chaos.ChaosMonkey;
 import io.continuum.provider.LlmProvider;
@@ -9,19 +9,16 @@ import io.continuum.provider.model.ResponseFormat;
 import io.continuum.provider.model.Role;
 import io.continuum.provider.model.ToolCall;
 import io.continuum.provider.model.ToolSpec;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 /**
- * Always-available, deterministic, zero-cost provider.
- *
- * It is the safety net at the end of the failover chain so the system is fully
- * demonstrable with no API keys, and it gives tests a stable LLM. Its output is
- * a function of the prompt, so replay assertions are easy to reason about.
+ * A deterministic, zero-cost LLM for tests only. It is not part of the product:
+ * a real deployment answers with Groq or Gemini, or says that none is set up.
+ * Its output is a function of the prompt, so assertions are easy to reason
+ * about, and it streams, calls tools and reads images like a real provider.
  */
-@Component
-public class MockProvider implements LlmProvider {
+public class FakeLlmProvider implements LlmProvider {
 
     /**
      * Optional so the provider stays constructible in a plain unit test, where
@@ -29,12 +26,12 @@ public class MockProvider implements LlmProvider {
      */
     private final ChaosMonkey chaos;
 
-    public MockProvider() {
+    public FakeLlmProvider() {
         this(null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
-    public MockProvider(ChaosMonkey chaos) {
+    public FakeLlmProvider(ChaosMonkey chaos) {
         this.chaos = chaos;
     }
 
@@ -97,7 +94,7 @@ public class MockProvider implements LlmProvider {
 
     @Override
     public String name() {
-        return "mock";
+        return "fake";
     }
 
     /**
@@ -109,8 +106,12 @@ public class MockProvider implements LlmProvider {
      * total provider failure can be exercised end to end without a way to take
      * it down.
      */
-    private final boolean unavailable = Boolean.parseBoolean(
-            System.getenv().getOrDefault("CONTINUUM_MOCK_UNAVAILABLE", "false"));
+    private volatile boolean unavailable = false;
+
+    /** Lets a test play a deployment whose provider has no key. */
+    public void setAvailable(boolean available) {
+        this.unavailable = !available;
+    }
 
     @Override
     public boolean isAvailable() {
@@ -165,15 +166,10 @@ public class MockProvider implements LlmProvider {
     @Override
     public LlmResponse complete(LlmRequest request) {
         if (unavailable) {
-            throw new IllegalStateException("mock provider is marked unavailable");
+            throw new IllegalStateException("fake provider is marked unavailable");
         }
-        // A real provider fails intermittently, and a mock that never does makes
-        // failover untestable — which is the one behaviour this product is most
-        // often judged on. Armed through the chaos API, off unless asked for.
-        if (chaos != null && chaos.shouldFailProviderCall()) {
-            throw new ChaosMonkey.SimulatedProviderFailure(
-                    "mock provider: injected failure (chaos)");
-        }
+        // Injected provider failures are applied by ProviderRouter, to every
+        // provider, so the fake does not apply them a second time.
         String lastUser = request.messages().stream()
                 .filter(m -> m.role() == Role.USER)
                 .map(Message::content)
@@ -183,7 +179,7 @@ public class MockProvider implements LlmProvider {
         // difference small models actually exhibit, and enough for a cascade to
         // have something real to judge.
         serve();
-        String model = request.model() == null ? "mock-small" : request.model();
+        String model = request.model() == null ? "fake-small" : request.model();
         boolean large = model.contains("large");
 
         int promptTokens = request.messages().stream()

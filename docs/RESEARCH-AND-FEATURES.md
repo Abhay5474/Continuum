@@ -1,5 +1,10 @@
 # Continuum — The Complete Guide
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **What this document is:** everything Continuum does, every research paper it is
 built on, exactly which part of each paper was implemented, what the paper itself
 said it could *not* do, and what we did about that.

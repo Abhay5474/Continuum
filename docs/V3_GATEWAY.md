@@ -24,7 +24,7 @@ External app ──Bearer cnt_live_xxx──► /api/gateway/chat
         │ ProviderHealthTracker(record) → gateway_requests(log)           │
         └─────────────────────────────────────────────────────────────────┘
                                         ▼
-                          Gemini · Groq · Mock adapters
+                          Gemini · Groq adapters
 ```
 
 ## Reuse, not rebuild
@@ -74,13 +74,13 @@ routing loop.
 
 ### F5 — Hierarchical model failover + health
 `ModelFallbackPolicy` builds a `(provider, model)` chain; the gateway walks it
-until one succeeds (e.g. `gemini-3.5-flash → gemini-2.5-flash → … → mock`).
+until one succeeds (e.g. `gemini-3.5-flash → gemini-2.5-flash → … → llama-3.3-70b-versatile`).
 `ProviderHealthTracker` records per-model availability/latency/error-rate
 (`provider_model_health`) to deprioritize unhealthy targets.
 
 ### F6 — Model registry & lifecycle
 `models` table with lifecycle `DISCOVERED → TESTING → ACTIVE → DEPRECATED →
-REMOVED`. `ModelDiscoveryProvider`s (Gemini/Groq/Mock) seed a vetted catalog at
+REMOVED`. `ModelDiscoveryProvider`s (Gemini/Groq) seed a vetted catalog at
 startup and a monthly `ModelDiscoveryScheduler` reconciles changes — net-new
 live models enter as `DISCOVERED` (never auto-activated); **disappeared models
 are auto-marked `DEPRECATED`**. Only `ACTIVE` models are routable.
@@ -125,8 +125,7 @@ Two modes, named on the final chunk's `continuum.stream_mode`:
 
 - **passthrough**: nothing downstream needs the finished answer, so text is
   sent as the provider generates it. Groq streams over server-sent events
-  (`"stream": true`), Gemini over `:streamGenerateContent?alt=sse`, and the mock
-  a few words at a time. The first piece arrives when the provider produces it.
+  (`"stream": true`), Gemini over `:streamGenerateContent?alt=sse`. The first piece arrives when the provider produces it.
   An answer that comes whole anyway (from the semantic cache, or with tool
   calls) is sent in pieces once complete.
 - **buffered**: a feature that judges or rewrites finished answers is on: the
@@ -172,9 +171,9 @@ short answer. When the client disconnects, the provider stops generating.
 | `ModelFallbackPolicyTest` | simple→cheap, complex→strong, vision filter, requested-model pinning |
 
 Verified at runtime against PostgreSQL: developer onboarding + key issuance;
-`auto` routing → mock; invalid key → 401; credential stored as ciphertext only
+`auto` routing; invalid key → 401; credential stored as ciphertext only
 (DB grep finds no plaintext, metadata API hides the secret); invalid Gemini key
-→ 4 silent model failovers → mock success with `failuresPrevented=4`,
+→ 4 silent model failovers → success on the next provider with `failuresPrevented=4`,
 `developerVisibleFailures=0`; registry seeded with 7 models across providers.
 
 ---
@@ -221,7 +220,7 @@ GET  /api/portal/developer/stats | /requests               # developer-scoped an
 ### "Use my provider keys as primary" toggle
 Stored per developer (`developer_auth.use_own_keys_primary`, default `true`).
 `GatewayService` honors it: when **on**, the developer's own providers are
-preferred and their decrypted keys are used (falling back to platform/mock on
+preferred and their decrypted keys are used (falling back to platform keys on
 failure); when **off**, requests run on platform keys only.
 
 ### Credential Vault UI (Developer Portal tab)

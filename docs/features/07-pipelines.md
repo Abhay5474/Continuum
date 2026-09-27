@@ -1,5 +1,10 @@
 # Pipelines — input in, answer out
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** Phase 3 shipped · **Migration:** `V25__pipelines.sql`
 **Default: OFF.** A new pipeline is created disabled and stays that way until you turn it on.
 

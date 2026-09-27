@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 /**
  * When the model catalogue is refreshed.
  *
- * <p>At startup: the database only — the built-in mock models, and seeds for any
+ * <p>At startup: the database only — seeds for any
  * provider whose list has never been read. No provider is called on the startup
  * path, so a restart loop cannot turn into a stream of API requests.
  *

@@ -24,8 +24,8 @@ import java.util.Set;
  * <p>Groq and Gemini are no longer discovered here: their curated lists
  * re-asserted every name as ACTIVE on each run, so a model the provider had
  * retired could never leave the registry. They are read from the providers'
- * own model lists by {@code ModelCatalogService}; this reconciles the built-in
- * mock provider.
+ * own model lists by {@code ModelCatalogService}; this reconciles any other
+ * registered discovery source.
  */
 @Service
 public class ModelRegistryService {
@@ -125,10 +125,49 @@ public class ModelRegistryService {
         return routable(repo.findByProviderAndStatus(provider, ModelStatus.ACTIVE));
     }
 
+    /** The providers this build can actually call; read lazily to avoid a cycle. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<io.continuum.provider.LlmProvider> providers;
+
+    private java.util.Set<String> callable() {
+        if (providers == null) {
+            return null;
+        }
+        java.util.Set<String> names = new java.util.HashSet<>();
+        providers.stream().forEach(p -> names.add(p.name()));
+        return names;
+    }
+
+    /**
+     * Retires models whose provider this build no longer has — the built-in
+     * mock models of earlier versions. Left ACTIVE they would still be offered
+     * to routing, and every choice of one would be a failed attempt. A status
+     * change, not a delete: the rows and their history stay.
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @Transactional
+    public void retireModelsWithoutAProvider() {
+        java.util.Set<String> known = callable();
+        if (known == null || known.isEmpty()) {
+            return;
+        }
+        for (ModelEntity m : repo.findByStatus(ModelStatus.ACTIVE)) {
+            if (!known.contains(m.getProvider())) {
+                m.setStatus(ModelStatus.REMOVED);
+                m.setStatusReason("Provider '" + m.getProvider() + "' is no longer part of Continuum");
+                m.setRetiredAt(java.time.Instant.now());
+                repo.save(m);
+                log.info("Retired {}/{}: its provider is no longer part of this build", m.getProvider(), m.getModelName());
+            }
+        }
+    }
+
     private List<ModelEntity> routable(List<ModelEntity> rows) {
         io.continuum.registry.catalog.ModelResolver r = resolver == null ? null : resolver.getIfAvailable();
+        java.util.Set<String> known = callable();
         return rows.stream()
                 .filter(ModelEntity::isChat)
+                .filter(m -> known == null || known.contains(m.getProvider()))
                 .filter(m -> r == null || !r.isQuarantined(m.getProvider(), m.getModelName()))
                 .toList();
     }

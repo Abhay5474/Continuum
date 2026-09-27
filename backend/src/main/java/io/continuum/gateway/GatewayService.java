@@ -341,6 +341,12 @@ public class GatewayService {
                         developerId, e.getMessage());
             }
             if (verified != null) {
+                // The same outbound guard as every other path: an answer that
+                // repeats a secret back must not reach the caller unredacted.
+                String guarded = firewall.guardOutbound(developerId, verified.response());
+                if (guarded != null && !guarded.equals(verified.response())) {
+                    verified = verified.withRevision(guarded, 0, 0, " · secrets redacted from the answer");
+                }
                 // Logged like every other request. This path used to return
                 // without a row, so verified requests were missing from usage,
                 // spend and the request feed — and were never counted against
@@ -504,9 +510,22 @@ public class GatewayService {
             }
         }
 
+        // Nothing to call at all: no platform key and none of the developer's
+        // own. Said plainly, before any attempt, rather than after trying every
+        // model and reporting that "all upstream providers are unavailable".
+        boolean platformKeys = !router.availableChain().isEmpty();
+        boolean ownKeys = useOwnKeys && !vault.listProviders(developerId).isEmpty();
+        if (!platformKeys && !ownKeys) {
+            logFailure(developerId, req, complexity, mode);
+            throw new NoProviderException();
+        }
+
         if (chain.isEmpty()) {
             logFailure(developerId, req, complexity, mode);
-            throw new GatewayException("No eligible model is available for this request");
+            throw new SetupException(requireVision
+                    ? "No model that can read images is available: the vision-capable models are retired or unreachable"
+                    : "No eligible model is available for this request: the model catalogue has no usable model yet. "
+                            + "Run a check on the Models page.");
         }
 
         // Resolve developer-supplied provider keys (decrypted only here, never logged/returned).
@@ -957,6 +976,25 @@ public class GatewayService {
     }
 
     /** Thrown when the gateway cannot fulfil a request; mapped to a secure error by the controller. */
+    /**
+     * The request cannot be served because of how the deployment is set up, not
+     * because a provider failed: its message says what to change, and is safe to
+     * show the caller (it names no provider internals).
+     */
+    public static class SetupException extends GatewayException {
+        public SetupException(String message) {
+            super(message);
+        }
+    }
+
+    /** No provider can be called: neither the platform nor the developer has a key. */
+    public static class NoProviderException extends SetupException {
+        public NoProviderException() {
+            super("No model provider is set up. Add a Groq or Gemini key on the server (GROQ_API_KEY or "
+                    + "GEMINI_API_KEY), or your own key under API Keys & Providers.");
+        }
+    }
+
     public static class GatewayException extends RuntimeException {
         /** The logged request's id, when it got as far as being logged. */
         public String requestId;

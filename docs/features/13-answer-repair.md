@@ -1,5 +1,10 @@
 # Answer Repair Engine
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #6 · **Migration:** `V30__answer_repair.sql`
 **Default: OFF** for every tenant. With it off the quality gate's existing
 single-shot repair is unchanged.

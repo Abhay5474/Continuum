@@ -1,5 +1,10 @@
 # Priority & Deadline Scheduling
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #14 · **Migration:** `V37__priority_scheduling.sql`
 **Default: OFF** for every tenant.
 

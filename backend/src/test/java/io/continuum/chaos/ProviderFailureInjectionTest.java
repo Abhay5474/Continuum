@@ -1,6 +1,6 @@
 package io.continuum.chaos;
 
-import io.continuum.provider.mock.MockProvider;
+import io.continuum.testsupport.FakeLlmProvider;
 import io.continuum.provider.model.LlmRequest;
 import io.continuum.provider.model.Message;
 import org.junit.jupiter.api.Test;
@@ -69,21 +69,32 @@ class ProviderFailureInjectionTest {
         assertThat(chaos.state(null).providerFailureRate()).isZero();
     }
 
-    @Test
-    void theMockProviderHonoursIt() {
-        ChaosMonkey chaos = new ChaosMonkey();
-        chaos.setProviderFailureRate(null, 1.0);
-        MockProvider provider = new MockProvider(chaos);
-
-        assertThatThrownBy(() -> provider.complete(
-                new LlmRequest("mock-1", List.of(Message.user("hi")), 50, 0.2)))
-                .isInstanceOf(ChaosMonkey.SimulatedProviderFailure.class);
+    /** The router applies it to every provider, before calling it. */
+    private static io.continuum.provider.ProviderRouter routerWith(ChaosMonkey chaos) {
+        io.continuum.config.LlmProperties props = new io.continuum.config.LlmProperties();
+        props.setFailoverOrder(List.of("fake"));
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<io.continuum.routing.ProviderMetrics> metrics =
+                org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        var router = new io.continuum.provider.ProviderRouter(List.of(new FakeLlmProvider()), props, metrics);
+        org.springframework.test.util.ReflectionTestUtils.setField(router, "chaos", chaos);
+        return router;
     }
 
     @Test
-    void theMockProviderIsUnaffectedWhenNothingIsArmed() throws Exception {
-        MockProvider provider = new MockProvider(new ChaosMonkey());
-        var resp = provider.complete(new LlmRequest("mock-1", List.of(Message.user("hi")), 50, 0.2));
+    void theRouterFailsAnyProviderWhenArmed() {
+        ChaosMonkey chaos = new ChaosMonkey();
+        chaos.setProviderFailureRate(null, 1.0);
+
+        assertThatThrownBy(() -> routerWith(chaos).complete(
+                new LlmRequest("m", List.of(Message.user("hi")), 50, 0.2), List.of("fake"), null))
+                .hasRootCauseInstanceOf(ChaosMonkey.SimulatedProviderFailure.class);
+    }
+
+    @Test
+    void theRouterIsUnaffectedWhenNothingIsArmed() {
+        var resp = routerWith(new ChaosMonkey()).complete(
+                new LlmRequest("m", List.of(Message.user("hi")), 50, 0.2), List.of("fake"), null);
         assertThat(resp.content()).isNotBlank();
     }
 

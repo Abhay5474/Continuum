@@ -4058,6 +4058,9 @@ export interface components {
         ChatResponse: {
             /** Format: int32 */
             agreementClusters: number;
+            choices: {
+                [key: string]: Record<string, never>;
+            }[];
             /** Format: int32 */
             completionTokens: number;
             /** Format: double */

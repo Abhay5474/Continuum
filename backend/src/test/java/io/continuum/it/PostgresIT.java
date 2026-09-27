@@ -33,6 +33,8 @@ import java.sql.DriverManager;
         "spring.jpa.hibernate.ddl-auto=validate",
         "CONTINUUM_SESSION_KEY=integration-test-session-key-0123456789",
         "GEMINI_API_KEY=", "GROQ_API_KEY=",
+        // The test LLM (testsupport.FakeProviders) is the only provider.
+        "continuum.llm.failover-order=fake",
         // Webhook and HTTP-step tests call a receiver on this machine.
         "continuum.declarative.allow-private-targets=true",
         // The consensus DAG waits on workers the tests drive by hand; don't wait long.
@@ -40,6 +42,7 @@ import java.sql.DriverManager;
         "logging.level.io.continuum=WARN"
 })
 @ExtendWith(PostgresIT.RequiresPostgres.class)
+@org.springframework.context.annotation.Import(io.continuum.testsupport.FakeProviders.class)
 public abstract class PostgresIT {
 
     static final String URL = env("CONTINUUM_IT_DB_URL", "jdbc:postgresql://localhost:5432/continuum_it");

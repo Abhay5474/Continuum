@@ -1,5 +1,10 @@
 # Confidence policy — what the model may do with the evidence
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** Phase 4 shipped · **Migration:** `V26__confidence_policy.sql`
 **Default: OFF**, per pipeline, including every pipeline that already exists.
 

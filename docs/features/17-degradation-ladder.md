@@ -1,5 +1,10 @@
 # Graceful Degradation Ladder
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #11 · **Migration:** `V34__degradation_ladder.sql`
 **Default: OFF** for every tenant.
 

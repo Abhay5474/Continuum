@@ -84,21 +84,32 @@ public class PromptFirewallService {
                     continue;
                 }
                 PromptFirewall.InboundResult r = firewall.scanInbound(msg.content(), true, true);
+                // Always the sanitised text: the event log must never hold what
+                // the firewall exists to keep out of it.
+                String excerpt = excerpt(r.sanitized());
                 if (r.blocked()) {
                     record(developerId, "INBOUND", "PROMPT_INJECTION", "BLOCKED", 1,
-                            "score=" + r.injectionScore() + " hits=" + r.injectionHits());
-                    throw new BlockedException("Request blocked: prompt-injection attempt detected");
+                            "score=" + r.injectionScore() + " matched: " + String.join("; ", r.injectionHits()), excerpt);
+                    throw new BlockedException("Request blocked: prompt-injection attempt detected ("
+                            + String.join("; ", r.injectionHits()) + ")");
                 }
                 if (r.injectionScore() > 0) {
                     record(developerId, "INBOUND", "PROMPT_INJECTION", "FLAGGED", r.injectionHits().size(),
-                            "score=" + r.injectionScore());
+                            "score=" + r.injectionScore() + " matched: " + String.join("; ", r.injectionHits()), excerpt);
                 }
                 for (PromptFirewall.Match m : r.redactions()) {
-                    record(developerId, "INBOUND", m.category(), "REDACTED", m.count(), null);
+                    record(developerId, "INBOUND", m.category(), "REDACTED", m.count(),
+                            "replaced before the prompt left for the provider", excerpt);
                 }
-                out.add(r.changed() ? new Message(msg.role(), r.sanitized(), msg.toolCalls()) : msg);
+                // The full message, not just role and text: images and the id
+                // tying a tool result to its call were dropped here.
+                out.add(r.changed() ? new Message(msg.role(), r.sanitized(), msg.toolCalls(), msg.images(),
+                        msg.toolCallId()) : msg);
             }
-            return new LlmRequest(request.model(), out, request.maxTokens(), request.temperature());
+            // withMessages keeps the caller's tools and response format; the
+            // four-argument constructor used here dropped both whenever a
+            // prompt was redacted, so JSON mode and tool calls silently stopped.
+            return request.withMessages(out);
         } catch (BlockedException be) {
             throw be;
         } catch (Exception e) {
@@ -115,7 +126,8 @@ public class PromptFirewallService {
         try {
             PromptFirewall.OutboundResult r = firewall.scanOutbound(content, true);
             for (PromptFirewall.Match m : r.redactions()) {
-                record(developerId, "OUTBOUND", m.category(), "REDACTED", m.count(), null);
+                record(developerId, "OUTBOUND", m.category(), "REDACTED", m.count(),
+                        "replaced in the model's answer before it was returned", excerpt(r.sanitized()));
             }
             return r.sanitized();
         } catch (Exception e) {
@@ -124,10 +136,23 @@ public class PromptFirewallService {
         }
     }
 
+    /** Up to 240 characters, starting just before the first placeholder when there is one. */
+    static String excerpt(String sanitized) {
+        if (sanitized == null) {
+            return null;
+        }
+        String t = sanitized.replaceAll("\\s+", " ").trim();
+        int at = t.indexOf("[REDACTED_");
+        int from = at > 80 ? at - 80 : 0;
+        String cut = t.substring(from, Math.min(t.length(), from + 240));
+        return (from > 0 ? "…" : "") + cut + (from + 240 < t.length() ? "…" : "");
+    }
+
     private void record(String developerId, String direction, String category,
-                        String action, int count, String detail) {
+                        String action, int count, String detail, String excerpt) {
         try {
-            events.save(new FirewallEventEntity(developerId, direction, category, action, count, detail));
+            events.save(new FirewallEventEntity(developerId, direction, category, action, count, detail)
+                    .withExcerpt(excerpt));
         } catch (Exception ignored) {
             // Auditing must never break a request.
         }

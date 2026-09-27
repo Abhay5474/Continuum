@@ -163,7 +163,7 @@ public class AutopilotController {
                     goal == null ? "reliable, cost-aware responses" : goal,
                     maxCostPerRequest == null ? 0.02 : maxCostPerRequest,
                     maxLatencyMs == null ? 5000 : maxLatencyMs,
-                    allowedProviders == null ? List.of("gemini", "groq", "mock") : allowedProviders,
+                    allowedProviders == null ? List.of("gemini", "groq") : allowedProviders,
                     preferredModelClasses == null ? List.of() : preferredModelClasses,
                     m);
         }

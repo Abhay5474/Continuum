@@ -30,7 +30,7 @@ providers** — all without losing state.
                                        │     Activities     │  │     Sinks      │
                                        └─────────┬──────────┘  └────────────────┘
                                        ┌─────────▼──────────┐
-                                       │  Provider Adapters │  Gemini · Groq · Mock
+                                       │  Provider Adapters │  Gemini · Groq
                                        └────────────────────┘
 ```
 
@@ -55,7 +55,7 @@ providers** — all without losing state.
 4. **Idempotent, exactly-once side effects** — emails/payments go through a
    transactional outbox keyed by a deterministic idempotency key.
 5. **Provider failover** — LLM calls route through an ordered provider chain
-   (Gemini → Groq → Mock); a failure transparently falls over to the next.
+   (Gemini → Groq); a failure transparently falls over to the next.
 
 **[docs/FEATURES.md](docs/FEATURES.md)** lists every feature once, by name, with where it lives and
 what it answers on. See **[docs/USAGE.md](docs/USAGE.md)** for a guided tour of every feature,
@@ -253,8 +253,10 @@ docker compose up --build
 # API:       http://localhost:8080
 ```
 
-No API keys needed — Continuum ships with an always-available mock LLM provider.
-Add `GEMINI_API_KEY` / `GROQ_API_KEY` to use real models and demo failover.
+Set `GEMINI_API_KEY` and/or `GROQ_API_KEY` (both have free tiers), or add your
+own key in the console under API Keys & Providers. With no provider set up, a
+chat request returns `503 {"error":"no_provider"}` explaining what to add; set
+both keys to demo failover.
 
 ## Run locally without Docker
 

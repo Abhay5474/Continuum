@@ -115,8 +115,8 @@ POST /api/routing/select             # preview scoring for a sample task
 GET  /api/routing/decisions?limit=
 ```
 
-> With only the mock provider available the chain has one entry; configure real
-> Gemini/Groq keys to see differentiated scoring and selection.
+> With only one provider key configured the chain has one entry; configure both
+> Gemini and Groq keys to see differentiated scoring and selection.
 
 ---
 
@@ -238,7 +238,7 @@ New entities: `ReplayVerificationReportEntity`, `ProviderStatsEntity`,
 - ✅ `LlmActivity` default path identical to V1 when routing/hedging/ai-chaos are off.
 - ✅ `ProviderRouter.complete(request)` behaves exactly as before; the new
   `complete(request, chain)` overload powers routing/hedging.
-- ✅ Provider adapters (Gemini/Groq/Mock) untouched.
+- ✅ Provider adapters (Gemini/Groq) untouched.
 - ✅ Only additive DB migrations.
 - ✅ `mvn test` green (V1 + V2).
 

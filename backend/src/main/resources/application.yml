@@ -56,7 +56,7 @@ continuum:
     # 0 keeps finished workflows (and their history) forever.
     finished-workflow-days: ${RETENTION_FINISHED_WORKFLOW_DAYS:0}
   llm:
-    failover-order: ${LLM_FAILOVER_ORDER:gemini,groq,mock}
+    failover-order: ${LLM_FAILOVER_ORDER:gemini,groq}
     gemini:
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_MODEL:}

@@ -1,5 +1,10 @@
 # Decision Provenance Graph
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #10 · **Migration:** `V33__decision_provenance.sql`
 **Default: OFF** for every tenant.
 

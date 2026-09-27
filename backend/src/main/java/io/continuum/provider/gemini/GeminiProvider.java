@@ -36,7 +36,7 @@ import java.util.Set;
  * result becomes a {@code functionResponse} part, images become inline data, and
  * JSON mode becomes a response MIME type. The first version sent text only:
  * tools, images and JSON mode were dropped without a word, so a tool-calling
- * client got prose back from Gemini and a function call back from the mock, and
+ * client got prose back from Gemini and a function call back from Groq, and
  * could not tell which provider had served it.
  */
 @Component

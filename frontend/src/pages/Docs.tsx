@@ -99,7 +99,13 @@ export default function Docs() {
               <code className="rounded bg-ink px-1 text-neon">POST /api/gateway/chat</code> (and the
               OpenAI-shaped alias <code className="rounded bg-ink px-1 text-neon">/v1/chat/completions</code>).
               Set <code className="rounded bg-ink px-1">model</code> to <code className="rounded bg-ink px-1">"auto"</code> to
-              let Continuum route by complexity.
+              let Continuum route by complexity. The answer is in{" "}
+              <code className="rounded bg-ink px-1">response</code> and, OpenAI-style, in{" "}
+              <code className="rounded bg-ink px-1">choices[0].message.content</code>, on both
+              endpoints. A failed request has no answer: it returns{" "}
+              <code className="rounded bg-ink px-1">{"{ error, message }"}</code> with a non-2xx
+              status (503 <code className="rounded bg-ink px-1">no_provider</code> when no model
+              key is set up), so check the status before reading the answer.
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="min-w-0">
@@ -121,7 +127,13 @@ export default function Docs() {
   }
 );
 const data = await res.json();
-console.log(data.response);`}
+if (!res.ok) {
+  // Errors are { error, message }: show the message,
+  // or the reply reads "undefined".
+  throw new Error(data.message ?? data.error);
+}
+// Both shapes are present on either endpoint:
+console.log(data.response); // or data.choices[0].message.content`}
                 />
               </div>
               <div className="min-w-0">
@@ -138,7 +150,11 @@ r = requests.post(
         "messages": [{"role": "user", "content": "Hello!"}],
     },
 )
-print(r.json()["response"])`}
+data = r.json()
+if not r.ok:
+    # Errors are {"error", "message"}; there is no "response".
+    raise RuntimeError(data.get("message") or data.get("error"))
+print(data["response"])  # or data["choices"][0]["message"]["content"]`}
                 />
               </div>
             </div>

@@ -34,7 +34,7 @@ public record PolicyBundle(
                     case BALANCED -> "BALANCED";
                 },
                 allowedProviders == null || allowedProviders.isEmpty()
-                        ? List.of("gemini", "groq", "mock") : allowedProviders,
+                        ? List.of("gemini", "groq") : allowedProviders,
                 3,
                 mode == AutopilotMode.LOW_LATENCY ? 500 : 900,
                 1,

@@ -78,6 +78,10 @@ public class DeveloperGatewayController {
                     .body(Map.of("error", "request_blocked", "message", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "invalid_request", "message", e.getMessage()));
+        } catch (GatewayService.SetupException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", e instanceof GatewayService.NoProviderException ? "no_provider" : "not_set_up",
+                            "message", e.getMessage()));
         } catch (GatewayService.GatewayException e) {
             // Upstream providers failed — generic 502, no provider internals leaked.
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)

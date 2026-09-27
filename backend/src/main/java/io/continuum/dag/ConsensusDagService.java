@@ -128,8 +128,24 @@ public class ConsensusDagService {
                 "V6 consensus DAG %s: %d claims, %d verifiers, confidence %.1f%% (%s uncertainty)",
                 workflowId, result.plan().claims().size(), result.verifiers().size(),
                 result.finalConfidence() * 100, result.uncertainty());
-        return new GatewayDtos.ChatResponse(result.answer(), "continuum", "consensus-dag-v6",
-                totalMs, result.totalTokens(), result.totalCostUsd(), 0, reason);
+        // The caller gets the answer. The verification narrative (claims,
+        // posteriors, verifier notes) is for the console's DAG view, where it is
+        // kept with the run; appended to the answer it reached end users as a
+        // wall of debugging text.
+        String answer = answerOnly(result.answer());
+        boolean unverified = result.finalConfidence() < 0.5;
+        return new GatewayDtos.ChatResponse(answer, "continuum", "consensus-dag-v6",
+                totalMs, result.totalTokens(), result.totalCostUsd(), 0, reason,
+                result.finalConfidence(), unverified, null, null, null, null, "stop");
+    }
+
+    /** The synthesis text up to the verification summary it ends with. */
+    static String answerOnly(String synthesis) {
+        if (synthesis == null) {
+            return "";
+        }
+        int cut = synthesis.indexOf("— Verification summary");
+        return (cut < 0 ? synthesis : synthesis.substring(0, cut)).trim();
     }
 
     private WorkflowInstanceEntity awaitCompletion(String workflowId) {

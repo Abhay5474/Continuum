@@ -253,7 +253,7 @@ public class DigitalTwinSimulator {
                 .filter(p -> !order.contains(p))
                 .sorted()
                 .forEach(order::add);
-        return order.isEmpty() ? List.of("mock") : order;
+        return order.isEmpty() ? List.of("gemini", "groq") : order;
     }
 
     /** The caller's own bundle; another tenant's policy is not something to replay. */

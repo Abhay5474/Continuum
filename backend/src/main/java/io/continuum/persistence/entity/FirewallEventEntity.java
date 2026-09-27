@@ -35,6 +35,10 @@ public class FirewallEventEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** The text the event was about, secrets already replaced by placeholders. */
+    @Column(name = "excerpt", columnDefinition = "text")
+    private String excerpt;
+
     protected FirewallEventEntity() {
     }
 
@@ -56,4 +60,10 @@ public class FirewallEventEntity {
     public int getMatchCount() { return matchCount; }
     public String getDetail() { return detail; }
     public Instant getCreatedAt() { return createdAt; }
+    public String getExcerpt() { return excerpt; }
+
+    public FirewallEventEntity withExcerpt(String excerpt) {
+        this.excerpt = excerpt;
+        return this;
+    }
 }

@@ -8,8 +8,8 @@ import java.util.List;
 @ConfigurationProperties(prefix = "continuum.llm")
 public class LlmProperties {
 
-    /** Ordered failover chain by provider name, e.g. [gemini, groq, mock]. */
-    private List<String> failoverOrder = List.of("gemini", "groq", "mock");
+    /** Ordered failover chain by provider name, e.g. [gemini, groq]. */
+    private List<String> failoverOrder = List.of("gemini", "groq");
 
     // Last-resort names, used only when nothing is configured and the catalogue
     // has no usable model yet. The catalogue decides the real default.

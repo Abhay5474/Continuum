@@ -1,5 +1,10 @@
 # Answer Confidence — semantic uncertainty
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #2 · **Migration:** `V20__semantic_uncertainty.sql`
 **Research:** [Farquhar, Kossen, Kuhn & Gal, *Detecting hallucinations in large language models using semantic entropy*](https://www.nature.com/articles/s41586-024-07421-0) (Nature, 2024)
 

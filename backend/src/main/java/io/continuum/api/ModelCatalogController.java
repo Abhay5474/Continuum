@@ -194,7 +194,7 @@ public class ModelCatalogController {
         } else {
             free = "UNKNOWN";
         }
-        v.put("free", "mock".equals(m.getProvider()) ? "BUILT_IN" : free);
+        v.put("free", free);
         return v;
     }
 

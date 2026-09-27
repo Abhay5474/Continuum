@@ -47,7 +47,7 @@ import java.util.concurrent.Executors;
  * <ul>
  *   <li><b>passthrough</b> — nothing downstream needs the finished answer, so
  *       tokens are streamed as the provider produces them (Groq and Gemini
- *       over server-sent events; the mock a few words at a time). An answer
+ *       over server-sent events). An answer
  *       that arrives whole anyway — from the cache, or with tool calls — is
  *       sent in pieces once it is complete.</li>
  *   <li><b>buffered</b> — a post-generation feature is enabled, so the pipeline
@@ -315,6 +315,11 @@ public class OpenAiCompatController {
         if (e instanceof io.continuum.scheduling.SchedulerService.DeadlineUnreachableException) {
             return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(OpenAiDtos.ErrorEnvelope.of("invalid_request_error", message, "deadline_unreachable"));
+        }
+        if (e instanceof io.continuum.gateway.GatewayService.SetupException) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(OpenAiDtos.ErrorEnvelope.of("api_error", message,
+                            e instanceof io.continuum.gateway.GatewayService.NoProviderException ? "no_provider" : "not_set_up"));
         }
         var failed = ResponseEntity.status(HttpStatus.BAD_GATEWAY);
         if (e instanceof io.continuum.gateway.GatewayService.GatewayException g && g.requestId != null) {

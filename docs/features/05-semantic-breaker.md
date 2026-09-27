@@ -1,5 +1,10 @@
 # Semantic Breaker — trip on quality, not on errors
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #4 · **Migration:** `V22__semantic_breaker.sql`
 **Default: OFF.**
 **Research:** [Chen, Zaharia & Zou, *How is ChatGPT's behavior changing over time?*](https://arxiv.org/abs/2307.09009) (HDSR 2024),

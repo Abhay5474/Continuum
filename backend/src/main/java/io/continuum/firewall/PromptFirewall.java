@@ -25,21 +25,78 @@ import java.util.regex.Pattern;
  */
 public final class PromptFirewall {
 
-    /** One category of sensitive content and how to find it. */
+    /**
+     * One category of sensitive content and how to find it. {@code valueGroup}
+     * is the regex group holding the secret itself; 0 means the whole match.
+     * Context patterns ("my pin is 7849") redact only the value, so the reader
+     * of the sanitised prompt still knows a PIN was there.
+     */
     public enum PiiType {
-        EMAIL("\\b[\\w.+-]+@[\\w-]+\\.[a-z]{2,}\\b"),
-        CREDIT_CARD("\\b(?:\\d[ -]*?){13,16}\\b"),
-        SSN("\\b\\d{3}-\\d{2}-\\d{4}\\b"),
-        PHONE("\\b(?:\\+?\\d{1,3}[ -]?)?\\(?\\d{3}\\)?[ -]?\\d{3}[ -]?\\d{4}\\b"),
-        IP_ADDRESS("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"),
-        API_KEY("\\b(?:sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|cnt_live_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{20,})\\b"),
-        JWT("\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b");
+        EMAIL("\\b[\\w.+-]+@[\\w-]+\\.[a-z]{2,}\\b", 0),
+        // A number called a card or account number is one, checksum or not: a
+        // made-up or mistyped card number is still one the user meant to share.
+        CARD_NUMBER("(?i)\\b(?:card|credit|debit|account|acct|a/c)\\b[^\\d\\n]{0,30}?(\\d(?:[ -]?\\d){7,22})", 1),
+        CREDIT_CARD("\\b(?:\\d[ -]*?){13,16}\\b", 0),
+        // PINs, passwords, CVVs and one-time codes, named in the sentence.
+        CREDENTIAL("(?i)\\b(?:pin|password|passcode|passwd|pwd|cvv|cvc|cvv2|otp|one[- ]time (?:code|password)|security code)"
+                + "\\b(?:\\s*(?:number|no\\.?|code))?\\s*(?:is|was|=|:|-)?\\s*[\"']?([^\\s,;\"']{3,64})", 1),
+        SSN("\\b\\d{3}-\\d{2}-\\d{4}\\b", 0),
+        PHONE("\\b(?:\\+?\\d{1,3}[ -]?)?\\(?\\d{3}\\)?[ -]?\\d{3}[ -]?\\d{4}\\b", 0),
+        IP_ADDRESS("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", 0),
+        API_KEY("\\b(?:sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|cnt_live_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{20,})\\b", 0),
+        JWT("\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b", 0);
 
         final Pattern pattern;
+        final int valueGroup;
 
-        PiiType(String regex) {
+        PiiType(String regex, int valueGroup) {
             this.pattern = Pattern.compile(regex);
+            this.valueGroup = valueGroup;
         }
+    }
+
+    /** What the outbound scan looks for: secrets a model might echo back, not ordinary prose. */
+    private static final List<PiiType> OUTBOUND = List.of(
+            PiiType.API_KEY, PiiType.JWT, PiiType.SSN, PiiType.CARD_NUMBER, PiiType.CREDIT_CARD, PiiType.CREDENTIAL);
+
+    /**
+     * Replaces each finding of {@code types} with a typed placeholder and counts
+     * them. The value alone is replaced for context patterns. A text that is
+     * already a placeholder is left alone, so a second pass changes nothing.
+     */
+    static String redact(String text, List<PiiType> types, boolean redact, List<Match> found) {
+        String out = text;
+        for (PiiType type : types) {
+            Matcher m = type.pattern.matcher(out);
+            StringBuilder sb = new StringBuilder();
+            int count = 0;
+            int last = 0;
+            while (m.find()) {
+                int start = type.valueGroup > 0 ? m.start(type.valueGroup) : m.start();
+                int end = type.valueGroup > 0 ? m.end(type.valueGroup) : m.end();
+                String value = out.substring(start, end);
+                if (value.startsWith("[REDACTED_")) {
+                    continue;
+                }
+                if (type == PiiType.CREDIT_CARD && !luhnValid(value)) {
+                    continue; // avoid flagging arbitrary long digit runs with no context
+                }
+                if (type == PiiType.CREDENTIAL && !statedAsValue(out.substring(m.start(), start), value)) {
+                    continue; // "what is a pin code used for" names a PIN; it does not give one
+                }
+                count++;
+                sb.append(out, last, start).append("[REDACTED_").append(type.name()).append(']');
+                last = end;
+            }
+            if (count > 0) {
+                found.add(new Match(type.name(), count));
+                if (redact) {
+                    sb.append(out.substring(last));
+                    out = sb.toString();
+                }
+            }
+        }
+        return out;
     }
 
     /** Prompt-injection / jailbreak signatures with a severity weight in [0,1]. */
@@ -79,29 +136,8 @@ public final class PromptFirewall {
         if (text == null || text.isBlank()) {
             return new InboundResult(text, List.of(), 0, false, List.of());
         }
-        String sanitized = text;
         List<Match> redactions = new ArrayList<>();
-        for (PiiType type : PiiType.values()) {
-            Matcher m = type.pattern.matcher(sanitized);
-            int count = 0;
-            StringBuilder sb = new StringBuilder();
-            while (m.find()) {
-                if (type == PiiType.CREDIT_CARD && !luhnValid(m.group())) {
-                    continue; // avoid flagging arbitrary long digit runs
-                }
-                count++;
-                if (redact) {
-                    m.appendReplacement(sb, "[REDACTED_" + type.name() + "]");
-                }
-            }
-            if (redact) {
-                m.appendTail(sb);
-                sanitized = sb.toString();
-            }
-            if (count > 0) {
-                redactions.add(new Match(type.name(), count));
-            }
-        }
+        String sanitized = redact(text, List.of(PiiType.values()), redact, redactions);
 
         double injectionScore = 0;
         List<String> hits = new ArrayList<>();
@@ -121,31 +157,16 @@ public final class PromptFirewall {
         if (text == null || text.isBlank()) {
             return new OutboundResult(text, List.of());
         }
-        String sanitized = text;
         List<Match> redactions = new ArrayList<>();
-        // Only the high-confidence secret categories on the way out (avoid mangling normal prose).
-        for (PiiType type : List.of(PiiType.API_KEY, PiiType.JWT, PiiType.SSN, PiiType.CREDIT_CARD)) {
-            Matcher m = type.pattern.matcher(sanitized);
-            int count = 0;
-            StringBuilder sb = new StringBuilder();
-            while (m.find()) {
-                if (type == PiiType.CREDIT_CARD && !luhnValid(m.group())) {
-                    continue;
-                }
-                count++;
-                if (redact) {
-                    m.appendReplacement(sb, "[REDACTED_" + type.name() + "]");
-                }
-            }
-            if (redact) {
-                m.appendTail(sb);
-                sanitized = sb.toString();
-            }
-            if (count > 0) {
-                redactions.add(new Match(type.name(), count));
-            }
-        }
+        String sanitized = redact(text, OUTBOUND, redact, redactions);
         return new OutboundResult(sanitized, redactions);
+    }
+
+    private static final Pattern STATED = Pattern.compile("(?i)(?:\\bis|\\bwas|=|:)\\s*[\"']?$");
+
+    /** A credential is given when its value has a digit, or follows "is", ":" or "=". */
+    private static boolean statedAsValue(String lead, String value) {
+        return value.chars().anyMatch(Character::isDigit) || STATED.matcher(lead).find();
     }
 
     /** Luhn checksum — filters out non-card digit strings so we don't over-redact. */

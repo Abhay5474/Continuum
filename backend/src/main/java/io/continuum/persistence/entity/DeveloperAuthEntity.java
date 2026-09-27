@@ -33,7 +33,7 @@ public class DeveloperAuthEntity {
 
     /**
      * When true (default), the gateway prefers this developer's own provider keys
-     * and falls back to the platform/mock only if they fail. When false, requests
+     * and falls back to the platform keys only if they fail. When false, requests
      * run on the platform's global keys.
      */
     @Column(name = "use_own_keys_primary", nullable = false)

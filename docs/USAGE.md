@@ -250,7 +250,7 @@ LLM calls go through a provider-agnostic model (`Message`/`LlmRequest`/
 
 ```bash
 curl -s localhost:8080/api/meta | jq .providerFailoverChain
-# e.g. ["gemini","groq","mock"]
+# e.g. ["gemini","groq"]
 
 # Force the primary down → the next LLM call transparently fails over to Groq
 curl -s -X POST "localhost:8080/api/chaos/provider-down?down=true"

@@ -149,6 +149,19 @@ public final class OpenAiDtos {
             @JsonProperty("system_fingerprint") String systemFingerprint,
             /** Everything the console shows that the OpenAI shape has no room for. */
             @JsonProperty("continuum") ContinuumMeta continuumMeta) {
+
+        /**
+         * The answer as plain text, beside {@code choices}. A client written for
+         * Continuum's own endpoint reads {@code response}; without this it read
+         * {@code undefined} here and showed that to its user.
+         */
+        public String getResponse() {
+            if (choices == null || choices.isEmpty() || choices.get(0).message() == null) {
+                return null;
+            }
+            Object content = choices.get(0).message().content();
+            return content instanceof String text ? text : null;
+        }
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

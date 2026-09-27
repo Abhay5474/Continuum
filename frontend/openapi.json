@@ -258,6 +258,15 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "choices" : {
+            "items" : {
+              "additionalProperties" : {
+                "type" : "object"
+              },
+              "type" : "object"
+            },
+            "type" : "array"
+          },
           "completionTokens" : {
             "format" : "int32",
             "type" : "integer"

@@ -49,7 +49,7 @@ development zero-config.
 | `GEMINI_MODEL` | `gemini-3.5-flash` | See Gemini model options below |
 | `GROQ_API_KEY` | _(empty)_ | Enables the Groq adapter |
 | `GROQ_MODEL` | `llama-3.3-70b-versatile` | See Groq model options below |
-| `LLM_FAILOVER_ORDER` | `gemini,groq,mock` | Comma-separated failover chain |
+| `LLM_FAILOVER_ORDER` | `gemini,groq` | Comma-separated failover chain |
 
 **Gemini model options** (`GEMINI_MODEL`):
 
@@ -67,9 +67,11 @@ development zero-config.
 | `llama-3.3-70b-versatile` | **Default.** Latest high-quality general-purpose model |
 | `llama-3.1-8b-instant` | Fastest, lowest cost for high-volume tasks |
 
-If no API keys are set, the always-available **mock provider** is used, so the
-system is fully functional and demoable with zero keys. To demonstrate real
-failover, configure both Gemini and Groq.
+At least one provider key is needed for chat: with none, gateway requests
+return `503 {"error":"no_provider"}` saying which keys to add (the workflow
+engine, console and everything else still run). Developers can also bring
+their own keys under API Keys & Providers. To demonstrate real failover,
+configure both Gemini and Groq.
 
 ### Engine tuning (optional)
 
@@ -191,6 +193,6 @@ VITE_API_BASE=https://api.example.com npm run build
 
 - [ ] PostgreSQL reachable; credentials set (`DATABASE_URL` or the three vars).
 - [ ] Outbound network egress allowed to provider APIs (if using real LLMs).
-- [ ] `GEMINI_API_KEY` / `GROQ_API_KEY` set (optional; mock works without).
+- [ ] `GEMINI_API_KEY` / `GROQ_API_KEY` set (at least one, or developers add their own keys).
 - [ ] `VITE_API_BASE` points at the deployed API for the dashboard.
 - [ ] `GET /actuator/health` returns `UP` after first boot (Flyway migration ran).

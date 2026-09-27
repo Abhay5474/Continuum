@@ -1,5 +1,10 @@
 # Quality Gate — check the answer against the request
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #3 · **Migration:** `V21__quality_gate.sql`
 **Default: OFF.** Like every feature on this roadmap.
 **Research:** [Zheng et al., *Judging LLM-as-a-Judge*](https://arxiv.org/abs/2306.05685) (NeurIPS 2023),

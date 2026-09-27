@@ -79,7 +79,7 @@ function statusOf(m: Model): { label: string; tone: Tone } {
   if (m.kind !== "CHAT" && m.status === "ACTIVE") return { label: m.kind === "ALIAS" ? "alias" : "not for chat", tone: "mute" };
   switch (m.status) {
     case "ACTIVE":
-      return m.verifiedAt || m.provider === "mock" ? { label: "in use", tone: "ok" } : { label: "assumed", tone: "info" };
+      return m.verifiedAt ? { label: "in use", tone: "ok" } : { label: "assumed", tone: "info" };
     case "DISCOVERED":
     case "TESTING":
       return { label: "waiting for a test", tone: "info" };
@@ -219,10 +219,14 @@ export default function Models() {
   }, [models, filter, q]);
 
   const byProvider = useMemo(() => {
+    // Only providers this deployment has. Earlier versions shipped built-in
+    // demo models; their retired rows are not a provider anyone can use.
+    const known = new Set((data?.providers ?? []).map((p) => p.provider));
     const g = new Map<string, Model[]>();
-    shown.forEach((m) => g.set(m.provider, [...(g.get(m.provider) ?? []), m]));
+    shown.filter((m) => known.size === 0 || known.has(m.provider))
+      .forEach((m) => g.set(m.provider, [...(g.get(m.provider) ?? []), m]));
     return g;
-  }, [shown]);
+  }, [shown, data]);
 
   const lastRun = check?.lastRun;
   const anyConfigured = (data?.providers ?? []).some((p) => p.configured);
@@ -318,7 +322,7 @@ export default function Models() {
             ) : (
               [...byProvider.entries()].map(([provider, list]) => (
                 <div key={provider} className="space-y-1.5">
-                  <div className="micro">{provider === "mock" ? "Built-in demo models" : data.providers.find((x) => x.provider === provider)?.label ?? provider}</div>
+                  <div className="micro">{data.providers.find((x) => x.provider === provider)?.label ?? provider}</div>
                   <ModelTable
                     models={list}
                     defaultModel={data.providers.find((x) => x.provider === provider)?.defaultModel ?? null}

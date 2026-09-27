@@ -10,7 +10,7 @@ import io.continuum.provider.model.LlmResponse;
  */
 public interface LlmProvider {
 
-    /** Stable provider id, e.g. "gemini", "groq", "mock". */
+    /** Stable provider id, e.g. "gemini", "groq". */
     String name();
 
     /** Whether this provider is usable (e.g. an API key is configured). */

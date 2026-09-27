@@ -9,7 +9,7 @@ import java.util.Map;
  *
  * <p>Continuum already explains itself — in a string. {@code routingReason}
  * accumulates fragments like {@code "mode=BALANCED, complexity=0.00, low
- * complexity → cheaper model → mock/mock-small · quality 0.55 (repair) ·
+ * complexity → cheaper model → groq/openai/gpt-oss-20b · quality 0.55 (repair) ·
  * confidence 0.82 over 4 samples"}. That is readable and useless: nothing can
  * aggregate it, alert on it, or answer "how often did the cascade escalate last
  * Tuesday, and what did it cost?"

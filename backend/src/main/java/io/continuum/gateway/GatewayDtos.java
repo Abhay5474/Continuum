@@ -156,6 +156,22 @@ public final class GatewayDtos {
              */
             String requestId) {
 
+        /**
+         * The answer in OpenAI's shape too ({@code choices[0].message.content}),
+         * beside {@code response}. Most client code is written for that shape;
+         * pointed here it read {@code undefined} and showed that to its user.
+         */
+        public java.util.List<java.util.Map<String, Object>> getChoices() {
+            java.util.Map<String, Object> message = new java.util.LinkedHashMap<>();
+            message.put("role", "assistant");
+            message.put("content", response);
+            java.util.Map<String, Object> choice = new java.util.LinkedHashMap<>();
+            choice.put("index", 0);
+            choice.put("message", message);
+            choice.put("finish_reason", finishReason == null ? "stop" : finishReason);
+            return java.util.List.of(choice);
+        }
+
         public ChatResponse(String response, String provider, String model, long latency, int tokens,
                             double cost, int failovers, String routingReason, Double confidence,
                             Boolean lowConfidence, Integer agreementClusters, List<ToolCallRef> toolCalls,

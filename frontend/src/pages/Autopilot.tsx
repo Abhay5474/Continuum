@@ -374,7 +374,7 @@ function Wizard({ onEnable, onCancel, busy }: {
   const [mode, setMode] = useState("BALANCED");
   const [maxCost, setMaxCost] = useState(0.02);
   const [maxLatency, setMaxLatency] = useState(5000);
-  const [providers, setProviders] = useState<string[]>(["gemini", "groq", "mock"]);
+  const [providers, setProviders] = useState<string[]>(["gemini", "groq"]);
 
   const toggleProvider = (p: string) =>
     setProviders((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
@@ -422,7 +422,7 @@ function Wizard({ onEnable, onCancel, busy }: {
         <div className="mt-4 space-y-3">
           <div className="text-sm text-slate-300">Which providers may Autopilot use?</div>
           <div className="flex flex-wrap gap-2">
-            {["gemini", "groq", "mock"].map((p) => (
+            {["gemini", "groq"].map((p) => (
               <button key={p} onClick={() => toggleProvider(p)}
                 className={`rounded-md px-3 py-1.5 text-sm capitalize ${providers.includes(p) ? "bg-[color:var(--accent-strong)] text-white" : "border border-edge"}`}>
                 {p}

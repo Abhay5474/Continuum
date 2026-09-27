@@ -1,5 +1,10 @@
 # Model Cascade — verify then escalate
 
+> **Note:** the live runs below were recorded against a built-in mock provider
+> that has since been removed; Continuum now always answers with a real
+> provider (Groq or Gemini). The mechanisms described are unchanged.
+
+
 **Status:** shipped · **Ranked feature:** #1 · **Migration:** `V19__response_cascade.sql`
 **Research:** [FrugalGPT](https://arxiv.org/abs/2305.05176) (Chen, Zaharia & Zou, Stanford 2023),
 [UCCI](https://arxiv.org/abs/2605.18796) (2026), [Semantic Agreement](https://arxiv.org/pdf/2509.21837) (2025)
