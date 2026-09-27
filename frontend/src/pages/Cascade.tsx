@@ -1,3 +1,4 @@
+import { dateTimeOf } from "../system/time";
 import { useCallback, useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
@@ -19,6 +20,8 @@ import {
   Stage,
   Stat,
   Stats,
+  RecordPanel,
+  Field,
 } from "../system/hub";
 import { BeforeAfter } from "../system/charts";
 import { Select } from "../system/controls";
@@ -85,6 +88,7 @@ export default function Cascade() {
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<any | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -489,6 +493,8 @@ export default function Cascade() {
                 return (
                   <Row
                     key={r.id}
+                    onClick={() => setOpen(r)}
+                    selected={open?.id === r.id}
                     title={r.concerns ?? "no concerns"}
                     subtitle={`${r.escalated ? r.strongModel : r.cheapModel} · $${(r.cost ?? 0).toFixed(5)} · ${r.totalLatencyMs}ms`}
                     status={
@@ -515,8 +521,28 @@ export default function Cascade() {
           )}
         </div>
       </section>
+      <RecordPanel
+        record={open}
+        title={open ? (open.escalated ? "Escalated to the strong model" : "Answered by the cheap model") : ""}
+        subtitle={open ? dateTimeOf(open.createdAt) : undefined}
+        hide={["id"]}
+        onClose={() => setOpen(null)}
+        lead={open && <Field label="What happened">{cascadeSentence(open)}</Field>}
+      />
     </div>
   );
+}
+
+function cascadeSentence(r: any): string {
+  const conf = `${Math.round((r.confidence ?? 0) * 100)}%`;
+  const bar = `${Math.round((r.threshold ?? 0) * 100)}%`;
+  let s = r.escalated
+    ? `${r.cheapModel} answered first, but the judge's confidence was ${conf}, under the ${bar} bar${r.concerns ? ` (${r.concerns})` : ""}, so ${r.strongModel} answered instead.`
+    : `${r.cheapModel} answered and the judge's confidence was ${conf}, at or over the ${bar} bar, so its answer was used and the strong model was not called.`;
+  if (r.audit) s += " This one was also sent to the strong model as an audit sample, to check the judge.";
+  if (r.agreedWithStrong === false && !r.escalated) s += " The audit found the strong model disagreed: the cheap answer should have been escalated.";
+  if (r.agreedWithStrong === true && r.escalated) s += " The two answers agreed, so this escalation cost more without changing the answer.";
+  return s;
 }
 
 /**

@@ -20,7 +20,7 @@ import {
   SidePanel,
   Stage,
   Stat,
-  Stats, Chip } from "../system/hub";
+  Stats, Chip, RecordPanel } from "../system/hub";
 
 /**
  * Context MMU — the memory space.
@@ -37,6 +37,7 @@ import {
  */
 export default function MmuProfiler() {
   const [profile, setProfile] = useState<any | null>(null);
+  const [openReq, setOpenReq] = useState<any | null>(null);
   const [busyWs, setBusyWs] = useState(false);
   const [stubs, setStubs] = useState<any[]>([]);
   const [sel, setSel] = useState<string | null>(null);
@@ -347,6 +348,21 @@ export default function MmuProfiler() {
             <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">
               Requests · newest first
             </h2>
+            <RecordPanel
+              record={openReq}
+              title={openReq ? `${openReq.tokensWithoutMmu?.toLocaleString()} → ${openReq.tokensSent?.toLocaleString()} tokens` : ""}
+              subtitle={openReq ? timeOf(openReq.createdAt) : undefined}
+              hide={["id"]}
+              onClose={() => setOpenReq(null)}
+              lead={openReq && (
+                <Field label="What happened">
+                  {`The conversation would have cost ${openReq.tokensWithoutMmu} prompt tokens; older turns were paged out to short stubs, so ${openReq.tokensSent} were sent.`}
+                  {openReq.pageFaults > 0
+                    ? ` The model referred back to ${openReq.pageFaults} paged-out turn${openReq.pageFaults > 1 ? "s" : ""}, which ${openReq.pageFaults > 1 ? "were" : "was"} brought back in, adding ${openReq.faultLatencyMs} ms.`
+                    : " Nothing paged out was needed again."}
+                </Field>
+              )}
+            />
             <div className="mt-3">
               <Rail>
                 {recent.slice(0, 14).map((r: any) => {
@@ -354,6 +370,8 @@ export default function MmuProfiler() {
                   return (
                     <Row
                       key={r.id}
+                      onClick={() => setOpenReq(r)}
+                      selected={openReq?.id === r.id}
                       title={
                         <span className="readout text-[12.5px]">
                           {r.tokensWithoutMmu.toLocaleString()} → {r.tokensSent.toLocaleString()}

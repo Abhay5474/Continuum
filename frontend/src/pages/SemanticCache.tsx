@@ -21,6 +21,8 @@ import {
   Stage,
   Stat,
   Stats,
+  RecordPanel,
+  Excerpt,
 } from "../system/hub";
 import { Select } from "../system/controls";
 
@@ -90,6 +92,7 @@ export default function SemanticCache() {
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<any | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -342,6 +345,8 @@ export default function SemanticCache() {
               {rows.map((r) => (
                 <Row
                   key={r.id}
+                  onClick={() => setOpen(r)}
+                  selected={open?.id === r.id}
                   title={r.prompt}
                   subtitle={`${r.model ?? "unknown model"} · expires ${dateTimeOf(r.expiresAt)}`}
                   meta={
@@ -367,6 +372,23 @@ export default function SemanticCache() {
           )}
         </div>
       </section>
+      <RecordPanel
+        record={open}
+        title="Stored answer"
+        subtitle={open ? `${open.provider ?? "?"}/${open.model ?? "?"} · served ${open.hitCount ?? 0}×` : undefined}
+        hide={["id", "prompt", "question", "answer"]}
+        onClose={() => setOpen(null)}
+        lead={open && (
+          <>
+            <Excerpt label="Question it answers" text={open.question ?? open.prompt} />
+            <Excerpt label="Answer it serves" text={open.answer} />
+            <p className="mt-3 text-[12px] leading-relaxed text-slate-500">
+              Any later question this close in meaning, in the same conversation context, gets this answer
+              without calling a model, until it expires.
+            </p>
+          </>
+        )}
+      />
     </div>
   );
 }

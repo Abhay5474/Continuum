@@ -34,3 +34,4 @@ export * from "./detail";
 export * from "./workspace";
 export * from "./panels";
 export * from "./sequence";
+export * from "./record";

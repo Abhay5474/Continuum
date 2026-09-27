@@ -4,7 +4,7 @@ import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Readout, Switch, Note } from "../system/primitives";
 import { ErrorState, useToast } from "../components/ui";
-import { BarList, Card, CardHead, Explain, Pill, toneInk, type Tone } from "../system/hub";
+import { BarList, Card, CardHead, Explain, Pill, toneInk, type Tone, RecordPanel, Field, openable } from "../system/hub";
 
 /**
  * Decision provenance.
@@ -358,11 +358,26 @@ function Degradation() {
     return visibleInterval(() => void load(), 5000);
   }, [load]);
 
+  const [openRung, setOpenRung] = useState<any | null>(null);
   const byRung: Record<string, number> = status?.byRung ?? {};
   const recent: any[] = status?.recent ?? [];
 
   return (
     <div className="space-y-3">
+      <RecordPanel
+        record={openRung}
+        title={openRung ? (openRung.rung === "CACHED" ? "Served a past answer" : "Nothing to serve") : ""}
+        hide={["id"]}
+        onClose={() => setOpenRung(null)}
+        lead={openRung && (
+          <Field label="What happened">
+            {openRung.rung === "CACHED"
+              ? "Every model failed for this request, so the answer to an earlier equivalent question was returned instead, marked degraded/cached."
+              : "Every model failed and there was no earlier answer to fall back on, so the caller got an honest message instead of an answer, marked degraded/static."}{" "}
+            {openRung.reason}
+          </Field>
+        )}
+      />
       <Switch
         checked={!!status?.enabled}
         busy={busy}
@@ -409,7 +424,7 @@ function Degradation() {
       {recent.length > 0 && (
         <div className="space-y-1">
           {recent.slice(0, 6).map((e, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-x-3 rounded-md border border-edge/60 px-3 py-1.5">
+            <div key={i} {...openable(() => setOpenRung(e))} className="flex cursor-pointer flex-wrap items-center gap-x-3 rounded-md border border-edge/60 px-3 py-1.5 hover:bg-slate-500/[0.055]">
               <Pill tone={e.rung === "CACHED" ? "warn" : "bad"} dot>{e.rung === "CACHED" ? "served a past answer" : "nothing to serve"}</Pill>
               <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{e.reason}</span>
             </div>

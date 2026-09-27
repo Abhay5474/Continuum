@@ -4,7 +4,7 @@ import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Note } from "../system/primitives";
 import { StackedBar, BarChart } from "../system/charts";
-import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone } from "../system/hub";
+import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone, RecordPanel, Field, openable } from "../system/hub";
 
 /**
  * Autopilot — beginner-friendly control plane UI. Reuses the developer session
@@ -13,6 +13,7 @@ import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone } fr
  */
 export default function Autopilot() {
   const [status, setStatus] = useState<any>(null);
+  const [openItem, setOpenItem] = useState<any | null>(null);
   const [recs, setRecs] = useState<any[]>([]);
   const [canary, setCanary] = useState<any[]>([]);
   const [decisions, setDecisions] = useState<any[]>([]);
@@ -217,11 +218,26 @@ export default function Autopilot() {
             </div>
           </Panel>
 
+          <RecordPanel
+            record={openItem}
+            title={openItem ? (openItem.kind === "decision" ? String(openItem.type ?? "Decision") : openItem.kind === "rollback" ? "Rollback" : `Canary · bundle ${openItem.candidateBundleId}`) : ""}
+            hide={["id", "kind"]}
+            onClose={() => setOpenItem(null)}
+            lead={openItem && (
+              <Field label="What happened">
+                {openItem.kind === "decision"
+                  ? openItem.summary
+                  : openItem.kind === "rollback"
+                    ? `${openItem.automatic ? "Autopilot rolled back on its own" : "The policy was rolled back by hand"}: ${openItem.reason ?? "no reason recorded"}.`
+                    : `Candidate policy bundle ${openItem.candidateBundleId} served ${openItem.percentage}% of traffic; status ${String(openItem.status ?? "").toLowerCase()}. It is promoted only if it does at least as well as the current policy.`}
+              </Field>
+            )}
+          />
           {/* canary status */}
           <Panel title="Canary rollouts">
             {canary.length === 0 && <div className="text-xs text-slate-500">No canary runs yet.</div>}
             {canary.slice(0, 5).map((c) => (
-              <div key={c.id} className="mb-2">
+              <div key={c.id} {...openable(() => setOpenItem({ kind: "canary", ...c }))} className="mb-2 cursor-pointer rounded hover:bg-slate-500/[0.055]">
                 <div className="flex items-center gap-2 text-sm">
                   <StatusPill status={c.status} />
                   <span>candidate v-bundle {c.candidateBundleId} @ {c.percentage}%</span>
@@ -312,7 +328,7 @@ export default function Autopilot() {
               )}
               <ol className="space-y-1 text-xs">
                 {decisions.slice(0, 12).map((d) => (
-                  <li key={d.id} className="flex gap-2">
+                  <li key={d.id} {...openable(() => setOpenItem({ kind: "decision", ...d }))} className="flex cursor-pointer gap-2 rounded hover:bg-slate-500/[0.055]">
                     <span className="w-24 shrink-0 font-mono text-slate-500">{d.type}</span>
                     <span className="text-slate-300">{d.summary}</span>
                   </li>
@@ -324,7 +340,7 @@ export default function Autopilot() {
           {rollbacks.length > 0 && (
             <Panel title="Rollback events">
               {rollbacks.slice(0, 5).map((r) => (
-                <div key={r.id} className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                <div key={r.id} {...openable(() => setOpenItem({ kind: "rollback", ...r }))} className="flex cursor-pointer flex-wrap items-center gap-2 rounded text-xs text-slate-400 hover:bg-slate-500/[0.055]">
                   <Pill tone={r.automatic ? "warn" : "info"}>{r.automatic ? "automatic" : "manual"}</Pill>
                   {r.reason}
                 </div>

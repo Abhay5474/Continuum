@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
-import { Card, CardHead, Empty, Pill, Primary, toneInk, type Tone } from "../system/hub";
+import { Card, CardHead, Empty, Pill, Primary, toneInk, type Tone, RecordPanel, Excerpt, openable } from "../system/hub";
 import { PageHeader } from "../system/primitives";
 
 const TIERS = ["WORKING", "EPISODIC", "LONG_TERM", "ARCHIVED"];
@@ -35,6 +35,7 @@ export default function Memory() {
   const [entries, setEntries] = useState<any[]>([]);
   const [retrieved, setRetrieved] = useState<any[]>([]);
   const [only, setOnly] = useState<string | null>(null);
+  const [openMem, setOpenMem] = useState<any | null>(null);
 
   const list = async () => setEntries(await api.get<any[]>(`/api/memory/${scope}`));
   const store = async () => {
@@ -180,9 +181,17 @@ export default function Memory() {
           <CardHead glyph="list" tone="blue" title="All memories"
                     sub={only ? `${entries.filter((e) => e.tier === only).length} in ${tierLabel(only)} · ${entries.length} in this scope` : `${entries.length} in this scope`} divided />
         </div>
+        <RecordPanel
+          record={openMem}
+          title={openMem ? `${tierLabel(openMem.tier)} memory` : ""}
+          subtitle={openMem ? `${openMem.accessCount ?? 0} read${openMem.accessCount === 1 ? "" : "s"}` : undefined}
+          hide={["id", "content", "embedding"]}
+          onClose={() => setOpenMem(null)}
+          lead={openMem && <Excerpt label="What is remembered" text={openMem.content} />}
+        />
         <div className="divide-y divide-edge text-sm">
           {entries.filter((e) => !only || e.tier === only).map((e) => (
-            <div key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
+            <div key={e.id} {...openable(() => setOpenMem(e))} className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 hover:bg-slate-500/[0.055]">
               <Pill tone={TIER_LOOK[e.tier]?.tone ?? "mute"}>{tierLabel(e.tier)}</Pill>
               <span className="min-w-0 flex-1 truncate">{e.content}</span>
               <span className="flex items-center gap-3" title="Salience: how much this memory matters · reads: how often it has been used">

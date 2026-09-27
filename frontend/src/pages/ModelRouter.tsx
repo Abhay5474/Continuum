@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { api } from "../api";
-import { Chip, Empty } from "../system/hub";
+import { Chip, Empty, RecordPanel, Field } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { Readout, Plane, StateDot, Meter, InfoTip } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
@@ -718,6 +718,7 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
   const diverged = comparison?.whenDiverged;
   const agreed = comparison?.whenAgreed;
   const recent: any[] = comparison?.recent ?? [];
+  const [openDec, setOpenDec] = useState<any | null>(null);
   const divergenceRate = comparison?.divergenceRate ?? 0;
 
   const pct = (v: number | null | undefined) => (v == null ? "—" : `${(v * 100).toFixed(1)}%`);
@@ -726,8 +727,27 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
       ? diverged.successRate - agreed.successRate
       : null;
 
+  const panel = (
+    <RecordPanel
+      record={openDec}
+      title={openDec ? `${openDec.chosen}${openDec.diverged ? " (override)" : ""}` : ""}
+      subtitle={openDec?.context}
+      hide={["id"]}
+      onClose={() => setOpenDec(null)}
+      lead={openDec && (
+        <Field label="What happened">
+          {openDec.diverged
+            ? `The scorer wanted ${openDec.baseline ?? "another provider"}, but the learned policy sent this request to ${openDec.chosen}${openDec.explored ? " to explore it (it is still learning how that provider does here)" : " because it has done better in this context"}.`
+            : `The learned policy agreed with the scorer and sent this request to ${openDec.chosen}.`}{" "}
+          {openDec.success ? `It answered in ${openDec.latencyMs} ms.` : "The call failed."}
+        </Field>
+      )}
+    />
+  );
+
   return (
     <section className="space-y-3">
+      {panel}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Decision ledger · learned routing against its own baseline</h2>
         <span className="micro">
@@ -786,7 +806,7 @@ function LearningLedger({ comparison, strategy }: { comparison: any; strategy?: 
             }
           >
             {recent.map((r) => (
-              <TR key={r.id}>
+              <TR key={r.id} onClick={() => setOpenDec(r)} selected={openDec?.id === r.id}>
                 <TD muted>{r.context}</TD>
                 <TD muted>{r.baseline ?? "—"}</TD>
                 <TD>

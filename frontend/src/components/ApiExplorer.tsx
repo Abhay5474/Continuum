@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { BASE, portal } from "../api";
-import { Pill } from "../system/hub";
+import { Field, Pill, RecordPanel } from "../system/hub";
 import { Input, Labelled, Select, Table, TD, TH, TR } from "../system/controls";
 import { BarChart, ChartFrame, Histogram, type Datum } from "../system/charts";
 import { dateTimeOf } from "../system/time";
@@ -245,6 +245,7 @@ export default function ApiExplorer({ issuedKey }: { issuedKey?: string }) {
 /** Your recent gateway requests, as your key saw them. */
 export function RequestLog() {
   const [rows, setRows] = useState<any[] | null>(null);
+  const [openReq, setOpenReq] = useState<any | null>(null);
   useEffect(() => {
     portal.requests(100).then(setRows).catch(() => setRows([]));
   }, []);
@@ -280,6 +281,14 @@ export function RequestLog() {
           <BarChart data={byModel} categorical />
         </ChartFrame>
       </div>
+      <RecordPanel
+        record={openReq}
+        title={openReq ? `${openReq.chosenProvider}/${openReq.chosenModel}` : ""}
+        subtitle={openReq ? dateTimeOf(openReq.createdAt) : undefined}
+        hide={["id", "routingReason"]}
+        onClose={() => setOpenReq(null)}
+        lead={openReq?.routingReason && <Field label="Why this model">{openReq.routingReason}</Field>}
+      />
       <Table
         minWidth={680}
         maxHeight={360}
@@ -295,7 +304,7 @@ export function RequestLog() {
         }
       >
         {rows.map((r) => (
-          <TR key={r.id}>
+          <TR key={r.id} onClick={() => setOpenReq(r)} selected={openReq?.id === r.id}>
             <TD>
               <span className="whitespace-nowrap text-slate-400">{dateTimeOf(r.createdAt)}</span>
             </TD>

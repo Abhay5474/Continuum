@@ -223,6 +223,11 @@ public class SemanticCacheService {
                             ? e.getPromptText().substring(0, 160) + "…" : e.getPromptText());
                     m.put("model", e.getModel());
                     m.put("provider", e.getProvider());
+                    // What a stored entry is, for the console's detail view:
+                    // the question as it was filed (already past the firewall)
+                    // and the answer it will be served.
+                    m.put("question", clip(e.getPromptText(), 2000));
+                    m.put("answer", clip(e.getResponse(), 2000));
                     m.put("tokens", e.getTokens());
                     m.put("hitCount", e.getHitCount());
                     m.put("createdAt", e.getCreatedAt());
@@ -230,6 +235,10 @@ public class SemanticCacheService {
                     return m;
                 })
                 .toList();
+    }
+
+    private static String clip(String s, int max) {
+        return s == null || s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
     private SemanticCacheSettingEntity load(String developerId) {

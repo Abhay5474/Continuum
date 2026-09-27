@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import { Chip, Empty, Pill, Segmented, Stat, Stats, type Tone } from "../system/hub";
+import { Chip, Empty, Pill, Segmented, Stat, Stats, type Tone, RecordPanel, Field, openable } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { StackedBar, type Datum } from "../system/charts";
 import { Input, Select, Table, TD, TH, TR } from "../system/controls";
@@ -126,6 +126,7 @@ export default function Models() {
   const toast = useToast();
   const { operator } = useOperator();
   const [data, setData] = useState<Catalog | null>(null);
+  const [openEv, setOpenEv] = useState<any | null>(null);
   const [events, setEvents] = useState<ModelEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("chat");
@@ -339,8 +340,15 @@ export default function Models() {
               <p className="text-sm text-slate-500">Nothing yet. Changes appear here after a check: models added, verified, missing, retired and replaced.</p>
             ) : (
               <ol className="plane divide-y divide-edge/50 overflow-hidden">
+                <RecordPanel
+                  record={openEv}
+                  title={openEv ? `${openEv.type.toLowerCase().replace(/_/g, " ")}${openEv.model ? ` · ${openEv.model}` : ""}` : ""}
+                  hide={["id"]}
+                  onClose={() => setOpenEv(null)}
+                  lead={openEv?.detail && <Field label="What happened">{openEv.detail}</Field>}
+                />
                 {events.slice(0, 40).map((e, i) => (
-                  <li key={e.id} className="rise-in flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
+                  <li key={e.id} {...openable(() => setOpenEv(e))} className="rise-in flex cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-slate-500/[0.055]" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
                     <span className="w-24 shrink-0 text-[11.5px] text-slate-500">{ago(e.createdAt)}</span>
                     <Pill tone={EVENT_TONE[e.type] ?? "mute"}>{e.type.toLowerCase().replace(/_/g, " ")}</Pill>
                     {e.model && <span className="font-mono text-[12px] text-slate-300">{e.model}</span>}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
-import { Card, Empty, Pill, type Tone } from "../system/hub";
+import { Card, Empty, Field, Pill, RecordPanel, openable, type Tone } from "../system/hub";
 import { Gauge } from "../system/viz";
 import { PageHeader, Readout, Switch } from "../system/primitives";
 import { ErrorState, SkeletonRows, useToast } from "../components/ui";
@@ -55,6 +55,7 @@ export default function BreakerPage() {
   const [events, setEvents] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<any | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -239,7 +240,8 @@ export default function BreakerPage() {
         ) : (
           <div className="divide-y divide-edge/40">
             {events.map((e) => (
-              <div key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 text-xs">
+              <div key={e.id} {...openable(() => setOpen(e))}
+                className="flex cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 text-xs hover:bg-slate-500/[0.055]">
                 <Pill tone={kindTone(e.kind)} dot>{String(e.kind).toLowerCase().replace("_", " ")}</Pill>
                 <span className="shrink-0 text-slate-300">
                   {e.provider}/{e.model}
@@ -251,9 +253,26 @@ export default function BreakerPage() {
           </div>
         )}
       </section>
+      <RecordPanel
+        record={open}
+        title={open ? `${open.provider}/${open.model}` : ""}
+        subtitle={open ? `${String(open.kind).toLowerCase().replace("_", " ")} · ${dateTimeOf(open.createdAt)}` : undefined}
+        hide={["id"]}
+        onClose={() => setOpen(null)}
+        lead={open && <Field label="What happened">{KIND_SENTENCE[open.kind] ?? open.detail}</Field>}
+      />
     </div>
   );
 }
+
+const KIND_SENTENCE: Record<string, string> = {
+  TRIPPED: "This model's answers scored below its own baseline for long enough, so the breaker opened and traffic went to the next model in the chain.",
+  REOPENED: "The probe answer after cool-down was still poor, so the model was taken out of rotation again.",
+  PROBES_PAUSED: "Probing was paused: there was not enough traffic to test the model safely.",
+  PROBES_STOPPED: "Probing stopped after repeated failures; the model stays out of rotation until you reset it.",
+  HALF_OPEN: "The cool-down ended; one request was let through to test whether the model has recovered.",
+  RECOVERED: "The probe answer scored back at baseline, so the model is serving traffic again.",
+};
 
 function kindTone(kind: string): Tone {
   return kind === "TRIPPED" || kind === "REOPENED" ? "bad" : kind === "RECOVERED" ? "ok" : "warn";

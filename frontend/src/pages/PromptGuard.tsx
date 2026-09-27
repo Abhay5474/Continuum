@@ -21,7 +21,10 @@ import {
   Segmented,
   Stage,
   Stat,
-  Stats, Chip } from "../system/hub";
+  Stats, Chip,
+  RecordPanel,
+  Excerpt,
+  Field } from "../system/hub";
 
 /**
  * Prompt Guard — the two things that sit between a prompt and the model.
@@ -60,6 +63,37 @@ function humanise(raw: string) {
     )
     .join(" ");
 }
+
+/** One sentence for a firewall event: what it caught, and what it did about it. */
+function whatHappened(r: any): string {
+  const what = KIND_SENTENCE[r.category] ?? humanise(r.category).toLowerCase();
+  const n = r.matchCount > 1 ? `${r.matchCount} ${what}s` : `${/^[aeiou]/i.test(what) ? "An" : "A"} ${what}`;
+  const out = r.direction === "OUTBOUND";
+  switch (r.action) {
+    case "REDACTED":
+      return out
+        ? `${n} in the model's answer was hidden before the answer reached your app.`
+        : `${n} in the prompt was replaced with a placeholder before the prompt left for the provider. The provider never saw the value.`;
+    case "BLOCKED":
+      return "The prompt looked like an attempt to override the model's instructions, so it was refused and never sent to a provider.";
+    case "FLAGGED":
+      return "The prompt had signs of an instruction override, not enough to refuse it. It was sent, and logged here so you can check it.";
+    default:
+      return `${n} was seen; the firewall ${String(r.action).toLowerCase()} it.`;
+  }
+}
+
+const KIND_SENTENCE: Record<string, string> = {
+  EMAIL: "email address",
+  PHONE: "phone number",
+  SSN: "social security number",
+  CREDIT_CARD: "payment card number",
+  CARD_NUMBER: "card or account number",
+  CREDENTIAL: "PIN, password or code",
+  API_KEY: "API key",
+  JWT: "access token",
+  IP_ADDRESS: "IP address",
+};
 
 type Which = "firewall" | "compression";
 
@@ -235,6 +269,7 @@ function Firewall({
   // Whatever the firewall saw and did not act on. Named rather than left as the
   // gap between two numbers, because "it looked and was happy" is a result.
   const passed = Math.max(0, events - redacted - blocked - flagged);
+  const [open, setOpen] = useState<any | null>(null);
 
   return (
     <div className="space-y-7">
@@ -348,6 +383,8 @@ function Firewall({
                     return (
                       <Row
                         key={r.id ?? i}
+                        onClick={() => setOpen(r)}
+                        selected={open?.id != null && open.id === r.id}
                         mark={<KindMark kind={injection ? "moderation" : "extraction"} size={26} />}
                         title={humanise(r.category)}
                         status={
@@ -378,6 +415,25 @@ function Firewall({
               )}
             </div>
           </section>
+          <RecordPanel
+            record={open}
+            title={open ? humanise(open.category) : ""}
+            subtitle={open ? `${String(open.action).toLowerCase()} · ${dateTimeOf(open.createdAt)}` : undefined}
+            mark={open ? <KindMark kind={String(open.category).includes("INJECTION") ? "moderation" : "extraction"} size={30} /> : undefined}
+            hide={["id", "excerpt", "detail"]}
+            onClose={() => setOpen(null)}
+            lead={open && (
+              <>
+                <Field label="What happened">{whatHappened(open)}</Field>
+                <Excerpt
+                  label={open.direction === "OUTBOUND" ? "The answer, as returned" : "The prompt, as the provider saw it"}
+                  text={open.excerpt}
+                  empty="This event was logged before Continuum kept an excerpt. New events show the text with what was caught hidden."
+                />
+                {open.detail && <Field label="Detail">{open.detail}</Field>}
+              </>
+            )}
+          />
         </>
       )}
     </div>

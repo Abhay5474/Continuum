@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { api } from "../api";
-import { BarList, Chip, Pill } from "../system/hub";
+import { BarList, Chip, Pill, RecordPanel, Field, openable } from "../system/hub";
 import { Gauge } from "../system/viz";
 
 const human = (t: string) => t.charAt(0) + t.slice(1).toLowerCase().replace(/_/g, " ");
@@ -32,6 +32,7 @@ interface Metrics {
 
 export default function AiChaosLab() {
   const [state, setState] = useState<AiChaosState | null>(null);
+  const [openEv, setOpenEv] = useState<any | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [events, setEvents] = useState<any[]>([]);
 
@@ -147,9 +148,22 @@ export default function AiChaosLab() {
 
       <div className="card rounded-lg border border-edge bg-panel">
         <div className="border-b border-edge px-4 py-2 font-medium">Recent injections</div>
+        <RecordPanel
+          record={openEv}
+          title={openEv ? human(String(openEv.failureType ?? "")) : ""}
+          subtitle={openEv?.workflowId ? `run ${String(openEv.workflowId).slice(0, 8)}` : undefined}
+          hide={["id"]}
+          onClose={() => setOpenEv(null)}
+          lead={openEv && (
+            <Field label="What happened">
+              Chaos Lab deliberately corrupted this model call ({human(String(openEv.failureType ?? "")).toLowerCase()}), so you can see how the
+              workflow and the answer checks cope with a bad answer. {openEv.detail}
+            </Field>
+          )}
+        />
         <div className="divide-y divide-edge text-sm">
           {events.map((e) => (
-            <div key={e.id} className="flex items-center gap-3 px-4 py-2">
+            <div key={e.id} {...openable(() => setOpenEv(e))} className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-slate-500/[0.055]">
               <Pill tone="bad">{human(String(e.failureType ?? ""))}</Pill>
               <span className="font-mono text-xs text-slate-400">{(e.workflowId || "").slice(0, 8)}</span>
               <span className="text-xs text-slate-400">{e.detail}</span>

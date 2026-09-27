@@ -335,7 +335,7 @@ public class GatewayService {
             firewalled = true;
             GatewayDtos.ChatResponse verified = null;
             try {
-                verified = consensusDag.run(developerId, req, lastUserContent(canonical));
+                verified = consensusDag.run(developerId, req, conversationPrompt(canonical));
             } catch (Exception e) {
                 log.warn("V6 DAG run failed for {}, falling back to legacy path: {}",
                         developerId, e.getMessage());
@@ -401,7 +401,7 @@ public class GatewayService {
         // again. Placed after the firewall so a cached prompt is already
         // redacted, and before routing/paging/compression — all of which exist
         // to serve the call we are about to skip.
-        String cacheKey = lastUserContent(canonical);
+        String cacheKey = cacheKeyOf(canonical);
         if (semanticCache.enabledFor(developerId)) {
             var hit = semanticCache.lookup(developerId, cacheKey, req.model());
             metrics.cache(hit.isPresent());

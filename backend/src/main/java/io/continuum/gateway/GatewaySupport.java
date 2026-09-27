@@ -80,4 +80,83 @@ public final class GatewaySupport {
         }
         return null;
     }
+
+    /**
+     * What a verification run is asked: the last user message, with the
+     * conversation before it when there is one.
+     *
+     * <p>The verification engine used to be given only the last user message,
+     * so a follow-up ("and what about a bird?") was verified with no idea what
+     * came before, and the system prompt was dropped as well.
+     */
+    public static String conversationPrompt(LlmRequest canonical) {
+        String last = lastUserContent(canonical);
+        if (!hasEarlierTurns(canonical)) {
+            return last;
+        }
+        return transcript(canonical, 12, 6000)
+                + "\n\nAnswer the last user message, using the conversation above as context.";
+    }
+
+    /**
+     * The key a cached answer is filed under, or null when the request must not
+     * be answered from the cache.
+     *
+     * <p>It used to be the last user message alone, so the same follow-up in two
+     * different conversations ("and for a bird?") got whichever answer was stored
+     * first. The whole conversation is the key now. Requests with tools or images
+     * are not cached: the answer depends on what is not in the text.
+     */
+    public static String cacheKeyOf(LlmRequest canonical) {
+        if (canonical.tools() != null && !canonical.tools().isEmpty()) {
+            return null;
+        }
+        for (Message m : canonical.messages()) {
+            if (m.images() != null && !m.images().isEmpty()) {
+                return null;
+            }
+        }
+        if (!hasEarlierTurns(canonical)) {
+            return lastUserContent(canonical);
+        }
+        return transcript(canonical, Integer.MAX_VALUE, Integer.MAX_VALUE);
+    }
+
+    /** A system prompt or an earlier turn before the last user message. */
+    static boolean hasEarlierTurns(LlmRequest canonical) {
+        int users = 0;
+        for (Message m : canonical.messages()) {
+            if (m.role() == io.continuum.provider.model.Role.USER) {
+                users++;
+            } else {
+                return true;
+            }
+        }
+        return users > 1;
+    }
+
+    /** The last {@code maxMessages} messages as "role: text" lines, newest kept when over {@code maxChars}. */
+    static String transcript(LlmRequest canonical, int maxMessages, int maxChars) {
+        List<Message> all = canonical.messages();
+        StringBuilder out = new StringBuilder();
+        Message system = all.stream().filter(m -> m.role() == io.continuum.provider.model.Role.SYSTEM).findFirst().orElse(null);
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        for (Message m : all) {
+            if (m.role() == io.continuum.provider.model.Role.SYSTEM || m.content() == null || m.content().isBlank()) {
+                continue;
+            }
+            lines.add(m.role().name().toLowerCase() + ": " + m.content().trim());
+        }
+        int from = Math.max(0, lines.size() - maxMessages);
+        java.util.List<String> kept = new java.util.ArrayList<>(lines.subList(from, lines.size()));
+        int size = kept.stream().mapToInt(l -> l.length() + 1).sum();
+        while (kept.size() > 1 && size > maxChars) {
+            size -= kept.remove(0).length() + 1;
+        }
+        if (system != null && system.content() != null && !system.content().isBlank()) {
+            out.append("system: ").append(system.content().trim()).append('\n');
+        }
+        out.append(String.join("\n", kept));
+        return out.toString();
+    }
 }

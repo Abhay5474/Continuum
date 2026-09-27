@@ -1,6 +1,7 @@
 import { Gauge } from "../system/viz";
 import { Pill, toneInk, type Tone } from "../system/hub";
 import DataView from "../system/DataView";
+import { Link } from "react-router-dom";
 
 /**
  * A gateway response, drawn.
@@ -47,6 +48,7 @@ export function parseVerification(text: string) {
 export default function GatewayResult({ out }: { out: any }) {
   if (!out || out.error) return <DataView value={out} />;
   const { answer, summary } = parseVerification(String(out.response ?? ""));
+  const dagRun = /\b(dag-[0-9a-f-]{36})\b/.exec(String(out.routingReason ?? ""))?.[1];
   const unc: Tone = summary?.uncertainty === "LOW" ? "ok" : summary?.uncertainty === "MEDIUM" ? "warn" : "bad";
   return (
     <div className="space-y-4">
@@ -103,6 +105,19 @@ export default function GatewayResult({ out }: { out: any }) {
             ))}
             <p className="text-[11px] text-slate-500">Green bars support the claim, red bars weaken it; length is how valid that check found it.</p>
           </div>
+        </div>
+      )}
+
+      {!summary && dagRun && (
+        // The verification narrative is no longer appended to the answer (it
+        // reached end users as a wall of text); it is kept with the run.
+        <div className="flex flex-wrap items-center gap-4">
+          {typeof out.confidence === "number" && (
+            <Gauge value={out.confidence} max={1} label="Verified confidence" display={`${Math.round(out.confidence * 100)}%`} invert warnAt={0.3} badAt={0.5} size={110} />
+          )}
+          <Link to={`/dag/${dagRun}`} className="text-[12.5px] font-medium text-[color:var(--accent-ink)] hover:underline">
+            See the claims and checks for this answer →
+          </Link>
         </div>
       )}
 

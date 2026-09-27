@@ -20,7 +20,7 @@ import {
   Stage,
   Stat,
   Stats,
-  kindOf, Chip } from "../system/hub";
+  kindOf, Chip, RecordPanel, Field } from "../system/hub";
 
 /**
  * The context layer.
@@ -138,6 +138,7 @@ export default function ContextTransformers() {
   const toast = useToast();
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [openRun, setOpenRun] = useState<any | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -413,6 +414,19 @@ export default function ContextTransformers() {
           )}
         </div>
         <div className="mt-3">
+          <RecordPanel
+            record={openRun}
+            title={openRun ? openRun.sourceName ?? "pasted input" : ""}
+            subtitle={openRun ? words(openRun.contextType) : undefined}
+            hide={["id"]}
+            onClose={() => setOpenRun(null)}
+            lead={openRun && (
+              <Field label="What happened">
+                {`Recognised as ${words(openRun.contextType).toLowerCase()}${openRun.structure ? ` (${words(openRun.structure).toLowerCase()})` : ""} and rewritten into the form a model reads best: ${openRun.tokensBefore} tokens became ${openRun.tokensAfter}.`}
+                {openRun.ambiguities > 0 ? ` ${openRun.ambiguities} thing${openRun.ambiguities > 1 ? "s were" : " was"} left as written rather than guessed.` : ""}
+              </Field>
+            )}
+          />
           {history.length === 0 ? (
             <Empty
               title="Nothing transformed yet"
@@ -425,6 +439,8 @@ export default function ContextTransformers() {
                 return (
                   <Row
                     key={h.id}
+                    onClick={() => setOpenRun(h)}
+                    selected={openRun?.id === h.id}
                     mark={<KindMark kind={kindOf(h.contextType)} size={28} />}
                     title={h.sourceName ?? "pasted input"}
                     subtitle={`${words(h.contextType)}${h.structure ? ` · ${words(h.structure)}` : ""}`}

@@ -3,7 +3,7 @@ import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { api, BASE } from "../api";
 import { useToast } from "../components/ui";
-import { Chip, Segmented, Stat, Stats } from "../system/hub";
+import { Chip, Segmented, Stat, Stats, RecordPanel, Field, openable } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
@@ -34,6 +34,7 @@ const GW_TABS = [
 export default function GatewayDashboard() {
   const toast = useToast();
   const [tab, setTab] = useState<"flow" | "health" | "models" | "send">("flow");
+  const [openReq, setOpenReq] = useState<any | null>(null);
   const [stats, setStats] = useState<any | null>(null);
   const [models, setModels] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
@@ -228,6 +229,25 @@ export default function GatewayDashboard() {
           </div>
         ) : (
           <div data-guide="gateway-flow">
+          <RecordPanel
+            record={openReq}
+            title={openReq ? `req_${openReq.id}` : ""}
+            subtitle={openReq ? `${openReq.chosenProvider}/${openReq.chosenModel} · ${timeOf(openReq.createdAt)}` : undefined}
+            hide={["id", "routingReason"]}
+            onClose={() => setOpenReq(null)}
+            lead={openReq && (
+              <>
+                <Field label="What happened">
+                  {openReq.success
+                    ? `Asked for ${openReq.requestedModel || "auto"}; answered by ${openReq.chosenProvider}/${openReq.chosenModel} in ${openReq.latencyMs} ms${
+                        openReq.failoverCount > 0 ? `, after ${openReq.failoverCount} failed attempt${openReq.failoverCount > 1 ? "s" : ""} that your app never saw` : ""
+                      }.`
+                    : `Asked for ${openReq.requestedModel || "auto"}; no model answered, so your app got an error.`}
+                </Field>
+                {openReq.routingReason && <Field label="Why this model">{openReq.routingReason}</Field>}
+              </>
+            )}
+          />
           <Spotlight className="plane mt-2 max-h-[420px] overflow-y-auto px-3">
             <div className="divide-y divide-edge/40">
             {requests.map((r) => {
@@ -236,7 +256,8 @@ export default function GatewayDashboard() {
                 <div
                   key={r.id}
                   title={r.routingReason ?? undefined}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[11px]"
+                  {...openable(() => setOpenReq(r))}
+                  className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[11px] hover:bg-slate-500/[0.055]"
                 >
                   <StateDot state={st} size={6} />
                   <span className="readout w-16 shrink-0 text-slate-600">
