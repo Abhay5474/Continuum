@@ -56,6 +56,10 @@ public class RetentionService {
     private final int batchSize;
     private final AtomicBoolean running = new AtomicBoolean();
 
+    /** Purged runs leave the decision cache too (it would reload them anyway). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.continuum.core.event.HistoryCache historyCache;
+
     public RetentionService(JdbcTemplate jdbc,
                             @Value("${continuum.retention.enabled:true}") boolean enabled,
                             @Value("${continuum.retention.decision-task-days:1}") int decisionTaskDays,
@@ -170,6 +174,9 @@ public class RetentionService {
             for (String table : WORKFLOW_TABLES) {
                 out.merge(table, jdbc.update("DELETE FROM " + table + " WHERE workflow_id = ANY (?)",
                         ps -> ps.setArray(1, ps.getConnection().createArrayOf("varchar", array))), Integer::sum);
+            }
+            if (historyCache != null) {
+                ids.forEach(historyCache::remove);
             }
             out.merge("workflow_instances", jdbc.update("DELETE FROM workflow_instances WHERE workflow_id = ANY (?)",
                     ps -> ps.setArray(1, ps.getConnection().createArrayOf("varchar", array))), Integer::sum);

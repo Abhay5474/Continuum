@@ -25,11 +25,14 @@ public class EventStore {
     private final WorkflowEventRepository events;
     private final WorkflowInstanceRepository instances;
     private final Json json;
+    private final HistoryCache cache;
 
-    public EventStore(WorkflowEventRepository events, WorkflowInstanceRepository instances, Json json) {
+    public EventStore(WorkflowEventRepository events, WorkflowInstanceRepository instances, Json json,
+                      HistoryCache cache) {
         this.events = events;
         this.instances = instances;
         this.json = json;
+        this.cache = cache;
     }
 
     /**
@@ -54,5 +57,59 @@ public class EventStore {
 
     public List<WorkflowEventEntity> history(String workflowId) {
         return events.findByWorkflowIdOrderBySequenceNumberAsc(workflowId);
+    }
+
+    /**
+     * The history a decision replays, reading only what is new since the last
+     * decision on this workflow.
+     *
+     * <p>Only for the start of a decision: the caller holds the instance lock
+     * and has appended nothing yet in its transaction, so every event it can
+     * see is committed and none can be added under it. A cached history is
+     * trusted only if it still fits — no longer than the instance says the log
+     * is, and starting with the same database row (a workflow id reused after
+     * its run was purged starts a different log). Anything else reads the
+     * whole log again.
+     */
+    public List<WorkflowEventEntity> historyForDecision(WorkflowInstanceEntity locked) {
+        String id = locked.getWorkflowId();
+        long next = locked.getCurrentSequence();
+        List<WorkflowEventEntity> cached = cache.enabled() ? cache.get(id) : null;
+        List<WorkflowEventEntity> history = null;
+        if (cached != null && !cached.isEmpty()) {
+            WorkflowEventEntity first = cached.get(0);
+            long last = cached.get(cached.size() - 1).getSequenceNumber();
+            boolean sameLog = last < next && events.idAt(id, first.getSequenceNumber())
+                    .map(pk -> pk.equals(first.getId())).orElse(false);
+            if (sameLog) {
+                List<WorkflowEventEntity> newer = last + 1 == next ? List.of()
+                        : events.findByWorkflowIdAndSequenceNumberGreaterThanOrderBySequenceNumberAsc(id, last);
+                List<WorkflowEventEntity> joined = new java.util.ArrayList<>(cached.size() + newer.size());
+                joined.addAll(cached);
+                joined.addAll(newer);
+                if (contiguous(joined) && joined.get(joined.size() - 1).getSequenceNumber() == next - 1) {
+                    history = joined;
+                }
+            }
+        }
+        if (history == null) {
+            history = events.findByWorkflowIdOrderBySequenceNumberAsc(id);
+        }
+        cache.put(id, history);
+        return history;
+    }
+
+    /** Forgets a workflow's cached history (its log was removed). */
+    public void forget(String workflowId) {
+        cache.remove(workflowId);
+    }
+
+    private static boolean contiguous(List<WorkflowEventEntity> h) {
+        for (int i = 1; i < h.size(); i++) {
+            if (h.get(i).getSequenceNumber() != h.get(i - 1).getSequenceNumber() + 1) {
+                return false;
+            }
+        }
+        return true;
     }
 }

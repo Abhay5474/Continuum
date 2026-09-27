@@ -84,12 +84,12 @@ public class ParadoxResolutionService {
         for (WorkflowEventEntity e : history) {
             switch (e.getEventType()) {
                 case ACTIVITY_SCHEDULED -> {
-                    var p = json.read(e.getPayload(), Payloads.ActivityScheduled.class);
+                    var p = e.payloadAs(Payloads.ActivityScheduled.class, json);
                     activityTypes.put(p.commandSeq(), p.activityType());
                     usedSeqs.add(p.commandSeq());
                 }
                 case SIDE_EFFECT_RECORDED -> {
-                    var p = json.read(e.getPayload(), Payloads.SideEffectRecorded.class);
+                    var p = e.payloadAs(Payloads.SideEffectRecorded.class, json);
                     usedSeqs.add(p.commandSeq());
                 }
                 default -> { /* not part of the command sequence space */ }
@@ -240,11 +240,11 @@ public class ParadoxResolutionService {
         for (WorkflowEventEntity e : history) {
             switch (e.getEventType()) {
                 case ACTIVITY_SCHEDULED -> {
-                    var p = json.read(e.getPayload(), Payloads.ActivityScheduled.class);
+                    var p = e.payloadAs(Payloads.ActivityScheduled.class, json);
                     st.scheduled.add(p.commandSeq());
                 }
                 case ACTIVITY_COMPLETED -> {
-                    var p = json.read(e.getPayload(), Payloads.ActivityCompleted.class);
+                    var p = e.payloadAs(Payloads.ActivityCompleted.class, json);
                     // The first outcome recorded for a step is the one the
                     // workflow acted on. A later one — two workers that both
                     // finished the same step, before completions were fenced —
@@ -255,14 +255,14 @@ public class ParadoxResolutionService {
                     st.scheduled.remove(p.commandSeq());
                 }
                 case ACTIVITY_FAILED -> {
-                    var p = json.read(e.getPayload(), Payloads.ActivityFailed.class);
+                    var p = e.payloadAs(Payloads.ActivityFailed.class, json);
                     if (p.terminal() && !st.completed.containsKey(p.commandSeq())) {
                         st.failed.putIfAbsent(p.commandSeq(), p.error());
                         st.scheduled.remove(p.commandSeq());
                     }
                 }
                 case SIDE_EFFECT_RECORDED -> {
-                    var p = json.read(e.getPayload(), Payloads.SideEffectRecorded.class);
+                    var p = e.payloadAs(Payloads.SideEffectRecorded.class, json);
                     st.sideEffects.put(p.commandSeq(), p.value());
                 }
                 default -> { /* not replay-relevant */ }

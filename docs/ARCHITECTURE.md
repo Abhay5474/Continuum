@@ -96,6 +96,23 @@ Written in the same transaction as the completion event. `UNIQUE(idempotency_key
 guarantees a logical message exists at most once. The dispatcher delivers and
 marks `SENT`.
 
+### Replaying long histories
+A decision replays the workflow from its first event. It used to read and
+parse the whole log from the database each time, so a run's decisions cost
+more and more as it went on. Now:
+- Recent histories are kept in memory (`continuum.engine.history-cache-mb`,
+  32 MB by default), and a decision reads only the events added since the
+  last one.
+- Each event keeps its parsed payload, so it is parsed once, not once per
+  decision.
+- A cached history is used only if it still matches the database: no longer
+  than the instance says the log is, and starting with the same row. Otherwise
+  the log is read whole.
+
+At 1,200 steps (3,600 events), a late decision went from about 20 ms to about
+4 ms (`ReplayCostIT`). `HistoryCacheIT` checks that events written by another
+worker, and a workflow id reused after its run was purged, are always seen.
+
 ### Retention
 Queue bookkeeping would otherwise grow forever — every wake-up of a workflow
 writes a `workflow_tasks` row. `RetentionService` runs every six hours and

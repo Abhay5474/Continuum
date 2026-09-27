@@ -73,6 +73,32 @@ public class ItWorkflows {
         };
     }
 
+    /** {@code steps} sequential echo steps: a long history, for measuring replay. */
+    public record Long_(int steps) {
+    }
+
+    @Bean
+    Workflow itLong() {
+        return new Workflow() {
+            @Override
+            public String type() {
+                return "it.long";
+            }
+
+            @Override
+            public Object execute(WorkflowContext ctx) {
+                Long_ in = ctx.input(Long_.class);
+                ActivityOptions opts = ActivityOptions.defaults().timeoutSeconds(10);
+                int last = 0;
+                for (int i = 0; i < in.steps(); i++) {
+                    Map<?, ?> r = ctx.executeActivity("it.echo", Map.of("value", i), opts, Map.class);
+                    last = ((Number) r.get("value")).intValue();
+                }
+                return Map.of("last", last);
+            }
+        };
+    }
+
     @Bean
     Activity itEcho() {
         return new Activity() {

@@ -70,6 +70,25 @@ public class WorkflowEventEntity {
         return eventType;
     }
 
+    /**
+     * The payload, parsed, kept with the event. A cached history is replayed at
+     * every decision, and parsing each event's JSON again each time was most of
+     * what a late decision in a long run cost. Payloads are immutable records,
+     * so one parse can be shared.
+     */
+    @jakarta.persistence.Transient
+    private transient volatile Object parsed;
+
+    public <T> T payloadAs(Class<T> type, io.continuum.common.Json json) {
+        Object p = parsed;
+        if (type.isInstance(p)) {
+            return type.cast(p);
+        }
+        T value = json.read(payload, type);
+        parsed = value;
+        return value;
+    }
+
     public String getPayload() {
         return payload;
     }

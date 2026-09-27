@@ -43,6 +43,9 @@ continuum:
     recovery-interval-ms: ${ENGINE_RECOVERY_INTERVAL_MS:5000}
     workflow-task-timeout-seconds: ${ENGINE_WORKFLOW_TASK_TIMEOUT:60}
     workers-enabled: ${ENGINE_WORKERS_ENABLED:true}
+    # Memory for recent workflows' histories, so a decision reads only the
+    # events added since the last one (0 turns it off).
+    history-cache-mb: ${ENGINE_HISTORY_CACHE_MB:32}
   # What the retention job removes, and after how long (see RetentionService).
   # Running workflows and cost records are never removed.
   retention:

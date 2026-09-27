@@ -211,7 +211,7 @@ public class WorkflowEngine {
             return; // already finished
         }
 
-        List<WorkflowEventEntity> history = eventStore.history(workflowId);
+        List<WorkflowEventEntity> history = eventStore.historyForDecision(instance);
         ReplayState state = rebuild(history);
 
         Workflow workflow = registry.get(instance.getWorkflowType());
@@ -288,11 +288,11 @@ public class WorkflowEngine {
         for (WorkflowEventEntity e : history) {
             switch (e.getEventType()) {
                 case ACTIVITY_SCHEDULED -> {
-                    var p = json.read(e.getPayload(), Payloads.ActivityScheduled.class);
+                    var p = e.payloadAs(Payloads.ActivityScheduled.class, json);
                     st.scheduled.add(p.commandSeq());
                 }
                 case ACTIVITY_COMPLETED -> {
-                    var p = json.read(e.getPayload(), Payloads.ActivityCompleted.class);
+                    var p = e.payloadAs(Payloads.ActivityCompleted.class, json);
                     // The first outcome recorded for a step is the one the
                     // workflow acted on. A later one — two workers that both
                     // finished the same step, before completions were fenced —
@@ -303,14 +303,14 @@ public class WorkflowEngine {
                     st.scheduled.remove(p.commandSeq());
                 }
                 case ACTIVITY_FAILED -> {
-                    var p = json.read(e.getPayload(), Payloads.ActivityFailed.class);
+                    var p = e.payloadAs(Payloads.ActivityFailed.class, json);
                     if (p.terminal() && !st.completed.containsKey(p.commandSeq())) {
                         st.failed.putIfAbsent(p.commandSeq(), p.error());
                         st.scheduled.remove(p.commandSeq());
                     }
                 }
                 case SIDE_EFFECT_RECORDED -> {
-                    var p = json.read(e.getPayload(), Payloads.SideEffectRecorded.class);
+                    var p = e.payloadAs(Payloads.SideEffectRecorded.class, json);
                     st.sideEffects.put(p.commandSeq(), p.value());
                 }
                 default -> { /* other events do not affect replay decisions */ }
