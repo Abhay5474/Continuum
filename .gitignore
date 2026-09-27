@@ -33,3 +33,8 @@ video/voice.wav
 video/audio-list.txt
 video/node_modules
 video/models/
+
+# Compiler output of vite.config.ts. Vite prefers a .js config over the .ts one,
+# so a stale copy here would silently override edits to vite.config.ts.
+frontend/vite.config.js
+frontend/vite.config.d.ts
