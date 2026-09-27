@@ -119,6 +119,27 @@ GET  /api/models | GET /api/models/active | POST /api/models/discover | POST /ap
 GET  /api/gateway/stats | GET /api/gateway/requests | GET /api/gateway/health
 ```
 
+## Streaming (`"stream": true` on `/v1/chat/completions`)
+
+Two modes, named on the final chunk's `continuum.stream_mode`:
+
+- **passthrough**: nothing downstream needs the finished answer, so text is
+  sent as the provider generates it. Groq streams over server-sent events
+  (`"stream": true`), Gemini over `:streamGenerateContent?alt=sse`, and the mock
+  a few words at a time. The first piece arrives when the provider produces it.
+  An answer that comes whole anyway (from the semantic cache, or with tool
+  calls) is sent in pieces once complete.
+- **buffered**: a feature that judges or rewrites finished answers is on: the
+  enforcing quality gate, confidence sampling, cascade, prompt firewall,
+  consensus DAG, hedging, context MMU or AI chaos. The pipeline runs to the end
+  first, then the final answer is sent in pieces.
+
+A provider that fails **before** sending anything is failed over as usual.
+Once text has been sent, a failure ends the stream with an error frame. A second
+provider's answer is never appended to the first one's beginning. A stream
+that closes without the provider's finish marker counts as a failure, not a
+short answer. When the client disconnects, the provider stops generating.
+
 ## Database (migration `V3__developer_gateway.sql`, additive)
 
 `developers`, `developer_api_keys`, `developer_provider_credentials`, `models`,
@@ -136,8 +157,10 @@ GET  /api/gateway/stats | GET /api/gateway/requests | GET /api/gateway/health
 
 - Provider secrets: AES-256-GCM at rest, decrypt-on-use, never logged/returned.
 - API keys: hash + prefix only; constant-time verify; shown once.
-- Auth scope: only `/api/gateway/chat` + `/v1/chat/completions` are key-protected
-  — V1/V2 endpoints unchanged. Admin routes gated by a separate token filter.
+- Auth scope: `/api/gateway/chat`, `/v1/chat/completions` and the pipeline
+  routes take an API key; `/api/admin/**` an operator session or the admin
+  token; every other `/api` route a console session (deny by default, checked
+  route by route by `AuthCoverageIT`).
 - Upstream failures surface as a single generic `502` (no provider internals).
 
 ## Tests (mvn test — 26 total, all green)

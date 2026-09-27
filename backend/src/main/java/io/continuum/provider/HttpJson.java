@@ -72,6 +72,51 @@ public class HttpJson {
         return new Result(r.statusCode(), r.headers().map(), r.body());
     }
 
+    /** One line of a streamed answer. */
+    @FunctionalInterface
+    public interface LineHandler {
+        void accept(String line) throws Exception;
+    }
+
+    /**
+     * A POST whose answer is read line by line as it arrives — server-sent
+     * events. {@code firstByteSeconds} bounds the wait for the answer to start;
+     * {@code totalSeconds} bounds the whole of it, so a provider that trickles
+     * forever is still cut off. A non-2xx answer is read whole and thrown, like
+     * {@link #post}.
+     */
+    public void postLines(String url, Object body, String[] headers, int firstByteSeconds, int totalSeconds,
+                          LineHandler onLine) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(firstByteSeconds))
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream")
+                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
+        for (int i = 0; i + 1 < headers.length; i += 2) {
+            builder.header(headers[i], headers[i + 1]);
+        }
+        HttpResponse<java.util.stream.Stream<String>> response =
+                CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofLines());
+        try (java.util.stream.Stream<String> lines = response.body()) {
+            if (response.statusCode() / 100 != 2) {
+                throw new HttpStatusException(response.statusCode(),
+                        lines.collect(java.util.stream.Collectors.joining("\n")));
+            }
+            long deadline = System.nanoTime() + Duration.ofSeconds(totalSeconds).toNanos();
+            java.util.Iterator<String> it = lines.iterator();
+            while (it.hasNext()) {
+                if (System.nanoTime() > deadline) {
+                    throw new java.net.http.HttpTimeoutException("stream still running after " + totalSeconds + "s");
+                }
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new InterruptedException("stream interrupted");
+                }
+                onLine.accept(it.next());
+            }
+        }
+    }
+
     /** An HTTP answer, kept whole. */
     public record Result(int status, java.util.Map<String, java.util.List<String>> headers, String body) {
 

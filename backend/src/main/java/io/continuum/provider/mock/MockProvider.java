@@ -130,6 +130,38 @@ public class MockProvider implements LlmProvider {
         return (promptTokens / 1000.0) * in + (completionTokens / 1000.0) * out;
     }
 
+    /** Gap between streamed pieces, so a keyless deployment shows an answer arriving. */
+    private static final long STREAM_GAP_MS = 12;
+
+    /**
+     * Streams its answer a few words at a time. The mock has no provider to
+     * stream from, but a client being built against the gateway needs to see
+     * text arrive in pieces, with gaps, to know its rendering works.
+     */
+    @Override
+    public LlmResponse stream(LlmRequest request, String apiKeyOverride, io.continuum.provider.TokenSink sink)
+            throws Exception {
+        LlmResponse r = complete(request);
+        String text = r.content();
+        if (text == null || text.isEmpty()) {
+            return r;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\S+\\s*(\\S+\\s*){0,2}").matcher(text);
+        int at = 0;
+        while (m.find()) {
+            if (m.start() > at) {
+                sink.accept(text.substring(at, m.start()));
+            }
+            sink.accept(m.group());
+            at = m.end();
+            Thread.sleep(STREAM_GAP_MS);
+        }
+        if (at < text.length()) {
+            sink.accept(text.substring(at));
+        }
+        return r;
+    }
+
     @Override
     public LlmResponse complete(LlmRequest request) {
         if (unavailable) {

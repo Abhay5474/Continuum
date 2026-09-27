@@ -204,6 +204,29 @@ public class GatewayService {
      * <p>The finally block is not optional: a reservation that is never returned
      * holds allowance nobody is using until it times out.
      */
+    /**
+     * Like {@link #chat(String, GatewayDtos.ChatRequest)}, handing the answer to
+     * {@code sink} as the provider generates it.
+     *
+     * <p>Only the ordinary provider call streams. A cached answer, a cascaded
+     * or hedged one, one that the MMU pages or AI chaos rewrites, or one with
+     * tool calls arrives whole and is not handed to the sink at all — the
+     * caller sends it as it would a buffered answer. {@link #streamedLive}
+     * says which happened.
+     */
+    public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req,
+                                         io.continuum.provider.TokenSink sink) {
+        LIVE.set(sink);
+        try {
+            return chat(developerId, req);
+        } finally {
+            LIVE.remove();
+        }
+    }
+
+    /** The caller's sink while a streamed request runs on this thread, else null. */
+    private static final ThreadLocal<io.continuum.provider.TokenSink> LIVE = new ThreadLocal<>();
+
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
         LOGGED.remove();
         try {
@@ -582,7 +605,14 @@ public class GatewayService {
             // would count time the provider is not busy against its capacity.
             AdmissionService.Slot slot = admissionSlot(developerId, c.provider(), req);
             try {
-                LlmResponse resp = chaos(developerId, router.complete(perModel, List.of(c.provider()), keys));
+                // Streamed only when nothing below rewrites the answer: the MMU
+                // may re-dispatch it, and AI chaos may corrupt it on purpose.
+                io.continuum.provider.TokenSink live = LIVE.get();
+                boolean streamNow = live != null && mmuSession == null
+                        && (developerId == null || !aiChaos.isActive(developerId));
+                LlmResponse resp = streamNow
+                        ? router.stream(perModel, List.of(c.provider()), keys, live)
+                        : chaos(developerId, router.complete(perModel, List.of(c.provider()), keys));
                 if (slot != null) {
                     slot.success();
                 }
@@ -686,6 +716,11 @@ public class GatewayService {
                             "failing over: " + e.getMessage());
                 }
                 lastError = new RuntimeException(e.getMessage(), e);
+                if (e instanceof io.continuum.provider.ProviderRouter.StreamBrokenException broken) {
+                    // Part of an answer is already with the caller; another
+                    // provider's answer cannot be appended to it.
+                    throw broken;
+                }
                 if (isCredentialRejection(e)) {
                     rejectedCredential.add(c.provider());
                 }

@@ -42,17 +42,66 @@ public class StreamPolicy {
 
     private final QualityGateService quality;
     private final SemanticUncertaintyService uncertainty;
+    private final org.springframework.beans.factory.ObjectProvider<io.continuum.cascade.ResponseCascadeService> cascade;
+    private final org.springframework.beans.factory.ObjectProvider<io.continuum.firewall.PromptFirewallService> firewall;
+    private final org.springframework.beans.factory.ObjectProvider<io.continuum.dag.ConsensusDagService> consensus;
+    private final org.springframework.beans.factory.ObjectProvider<io.continuum.hedging.HedgingService> hedging;
+    private final org.springframework.beans.factory.ObjectProvider<io.continuum.mmu.ContextMMU> mmu;
+    private final org.springframework.beans.factory.ObjectProvider<io.continuum.aichaos.AiChaosEngine> aiChaos;
 
-    public StreamPolicy(QualityGateService quality, SemanticUncertaintyService uncertainty) {
+    public StreamPolicy(QualityGateService quality, SemanticUncertaintyService uncertainty,
+                        org.springframework.beans.factory.ObjectProvider<io.continuum.cascade.ResponseCascadeService> cascade,
+                        org.springframework.beans.factory.ObjectProvider<io.continuum.firewall.PromptFirewallService> firewall,
+                        org.springframework.beans.factory.ObjectProvider<io.continuum.dag.ConsensusDagService> consensus,
+                        org.springframework.beans.factory.ObjectProvider<io.continuum.hedging.HedgingService> hedging,
+                        org.springframework.beans.factory.ObjectProvider<io.continuum.mmu.ContextMMU> mmu,
+                        org.springframework.beans.factory.ObjectProvider<io.continuum.aichaos.AiChaosEngine> aiChaos) {
         this.quality = quality;
         this.uncertainty = uncertainty;
+        this.cascade = cascade;
+        this.firewall = firewall;
+        this.consensus = consensus;
+        this.hedging = hedging;
+        this.mmu = mmu;
+        this.aiChaos = aiChaos;
     }
 
     public Mode modeFor(String developerId) {
-        if (rewritesAnswers(developerId) || resamplesAnswers(developerId)) {
+        if (rewritesAnswers(developerId) || resamplesAnswers(developerId) || needsWholeAnswer(developerId)) {
             return Mode.BUFFERED;
         }
         return Mode.PASSTHROUGH;
+    }
+
+    /**
+     * The other features that act on a finished answer, or produce one some
+     * other way than a single provider streaming it:
+     * <ul>
+     *   <li>the cascade judges a cheap answer before choosing to pay for a better one;</li>
+     *   <li>the prompt firewall redacts secrets from the answer before it leaves;</li>
+     *   <li>the consensus DAG answers from several verified drafts;</li>
+     *   <li>hedging races two providers and keeps the first finished answer;</li>
+     *   <li>the context MMU may re-dispatch after the model asks for a paged segment;</li>
+     *   <li>AI chaos corrupts answers on purpose, after they are generated.</li>
+     * </ul>
+     */
+    private boolean needsWholeAnswer(String developerId) {
+        try {
+            return on(cascade, c -> c.enabledFor(developerId))
+                    || on(firewall, f -> f.enabledFor(developerId))
+                    || on(consensus, d -> d.enabledFor(developerId))
+                    || on(hedging, io.continuum.hedging.HedgingService::isEnabled)
+                    || on(mmu, m -> m.enabledFor(developerId))
+                    || on(aiChaos, a -> a.isActive(developerId));
+        } catch (RuntimeException e) {
+            return true;
+        }
+    }
+
+    private static <T> boolean on(org.springframework.beans.factory.ObjectProvider<T> p,
+                                  java.util.function.Predicate<T> test) {
+        T bean = p.getIfAvailable();
+        return bean != null && test.test(bean);
     }
 
     /**

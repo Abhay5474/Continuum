@@ -30,4 +30,21 @@ public interface LlmProvider {
     default LlmResponse complete(LlmRequest request, String apiKeyOverride) throws Exception {
         return complete(request);
     }
+
+    /**
+     * Like {@link #complete(LlmRequest, String)}, handing text to {@code sink} as
+     * it is generated, and returning the whole response at the end — the same
+     * response {@code complete} would have, so accounting and caching do not
+     * need to know it was streamed.
+     *
+     * <p>The default does not stream: it completes, then hands over the whole
+     * answer at once. Adapters for providers that can stream override it.
+     */
+    default LlmResponse stream(LlmRequest request, String apiKeyOverride, TokenSink sink) throws Exception {
+        LlmResponse r = complete(request, apiKeyOverride);
+        if (r != null && r.content() != null && !r.content().isEmpty()) {
+            sink.accept(r.content());
+        }
+        return r;
+    }
 }

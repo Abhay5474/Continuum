@@ -119,6 +119,79 @@ public class ProviderRouter {
         throw new RuntimeException("All providers in failover chain failed", last);
     }
 
+    /**
+     * A stream failed after part of the answer had already been sent. Failing
+     * over now would append a second provider's answer to the first one's
+     * beginning, so it is reported instead.
+     */
+    public static final class StreamBrokenException extends RuntimeException {
+        public StreamBrokenException(String provider, Throwable cause) {
+            super("The answer from '" + provider + "' stopped partway: " + cause.getMessage(), cause);
+        }
+    }
+
+    /**
+     * Like {@link #complete(LlmRequest, List, Map)}, handing the answer to
+     * {@code sink} as it is generated. Fails over exactly as {@code complete}
+     * does while nothing has been sent; once text has gone to the caller, a
+     * failure ends the request ({@link StreamBrokenException}).
+     */
+    public LlmResponse stream(LlmRequest request, List<String> chain, Map<String, String> apiKeysByProvider,
+                              TokenSink sink) {
+        if (chain == null || chain.isEmpty()) {
+            throw new IllegalStateException("No LLM providers available");
+        }
+        RuntimeException last = null;
+        for (String name : chain) {
+            LlmProvider provider = providers.get(name);
+            String overrideKey = apiKeysByProvider == null ? null : apiKeysByProvider.get(name);
+            if (provider == null || (overrideKey == null && !provider.isAvailable())) {
+                continue;
+            }
+            boolean[] sent = {false};
+            TokenSink counting = delta -> {
+                sent[0] = true;
+                sink.accept(delta);
+            };
+            long start = System.nanoTime();
+            try {
+                LlmResponse response = provider.stream(request, overrideKey, counting);
+                long ms = (System.nanoTime() - start) / 1_000_000;
+                double cost = provider.estimateCost(response.model(), response.promptTokens(), response.completionTokens());
+                record(m -> m.recordSuccess(name, ms, response.promptTokens(), response.completionTokens(), cost));
+                return response;
+            } catch (Exception e) {
+                long ms = (System.nanoTime() - start) / 1_000_000;
+                if (interrupted(e)) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while streaming from '" + name + "'", e);
+                }
+                record(m -> m.recordFailure(name, ms));
+                if (sent[0]) {
+                    throw new StreamBrokenException(name, e);
+                }
+                log.warn("Provider '{}' failed before streaming: {} — trying next in chain", name, e.getMessage());
+                last = new RuntimeException("Provider '" + name + "' failed: " + e.getMessage(), e);
+                if (e instanceof ModelUnavailableException gone) {
+                    // The model is gone before a token was sent: the catalogue
+                    // is told, and the same provider's replacement answers.
+                    LlmResponse retried = onModelUnavailable(request, provider, overrideKey, gone);
+                    if (retried != null) {
+                        if (retried.content() != null && !retried.content().isEmpty()) {
+                            try {
+                                sink.accept(retried.content());
+                            } catch (Exception sinkFailed) {
+                                throw new StreamBrokenException(name, sinkFailed);
+                            }
+                        }
+                        return retried;
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("All providers in failover chain failed", last);
+    }
+
     /** True when the thread was interrupted, or the failure was the interruption itself. */
     static boolean interrupted(Throwable e) {
         if (Thread.currentThread().isInterrupted()) {

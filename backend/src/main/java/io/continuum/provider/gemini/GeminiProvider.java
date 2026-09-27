@@ -137,6 +137,72 @@ public class GeminiProvider implements LlmProvider {
         return parse(resp, request, model);
     }
 
+    /**
+     * Streams with {@code :streamGenerateContent?alt=sse}: each event is a
+     * partial response whose text parts are handed on as they arrive. The last
+     * carries the finish reason and the token counts. A request with tools is
+     * completed instead — a function call is only usable whole.
+     */
+    @Override
+    public LlmResponse stream(LlmRequest request, String apiKeyOverride, io.continuum.provider.TokenSink sink)
+            throws Exception {
+        if (request.hasTools()) {
+            return LlmProvider.super.stream(request, apiKeyOverride, sink);
+        }
+        if (chaos.isPrimaryProviderDown()) {
+            throw new RuntimeException("CHAOS: Gemini is down");
+        }
+        String apiKey = (apiKeyOverride != null && !apiKeyOverride.isBlank()) ? apiKeyOverride : config.getApiKey();
+        String model = modelFor(request);
+        String url = config.getBaseUrl() + "/v1beta/models/" + model + ":streamGenerateContent?alt=sse";
+        StringBuilder text = new StringBuilder();
+        JsonNode[] last = {null};
+        try {
+            http.postLines(url, buildBody(http.mapper(), request), new String[]{"x-goog-api-key", apiKey}, 30, 300,
+                    line -> {
+                        if (!line.startsWith("data:")) {
+                            return;
+                        }
+                        String data = line.substring(5).trim();
+                        if (data.isEmpty()) {
+                            return;
+                        }
+                        JsonNode event = http.mapper().readTree(data);
+                        last[0] = event;
+                        for (JsonNode part : event.path("candidates").path(0).path("content").path("parts")) {
+                            if (part.path("thought").asBoolean(false) || !part.has("text")) {
+                                continue;
+                            }
+                            String delta = part.path("text").asText("");
+                            if (!delta.isEmpty()) {
+                                text.append(delta);
+                                sink.accept(delta);
+                            }
+                        }
+                    });
+        } catch (HttpJson.HttpStatusException e) {
+            if (io.continuum.registry.catalog.GeminiCatalogClient.gone(e.status(), e.body())) {
+                throw new ModelUnavailableException(name(), model, ModelUnavailableException.Reason.GONE, e);
+            }
+            if (io.continuum.registry.catalog.GeminiCatalogClient.noFreeQuota(e.status(), e.body())) {
+                throw new ModelUnavailableException(name(), model, ModelUnavailableException.Reason.NOT_FREE, e);
+            }
+            throw e;
+        }
+        JsonNode end = last[0] == null ? http.mapper().createObjectNode() : last[0];
+        JsonNode candidate = end.path("candidates").path(0);
+        // The last event carries the finish reason (or, for a refused prompt,
+        // the block reason). Without either, the connection closed mid-answer.
+        if (!candidate.has("finishReason") && !end.path("promptFeedback").has("blockReason")) {
+            throw new java.io.IOException("Gemini's stream ended before the answer finished");
+        }
+        int promptTokens = end.path("usageMetadata").path("promptTokenCount").asInt(estimateTokens(request));
+        int completionTokens = end.path("usageMetadata").path("candidatesTokenCount").asInt(text.length() / 4);
+        String finish = candidate.isMissingNode() && end.path("promptFeedback").has("blockReason")
+                ? "SAFETY" : candidate.path("finishReason").asText("STOP");
+        return new LlmResponse(text.toString(), List.of(), promptTokens, completionTokens, name(), model, finish);
+    }
+
     /** The request body, separate from the call so the translation is testable without a key. */
     public ObjectNode buildBody(ObjectMapper m, LlmRequest request) {
         ObjectNode body = m.createObjectNode();

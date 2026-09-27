@@ -46,7 +46,10 @@ import java.util.concurrent.Executors;
  *
  * <ul>
  *   <li><b>passthrough</b> — nothing downstream needs the finished answer, so
- *       tokens are streamed as the provider produces them.</li>
+ *       tokens are streamed as the provider produces them (Groq and Gemini
+ *       over server-sent events; the mock a few words at a time). An answer
+ *       that arrives whole anyway — from the cache, or with tool calls — is
+ *       sent in pieces once it is complete.</li>
  *   <li><b>buffered</b> — a post-generation feature is enabled, so the pipeline
  *       runs to completion and the final (possibly repaired) answer is then
  *       streamed. Time-to-first-token is the full generation time.</li>
@@ -207,9 +210,19 @@ public class OpenAiCompatController {
 
         streams.execute(() -> {
             try {
-                send(emitter, translator.openingChunk(id, req.model() == null ? "auto" : req.model()));
+                String opening = req.model() == null ? "auto" : req.model();
+                send(emitter, translator.openingChunk(id, opening));
 
-                GatewayDtos.ChatResponse r = gateway.chat(developerId, req);
+                // Passthrough: text is sent as the provider produces it. If the
+                // client goes away, the send fails and so does the sink, which
+                // stops the provider generating tokens nobody will read.
+                boolean[] live = {false};
+                GatewayDtos.ChatResponse r = mode == StreamPolicy.Mode.PASSTHROUGH
+                        ? gateway.chat(developerId, req, delta -> {
+                            live[0] = true;
+                            send(emitter, translator.contentChunk(id, opening, delta));
+                        })
+                        : gateway.chat(developerId, req);
                 String model = r.model() != null ? r.model() : "auto";
 
                 if (r.toolCalls() != null && !r.toolCalls().isEmpty()) {
@@ -217,7 +230,9 @@ public class OpenAiCompatController {
                     for (GatewayDtos.ToolCallRef call : r.toolCalls()) {
                         send(emitter, translator.toolCallChunk(id, model, i++, call));
                     }
-                } else {
+                } else if (!live[0]) {
+                    // Arrived whole — buffered mode, a cached answer, a cascade
+                    // or a hedge — so it is sent in pieces now.
                     for (String piece : split(r.response())) {
                         send(emitter, translator.contentChunk(id, model, piece));
                     }
