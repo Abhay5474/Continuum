@@ -52,6 +52,7 @@ public class RetentionService {
     private final int decisionTaskDays;
     private final int requestLogDays;
     private final int finishedWorkflowDays;
+    private final int webhookDeliveryDays;
     private final int batchSize;
     private final AtomicBoolean running = new AtomicBoolean();
 
@@ -61,6 +62,18 @@ public class RetentionService {
                             @Value("${continuum.retention.request-log-days:90}") int requestLogDays,
                             @Value("${continuum.retention.finished-workflow-days:0}") int finishedWorkflowDays,
                             @Value("${continuum.retention.batch-size:2000}") int batchSize) {
+        this(jdbc, enabled, decisionTaskDays, requestLogDays, finishedWorkflowDays, 30, batchSize);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public RetentionService(JdbcTemplate jdbc,
+                            @Value("${continuum.retention.enabled:true}") boolean enabled,
+                            @Value("${continuum.retention.decision-task-days:1}") int decisionTaskDays,
+                            @Value("${continuum.retention.request-log-days:90}") int requestLogDays,
+                            @Value("${continuum.retention.finished-workflow-days:0}") int finishedWorkflowDays,
+                            @Value("${continuum.retention.webhook-delivery-days:30}") int webhookDeliveryDays,
+                            @Value("${continuum.retention.batch-size:2000}") int batchSize) {
+        this.webhookDeliveryDays = Math.max(0, webhookDeliveryDays);
         this.jdbc = jdbc;
         this.enabled = enabled;
         this.decisionTaskDays = Math.max(1, decisionTaskDays);
@@ -85,6 +98,7 @@ public class RetentionService {
         m.put("decisionTaskDays", decisionTaskDays);
         m.put("requestLogDays", requestLogDays);
         m.put("finishedWorkflowDays", finishedWorkflowDays);
+        m.put("webhookDeliveryDays", webhookDeliveryDays);
         m.put("running", running.get());
         return m;
     }
@@ -112,6 +126,10 @@ public class RetentionService {
             if (requestLogDays > 0) {
                 deleted.put("gateway_requests", batched("gateway_requests", "created_at < ?",
                         Timestamp.from(now.minus(Duration.ofDays(requestLogDays)))));
+            }
+            if (webhookDeliveryDays > 0) {
+                deleted.put("webhook_deliveries", batched("webhook_deliveries", "attempted_at < ?",
+                        Timestamp.from(now.minus(Duration.ofDays(webhookDeliveryDays)))));
             }
             if (finishedWorkflowDays > 0) {
                 deleted.putAll(finishedWorkflows(now.minus(Duration.ofDays(finishedWorkflowDays))));

@@ -49,6 +49,7 @@ continuum:
     enabled: ${RETENTION_ENABLED:true}
     decision-task-days: ${RETENTION_DECISION_TASK_DAYS:1}
     request-log-days: ${RETENTION_REQUEST_LOG_DAYS:90}
+    webhook-delivery-days: ${RETENTION_WEBHOOK_DELIVERY_DAYS:30}
     # 0 keeps finished workflows (and their history) forever.
     finished-workflow-days: ${RETENTION_FINISHED_WORKFLOW_DAYS:0}
   llm:

@@ -7,6 +7,7 @@ import { Chip, Spark, type Tone } from "../system/hub";
 import { useRecentRequests } from "../system/traffic";
 import { useToast, Spinner, CopyButton, CodeBlock } from "../components/ui";
 import GatewayResult from "../components/GatewayResult";
+import Webhooks from "../components/Webhooks";
 
 const PROVIDERS = ["gemini", "groq", "openai"];
 
@@ -337,6 +338,8 @@ function Portal({ onLogout }: { onLogout: () => void }) {
           {keys.length === 0 && <div className="text-xs text-slate-500">no keys yet — issue one above ↑</div>}
         </div>
       </div>
+
+      <Webhooks />
 
       <ApiExplorer issuedKey={newKey || undefined} />
 

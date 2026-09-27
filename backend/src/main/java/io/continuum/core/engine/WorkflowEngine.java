@@ -49,6 +49,36 @@ public class WorkflowEngine {
     private final ParadoxResolutionService healing;
     private final Json json;
 
+    /** Optional so the engine stands alone in tests; present in the application. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.continuum.webhook.WebhookService webhooks;
+
+    /**
+     * Queues a webhook for the run's owner in the current transaction — so it
+     * goes out if and only if the change it reports commits.
+     */
+    private void notifyOwner(WorkflowInstanceEntity instance, String event, java.util.Map<String, Object> extra) {
+        if (webhooks == null || instance.getDeveloperId() == null) {
+            return;
+        }
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("workflowId", instance.getWorkflowId());
+        data.put("workflowType", instance.getWorkflowType());
+        data.putAll(extra);
+        webhooks.enqueue(instance.getDeveloperId(), event, instance.getWorkflowId(), data);
+    }
+
+    private Object parsed(String jsonText) {
+        if (jsonText == null) {
+            return null;
+        }
+        try {
+            return json.read(jsonText, Object.class);
+        } catch (RuntimeException e) {
+            return jsonText;
+        }
+    }
+
     public WorkflowEngine(EventStore eventStore, WorkflowExecutor executor, WorkflowRegistry registry,
                           WorkflowInstanceRepository instances, ActivityTaskRepository activityTasks,
                           WorkflowTaskRepository workflowTasks, ParadoxResolutionService healing,
@@ -132,6 +162,7 @@ public class WorkflowEngine {
         instance.setStatus(WorkflowStatus.FAILED);
         instance.setError(error);
         instances.save(instance);
+        notifyOwner(instance, "workflow.cancelled", java.util.Map.of("status", "CANCELLED", "reason", error));
         int withdrawn = 0;
         for (var task : activityTasks.findByWorkflowIdOrderBySequenceNumberAsc(workflowId)) {
             if (task.getStatus() == io.continuum.persistence.entity.TaskStatus.PENDING) {
@@ -211,6 +242,10 @@ public class WorkflowEngine {
                         new Payloads.WorkflowCompleted(decision.result()));
                 instance.setStatus(WorkflowStatus.COMPLETED);
                 instance.setResult(decision.result());
+                java.util.Map<String, Object> done = new java.util.LinkedHashMap<>();
+                done.put("status", "COMPLETED");
+                done.put("result", parsed(decision.result()));
+                notifyOwner(instance, "workflow.completed", done);
                 log.info("Workflow {} completed", workflowId);
             }
             case FAIL -> {
@@ -218,6 +253,10 @@ public class WorkflowEngine {
                         new Payloads.WorkflowFailed(decision.error()));
                 instance.setStatus(WorkflowStatus.FAILED);
                 instance.setError(decision.error());
+                java.util.Map<String, Object> failed = new java.util.LinkedHashMap<>();
+                failed.put("status", "FAILED");
+                failed.put("error", decision.error());
+                notifyOwner(instance, "workflow.failed", failed);
                 log.warn("Workflow {} failed: {}", workflowId, decision.error());
             }
             case BLOCKED -> { /* waiting on an in-flight activity */ }

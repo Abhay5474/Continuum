@@ -43,6 +43,12 @@ public class TaskClaimer {
 
     private final AtomicLong claims = new AtomicLong();
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.continuum.webhook.WebhookService webhooks;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.continuum.persistence.repository.WorkflowInstanceRepository instances;
+
     /**
      * Claims runnable activities. Each claim is stamped with its own token
      * ({@code worker#n}), not just the worker's name, so that when a task is
@@ -146,6 +152,19 @@ public class TaskClaimer {
         boolean park = t.getAttempts() >= MAX_DECISION_ATTEMPTS;
         if (park) {
             t.setStatus(TaskStatus.FAILED);
+            if (webhooks != null && instances != null) {
+                instances.findById(t.getWorkflowId()).ifPresent(w -> {
+                    java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+                    data.put("workflowId", w.getWorkflowId());
+                    data.put("workflowType", w.getWorkflowType());
+                    data.put("status", "STUCK");
+                    data.put("attempts", t.getAttempts());
+                    data.put("error", t.getLastError());
+                    // Keyed by the parked task, so a second park after a resume is a new event.
+                    webhooks.enqueue(w.getDeveloperId(), "workflow.stuck", w.getWorkflowId(),
+                            w.getWorkflowId() + "#" + t.getId(), data);
+                });
+            }
         } else {
             t.setStatus(TaskStatus.PENDING);
             t.setVisibleAt(now.plusSeconds(decisionBackoffSeconds(t.getAttempts())));

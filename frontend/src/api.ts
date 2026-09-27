@@ -303,6 +303,18 @@ export function sessionRole(): "DEVELOPER" | "OPERATOR" | null {
 export const isOperator = () => sessionRole() === "OPERATOR" || hasOperator();
 
 export const portal = {
+  /** Webhook endpoints: signed, exactly-once notifications of run outcomes. */
+  webhooks: {
+    list: () => portalHttp<{ endpoints: any[]; events: string[] }>("/api/portal/developer/webhooks", "GET"),
+    create: (url: string, events: string[], description?: string) =>
+      portalHttp<{ endpoint: any; secret: string }>("/api/portal/developer/webhooks", "POST", { url, events, description }),
+    update: (id: number, patch: { enabled?: boolean; events?: string[]; description?: string }) =>
+      portalHttp<any>(`/api/portal/developer/webhooks/${id}`, "PUT", patch),
+    remove: (id: number) => portalHttp<any>(`/api/portal/developer/webhooks/${id}`, "DELETE"),
+    rotate: (id: number) => portalHttp<{ secret: string }>(`/api/portal/developer/webhooks/${id}/rotate-secret`, "POST"),
+    test: (id: number) => portalHttp<{ idempotencyKey: string }>(`/api/portal/developer/webhooks/${id}/test`, "POST"),
+    deliveries: (id: number) => portalHttp<any[]>(`/api/portal/developer/webhooks/${id}/deliveries?limit=25`, "GET"),
+  },
   session: () => localStorage.getItem(SESSION_KEY),
   setSession: (t: string | null) => {
     if (t) endedAt = 0;

@@ -33,6 +33,8 @@ import java.sql.DriverManager;
         "spring.jpa.hibernate.ddl-auto=validate",
         "CONTINUUM_SESSION_KEY=integration-test-session-key-0123456789",
         "GEMINI_API_KEY=", "GROQ_API_KEY=",
+        // Webhook and HTTP-step tests call a receiver on this machine.
+        "continuum.declarative.allow-private-targets=true",
         "logging.level.io.continuum=WARN"
 })
 @ExtendWith(PostgresIT.RequiresPostgres.class)

@@ -191,7 +191,7 @@ function Retention() {
         <p className="text-sm text-slate-500">Loading…</p>
       ) : (
         <>
-          <dl className="grid gap-3 text-[12.5px] sm:grid-cols-3">
+          <dl className="grid gap-3 text-[12.5px] sm:grid-cols-4">
             <div>
               <dt className="text-slate-500">Finished decision tasks</dt>
               <dd className="font-medium text-slate-200">{days(state.decisionTaskDays, "kept")}</dd>
@@ -199,6 +199,10 @@ function Retention() {
             <div>
               <dt className="text-slate-500">Gateway request logs</dt>
               <dd className="font-medium text-slate-200">{days(state.requestLogDays, "kept forever")}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Webhook delivery logs</dt>
+              <dd className="font-medium text-slate-200">{days(state.webhookDeliveryDays, "kept forever")}</dd>
             </div>
             <div>
               <dt className="text-slate-500">Finished workflows</dt>
