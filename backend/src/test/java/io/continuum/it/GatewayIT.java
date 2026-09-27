@@ -45,6 +45,7 @@ class GatewayIT extends PostgresIT {
     @Autowired ConsensusDagService consensus;
     @Autowired ChaosMonkey chaos;
     @Autowired JdbcTemplate jdbc;
+    @Autowired io.continuum.aichaos.AiChaosEngine aiChaos;
 
     private String dev;
 
@@ -60,6 +61,7 @@ class GatewayIT extends PostgresIT {
         io.continuum.portal.TenantContext.clear();
         hedging.setEnabled(false);
         chaos.setProviderFailureRate(dev, 0);
+        aiChaos.reset(dev);
     }
 
     private static GatewayDtos.Message user(String text) {
@@ -113,6 +115,33 @@ class GatewayIT extends PostgresIT {
         assertThat(second.response()).isEqualTo(first.response());
         assertThat(second.cost()).isZero();
         assertThat(second.routingReason().toLowerCase()).contains("cache");
+    }
+
+    @Test
+    void anAnswerCorruptedByAiChaosIsNotServedFromTheCacheAfterwards() {
+        cache.setEnabled(dev, true);
+        aiChaos.setRate(dev, io.continuum.aichaos.AiFailureType.HALLUCINATION, 1.0);
+        chat("What is the boiling point of water at sea level?");
+        aiChaos.reset(dev);
+
+        GatewayDtos.ChatResponse after = chat("What is the boiling point of water at sea level?");
+        assertThat(after.routingReason().toLowerCase()).doesNotContain("semantic cache");
+    }
+
+    @Test
+    void theSameFollowUpInADifferentConversationIsNotServedTheOtherConversationsAnswer() {
+        cache.setEnabled(dev, true);
+        GatewayDtos.ChatRequest fish = new GatewayDtos.ChatRequest(null, List.of(
+                user("I found an injured fish"), new GatewayDtos.Message("assistant", "Keep it in water.", null, null, null),
+                user("what first aid should I give?")), 200, 0.2, null, null, null, null, null);
+        GatewayDtos.ChatRequest bird = new GatewayDtos.ChatRequest(null, List.of(
+                user("I found an injured bird"), new GatewayDtos.Message("assistant", "Keep it warm and dark.", null, null, null),
+                user("what first aid should I give?")), 200, 0.2, null, null, null, null, null);
+        gateway.chat(dev, fish);
+        GatewayDtos.ChatResponse second = gateway.chat(dev, bird);
+        assertThat(second.routingReason().toLowerCase()).doesNotContain("semantic cache");
+        // The same conversation again is still a hit.
+        assertThat(gateway.chat(dev, fish).routingReason().toLowerCase()).contains("semantic cache");
     }
 
     @Test

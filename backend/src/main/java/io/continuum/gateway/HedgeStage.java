@@ -52,6 +52,12 @@ public class HedgeStage {
     private final RequestLog requestLog;
     private final AnswerBookkeeping bookkeeping;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AnswerReview review;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ResponseChaos chaos;
+
     public HedgeStage(ProviderHealthTracker health, ProviderRouter router, io.continuum.godmode.GodModeService godMode, io.continuum.observability.GatewayMetrics metrics, io.continuum.firewall.PromptFirewallService firewall, io.continuum.cache.SemanticCacheService semanticCache, io.continuum.routing.RoutingStrategyService routingStrategy, io.continuum.hedging.HedgingService hedging, RequestLog requestLog, AnswerBookkeeping bookkeeping) {
         this.health = health;
         this.router = router;
@@ -95,8 +101,8 @@ public class HedgeStage {
                         ModelFallbackPolicy.ModelCandidate cand = byProvider.get(provider);
                         Map<String, String> keys = devKeys.containsKey(provider)
                                 ? Map.of(provider, devKeys.get(provider)) : null;
-                        return router.complete(new LlmRequest(cand.model(), request.messages(),
-                                request.maxTokens(), request.temperature()), List.of(provider), keys);
+                        // withModel keeps the caller's tools and JSON mode.
+                        return router.complete(request.withModel(cand.model()), List.of(provider), keys);
                     });
 
             LlmResponse resp = result.response();
@@ -142,10 +148,19 @@ public class HedgeStage {
 
             String safeContent = firewall.guardOutbound(developerId, resp.content());
             godMode.observeExchange(developerId, "gateway", lastUserContent(canonical), safeContent);
-            semanticCache.store(developerId, cacheKey, req.model(), winner, safeContent, tokens, billedCost);
-
-            return completed(new GatewayDtos.ChatResponse(safeContent, winner, resp.model(),
-                    totalMs, tokens, billedCost, 0, reason), resp);
+            GatewayDtos.ChatResponse answered = completed(new GatewayDtos.ChatResponse(safeContent, winner,
+                    resp.model(), totalMs, tokens, billedCost, 0, reason), resp);
+            // The same checks as every other path. A hedged answer used to skip
+            // the quality gate and confidence measurement entirely, so turning
+            // hedging on quietly turned both of them off.
+            GatewayDtos.ChatResponse reviewed = review == null ? answered
+                    : review.withUncertainty(
+                            review.withQualityGate(answered, developerId, canonical, winner, resp.model(),
+                                    devKeys, complexity),
+                            developerId, req, canonical, winner, resp.model(), devKeys, false);
+            cacheIfSound(semanticCache, chaos, developerId, cacheKey, req.model(), winner, reviewed, tokens,
+                    billedCost);
+            return reviewed;
         } catch (Exception e) {
             log.warn("Hedged execution failed for {}; falling back to the sequential chain: {}",
                     developerId, e.getMessage());

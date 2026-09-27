@@ -95,8 +95,9 @@ public class CascadeStage {
         LlmResponse cheapResp;
         try {
             cheapResp = chaos.apply(developerId, router.complete(
-                    new LlmRequest(cheap.model(), canonical.messages(), canonical.maxTokens(),
-                            canonical.temperature()),
+                    // The caller's request, so its tools and JSON mode come too:
+                    // either tier's answer is what the caller receives.
+                    canonical.withModel(cheap.model()),
                     List.of(cheap.provider()), keyFor(devKeys, cheap.provider())));
         } catch (Exception e) {
             // The cheap tier is not special; a failure here is an ordinary
@@ -122,8 +123,7 @@ public class CascadeStage {
             try {
                 long t = System.nanoTime();
                 strongResp = chaos.apply(developerId, router.complete(
-                        new LlmRequest(strong.model(), canonical.messages(), canonical.maxTokens(),
-                                canonical.temperature()),
+                        canonical.withModel(strong.model()),
                         List.of(strong.provider()), keyFor(devKeys, strong.provider())));
                 strongCost = router.estimateCost(strong.provider(), strongResp.model(),
                         strongResp.promptTokens(), strongResp.completionTokens());
@@ -193,17 +193,18 @@ public class CascadeStage {
 
         String safeContent = firewall.guardOutbound(developerId, chosen.content());
         godMode.observeExchange(developerId, "gateway", lastUserContent(canonical), safeContent);
-        semanticCache.store(developerId, cacheKey, req.model(), chosenProvider, safeContent, tokens, billed);
 
         // The judge's ambivalent band is exactly where a second opinion is worth
         // buying, which is what ADAPTIVE mode targets.
         boolean judgeUnsure = assessment.confidence() < Math.min(1.0, assessment.threshold() + 0.15);
         String finalModel = served ? strong.model() : cheap.model();
-        return review.withUncertainty(
+        GatewayDtos.ChatResponse reviewed = review.withUncertainty(
                 review.withQualityGate(
                         completed(new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
                                 totalMs, tokens, billed, 0, reason), chosen),
                         developerId, canonical, chosenProvider, finalModel, devKeys, complexity),
                 developerId, req, canonical, chosenProvider, finalModel, devKeys, judgeUnsure);
+        cacheIfSound(semanticCache, chaos, developerId, cacheKey, req.model(), chosenProvider, reviewed, tokens, billed);
+        return reviewed;
     }
 }

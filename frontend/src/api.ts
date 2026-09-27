@@ -98,6 +98,17 @@ export const hasOperator = () => operatorToken() !== null;
  * Console API calls. These are now authenticated: the backend scopes every
  * response to the signed-in developer, so the token must travel with each request.
  */
+/**
+ * Tells whoever is listening — the recommendation box — that a setting may
+ * have changed, so it can re-check the configuration straight away rather
+ * than on its next poll.
+ */
+function configChanged(method?: string) {
+  if (method && method.toUpperCase() !== "GET" && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("continuum:config-changed"));
+  }
+}
+
 async function http<T>(path: string, init?: RequestInit, asOperator = false): Promise<T> {
   // On an operator-only route, prefer the elevated token when one is held; fall
   // back to the developer session so the request still reaches the server and
@@ -143,6 +154,7 @@ async function http<T>(path: string, init?: RequestInit, asOperator = false): Pr
     }
     throw err;
   }
+  configChanged(init?.method);
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
@@ -237,6 +249,7 @@ async function portalHttp<T>(path: string, method: string, body?: unknown): Prom
     }
     throw new Error(message);
   }
+  configChanged(method);
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
@@ -302,7 +315,21 @@ export function sessionRole(): "DEVELOPER" | "OPERATOR" | null {
  */
 export const isOperator = () => sessionRole() === "OPERATOR" || hasOperator();
 
+export type Advice = {
+  id: string;
+  severity: "error" | "warn" | "info";
+  area: string;
+  title: string;
+  message: string;
+  fix: string;
+  route?: string;
+};
+
+export type AdviceReport = { advice: Advice[]; checks: number; checkedAt: string; measuredRequests: number };
+
 export const portal = {
+  /** What is wrong with this account's configuration, across every feature. */
+  advice: () => portalHttp<AdviceReport>("/api/portal/developer/advice", "GET"),
   /** Every feature by its real name, with its state; plain switches can be flipped here. */
   features: {
     list: () => portalHttp<any[]>("/api/portal/developer/features", "GET"),

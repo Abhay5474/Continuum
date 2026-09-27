@@ -159,4 +159,37 @@ public final class GatewaySupport {
         out.append(String.join("\n", kept));
         return out.toString();
     }
+
+    /** The note {@code AnswerReview} adds when an answer failed the quality gate. */
+    private static final java.util.regex.Pattern FAILED_GATE =
+            java.util.regex.Pattern.compile("· quality [0-9.]+ \\((repair|block)\\)");
+
+    /**
+     * Files the final answer in the semantic cache, when it is one worth
+     * serving again.
+     *
+     * <p>The cache used to store the provider's first answer, before the quality
+     * gate and confidence checks had looked at it — so an answer the gate was
+     * about to repair was what later callers got — and it stored answers AI
+     * Chaos had corrupted on purpose, which went on being served after the
+     * experiment ended. Now: the reviewed answer only, and never one that was
+     * corrupted, failed the gate, came back with low confidence, or is a tool
+     * call.
+     */
+    public static void cacheIfSound(io.continuum.cache.SemanticCacheService cache, ResponseChaos chaos,
+                                    String developerId, String cacheKey, String requestedModel,
+                                    String provider, GatewayDtos.ChatResponse out, int tokens, double cost) {
+        if (cache == null || out == null || cacheKey == null) {
+            return;
+        }
+        if (chaos != null && chaos.active(developerId)) {
+            return;
+        }
+        if (Boolean.TRUE.equals(out.lowConfidence())
+                || (out.toolCalls() != null && !out.toolCalls().isEmpty())
+                || (out.routingReason() != null && FAILED_GATE.matcher(out.routingReason()).find())) {
+            return;
+        }
+        cache.store(developerId, cacheKey, requestedModel, provider, out.response(), tokens, cost);
+    }
 }

@@ -23,6 +23,16 @@ public record PolicyBundle(
         double verificationPassThreshold,   // semantic replay pass bar
         int timeoutSeconds) {               // activity timeout
 
+    /**
+     * Bundles saved before the built-in mock provider was removed still list
+     * it; it is dropped on read, so it is neither shown nor ranked.
+     */
+    public PolicyBundle {
+        if (providerOrder != null && providerOrder.stream().anyMatch("mock"::equalsIgnoreCase)) {
+            providerOrder = providerOrder.stream().filter(p -> !"mock".equalsIgnoreCase(p)).toList();
+        }
+    }
+
     /** Beginner-friendly, conservative starting policy derived from a profile. */
     public static PolicyBundle defaultFor(AutopilotMode mode, List<String> allowedProviders,
                                           double maxCost, long maxLatency) {

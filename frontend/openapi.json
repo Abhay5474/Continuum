@@ -4648,6 +4648,27 @@
         "tags" : [ "admission-controller" ]
       }
     },
+    "/api/portal/developer/advice" : {
+      "get" : {
+        "operationId" : "advice",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "advisor-controller" ]
+      }
+    },
     "/api/portal/developer/autopilot/active-bundle" : {
       "get" : {
         "operationId" : "activeBundle",

@@ -684,11 +684,6 @@ public class GatewayService {
                 godMode.observeExchange(developerId, "gateway",
                         lastUserContent(canonical), safeContent);
 
-                // Cache the answer for the next equivalent question. No-op when
-                // the cache is off, and it can never fail the request.
-                semanticCache.store(developerId, cacheKey, req.model(), c.provider(),
-                        safeContent, tokens, cost);
-
                 // Gate first, then measure: there is no point measuring the
                 // confidence of an answer that is about to be replaced.
                 // The model's tool calls and its token split travel with the
@@ -699,10 +694,15 @@ public class GatewayService {
                         completed(new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
                                 totalMs, tokens, cost, failovers, reason), resp);
 
-                return review.withUncertainty(
+                GatewayDtos.ChatResponse reviewed = review.withUncertainty(
                         review.withQualityGate(answered,
                                 developerId, canonical, c.provider(), c.model(), devKeys, complexity),
                         developerId, req, canonical, c.provider(), c.model(), devKeys, false);
+                // Cached after review, so the next equivalent question gets the
+                // answer this caller got. No-op when the cache is off.
+                cacheIfSound(semanticCache, responseChaos, developerId, cacheKey, req.model(),
+                        c.provider(), reviewed, tokens, cost);
+                return reviewed;
             } catch (Exception e) {
                 long attemptMs = (System.nanoTime() - attemptStart) / 1_000_000;
                 // A provider failure is the signal the gradient cannot see in
@@ -948,13 +948,13 @@ public class GatewayService {
     }
 
     /*
-     * On the other `new LlmRequest(...)` sites in this class: the judge, the
-     * repair pass, the cascade tiers and the probe all send prompts Continuum
-     * wrote, about the caller's answer. They deliberately do NOT inherit the
-     * caller's tools or response_format — a judge offered `get_weather` may call
-     * it instead of scoring, and a scorer forced into json_object returns a
-     * verdict in the caller's schema rather than its own. Dropping them there is
-     * the correct behaviour, not the same bug as line 415 was.
+     * On the other `new LlmRequest(...)` sites: the judge and the probe send
+     * prompts Continuum wrote, about the caller's answer, and deliberately do
+     * NOT inherit the caller's tools or response_format — a judge offered
+     * `get_weather` may call it instead of scoring. The cascade tiers and hedged
+     * calls answer the caller's own request, so they use withModel and keep
+     * both; repairs and confidence resamples keep the response format, so a
+     * JSON answer stays JSON.
      */
 
     private String routingReason(double complexity, RoutingMode mode, ModelFallbackPolicy.ModelCandidate c, int failovers) {

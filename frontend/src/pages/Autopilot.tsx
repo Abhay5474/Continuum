@@ -4,7 +4,7 @@ import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Note } from "../system/primitives";
 import { StackedBar, BarChart } from "../system/charts";
-import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone, RecordPanel, Field, openable } from "../system/hub";
+import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone, RecordPanel, Field, openable, rowClick } from "../system/hub";
 
 /**
  * Autopilot — beginner-friendly control plane UI. Reuses the developer session
@@ -328,8 +328,8 @@ export default function Autopilot() {
               )}
               <ol className="space-y-1 text-xs">
                 {decisions.slice(0, 12).map((d) => (
-                  <li key={d.id} {...openable(() => setOpenItem({ kind: "decision", ...d }))} className="flex cursor-pointer gap-2 rounded hover:bg-slate-500/[0.055]">
-                    <span className="w-24 shrink-0 font-mono text-slate-500">{d.type}</span>
+                  <li key={d.id} onClick={rowClick(() => setOpenItem({ kind: "decision", ...d }))} className="flex cursor-pointer gap-2 rounded hover:bg-slate-500/[0.055]">
+                    <button type="button" data-open className="w-24 shrink-0 text-left font-mono text-slate-500 hover:text-slate-300">{d.type}</button>
                     <span className="text-slate-300">{d.summary}</span>
                   </li>
                 ))}

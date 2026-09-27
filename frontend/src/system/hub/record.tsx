@@ -145,3 +145,18 @@ export function openable(open: () => void, label?: string) {
     },
   };
 }
+
+/**
+ * A click handler for a row that holds its own links or buttons: the row
+ * opens its record, except when the click was on one of those controls. The
+ * row itself takes no role — a control inside a control is unreachable to a
+ * screen reader — so pair it with a real button inside the row for keyboards.
+ */
+export function rowClick(open: () => void) {
+  return (e: { target: EventTarget | null }) => {
+    const el = e.target as HTMLElement | null;
+    const control = el?.closest?.("a,button,input,select,textarea");
+    if (control && !control.hasAttribute("data-open")) return;
+    open();
+  };
+}

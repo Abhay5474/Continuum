@@ -127,8 +127,12 @@ public class AutopilotService {
         } catch (Exception e) {
             mode = base.mode();
         }
+        // Profiles saved before the built-in mock provider was removed still
+        // list it; it no longer exists, so it is dropped rather than offered.
+        java.util.List<String> allowed = base.allowedProviders() == null ? null
+                : base.allowedProviders().stream().filter(p -> !"mock".equalsIgnoreCase(p)).toList();
         return new DeveloperProfile(base.applicationName(), base.goal(), base.maxCostPerRequest(),
-                base.maxLatencyMs(), base.allowedProviders(), base.preferredModelClasses(), mode);
+                base.maxLatencyMs(), allowed, base.preferredModelClasses(), mode);
     }
 
     // ---- closed loop: observe → propose → verify → (canary) ----

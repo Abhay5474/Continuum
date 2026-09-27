@@ -82,3 +82,31 @@ generates it. Some features judge or rewrite the finished answer: the
 enforcing quality gate, confidence sampling, cascade, firewall, verification
 engine, hedging, context optimizer and AI chaos. When any of them is on, the
 answer is buffered and then sent. See [V3_GATEWAY § Streaming](V3_GATEWAY.md).
+
+## Recommendations (the advisor)
+
+`GET /api/portal/developer/advice` reads the account's whole configuration
+against its own recent traffic and returns what is wrong with it: a max latency
+no model has met, a Verification Engine that bypasses features the account also
+turned on, a repair budget shorter than a model call, a cache that matches too
+loosely, a chaos experiment left armed, no provider key at all. Each item says
+why, how to fix it, and which page the setting is on. The console shows new
+findings in a pop-up and keeps them behind the badge in the bottom-right corner;
+it re-checks after every saved setting.
+
+## How features combine
+
+- **Verification Engine** answers on its own path. The Prompt Firewall still
+  runs first and on the answer; cache, cascade, quality gate, confidence,
+  compression, context optimizer and transformers do not. The advisor says so
+  when any of them is on alongside it. It is given the conversation and the
+  system prompt, not only the last message.
+- **Semantic Cache** is keyed on the whole conversation, not the last message,
+  and skips requests with tools or images. It stores the answer the caller
+  actually got, after the quality gate and confidence checks, and never one
+  that failed the gate, came back with low confidence, or was corrupted by AI
+  chaos.
+- **Cascade** and **hedging** answer the caller's own request, so tools and JSON
+  mode are kept; hedged answers go through the quality gate and confidence
+  checks like every other path. Quality-gate repairs and confidence resamples
+  keep the caller's JSON mode.

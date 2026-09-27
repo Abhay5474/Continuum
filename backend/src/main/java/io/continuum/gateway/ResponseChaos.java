@@ -46,6 +46,11 @@ public class ResponseChaos {
     public ResponseChaos(io.continuum.aichaos.AiChaosEngine aiChaos) {
         this.aiChaos = aiChaos;
     }
+    /** True while this tenant has AI chaos armed: its answers are corrupted on purpose. */
+    public boolean active(String developerId) {
+        return developerId != null && aiChaos.isActive(developerId);
+    }
+
     /**
      * Applies armed AI-level faults to a provider response.
      *

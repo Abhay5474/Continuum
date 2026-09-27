@@ -12,6 +12,7 @@ import { guideFor } from "./system/guides";
 import { FEATURES } from "./system/features";
 import FeatureTabs from "./system/FeatureTabs";
 import { useLiquidSurface } from "./system/primitives";
+import Advisor from "./components/Advisor";
 import { BrandMark } from "./system/brand";
 
 /**
@@ -358,6 +359,7 @@ export default function App() {
         <FeatureTabs />
         <Outlet />
       </PageStage>
+      <Advisor />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
 import { api, BASE } from "../api";
 import { useToast } from "../components/ui";
-import { Chip, Segmented, Stat, Stats, RecordPanel, Field, openable } from "../system/hub";
+import { Chip, Segmented, Stat, Stats, RecordPanel, Field, rowClick } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { Readout, Plane, StateDot } from "../system/primitives";
 import { STATE, type StateKey } from "../system/tokens";
@@ -256,13 +256,18 @@ export default function GatewayDashboard() {
                 <div
                   key={r.id}
                   title={r.routingReason ?? undefined}
-                  {...openable(() => setOpenReq(r))}
+                  onClick={rowClick(() => setOpenReq(r))}
                   className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[11px] hover:bg-slate-500/[0.055]"
                 >
                   <StateDot state={st} size={6} />
-                  <span className="readout w-16 shrink-0 text-slate-600">
+                  <button
+                    type="button"
+                    data-open
+                    aria-label={`Details for req_${r.id}`}
+                    className="readout w-16 shrink-0 rounded text-left text-slate-600 hover:text-slate-300"
+                  >
                     {timeOf(r.createdAt)}
-                  </span>
+                  </button>
 
                   {/* what was asked for → where it actually went */}
                   <span className="flex min-w-0 shrink-0 items-center gap-1.5">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import { Chip, Empty, Pill, Segmented, Stat, Stats, type Tone, RecordPanel, Field, openable } from "../system/hub";
+import { Chip, Empty, Pill, Segmented, Stat, Stats, type Tone, RecordPanel, Field, rowClick } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
 import { StackedBar, type Datum } from "../system/charts";
 import { Input, Select, Table, TD, TH, TR } from "../system/controls";
@@ -348,8 +348,8 @@ export default function Models() {
                   lead={openEv?.detail && <Field label="What happened">{openEv.detail}</Field>}
                 />
                 {events.slice(0, 40).map((e, i) => (
-                  <li key={e.id} {...openable(() => setOpenEv(e))} className="rise-in flex cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-slate-500/[0.055]" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
-                    <span className="w-24 shrink-0 text-[11.5px] text-slate-500">{ago(e.createdAt)}</span>
+                  <li key={e.id} onClick={rowClick(() => setOpenEv(e))} className="rise-in flex cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-slate-500/[0.055]" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
+                    <button type="button" data-open aria-label={`Details: ${e.type.toLowerCase().replace(/_/g, " ")}${e.model ? ` ${e.model}` : ""}`} className="w-24 shrink-0 text-left text-[11.5px] text-slate-500 hover:text-slate-300">{ago(e.createdAt)}</button>
                     <Pill tone={EVENT_TONE[e.type] ?? "mute"}>{e.type.toLowerCase().replace(/_/g, " ")}</Pill>
                     {e.model && <span className="font-mono text-[12px] text-slate-300">{e.model}</span>}
                     <span className="min-w-0 flex-1 text-[12.5px] text-slate-400">{e.detail}</span>

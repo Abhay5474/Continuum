@@ -120,7 +120,11 @@ public class AnswerReview {
             repairMessages.add(Message.user(verdict.repairInstruction()));
 
             LlmResponse repaired = chaos.apply(developerId, router.complete(
-                    new LlmRequest(model, repairMessages, canonical.maxTokens(), canonical.temperature()),
+                    // The caller's response format is kept: a repaired JSON
+                    // answer must still be JSON. Tools are not offered to a
+                    // repair — it rewrites text, it does not act.
+                    new LlmRequest(model, repairMessages, canonical.maxTokens(), canonical.temperature(),
+                            null, null, canonical.responseFormat()),
                     List.of(provider), keyFor(devKeys, provider)));
             long repairMs = (System.nanoTime() - start) / 1_000_000;
 
@@ -176,7 +180,7 @@ public class AnswerReview {
                 messages -> {
                     LlmResponse r = chaos.apply(developerId, router.complete(
                             new LlmRequest(model, messages, canonical.maxTokens(),
-                                    canonical.temperature()),
+                                    canonical.temperature(), null, null, canonical.responseFormat()),
                             List.of(provider), keyFor(devKeys, provider)));
                     String safe = firewall.guardOutbound(developerId, r.content());
                     double c = router.estimateCost(provider, r.model(),
@@ -230,7 +234,7 @@ public class AnswerReview {
             for (int i = 0; i < extra; i++) {
                 LlmResponse r = chaos.apply(developerId, router.complete(
                         new LlmRequest(model, canonical.messages(), canonical.maxTokens(),
-                                cfg.getTemperature()),
+                                cfg.getTemperature(), null, null, canonical.responseFormat()),
                         List.of(provider), keyFor(devKeys, provider)));
                 answers.add(r.content());
                 extraCost += router.estimateCost(provider, r.model(), r.promptTokens(), r.completionTokens());
