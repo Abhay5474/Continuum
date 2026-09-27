@@ -35,6 +35,8 @@ import java.sql.DriverManager;
         "GEMINI_API_KEY=", "GROQ_API_KEY=",
         // Webhook and HTTP-step tests call a receiver on this machine.
         "continuum.declarative.allow-private-targets=true",
+        // The consensus DAG waits on workers the tests drive by hand; don't wait long.
+        "continuum.dag.timeout-ms=1500",
         "logging.level.io.continuum=WARN"
 })
 @ExtendWith(PostgresIT.RequiresPostgres.class)
