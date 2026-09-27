@@ -38,13 +38,27 @@ import java.util.regex.Pattern;
 public final class PromptCompressor {
 
     private static final Set<String> STOPWORDS = Set.of(
-            "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for", "with", "as", "at",
+            "the", "a", "an", "and", "of", "to", "in", "on", "for", "with", "as", "at",
             "by", "is", "are", "was", "were", "be", "been", "being", "this", "that", "these", "those",
             "it", "its", "i", "you", "he", "she", "they", "we", "them", "his", "her", "their", "our",
-            "so", "then", "than", "there", "here", "which", "who", "whom", "whose", "what", "when",
+            "so", "then", "there", "here",
             "please", "just", "very", "really", "actually", "basically", "simply", "quite", "kind",
-            "sort", "like", "well", "okay", "ok", "um", "uh", "also", "too", "much", "many", "some",
-            "any", "all", "into", "from", "about", "over", "under", "again", "further", "once");
+            "sort", "like", "well", "okay", "ok", "um", "uh", "also", "too", "much", "many",
+            "into", "from", "about", "again", "further", "once");
+
+    /**
+     * Words that change what a sentence means, kept however short or common.
+     * The compressor used to drop every word of two letters or fewer and a
+     * list that included "under", "over", "all", "any", "or", "but", "than"
+     * and the question words — so "I have no allergies" reached the model as
+     * "have allergies", and "over 18" and "under 18" became the same prompt.
+     */
+    private static final Set<String> MEANING = Set.of(
+            "no", "not", "nor", "never", "none", "neither", "without", "nothing", "nobody",
+            "if", "unless", "or", "but", "except", "only", "than", "under", "over", "above", "below",
+            "before", "after", "all", "any", "some", "each", "every", "more", "less", "most", "least",
+            "what", "when", "where", "who", "whom", "whose", "which", "why", "how",
+            "up", "me", "my", "us", "do", "go");
 
     // Spans that must survive: quoted text, code/JSON blocks, numbers, IDs, emails, URLs.
     private static final Pattern PROTECTED = Pattern.compile(
@@ -205,6 +219,14 @@ public final class PromptCompressor {
             String lower = tok.toLowerCase().replaceAll("[^a-z0-9]", "");
             boolean isProtected = tok.contains(MARK_OPEN + "P");
             if (isProtected || lower.isEmpty()) {
+                sb.append(tok).append(' ');
+                continue;
+            }
+            if (MEANING.contains(lower) || tok.toLowerCase().matches(".*n['’]t\\W*")) {
+                // A negation, a condition, a comparison or a question word:
+                // never filler. (Contractions are matched on the raw token:
+                // "don't" is "dont" once punctuation is stripped.) Repeats are kept too — "no, no" and
+                // "not A or B, not C" both mean what they say.
                 sb.append(tok).append(' ');
                 continue;
             }

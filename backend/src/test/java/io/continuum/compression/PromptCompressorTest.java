@@ -95,4 +95,15 @@ class PromptCompressorTest {
         assertEquals(0, r.protectedSpans(), "plain prose has nothing to protect");
         assertTrue(r.achievedRatio() < 0.8, "and so it can actually be compressed: " + r.achievedRatio());
     }
+
+    @Test
+    void wordsThatChangeTheMeaningSurviveCompression() {
+        // One sentence, so it is kept and only word-level pruning applies.
+        String text = "Please note that I really have no allergies at all and if my patient is under the "
+                + "age limit or over it I don't want any of the usual adult doses, so what should I do before calling";
+        String out = compressor.compress(text, 0.5, 10).text().toLowerCase();
+        org.assertj.core.api.Assertions.assertThat(out)
+                .contains("no allergies", "if", "under", "or over", "don't", "any", "what", "before")
+                .doesNotContain("please", "really");
+    }
 }
