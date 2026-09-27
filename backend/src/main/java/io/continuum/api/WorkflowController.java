@@ -125,6 +125,21 @@ public class WorkflowController {
     }
 
     /**
+     * Tries a stuck workflow again. A workflow is stuck when its code failed on
+     * every try until the engine stopped retrying it; once the cause is fixed,
+     * this queues one fresh try. 409 when there is nothing parked to resume.
+     */
+    @PostMapping("/{id}/resume")
+    public java.util.Map<String, Object> resume(@PathVariable String id, HttpServletRequest http) {
+        RequestScope.requireOwner(http, query.ownerOf(id));
+        if (!engine.resume(id)) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                    "This run is not stuck, so there is nothing to resume.");
+        }
+        return java.util.Map.of("workflowId", id, "status", "RUNNING", "resumed", true);
+    }
+
+    /**
      * Starts a new run with the same type and input as an earlier one — the
      * "try again" after a failure or a cancel. The earlier run is untouched; the
      * new one is ordinary and unrelated in the engine, and says where it came

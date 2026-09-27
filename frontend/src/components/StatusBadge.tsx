@@ -1,4 +1,5 @@
 const COLORS: Record<string, string> = {
+  STUCK: "bg-orange-500/20 text-orange-300 border-orange-500/40",
   RUNNING: "bg-amber-500/20 text-amber-300 border-amber-500/40",
   COMPLETED: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
   FAILED: "bg-rose-500/20 text-rose-300 border-rose-500/40",

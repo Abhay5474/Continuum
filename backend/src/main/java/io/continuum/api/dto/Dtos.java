@@ -21,7 +21,14 @@ public final class Dtos {
      */
     public record WorkflowSummary(String workflowId, String workflowType, String status,
                                   long currentSequence, Instant createdAt, Instant updatedAt,
-                                  boolean cancelled) {
+                                  boolean cancelled, boolean stuck) {
+    }
+
+    /**
+     * A running workflow whose decision failed until it was parked.
+     * {@code attempts} is how many times it was tried; {@code error} the last reason.
+     */
+    public record StuckView(int attempts, String error, Instant since) {
     }
 
     public record EventView(long sequenceNumber, String eventType, Object payload, Instant createdAt) {
@@ -37,7 +44,8 @@ public final class Dtos {
 
     public record WorkflowDetail(WorkflowSummary summary, Object input, Object result, String error,
                                  List<EventView> events, List<ActivityTaskView> activities,
-                                 List<OutboxView> outbox, double costUsd, long tokens) {
+                                 List<OutboxView> outbox, double costUsd, long tokens,
+                                 StuckView stuck) {
     }
 
     public record CostByProvider(String provider, long tokens, double costUsd, long calls) {

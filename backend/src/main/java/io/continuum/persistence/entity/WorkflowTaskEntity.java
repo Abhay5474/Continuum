@@ -44,6 +44,16 @@ public class WorkflowTaskEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** Times this decision has been claimed. Counted at claim, so a crash counts too. */
+    @Column(name = "attempts", nullable = false)
+    private int attempts;
+
+    @Column(name = "last_error", columnDefinition = "TEXT")
+    private String lastError;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt = Instant.now();
+
     protected WorkflowTaskEntity() {
     }
 
@@ -56,6 +66,34 @@ public class WorkflowTaskEntity {
 
     public Long getId() {
         return id;
+    }
+
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
+    }
+
+    public String getLastError() {
+        return lastError;
+    }
+
+    public void setLastError(String lastError) {
+        this.lastError = lastError;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 
     public String getWorkflowId() {
@@ -94,7 +132,5 @@ public class WorkflowTaskEntity {
         this.lockedBy = lockedBy;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
+
 }

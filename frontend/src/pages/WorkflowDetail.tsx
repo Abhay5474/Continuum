@@ -100,6 +100,21 @@ export default function WorkflowDetailPage() {
     }
   };
 
+  const [resuming, setResuming] = useState(false);
+  const resume = async () => {
+    if (!id || resuming) return;
+    setResuming(true);
+    try {
+      await api.post(`/api/workflows/${id}/resume`);
+      setDetail(await api.workflow(id));
+      toast("Trying again", "success");
+    } catch (e: any) {
+      toast(`Could not resume: ${e?.body?.message ?? e?.body?.error ?? e?.message ?? "request failed"}`, "error");
+    } finally {
+      setResuming(false);
+    }
+  };
+
   const cancel = async () => {
     if (!id || cancelling) return;
     if (!window.confirm("Stop this workflow? Steps already done stay done; anything waiting to run will not run.")) return;
@@ -155,7 +170,7 @@ export default function WorkflowDetailPage() {
         <Link to="/dashboard" className="text-sm text-slate-400 hover:text-slate-200">
           ← Back
         </Link>
-        <StatusBadge status={isCancelled(detail.error) ? "CANCELLED" : detail.summary.status} />
+        <StatusBadge status={isCancelled(detail.error) ? "CANCELLED" : detail.stuck ? "STUCK" : detail.summary.status} />
         <div className="flex items-center gap-2.5">
           <Chip glyph="flow" tone="accent" size={28} />
           {/* A declarative run is named by its definition — "Declarative" is
@@ -231,6 +246,22 @@ export default function WorkflowDetailPage() {
             <div className="mt-0.5 text-[12.5px] text-slate-300">{detail.error}</div>
           </div>
           <Button size="sm" busy={rerunning} onClick={rerun}>Run again</Button>
+        </div>
+      )}
+
+      {detail.stuck && detail.summary.status === "RUNNING" && (
+        <div role="alert" className="-mt-3 flex flex-wrap items-center gap-3 rounded-[var(--r-lg)] border border-amber-500/30 bg-amber-500/[0.07] px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold text-amber-200">
+              Stuck after {detail.stuck.attempts} tries
+              <span className="ml-2 font-normal text-slate-400">since {timeOf(detail.stuck.since)}</span>
+            </div>
+            <div className="mt-0.5 break-words font-mono text-[12px] text-slate-300">{detail.stuck.error ?? "No error recorded"}</div>
+            <div className="mt-1 text-[12px] text-slate-400">
+              The engine stopped retrying so it would not loop forever. Nothing it did is lost. Fix the cause, then try again.
+            </div>
+          </div>
+          <Button size="sm" busy={resuming} onClick={resume}>Try again</Button>
         </div>
       )}
 

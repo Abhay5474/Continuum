@@ -76,6 +76,8 @@ public class TaskClaimer {
             t.setStatus(TaskStatus.RUNNING);
             t.setLockedBy(workerId);
             t.setLockedUntil(now.plusSeconds(props.getWorkflowTaskTimeoutSeconds()));
+            t.setAttempts(t.getAttempts() + 1);
+            t.setUpdatedAt(now);
         }
         workflowTasks.saveAll(claimed);
         return claimed;
@@ -100,7 +102,55 @@ public class TaskClaimer {
             t.setStatus(TaskStatus.COMPLETED);
             t.setLockedBy(null);
             t.setLockedUntil(null);
+            t.setUpdatedAt(Instant.now());
             workflowTasks.save(t);
+            // The workflow moved on, so any decision parked earlier no longer
+            // describes it.
+            workflowTasks.clearParked(t.getWorkflowId());
         });
+    }
+
+    /**
+     * How many times a decision may be tried before it is parked. With the
+     * backoff below that is about a quarter of an hour of retrying, which rides
+     * out a database blip and still stops a decision that fails every time.
+     * (Workflow code that throws fails its run instead; what lands here fails
+     * around that code — a workflow type no longer deployed, a history that
+     * cannot be read, a resolution the healing engine cannot commit.)
+     */
+    public static final int MAX_DECISION_ATTEMPTS = 8;
+
+    /** Seconds before a failed decision is tried again: 5, 10, 20 … capped at 5 minutes. */
+    static long decisionBackoffSeconds(int attempts) {
+        return Math.min(300L, 5L << Math.max(0, Math.min(attempts - 1, 10)));
+    }
+
+    /**
+     * A decision threw. It is tried again after a backoff, or — at the limit —
+     * parked with its error: the task is FAILED, the workflow stays RUNNING, and
+     * nothing retries it until someone resumes the workflow.
+     *
+     * @return true when the decision was parked
+     */
+    @Transactional
+    public boolean decisionFailed(Long id, String error) {
+        WorkflowTaskEntity t = workflowTasks.findById(id).orElse(null);
+        if (t == null) {
+            return false;
+        }
+        Instant now = Instant.now();
+        t.setLastError(error == null ? null : error.length() > 2000 ? error.substring(0, 2000) : error);
+        t.setLockedBy(null);
+        t.setLockedUntil(null);
+        t.setUpdatedAt(now);
+        boolean park = t.getAttempts() >= MAX_DECISION_ATTEMPTS;
+        if (park) {
+            t.setStatus(TaskStatus.FAILED);
+        } else {
+            t.setStatus(TaskStatus.PENDING);
+            t.setVisibleAt(now.plusSeconds(decisionBackoffSeconds(t.getAttempts())));
+        }
+        workflowTasks.save(t);
+        return park;
     }
 }

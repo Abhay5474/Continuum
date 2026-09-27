@@ -139,10 +139,109 @@ export default function Accounts() {
               </div>
             )}
           </section>
+
+          <Retention />
         </>
       )}
     </div>
   );
+}
+
+/**
+ * What the retention job keeps and for how long, what its last passes removed,
+ * and a button to run one now. Bookkeeping and old request logs only — a
+ * running workflow is never touched.
+ */
+function Retention() {
+  const toast = useToast();
+  const [state, setState] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => api.opGet<any>("/api/admin/retention").then(setState).catch(() => setState(null));
+  useEffect(() => {
+    load();
+  }, []);
+  const runNow = async () => {
+    setBusy(true);
+    try {
+      const r = await api.opPost<{ deleted: Record<string, number> }>("/api/admin/retention/run");
+      const total = Object.values(r.deleted ?? {}).reduce((a, b) => a + b, 0);
+      toast(total === 0 ? "Nothing old enough to remove" : `Removed ${total.toLocaleString()} rows`, "success");
+      await load();
+    } catch (e: any) {
+      toast(readError(e) ?? "Retention did not run", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const days = (n: number | undefined, off: string) => (!n ? off : `${n} day${n === 1 ? "" : "s"}`);
+  return (
+    <section className="plane space-y-3 p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Data retention</h2>
+        {state && !state.enabled && <Pill tone="warn">scheduled passes off</Pill>}
+        <button
+          onClick={runNow}
+          disabled={busy || !state}
+          className="ml-auto rounded-[var(--r-md)] bg-[color:var(--accent-strong)] px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {busy ? "Running…" : "Run now"}
+        </button>
+      </div>
+      {!state ? (
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : (
+        <>
+          <dl className="grid gap-3 text-[12.5px] sm:grid-cols-3">
+            <div>
+              <dt className="text-slate-500">Finished decision tasks</dt>
+              <dd className="font-medium text-slate-200">{days(state.decisionTaskDays, "kept")}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Gateway request logs</dt>
+              <dd className="font-medium text-slate-200">{days(state.requestLogDays, "kept forever")}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Finished workflows</dt>
+              <dd className="font-medium text-slate-200">{days(state.finishedWorkflowDays, "kept forever")}</dd>
+            </div>
+          </dl>
+          <p className="text-[12px] text-slate-500">
+            Runs every six hours. Running workflows and cost records are never removed. Change the periods with{" "}
+            <span className="font-mono">continuum.retention.*</span> settings.
+          </p>
+          {state.runs?.length > 0 && (
+            <Table
+              label="Recent retention passes"
+              head={
+                <tr>
+                  <TH>When</TH>
+                  <TH>Trigger</TH>
+                  <TH>Removed</TH>
+                </tr>
+              }
+            >
+              {state.runs.map((r: any) => (
+                <TR key={r.id}>
+                  <TD>{dateTimeOf(r.startedAt)}</TD>
+                  <TD>{String(r.trigger).toLowerCase()}</TD>
+                  <TD>{r.error ? <span className="text-rose-300">{r.error}</span> : removedOf(r.deleted)}</TD>
+                </TR>
+              ))}
+            </Table>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** "{workflow_tasks=3, gateway_requests=0}" → "3 workflow tasks". */
+function removedOf(raw: string | null): string {
+  if (!raw) return "—";
+  const parts = raw.replace(/[{}]/g, "").split(",").map((p) => p.trim()).filter(Boolean)
+    .map((p) => p.split("=")).filter(([, n]) => Number(n) > 0)
+    .map(([k, n]) => `${Number(n).toLocaleString()} ${k.replace(/_/g, " ")}`);
+  return parts.length ? parts.join(" · ") : "nothing";
 }
 
 function AccountRow({ account, open, onToggle }: { account: Account; open: boolean; onToggle: () => void }) {

@@ -320,7 +320,7 @@ export default function WorkflowBuilder() {
                 </div>
                 {runs.map((r: any) => {
                   const st: StateKey =
-                    r.cancelled ? "idle" : r.status === "FAILED" ? "critical" : r.status === "RUNNING" ? "active" : "healthy";
+                    r.cancelled ? "idle" : r.stuck ? "warning" : r.status === "FAILED" ? "critical" : r.status === "RUNNING" ? "active" : "healthy";
                   const f = facts[r.workflowId];
                   return (
                     <Link

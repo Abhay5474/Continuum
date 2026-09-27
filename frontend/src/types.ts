@@ -7,6 +7,15 @@ export interface WorkflowSummary {
   updatedAt: string;
   /** FAILED because someone stopped it, not because it broke. */
   cancelled?: boolean;
+  /** RUNNING, but its decision kept failing and the engine stopped retrying it. */
+  stuck?: boolean;
+}
+
+/** Why a running workflow is stuck: tries made and the last error. */
+export interface StuckView {
+  attempts: number;
+  error: string | null;
+  since: string;
 }
 
 export interface EventView {
@@ -47,6 +56,7 @@ export interface WorkflowDetail {
   outbox: OutboxView[];
   costUsd: number;
   tokens: number;
+  stuck?: StuckView | null;
 }
 
 export interface Stats {

@@ -146,7 +146,7 @@ export default function Dashboard() {
                   data-morph
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-edge/50"
                 >
-                  <StatusBadge status={w.status} />
+                  <StatusBadge status={w.stuck ? "STUCK" : w.status} />
                   <span className="text-sm font-medium">{w.workflowType}</span>
                   <span className="font-mono text-xs text-slate-400">{w.workflowId.slice(0, 8)}</span>
                   <RunLength w={w} slowest={slowest} delay={wi * 50} />

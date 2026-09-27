@@ -96,6 +96,15 @@ Written in the same transaction as the completion event. `UNIQUE(idempotency_key
 guarantees a logical message exists at most once. The dispatcher delivers and
 marks `SENT`.
 
+### Retention
+Queue bookkeeping would otherwise grow forever — every wake-up of a workflow
+writes a `workflow_tasks` row. `RetentionService` runs every six hours and
+deletes, in batches: finished decision tasks after a day, gateway request logs
+after 90 days, and — only when `continuum.retention.finished-workflow-days` is
+set — finished workflows with their history. Running workflows and cost
+records are never removed. The operator sees each pass, and can run one, on the
+Accounts page.
+
 ### `llm_cost_records` — accounting
 Deduplicated by idempotency key so retries/replays never double-count cost.
 
@@ -129,6 +138,14 @@ Deduplicated by idempotency key so retries/replays never double-count cost.
   *(Proven by `EngineIT` on a real database.)*
 - **Activity runs past its timeout.** The worker interrupts it and records a
   retryable failure; an LLM call in progress stops instead of failing over.
+- **A decision fails every time** — not the workflow's code, which fails its
+  run, but around it: a workflow type no longer deployed, a history that cannot
+  be read. Each claim is counted; a failure is retried after 5 s, 10 s, 20 s …
+  (capped at 5 min), and after 8 tries the decision is parked. The workflow
+  stays RUNNING, is shown as **stuck** with the error, and is retried only when
+  someone presses *Try again* (`POST /api/workflows/{id}/resume`). A decision
+  that takes the process down each time is parked the same way, by its claim
+  count. *(Proven by `StuckAndRetentionIT`.)*
 - **Worker dies mid-decision.** Decisions are pure replay; the `workflow_task`
   is reclaimed and re-run with no effect duplication.
 - **Activity succeeds but the commit fails (crash between work and persist).**

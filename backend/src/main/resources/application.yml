@@ -43,6 +43,14 @@ continuum:
     recovery-interval-ms: ${ENGINE_RECOVERY_INTERVAL_MS:5000}
     workflow-task-timeout-seconds: ${ENGINE_WORKFLOW_TASK_TIMEOUT:60}
     workers-enabled: ${ENGINE_WORKERS_ENABLED:true}
+  # What the retention job removes, and after how long (see RetentionService).
+  # Running workflows and cost records are never removed.
+  retention:
+    enabled: ${RETENTION_ENABLED:true}
+    decision-task-days: ${RETENTION_DECISION_TASK_DAYS:1}
+    request-log-days: ${RETENTION_REQUEST_LOG_DAYS:90}
+    # 0 keeps finished workflows (and their history) forever.
+    finished-workflow-days: ${RETENTION_FINISHED_WORKFLOW_DAYS:0}
   llm:
     failover-order: ${LLM_FAILOVER_ORDER:gemini,groq,mock}
     gemini:

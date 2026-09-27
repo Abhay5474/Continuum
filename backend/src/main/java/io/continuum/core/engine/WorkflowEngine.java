@@ -145,6 +145,29 @@ public class WorkflowEngine {
     }
 
     /**
+     * Tries a parked workflow again: its decision failed until it was parked,
+     * and someone has since fixed the cause (deployed a code fix, restored a
+     * dependency). One fresh decision is queued; if it fails again it backs off
+     * and parks again, as before.
+     *
+     * @return false when the workflow is not running or has nothing parked
+     */
+    @Transactional
+    public boolean resume(String workflowId) {
+        WorkflowInstanceEntity instance = instances.findByIdForUpdate(workflowId)
+                .orElseThrow(() -> new IllegalArgumentException("No such workflow: " + workflowId));
+        if (instance.getStatus() != WorkflowStatus.RUNNING) {
+            return false;
+        }
+        if (workflowTasks.clearParked(workflowId) == 0) {
+            return false;
+        }
+        workflowTasks.save(new WorkflowTaskEntity(workflowId));
+        log.info("Workflow {} resumed", workflowId);
+        return true;
+    }
+
+    /**
      * Process one decision for a workflow. Idempotent: terminal workflows and
      * re-delivered tasks are no-ops.
      */

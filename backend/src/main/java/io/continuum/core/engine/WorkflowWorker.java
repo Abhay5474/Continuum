@@ -35,17 +35,47 @@ public class WorkflowWorker {
         this.props = props;
     }
 
+    /** The exception and its root cause, which is usually the part that explains it. */
+    static String describe(Throwable e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String top = e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage());
+        if (root == e) {
+            return top;
+        }
+        return top + " (caused by " + root.getClass().getSimpleName()
+                + (root.getMessage() == null ? "" : ": " + root.getMessage()) + ")";
+    }
+
     @Scheduled(fixedDelayString = "${continuum.engine.poll-interval-ms:500}")
     public void poll() {
         List<WorkflowTaskEntity> tasks = claimer.claimWorkflowTasks(props.getBatchSize(), identity.id());
         for (WorkflowTaskEntity task : tasks) {
+            if (task.getAttempts() > TaskClaimer.MAX_DECISION_ATTEMPTS) {
+                // Claimed this often without ever reporting back: each attempt
+                // took the process down, or outlived its lease. Running it again
+                // is how it would do that once more.
+                claimer.decisionFailed(task.getId(), task.getLastError() != null ? task.getLastError()
+                        : "Never finished in " + TaskClaimer.MAX_DECISION_ATTEMPTS + " attempts");
+                log.error("Decision for workflow {} parked: claimed {} times without finishing",
+                        task.getWorkflowId(), task.getAttempts());
+                continue;
+            }
             try {
                 engine.processDecision(task.getWorkflowId());
                 claimer.completeWorkflowTask(task.getId());
             } catch (Exception e) {
-                // Leave the task RUNNING; the recovery sweeper will make it visible again.
-                log.error("Decision failed for workflow {} (task {}); will be retried after timeout",
-                        task.getWorkflowId(), task.getId(), e);
+                String error = describe(e);
+                boolean parked = claimer.decisionFailed(task.getId(), error);
+                if (parked) {
+                    log.error("Decision for workflow {} failed {} times and is parked until the workflow is resumed: {}",
+                            task.getWorkflowId(), task.getAttempts(), error, e);
+                } else {
+                    log.error("Decision failed for workflow {} (attempt {}); will be retried: {}",
+                            task.getWorkflowId(), task.getAttempts(), error, e);
+                }
             }
         }
     }

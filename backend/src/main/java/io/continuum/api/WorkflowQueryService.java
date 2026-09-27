@@ -20,11 +20,13 @@ public class WorkflowQueryService {
     private final ActivityTaskRepository activityTasks;
     private final OutboxRepository outbox;
     private final CostRecordRepository costs;
+    private final WorkflowTaskRepository workflowTasks;
     private final Json json;
 
     public WorkflowQueryService(WorkflowInstanceRepository instances, WorkflowEventRepository events,
                                 ActivityTaskRepository activityTasks, OutboxRepository outbox,
-                                CostRecordRepository costs, Json json) {
+                                CostRecordRepository costs, WorkflowTaskRepository workflowTasks, Json json) {
+        this.workflowTasks = workflowTasks;
         this.instances = instances;
         this.events = events;
         this.activityTasks = activityTasks;
@@ -35,15 +37,30 @@ public class WorkflowQueryService {
 
     @Transactional(readOnly = true)
     public List<WorkflowSummary> list(int limit) {
-        return instances.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit))
-                .map(this::toSummary).getContent();
+        return summarise(instances.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit)).getContent());
     }
 
     /** Only the workflows owned by {@code developerId} — what the console shows a tenant. */
     @Transactional(readOnly = true)
     public List<WorkflowSummary> listForDeveloper(String developerId, int limit) {
-        return instances.findByDeveloperIdOrderByCreatedAtDesc(developerId, PageRequest.of(0, limit))
-                .map(this::toSummary).getContent();
+        return summarise(instances.findByDeveloperIdOrderByCreatedAtDesc(developerId, PageRequest.of(0, limit))
+                .getContent());
+    }
+
+    /** Summaries for a page of workflows, with one query to find which are stuck. */
+    private List<WorkflowSummary> summarise(List<WorkflowInstanceEntity> page) {
+        List<String> running = page.stream()
+                .filter(i -> i.getStatus() == io.continuum.persistence.entity.WorkflowStatus.RUNNING)
+                .map(WorkflowInstanceEntity::getWorkflowId).toList();
+        java.util.Set<String> stuck = running.isEmpty() ? java.util.Set.of()
+                : new java.util.HashSet<>(workflowTasks.stuckAmong(running));
+        return page.stream().map(i -> toSummary(i, stuck.contains(i.getWorkflowId()))).toList();
+    }
+
+    /** Running workflows parked on a failing decision, engine-wide. */
+    @Transactional(readOnly = true)
+    public long stuckCount() {
+        return workflowTasks.countStuck();
     }
 
     /** How {@code WorkflowEngine#cancel} words the reason; what marks a cancel. */
@@ -98,8 +115,14 @@ public class WorkflowQueryService {
         long tokens = costs.findByWorkflowId(workflowId).stream()
                 .mapToLong(c -> c.getPromptTokens() + c.getCompletionTokens()).sum();
 
-        return new WorkflowDetail(toSummary(instance), parse(instance.getInput()), parse(instance.getResult()),
-                instance.getError(), eventViews, activityViews, outboxViews, cost, tokens);
+        StuckView stuck = instance.getStatus() != io.continuum.persistence.entity.WorkflowStatus.RUNNING ? null
+                : workflowTasks.findFirstByWorkflowIdAndStatusOrderByUpdatedAtDesc(workflowId, TaskStatus.FAILED)
+                        .map(t -> new StuckView(t.getAttempts(), t.getLastError(), t.getUpdatedAt()))
+                        .orElse(null);
+
+        return new WorkflowDetail(toSummary(instance, stuck != null), parse(instance.getInput()),
+                parse(instance.getResult()), instance.getError(), eventViews, activityViews, outboxViews,
+                cost, tokens, stuck);
     }
 
     @Transactional(readOnly = true)
@@ -120,11 +143,11 @@ public class WorkflowQueryService {
                 costs.totalTokensForDeveloper(developerId), byProvider);
     }
 
-    private WorkflowSummary toSummary(WorkflowInstanceEntity i) {
+    private WorkflowSummary toSummary(WorkflowInstanceEntity i, boolean stuck) {
         return new WorkflowSummary(i.getWorkflowId(), i.getWorkflowType(), i.getStatus().name(),
                 i.getCurrentSequence(), i.getCreatedAt(), i.getUpdatedAt(),
                 i.getStatus() == io.continuum.persistence.entity.WorkflowStatus.FAILED
-                        && i.getError() != null && i.getError().startsWith(CANCELLED_PREFIX));
+                        && i.getError() != null && i.getError().startsWith(CANCELLED_PREFIX), stuck);
     }
 
     private Object parse(String jsonStr) {
