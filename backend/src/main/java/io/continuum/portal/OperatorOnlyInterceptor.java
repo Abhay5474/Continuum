@@ -11,7 +11,8 @@ public class OperatorOnlyInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (handler instanceof HandlerMethod m && requiresOperator(m) && !RequestScope.isOperator(request)) {
-            throw new RequestScope.ForbiddenException();
+            throw new RequestScope.ForbiddenException(
+                    "This setting applies to the whole engine, so only the operator can change it.");
         }
         return true;
     }

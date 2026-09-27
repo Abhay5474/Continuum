@@ -76,5 +76,9 @@ public final class RequestScope {
         public ForbiddenException() {
             super("This resource belongs to another account.");
         }
+
+        public ForbiddenException(String message) {
+            super(message);
+        }
     }
 }
