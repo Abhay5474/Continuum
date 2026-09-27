@@ -158,6 +158,8 @@ export default function Settings() {
         {me && <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">{me.you?.email ?? me.email}{me.member ? ` · member of ${me.name}` : ""} · <span className="font-mono">{me.id}</span></p>}
       </div>
 
+      <Features />
+
       {/* API keys */}
       <Section title="API keys" subtitle="Shown once — name each for what it's for">
         <div className="flex flex-wrap gap-2">
@@ -478,6 +480,83 @@ function Operators() {
             Changes need your password. The last operator can't be removed.
           </p>
         </>
+      )}
+    </Section>
+  );
+}
+
+/**
+ * Every feature by what it does, with its state for this account. A plain
+ * on/off can be flipped here; a feature with modes links to its page. The
+ * older version-named switches (v6, v7, v8) set the same things.
+ */
+function Features() {
+  const toast = useToast();
+  const nav = useNavigate();
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => {
+    portal.features.list().then(setRows).catch(() => setRows([]));
+  }, []);
+  const flip = async (key: string, next: boolean) => {
+    setBusy(key);
+    try {
+      const updated = await portal.features.set(key, next);
+      setRows((r) => (r ?? []).map((x) => (x.key === key ? updated : x)));
+    } catch (e: any) {
+      toast(`Not changed: ${e?.body?.message ?? e?.message ?? "request failed"}`, "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <Section title="Features" subtitle="What is on for this account, by name. Labs features are research: complete and tested, but more likely to change.">
+      {rows === null ? (
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : (
+        <Table
+          label="Features"
+          head={
+            <tr>
+              <TH>Feature</TH>
+              <TH>Area</TH>
+              <TH>State</TH>
+              <TH><span className="sr-only">Actions</span></TH>
+            </tr>
+          }
+        >
+          {rows.map((f) => (
+            <TR key={f.key}>
+              <TD>
+                <div className="font-medium text-slate-200">
+                  {f.name} {f.labs && <Pill tone="violet">Labs</Pill>}
+                </div>
+                <div className="text-[11.5px] text-slate-500">{f.summary}</div>
+              </TD>
+              <TD>{f.area}</TD>
+              <TD>
+                {f.on == null ? <span className="text-slate-500">—</span>
+                  : f.on ? <span className="text-emerald-300">On</span> : <span className="text-slate-400">Off</span>}
+              </TD>
+              <TD>
+                <div className="flex justify-end gap-2">
+                  {f.switchable && f.on != null && (
+                    <button
+                      disabled={busy === f.key}
+                      onClick={() => flip(f.key, !f.on)}
+                      className="whitespace-nowrap rounded border border-edge px-2 py-1 text-xs hover:bg-edge/40 disabled:opacity-50"
+                    >
+                      {f.on ? "Turn off" : "Turn on"}
+                    </button>
+                  )}
+                  <button onClick={() => nav(f.route)} className="rounded border border-edge px-2 py-1 text-xs hover:bg-edge/40">
+                    Open
+                  </button>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </Table>
       )}
     </Section>
   );

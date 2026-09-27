@@ -29,6 +29,11 @@ export type Feature = {
   desc: string;
   /** The screens it is made of. The first is where the menu entry points. */
   views: FeatureView[];
+  /**
+   * Research features: complete and tested, but not needed for the engine's
+   * core guarantees, and more likely to change. Marked in the menu.
+   */
+  labs?: boolean;
 };
 
 export const FEATURES: Feature[] = [
@@ -107,6 +112,7 @@ export const FEATURES: Feature[] = [
   {
     name: "Context Optimizer",
     desc: "Page long histories out of the window and back in",
+    labs: true,
     views: [{ to: "/mmu", label: "Context Optimizer" }],
   },
   {
@@ -119,6 +125,7 @@ export const FEATURES: Feature[] = [
   {
     name: "Verification Engine",
     desc: "Solve, verify and score every answer as a graph of agents",
+    labs: true,
     views: [{ to: "/dag", label: "Verification Engine" }],
   },
   {
@@ -153,6 +160,7 @@ export const FEATURES: Feature[] = [
   {
     name: "Adaptive Policy",
     desc: "Autonomous memory and policy, gated by replay",
+    labs: true,
     views: [{ to: "/godmode", label: "Adaptive Policy" }],
   },
 ];

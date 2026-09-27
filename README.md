@@ -57,7 +57,8 @@ providers** — all without losing state.
 5. **Provider failover** — LLM calls route through an ordered provider chain
    (Gemini → Groq → Mock); a failure transparently falls over to the next.
 
-See **[docs/USAGE.md](docs/USAGE.md)** for a guided tour of every feature,
+**[docs/FEATURES.md](docs/FEATURES.md)** lists every feature once, by name, with where it lives and
+what it answers on. See **[docs/USAGE.md](docs/USAGE.md)** for a guided tour of every feature,
 including copy-paste chaos demos that kill workers and flood sinks with
 failures while the system stays correct.
 

@@ -303,6 +303,11 @@ export function sessionRole(): "DEVELOPER" | "OPERATOR" | null {
 export const isOperator = () => sessionRole() === "OPERATOR" || hasOperator();
 
 export const portal = {
+  /** Every feature by its real name, with its state; plain switches can be flipped here. */
+  features: {
+    list: () => portalHttp<any[]>("/api/portal/developer/features", "GET"),
+    set: (key: string, enabled: boolean) => portalHttp<any>(`/api/portal/developer/features/${key}`, "PUT", { enabled }),
+  },
   /** Webhook endpoints: signed, exactly-once notifications of run outcomes. */
   webhooks: {
     list: () => portalHttp<{ endpoints: any[]; events: string[] }>("/api/portal/developer/webhooks", "GET"),

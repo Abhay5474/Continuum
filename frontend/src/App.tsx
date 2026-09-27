@@ -21,7 +21,7 @@ import { BrandMark } from "./system/brand";
  * top-level links overflowed onto a second row and gave no sense of hierarchy.
  * Features are now organised by what they do, with account actions in a menu.
  */
-type Item = { to: string; label: string; desc: string; views?: string[] };
+type Item = { to: string; label: string; desc: string; views?: string[]; labs?: boolean };
 type Group = { label: string; items: Item[] };
 
 const GROUPS: Group[] = [
@@ -51,6 +51,7 @@ function featureItems(names: string[]): Item[] {
       // Named so the menu can show what is inside a merged feature without
       // making the reader open it to find out.
       views: f.views.length > 1 ? f.views.map((v) => v.label) : undefined,
+      labs: f.labs,
     }];
   });
 }
@@ -405,7 +406,15 @@ function MenuItems({
             }`
           }
         >
-          <div className="text-[13px] font-medium text-slate-200">{i.label}</div>
+          <div className="text-[13px] font-medium text-slate-200">
+            {i.label}
+            {i.labs && (
+              <span className="ml-1.5 rounded-full border border-violet-500/40 px-1.5 py-px align-middle text-[9.5px] font-semibold uppercase tracking-wider text-violet-300"
+                title="Research feature: complete and tested, but not needed for the core guarantees, and more likely to change">
+                Labs
+              </span>
+            )}
+          </div>
           <div className="text-[11.5px] leading-relaxed text-slate-500">{i.desc}</div>
           {/* What a merged feature is made of. Naming the parts here is the
               difference between "we combined three things" and "we hid two". */}
