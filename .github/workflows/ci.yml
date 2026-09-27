@@ -66,6 +66,10 @@ jobs:
       - run: npm ci
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      - name: API types match the backend's description
+        # openapi.json is checked against the running backend by OpenApiIT;
+        # this checks the generated types against openapi.json.
+        run: npm run gen:api && git diff --exit-code src/generated/api.d.ts
       - name: Lint
         run: npm run lint
       - name: Unit tests

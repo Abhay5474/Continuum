@@ -1,87 +1,34 @@
-export interface WorkflowSummary {
-  workflowId: string;
-  workflowType: string;
+/*
+ * The workflow, stats and cost shapes are generated from the backend's own API
+ * description (openapi.json → generated/api.d.ts), not written by hand. A
+ * field renamed in Java now fails `tsc` here, instead of turning into an
+ * `undefined` on a page. Regenerate with `npm run gen:api` after
+ * `CONTINUUM_WRITE_OPENAPI=true mvn verify -Dit.test=OpenApiIT` in backend.
+ */
+import type { components } from "./generated/api";
+
+type Schemas = components["schemas"];
+
+/** A run as the lists show it. `status` is narrowed to the three the engine uses. */
+export type WorkflowSummary = Omit<Schemas["WorkflowSummary"], "status"> & {
   status: "RUNNING" | "COMPLETED" | "FAILED";
-  currentSequence: number;
-  createdAt: string;
-  updatedAt: string;
-  /** FAILED because someone stopped it, not because it broke. */
-  cancelled?: boolean;
-  /** RUNNING, but its decision kept failing and the engine stopped retrying it. */
-  stuck?: boolean;
-}
+};
+
+export type EventView = Schemas["EventView"];
+export type ActivityTaskView = Schemas["ActivityTaskView"];
+export type OutboxView = Schemas["OutboxView"];
 
 /** Why a running workflow is stuck: tries made and the last error. */
-export interface StuckView {
-  attempts: number;
-  error: string | null;
-  since: string;
-}
+export type StuckView = Schemas["StuckView"];
 
-export interface EventView {
-  sequenceNumber: number;
-  eventType: string;
-  payload: any;
-  createdAt: string;
-}
-
-export interface ActivityTaskView {
-  sequenceNumber: number;
-  activityType: string;
-  status: string;
-  retryCount: number;
-  maxAttempts: number;
-  visibleAt: string;
-  lockedBy: string | null;
-}
-
-export interface OutboxView {
-  id: number;
-  destination: string;
-  eventType: string;
-  status: string;
-  attempts: number;
-  idempotencyKey: string;
-  createdAt: string;
-  dispatchedAt: string | null;
-}
-
-export interface WorkflowDetail {
+export type WorkflowDetail = Omit<Schemas["WorkflowDetail"], "summary" | "stuck"> & {
   summary: WorkflowSummary;
-  input: any;
-  result: any;
-  error: string | null;
-  events: EventView[];
-  activities: ActivityTaskView[];
-  outbox: OutboxView[];
-  costUsd: number;
-  tokens: number;
   stuck?: StuckView | null;
-}
+};
 
-export interface Stats {
-  total: number;
-  running: number;
-  completed: number;
-  failed: number;
-  /** Of `failed`, how many were stopped on request. */
-  cancelled?: number;
-  outboxDeliveries: number;
-  duplicateDeliveries: string[];
-}
-
-export interface CostByProvider {
-  provider: string;
-  tokens: number;
-  costUsd: number;
-  calls: number;
-}
-
-export interface CostReport {
-  totalCostUsd: number;
-  totalTokens: number;
-  byProvider: CostByProvider[];
-}
+export type Stats = Schemas["StatsView"];
+export type CostByProvider = Schemas["CostByProvider"];
+export type CostReport = Schemas["CostReport"];
 
 export interface Meta {
   workflowTypes: string[];

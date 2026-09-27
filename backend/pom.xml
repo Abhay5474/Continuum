@@ -100,6 +100,18 @@
             <version>2.0.3</version>
         </dependency>
 
+        <!--
+            The OpenAPI description of every endpoint (GET /v3/api-docs). The
+            console's TypeScript types are generated from it, and OpenApiIT
+            fails the build when the committed copy is out of date — so a
+            renamed field breaks the frontend build instead of a page.
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+            <version>2.6.0</version>
+        </dependency>
+
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>

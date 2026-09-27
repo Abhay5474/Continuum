@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run",
-    "gen:api": "openapi-typescript openapi.json -o src/generated/api.d.ts"
+    "gen:api": "openapi-typescript openapi.json --properties-required-by-default -o src/generated/api.d.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
