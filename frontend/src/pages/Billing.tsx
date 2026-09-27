@@ -58,7 +58,8 @@ export default function Billing() {
   const remember = (v: typeof pending) => {
     setPending(v);
     try {
-      v ? localStorage.setItem(PENDING_KEY, JSON.stringify(v)) : localStorage.removeItem(PENDING_KEY);
+      if (v) localStorage.setItem(PENDING_KEY, JSON.stringify(v));
+      else localStorage.removeItem(PENDING_KEY);
     } catch {
       /* private mode: the pending checkout lasts this visit only */
     }

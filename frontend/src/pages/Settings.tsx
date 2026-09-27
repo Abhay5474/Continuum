@@ -32,6 +32,10 @@ export default function Settings() {
   const [newKey, setNewKey] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [confirmDelete, setConfirmDelete] = useState("");
+  // Declared with the others, above the signed-out return: a hook after an
+  // early return runs on some renders and not others, and React fails the
+  // first time the sign-in state changes while the page is open.
+  const [elsewhereBusy, setElsewhereBusy] = useState(false);
 
   const load = () => {
     // Your own email, which differs from the account's when you are a member.
@@ -67,7 +71,6 @@ export default function Settings() {
       toast(e?.message ?? "Could not change password", "error");
     } finally { setPwBusy(false); }
   };
-  const [elsewhereBusy, setElsewhereBusy] = useState(false);
   const signOutElsewhere = async () => {
     setElsewhereBusy(true);
     try {

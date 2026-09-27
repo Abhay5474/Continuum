@@ -1333,8 +1333,9 @@ export function SidePanel({
     const id = requestAnimationFrame(() => {
       const el = panel.current;
       if (el && !el.contains(document.activeElement)) {
-        el.querySelector<HTMLElement>("[data-autofocus]")?.focus() ??
-          el.querySelector<HTMLElement>('button[aria-label="Close"]')?.focus();
+        const target = el.querySelector<HTMLElement>("[data-autofocus]")
+          ?? el.querySelector<HTMLElement>('button[aria-label="Close"]');
+        target?.focus();
       }
     });
     return () => {

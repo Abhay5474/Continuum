@@ -1,0 +1,4 @@
+{
+  "//": "The console's Content-Security-Policy. vercel.json, nginx.conf and vite preview must carry exactly this; src/csp.test.ts checks they do.",
+  "policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https: http://localhost:8080 http://127.0.0.1:8080; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+}

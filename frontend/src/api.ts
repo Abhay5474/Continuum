@@ -323,7 +323,8 @@ export const portal = {
   session: () => localStorage.getItem(SESSION_KEY),
   setSession: (t: string | null) => {
     if (t) endedAt = 0;
-    t ? localStorage.setItem(SESSION_KEY, t) : localStorage.removeItem(SESSION_KEY);
+    if (t) localStorage.setItem(SESSION_KEY, t);
+    else localStorage.removeItem(SESSION_KEY);
   },
   /** True when the server, not the user, ended the last session. */
   sessionEnded: () => endedAt > 0,

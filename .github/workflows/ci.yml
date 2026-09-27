@@ -2,7 +2,7 @@
 #
 # backend:  unit tests, then the integration tests against a real PostgreSQL
 #           (the engine's guarantees, the migrations, auth coverage).
-# frontend: type-check and production build, lint and unit tests.
+# frontend: lint, unit tests, type-check and production build.
 name: CI
 
 on:
@@ -66,5 +66,9 @@ jobs:
       - run: npm ci
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
       - name: Type-check and build
         run: npm run build

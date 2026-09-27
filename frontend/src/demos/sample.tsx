@@ -741,7 +741,12 @@ const mmu: DemoSpec<{ budget: number; chunks: Chunk[] }, (Chunk & { score: numbe
   run: ({ budget, chunks }) => {
     const scored = chunks.map((c) => ({ ...c, score: 0.7 * c.relevance + 0.3 * c.recency, kept: false })).sort((a, b) => b.score - a.score);
     let used = 0;
-    for (const c of scored) if (used + c.tokens <= budget) ((c.kept = true), (used += c.tokens));
+    for (const c of scored) {
+      if (used + c.tokens <= budget) {
+        c.kept = true;
+        used += c.tokens;
+      }
+    }
     return done(scored);
   },
   Input: ({ input }) => (
