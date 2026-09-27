@@ -297,8 +297,11 @@ class ModelCatalogServiceTest {
         groq.listing("openai/gpt-oss-20b");
         catalogue.reportUnavailable("groq", "openai/gpt-oss-120b", true, "HTTP 404: model_not_found");
 
-        // Immediately, before any confirmation: nothing more is sent to it.
-        assertThat(resolver.isQuarantined("groq", "openai/gpt-oss-120b")).isTrue();
+        // Immediately: nothing more is sent to it. Set aside, or — if the
+        // confirmation on the catalogue's thread has already finished —
+        // retired and redirected; either way no request reaches it.
+        assertThat(resolver.isQuarantined("groq", "openai/gpt-oss-120b")
+                || resolver.isRedirected("groq", "openai/gpt-oss-120b")).isTrue();
         assertThat(resolver.defaultFor("groq")).isEqualTo("openai/gpt-oss-20b");
 
         await(() -> row("openai/gpt-oss-120b").getStatus() == ModelStatus.REMOVED);
