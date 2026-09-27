@@ -86,7 +86,7 @@ public class SemanticReplayVerifier {
                 case ACTIVITY_COMPLETED -> {
                     var p = json.read(e.getPayload(), Payloads.ActivityCompleted.class);
                     if (LlmActivity.TYPE.equals(p.activityType())) {
-                        completedResults.put(p.commandSeq(), p.result());
+                        completedResults.putIfAbsent(p.commandSeq(), p.result()); // first outcome wins, as in replay
                     }
                 }
                 default -> {

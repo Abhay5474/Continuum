@@ -231,13 +231,19 @@ public class WorkflowEngine {
                 }
                 case ACTIVITY_COMPLETED -> {
                     var p = json.read(e.getPayload(), Payloads.ActivityCompleted.class);
-                    st.completed.put(p.commandSeq(), p.result());
+                    // The first outcome recorded for a step is the one the
+                    // workflow acted on. A later one — two workers that both
+                    // finished the same step, before completions were fenced —
+                    // must not change the answer under replay.
+                    if (!st.completed.containsKey(p.commandSeq()) && !st.failed.containsKey(p.commandSeq())) {
+                        st.completed.put(p.commandSeq(), p.result());
+                    }
                     st.scheduled.remove(p.commandSeq());
                 }
                 case ACTIVITY_FAILED -> {
                     var p = json.read(e.getPayload(), Payloads.ActivityFailed.class);
-                    if (p.terminal()) {
-                        st.failed.put(p.commandSeq(), p.error());
+                    if (p.terminal() && !st.completed.containsKey(p.commandSeq())) {
+                        st.failed.putIfAbsent(p.commandSeq(), p.error());
                         st.scheduled.remove(p.commandSeq());
                     }
                 }

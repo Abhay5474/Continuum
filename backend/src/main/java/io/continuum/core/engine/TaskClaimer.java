@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Atomically claims work from the durable queues.
@@ -33,17 +34,38 @@ public class TaskClaimer {
         this.props = props;
     }
 
+    /**
+     * How long past its timeout a claimed activity stays invisible. The worker
+     * stops the activity at its timeout and then records the outcome; the grace
+     * covers that write. Only a worker that died leaves the lease to run out.
+     */
+    public static final int LEASE_GRACE_SECONDS = 30;
+
+    private final AtomicLong claims = new AtomicLong();
+
+    /**
+     * Claims runnable activities. Each claim is stamped with its own token
+     * ({@code worker#n}), not just the worker's name, so that when a task is
+     * recovered and claimed again — even by the same process — the two attempts
+     * can be told apart and only the current one may record an outcome.
+     */
     @Transactional
     public List<ActivityTaskEntity> claimActivities(int limit, String workerId) {
         Instant now = Instant.now();
         List<ActivityTaskEntity> claimed = activityTasks.claimBatch(now, limit);
         for (ActivityTaskEntity t : claimed) {
             t.setStatus(TaskStatus.RUNNING);
-            t.setLockedBy(workerId);
-            t.setLockedUntil(now.plusSeconds(t.getTimeoutSeconds()));
+            t.setLockedBy(claimToken(workerId));
+            t.setLockedUntil(now.plusSeconds((long) t.getTimeoutSeconds() + LEASE_GRACE_SECONDS));
         }
         activityTasks.saveAll(claimed);
         return claimed;
+    }
+
+    private String claimToken(String workerId) {
+        String suffix = "#" + Long.toString(claims.incrementAndGet(), 36);
+        String base = workerId.length() + suffix.length() > 64 ? workerId.substring(0, 64 - suffix.length()) : workerId;
+        return base + suffix;
     }
 
     @Transactional

@@ -12,6 +12,15 @@ import java.util.List;
 public interface ActivityTaskRepository extends JpaRepository<ActivityTaskEntity, Long> {
 
     /**
+     * The task row, locked for the rest of the transaction. Recording an
+     * outcome reads the task's state and then changes it; without the lock two
+     * workers finishing the same task could both read "still running".
+     */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from ActivityTaskEntity t where t.id = :id")
+    java.util.Optional<ActivityTaskEntity> findByIdForUpdate(@Param("id") Long id);
+
+    /**
      * Claim a batch of runnable activity tasks.
      *
      * {@code FOR UPDATE SKIP LOCKED} is the heart of the durable queue: rows

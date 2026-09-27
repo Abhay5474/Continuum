@@ -114,6 +114,25 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <!--
+                Integration tests (*IT.java) run against a real PostgreSQL in
+                `mvn verify`. Unit tests stay on surefire and need no database.
+                The IT database is CONTINUUM_IT_DB_URL (default: a local
+                continuum_it database); without one reachable the ITs are skipped,
+                unless CONTINUUM_IT_REQUIRED=true, as it is in CI.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

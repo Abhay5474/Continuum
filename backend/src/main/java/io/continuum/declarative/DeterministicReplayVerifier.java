@@ -201,7 +201,7 @@ public class DeterministicReplayVerifier {
                 case ACTIVITY_COMPLETED -> {
                     var p = json.read(e.getPayload(), Payloads.ActivityCompleted.class);
                     if (isDeclarative(p.activityType())) {
-                        results.put(p.commandSeq(), bodyOf(p.result()));
+                        results.putIfAbsent(p.commandSeq(), bodyOf(p.result())); // first outcome wins, as in replay
                     }
                 }
                 default -> {

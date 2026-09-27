@@ -84,8 +84,10 @@ number of distinct workflows.
 
 ### `activity_tasks` / `workflow_tasks` — the durable queues
 Claimed with `SELECT … FOR UPDATE SKIP LOCKED LIMIT n`: concurrent workers each
-pull disjoint work without blocking. A claim flips the row to `RUNNING` and sets
-`locked_until` (a visibility timeout). `UNIQUE(workflow_id, sequence_number)` on
+pull disjoint work without blocking. A claim flips the row to `RUNNING`, stamps
+it with a claim token of its own (`worker-…#n`) and sets `locked_until` (a lease:
+the activity's timeout plus 30 s of grace). The worker stops the activity at its
+timeout, so only a worker that died lets the lease run out. `UNIQUE(workflow_id, sequence_number)` on
 `activity_tasks` makes scheduling idempotent — the same activity can never be
 enqueued twice.
 
@@ -108,6 +110,7 @@ Deduplicated by idempotency key so retries/replays never double-count cost.
 | No duplicate activity *records* | `UNIQUE(workflow_id, sequence_number)` + instance lock |
 | No duplicate external side effects | Outbox + `UNIQUE(idempotency_key)`, deterministic keys |
 | Crashed-worker progress | Visibility timeout + recovery sweeper re-queues |
+| One result per step | Outcomes are fenced by claim token and attempt; replay keeps the first result recorded |
 | Exactly-once delivery | Outbox written atomically with event; unique key on delivery |
 | Cost integrity | Cost rows keyed by idempotency key |
 
@@ -118,6 +121,14 @@ Deduplicated by idempotency key so retries/replays never double-count cost.
 - **Worker dies mid-activity.** Task stays `RUNNING` until `locked_until`; the
   sweeper resets it to `PENDING`; another worker re-runs it. Side effects are
   idempotent, so re-execution is safe. *(Demonstrated by the kill-`-9` demo.)*
+- **An attempt outlives its lease** (a stalled process, a GC pause). Another
+  worker may claim the task meanwhile. Whichever attempt succeeds first records
+  the result; any later one is discarded, and a failure counts only from the
+  attempt that holds the task. Replay also keeps the first result for a step, so
+  histories written before this fencing replay the answer the workflow acted on.
+  *(Proven by `EngineIT` on a real database.)*
+- **Activity runs past its timeout.** The worker interrupts it and records a
+  retryable failure; an LLM call in progress stops instead of failing over.
 - **Worker dies mid-decision.** Decisions are pure replay; the `workflow_task`
   is reclaimed and re-run with no effect duplication.
 - **Activity succeeds but the commit fails (crash between work and persist).**

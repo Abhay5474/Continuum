@@ -11,10 +11,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -49,6 +52,13 @@ public class ActivityWorker {
     private final EngineProperties props;
 
     private final ExecutorService pool;
+    /**
+     * Where activity bodies actually run. Separate from {@link #pool} so the
+     * pool thread can wait for a body with a deadline and walk away at its
+     * timeout. A body that ignores the interrupt keeps its thread here until it
+     * returns, but it no longer holds a permit or the task.
+     */
+    private final ExecutorService bodies;
     private final Semaphore permits;
     /** Live occupancy, published for the console so saturation is observable. */
     private final AtomicLong started = new AtomicLong();
@@ -64,6 +74,11 @@ public class ActivityWorker {
         this.permits = new Semaphore(n);
         this.pool = Executors.newFixedThreadPool(n, r -> {
             Thread t = new Thread(r, "activity-worker");
+            t.setDaemon(true);
+            return t;
+        });
+        this.bodies = Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r, "activity-body");
             t.setDaemon(true);
             return t;
         });
@@ -108,13 +123,14 @@ public class ActivityWorker {
     }
 
     private void process(ActivityTaskEntity task) {
+        ActivityExecutor.Attempt attempt = ActivityExecutor.Attempt.of(task);
         try {
             executor.markStarted(task, identity.id());
-            ActivityExecutor.ActivityOutcome outcome = executor.runActivity(task);
+            ActivityExecutor.ActivityOutcome outcome = runWithin(task);
             if (outcome.ok()) {
-                executor.complete(task.getId(), outcome.result(), outcome.ctx());
+                executor.complete(attempt, outcome.result(), outcome.ctx());
             } else {
-                executor.fail(task.getId(), outcome.error());
+                executor.fail(attempt, outcome.error());
             }
         } catch (Exception e) {
             // Unexpected error around persistence; let visibility timeout recover it.
@@ -123,8 +139,34 @@ public class ActivityWorker {
         }
     }
 
+    /**
+     * Runs the body, giving up at the activity's timeout.
+     *
+     * <p>The timeout used to be only the lease: a body that ran over simply kept
+     * going, while the recovery sweeper handed the same task to another worker —
+     * two LLM calls for one step, and two results for the workflow. Now the
+     * body is interrupted at its timeout and the attempt counts as failed, which
+     * the activity's retry policy then handles like any other failure.
+     */
+    private ActivityExecutor.ActivityOutcome runWithin(ActivityTaskEntity task) throws InterruptedException {
+        Future<ActivityExecutor.ActivityOutcome> body = bodies.submit(() -> executor.runActivity(task));
+        try {
+            return body.get(Math.max(1, task.getTimeoutSeconds()), TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            body.cancel(true);
+            log.warn("Activity {} (seq {}) for workflow {} ran past its {}s timeout; stopped",
+                    task.getActivityType(), task.getSequenceNumber(), task.getWorkflowId(), task.getTimeoutSeconds());
+            return ActivityExecutor.ActivityOutcome.timedOut(task.getTimeoutSeconds());
+        } catch (ExecutionException e) {
+            // runActivity catches what the body throws; this is an Error or a bug.
+            Throwable cause = e.getCause() == null ? e : e.getCause();
+            return ActivityExecutor.ActivityOutcome.crashed(cause);
+        }
+    }
+
     @PreDestroy
     public void shutdown() {
+        bodies.shutdownNow();
         pool.shutdown();
         try {
             if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {

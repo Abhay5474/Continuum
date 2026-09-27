@@ -296,7 +296,7 @@ public class ConsensusDagService {
                 } else if (e.getEventType() == EventType.ACTIVITY_COMPLETED) {
                     var p = json.read(e.getPayload(), Payloads.ActivityCompleted.class);
                     Timing prev = out.get(p.commandSeq());
-                    if (prev != null) {
+                    if (prev != null && prev.completed() == null) {
                         out.put(p.commandSeq(), new Timing(prev.type(), prev.claimId(), prev.check(),
                                 prev.scheduled(), e.getCreatedAt()));
                     }

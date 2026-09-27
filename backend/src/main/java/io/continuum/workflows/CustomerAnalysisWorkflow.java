@@ -39,7 +39,11 @@ public class CustomerAnalysisWorkflow implements Workflow {
         Input in = ctx.input(Input.class);
 
         ActivityOptions ioOpts = ActivityOptions.defaults().maxAttempts(5).timeoutSeconds(15);
-        ActivityOptions llmOpts = ActivityOptions.defaults().maxAttempts(3).timeoutSeconds(45);
+        // Long enough for the provider chain to run its course: each provider
+        // gets 30s, and a failover plus a retired-model retry is up to four
+        // calls. The timeout now stops the attempt, so it must not cut the
+        // chain short.
+        ActivityOptions llmOpts = ActivityOptions.defaults().maxAttempts(3).timeoutSeconds(120);
 
         // 1. Fetch customer (durable read)
         FetchCustomerActivity.Customer customer = ctx.executeActivity(

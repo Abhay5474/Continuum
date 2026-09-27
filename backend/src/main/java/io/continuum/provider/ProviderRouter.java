@@ -99,6 +99,12 @@ public class ProviderRouter {
                 return response;
             } catch (Exception e) {
                 long ms = (System.nanoTime() - start) / 1_000_000;
+                if (interrupted(e)) {
+                    // The caller gave up (an activity stopped at its timeout).
+                    // Going on down the chain would spend a call nobody reads.
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while calling '" + name + "'", e);
+                }
                 record(m -> m.recordFailure(name, ms));
                 log.warn("Provider '{}' failed: {} — trying next in chain", name, e.getMessage());
                 last = new RuntimeException("Provider '" + name + "' failed: " + e.getMessage(), e);
@@ -111,6 +117,22 @@ public class ProviderRouter {
             }
         }
         throw new RuntimeException("All providers in failover chain failed", last);
+    }
+
+    /** True when the thread was interrupted, or the failure was the interruption itself. */
+    static boolean interrupted(Throwable e) {
+        if (Thread.currentThread().isInterrupted()) {
+            return true;
+        }
+        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            // A socket timeout is an InterruptedIOException too, but it is the
+            // provider being slow, which the next provider may well not be.
+            if (t instanceof InterruptedException
+                    || (t instanceof java.io.InterruptedIOException && !(t instanceof java.net.SocketTimeoutException))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

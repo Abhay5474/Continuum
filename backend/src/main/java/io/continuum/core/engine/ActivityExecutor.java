@@ -88,10 +88,70 @@ public class ActivityExecutor {
         }
     }
 
+    /**
+     * One claimed run of a task: which task, which claim, which attempt.
+     * Captured when the work is claimed, so the outcome can later be checked
+     * against the task as it is by then.
+     */
+    public record Attempt(Long taskId, String claim, int retryCount) {
+        public static Attempt of(ActivityTaskEntity t) {
+            return new Attempt(t.getId(), t.getLockedBy(), t.getRetryCount());
+        }
+    }
+
+    /**
+     * Whether a successful run may record its result.
+     *
+     * <p>A run that outlived its lease may have been handed to another worker.
+     * The first run to succeed for an attempt wins; every later one is
+     * superseded. So a success is accepted while the task is still open —
+     * RUNNING under any claim, or PENDING because it was recovered and nobody
+     * has claimed it yet — and only for the attempt that is current. Once a
+     * task is COMPLETED or FAILED, or its retry count has moved on, the run's
+     * result is discarded: the workflow has already been, or will be, told
+     * something else, and telling it twice is how one step ends up with two
+     * results.
+     */
+    static boolean mayComplete(ActivityTaskEntity task, Attempt a) {
+        if (task.getRetryCount() != a.retryCount()) {
+            return false;
+        }
+        return task.getStatus() == TaskStatus.RUNNING || task.getStatus() == TaskStatus.PENDING;
+    }
+
+    /**
+     * Whether a failed run may record its failure. Stricter than success: a
+     * failure schedules a retry or ends the step, so it counts only from the
+     * run that holds the task — or when nobody holds it (recovered, unclaimed).
+     * A stale run failing while a newer claim is still working must not pull
+     * the task out from under it.
+     */
+    static boolean mayFail(ActivityTaskEntity task, Attempt a) {
+        if (task.getRetryCount() != a.retryCount()) {
+            return false;
+        }
+        if (task.getStatus() == TaskStatus.PENDING) {
+            return true;
+        }
+        return task.getStatus() == TaskStatus.RUNNING && a.claim() != null && a.claim().equals(task.getLockedBy());
+    }
+
     @Transactional
-    public void complete(Long taskId, String resultJson, ActivityContext ctx) {
-        ActivityTaskEntity task = activityTasks.findById(taskId).orElseThrow();
-        WorkflowInstanceEntity instance = instances.findByIdForUpdate(task.getWorkflowId()).orElseThrow();
+    public void complete(Attempt attempt, String resultJson, ActivityContext ctx) {
+        ActivityTaskEntity peek = activityTasks.findById(attempt.taskId()).orElseThrow();
+        // Instance first, then task: the order cancel() takes them in.
+        WorkflowInstanceEntity instance = instances.findByIdForUpdate(peek.getWorkflowId()).orElseThrow();
+        ActivityTaskEntity task = activityTasks.findByIdForUpdate(attempt.taskId()).orElseThrow();
+
+        if (!mayComplete(task, attempt)) {
+            // The money is spent either way; the idempotency key keeps it from
+            // being counted twice.
+            recordCosts(task, ctx);
+            log.warn("Activity {} (seq {}) for workflow {} finished after it was superseded ({} {}); result discarded",
+                    task.getActivityType(), task.getSequenceNumber(), task.getWorkflowId(),
+                    task.getStatus(), task.getLockedBy());
+            return;
+        }
 
         if (instance.getStatus() != io.continuum.persistence.entity.WorkflowStatus.RUNNING) {
             // The workflow ended — cancelled — while this ran. Its history is
@@ -154,8 +214,16 @@ public class ActivityExecutor {
     }
 
     @Transactional
-    public void fail(Long taskId, Throwable error) {
-        ActivityTaskEntity task = activityTasks.findById(taskId).orElseThrow();
+    public void fail(Attempt run, Throwable error) {
+        ActivityTaskEntity peek = activityTasks.findById(run.taskId()).orElseThrow();
+        java.util.Optional<WorkflowInstanceEntity> locked = instances.findByIdForUpdate(peek.getWorkflowId());
+        ActivityTaskEntity task = activityTasks.findByIdForUpdate(run.taskId()).orElseThrow();
+        if (!mayFail(task, run)) {
+            log.warn("Activity {} (seq {}) for workflow {} failed after it was superseded ({} {}); failure ignored: {}",
+                    task.getActivityType(), task.getSequenceNumber(), task.getWorkflowId(),
+                    task.getStatus(), task.getLockedBy(), error.getMessage());
+            return;
+        }
         int attempt = task.getRetryCount() + 1;
         // A failure the activity marked as settled is terminal on the first
         // attempt: retrying a rejected request only delays the outcome and
@@ -163,7 +231,7 @@ public class ActivityExecutor {
         boolean settled = isNonRetryable(error);
         // A workflow that has already ended — cancelled mid-activity — has no use
         // for a retry: scheduling one would wake a finished run later.
-        boolean ended = instances.findById(task.getWorkflowId())
+        boolean ended = locked
                 .map(i -> i.getStatus() != io.continuum.persistence.entity.WorkflowStatus.RUNNING)
                 .orElse(true);
         if (ended) {
@@ -210,6 +278,13 @@ public class ActivityExecutor {
         }
     }
 
+    /** An attempt that ran past its timeout. Retryable, like a network timeout. */
+    public static final class ActivityTimeoutException extends RuntimeException {
+        public ActivityTimeoutException(String message) {
+            super(message);
+        }
+    }
+
     /** Result of running an activity body, carrying buffered side effects. */
     public static final class ActivityOutcome {
         private final boolean ok;
@@ -230,6 +305,16 @@ public class ActivityExecutor {
 
         static ActivityOutcome failure(Throwable error, ActivityContext ctx) {
             return new ActivityOutcome(false, null, error, ctx);
+        }
+
+        /** The body was stopped at its timeout; nothing it buffered is kept. */
+        static ActivityOutcome timedOut(int timeoutSeconds) {
+            return new ActivityOutcome(false, null,
+                    new ActivityTimeoutException("Timed out after " + timeoutSeconds + "s"), null);
+        }
+
+        static ActivityOutcome crashed(Throwable error) {
+            return new ActivityOutcome(false, null, error, null);
         }
 
         public boolean ok() {

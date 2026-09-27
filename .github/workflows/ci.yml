@@ -1,0 +1,70 @@
+# Runs on every push and pull request.
+#
+# backend:  unit tests, then the integration tests against a real PostgreSQL
+#           (the engine's guarantees, the migrations, auth coverage).
+# frontend: type-check and production build, lint and unit tests.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: continuum
+          POSTGRES_PASSWORD: continuum
+          POSTGRES_DB: continuum_it
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U continuum"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      CONTINUUM_IT_DB_URL: jdbc:postgresql://localhost:5432/continuum_it
+      CONTINUUM_IT_DB_USER: continuum
+      CONTINUUM_IT_DB_PASSWORD: continuum
+      # A missing database must fail the build, not skip the tests.
+      CONTINUUM_IT_REQUIRED: "true"
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Unit and integration tests
+        run: mvn -B verify
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      - name: Type-check and build
+        run: npm run build
