@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import static io.continuum.gateway.GatewaySupport.*;
 
 /**
  * The gateway control plane.
@@ -113,6 +114,15 @@ public class GatewayService {
     // Trips a model out of rotation when its answers degrade, not when it errors.
     private final io.continuum.drift.SemanticBreakerService breaker;
 
+    // The stages the request passes through, each its own class. Setter-free
+    // field injection keeps the (already long) constructor unchanged.
+    @org.springframework.beans.factory.annotation.Autowired private RequestLog requestLog;
+    @org.springframework.beans.factory.annotation.Autowired private ResponseChaos responseChaos;
+    @org.springframework.beans.factory.annotation.Autowired private AnswerBookkeeping bookkeeping;
+    @org.springframework.beans.factory.annotation.Autowired private AnswerReview review;
+    @org.springframework.beans.factory.annotation.Autowired private CascadeStage cascadeStage;
+    @org.springframework.beans.factory.annotation.Autowired private HedgeStage hedgeStage;
+
     public GatewayService(RequestNormalizer normalizer, TaskComplexityEstimator complexityEstimator,
                           ProviderSelectionEngine selectionEngine, ModelRegistryService registry,
                           ModelFallbackPolicy fallbackPolicy, ProviderHealthTracker health,
@@ -183,14 +193,6 @@ public class GatewayService {
         this.breaker = breaker;
     }
 
-    /** Record a routing outcome into the contextual bandit; never affects the request. */
-    private void recordBandit(double complexity, String provider, boolean success, long latencyMs, double cost) {
-        try {
-            contextualBandit.observe(complexity, provider, success, latencyMs, cost);
-        } catch (Exception ignored) {
-            // Learning must never break a request.
-        }
-    }
 
     /**
      * Cost-aware admission wraps the request, when the tenant has enabled it.
@@ -228,20 +230,20 @@ public class GatewayService {
     private static final ThreadLocal<io.continuum.provider.TokenSink> LIVE = new ThreadLocal<>();
 
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
-        LOGGED.remove();
+        requestLog.clear();
         try {
             GatewayDtos.ChatResponse response = admitted(developerId, req);
-            Long id = LOGGED.get();
+            Long id = requestLog.lastId();
             return response == null || id == null ? response : response.withRequestId(requestId(id));
         } catch (GatewayException e) {
             // A failed request is logged too; its id is what a caller quotes.
-            Long id = LOGGED.get();
+            Long id = requestLog.lastId();
             if (id != null && e.requestId == null) {
                 e.requestId = requestId(id);
             }
             throw e;
         } finally {
-            LOGGED.remove();
+            requestLog.clear();
         }
     }
 
@@ -250,21 +252,7 @@ public class GatewayService {
         return "req_" + logId;
     }
 
-    /**
-     * The id of the row this request was logged under. The request runs on one
-     * thread from {@link #chat} to its return — the hedged path waits for its
-     * race — so a thread-local carries it out without threading a parameter
-     * through every stage. Cleared on entry and exit, because the thread is pooled.
-     */
-    private static final ThreadLocal<Long> LOGGED = new ThreadLocal<>();
 
-    private GatewayRequestLogEntity logged(GatewayRequestLogEntity row) {
-        GatewayRequestLogEntity saved = logRepo.save(row);
-        if (saved != null && saved.getId() != null) {
-            LOGGED.set(saved.getId());
-        }
-        return saved;
-    }
 
     private GatewayDtos.ChatResponse admitted(String developerId, GatewayDtos.ChatRequest req) {
         CostAwareLimiter.Ticket ticket = costAdmission.reserve(
@@ -359,7 +347,7 @@ public class GatewayService {
                 // the monthly token quota. Kept apart from the run itself, so
                 // a logging failure cannot send the request down a second path.
                 try {
-                    logged(new GatewayRequestLogEntity(developerId, req.model(), verified.provider(),
+                    requestLog.save(new GatewayRequestLogEntity(developerId, req.model(), verified.provider(),
                             verified.model(), 0, verified.routingReason(), verified.latency(),
                             verified.tokens(), verified.cost(), true, verified.failovers()));
                 } catch (RuntimeException e) {
@@ -425,7 +413,7 @@ public class GatewayService {
                 }
                 // Logged like any other request, with zero cost, so usage and
                 // spend reporting stay truthful about what the cache avoided.
-                logged(new GatewayRequestLogEntity(developerId, req.model(), h.provider(),
+                requestLog.save(new GatewayRequestLogEntity(developerId, req.model(), h.provider(),
                         h.model(), 0, "semantic-cache", cachedMs, 0, 0, true, 0)
                         .withTraceId(prov == null ? null : prov.requestId()));
                 return new GatewayDtos.ChatResponse(h.response(), h.provider(), h.model(),
@@ -545,7 +533,7 @@ public class GatewayService {
         // answer, nothing below needs to. Declines silently when the registry
         // offers no meaningful price difference between models.
         if (cascade.enabledFor(developerId)) {
-            GatewayDtos.ChatResponse cascaded = tryCascade(developerId, req, canonical, devKeys,
+            GatewayDtos.ChatResponse cascaded = cascadeStage.attempt(developerId, req, canonical, devKeys,
                     complexity, started, routingDecision, autopilot, cacheKey, prov);
             if (cascaded != null) {
                 return cascaded;
@@ -558,7 +546,7 @@ public class GatewayService {
         // durable workflows only; the gateway — the path an external
         // application actually uses — never had it.
         if (hedging.isEnabled() && chain.size() > 1) {
-            GatewayDtos.ChatResponse hedged = tryHedged(developerId, req, canonical, chain, devKeys,
+            GatewayDtos.ChatResponse hedged = hedgeStage.attempt(developerId, req, canonical, chain, devKeys,
                     complexity, mode, started, routingDecision, autopilot, cacheKey, prov);
             if (hedged != null) {
                 return hedged;
@@ -612,7 +600,7 @@ public class GatewayService {
                         && (developerId == null || !aiChaos.isActive(developerId));
                 LlmResponse resp = streamNow
                         ? router.stream(perModel, List.of(c.provider()), keys, live)
-                        : chaos(developerId, router.complete(perModel, List.of(c.provider()), keys));
+                        : responseChaos.apply(developerId, router.complete(perModel, List.of(c.provider()), keys));
                 if (slot != null) {
                     slot.success();
                 }
@@ -659,11 +647,11 @@ public class GatewayService {
                 metrics.tokens(c.provider(), resp.promptTokens(), resp.completionTokens());
                 metrics.cost(c.provider(), cost);
 
-                var savedLog = logged(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
+                var savedLog = requestLog.save(new GatewayRequestLogEntity(developerId, req.model(), c.provider(),
                         resp.model(), complexity, reason, totalMs, tokens, cost, true, failovers)
                         .withTraceId(prov == null ? null : prov.requestId()));
-                labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
-                recordBandit(complexity, c.provider(), true, totalMs, cost);
+                bookkeeping.labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, cost);
+                bookkeeping.recordBandit(complexity, c.provider(), true, totalMs, cost);
                 // The counterfactual: what the heuristic would have chosen is
                 // stored beside what actually ran, so "learning helped" is a
                 // number rather than a claim.
@@ -692,8 +680,8 @@ public class GatewayService {
                         completed(new GatewayDtos.ChatResponse(safeContent, c.provider(), resp.model(),
                                 totalMs, tokens, cost, failovers, reason), resp);
 
-                return withUncertainty(
-                        withQualityGate(answered,
+                return review.withUncertainty(
+                        review.withQualityGate(answered,
                                 developerId, canonical, c.provider(), c.model(), devKeys, complexity),
                         developerId, req, canonical, c.provider(), c.model(), devKeys, false);
             } catch (Exception e) {
@@ -706,7 +694,7 @@ public class GatewayService {
                 }
                 health.recordFailure(c.provider(), c.model(), attemptMs, e.getMessage());
                 metrics.failover(c.provider(), e.getClass().getSimpleName());
-                recordBandit(complexity, c.provider(), false, attemptMs, 0);
+                bookkeeping.recordBandit(complexity, c.provider(), false, attemptMs, 0);
                 routingStrategy.record(developerId, routingDecision, complexity,
                         c.provider(), false, attemptMs, 0);
                 failovers++;
@@ -737,7 +725,7 @@ public class GatewayService {
         metrics.request("none", req.model(), false, totalMs);
         metrics.visibleFailure("all_providers_failed");
         var failLog = logFailure(developerId, req, complexity, mode);
-        labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
+        bookkeeping.labelForAutopilot(autopilot, failLog == null ? null : failLog.getId(), developerId, false, totalMs, 0);
 
         // Graceful degradation. Every provider failed; with the ladder on, step
         // down to something rather than returning nothing. The response always
@@ -774,164 +762,9 @@ public class GatewayService {
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
     }
 
-    /**
-     * Runs the quality gate over a finished answer, repairing it if enforcing.
-     *
-     * <p>Returns the response unchanged on anything unexpected, and on a repair
-     * that runs out of budget. The answer already exists; discarding it because
-     * a check failed to complete would be the wrong trade every time.
-     */
-    private GatewayDtos.ChatResponse withQualityGate(
-            GatewayDtos.ChatResponse response, String developerId, LlmRequest canonical,
-            String provider, String model, Map<String, String> devKeys, double complexity) {
-
-        boolean gateOn = quality.activeFor(developerId);
-        boolean breakerOn = breaker.enabledFor(developerId);
-        if (!gateOn && !breakerOn) {
-            return response;
-        }
-        try {
-            var cfg = quality.settingsFor(developerId);
-            var verdict = qualityGate.check(canonical, response.response(), complexity, cfg.getThreshold());
-
-            // The breaker's input. Scoring is free — no model call — so it works
-            // whether or not the gate itself is enabled, and the breaker does not
-            // inherit the gate's mode.
-            breaker.observe(developerId, provider, model, verdict.score(),
-                    verdict.defects().isEmpty() ? null : verdict.summary());
-
-            if (!gateOn) {
-                // Breaker only: observe and get out of the way.
-                return response;
-            }
-
-            boolean enforce = cfg.getMode() == io.continuum.persistence.entity.QualityGateSettingEntity.Mode.ENFORCE;
-            // BLOCK is a refusal. Asking again is how you get the same refusal
-            // twice and pay for both, so it is never repaired.
-            boolean shouldRepair = enforce
-                    && verdict.action() == io.continuum.quality.QualityGate.Action.REPAIR
-                    && cfg.getMaxRepairs() > 0;
-
-            if (!shouldRepair) {
-                // MONITOR records the intent without acting on it; that gap is
-                // the evidence for whether enforcing would help.
-                quality.record(developerId, cfg, verdict, "NONE", model, response.response(),
-                        null, null, 0, 0);
-                return annotate(response, verdict, false);
-            }
-
-            // The targeted repair engine, when the developer has turned it on:
-            // one defect kind per attempt, re-checked after each, and any
-            // attempt that scores lower than what it replaced is discarded.
-            if (cfg.isRepairEngineEnabled()) {
-                return withRepairEngine(response, developerId, canonical, provider, model,
-                        devKeys, complexity, cfg, verdict);
-            }
-
-            long start = System.nanoTime();
-            List<Message> repairMessages = new ArrayList<>(canonical.messages());
-            repairMessages.add(Message.assistant(response.response()));
-            repairMessages.add(Message.user(verdict.repairInstruction()));
-
-            LlmResponse repaired = chaos(developerId, router.complete(
-                    new LlmRequest(model, repairMessages, canonical.maxTokens(), canonical.temperature()),
-                    List.of(provider), keyFor(devKeys, provider)));
-            long repairMs = (System.nanoTime() - start) / 1_000_000;
-
-            if (repairMs > cfg.getBudgetMs()) {
-                // Over budget: the repair may well be better, but latency is part
-                // of the contract too. Record the miss rather than hiding it.
-                quality.record(developerId, cfg, verdict, "BUDGET_EXCEEDED", model,
-                        response.response(), null, null, 0, repairMs);
-                return annotate(response, verdict, false);
-            }
-
-            double repairCost = router.estimateCost(provider, repaired.model(),
-                    repaired.promptTokens(), repaired.completionTokens());
-            String safe = firewall.guardOutbound(developerId, repaired.content());
-            var after = qualityGate.check(canonical, safe, complexity, cfg.getThreshold());
-
-            // Only keep the repair if it actually helped. A "correction" that
-            // scores worse is a regression the gate caused itself.
-            boolean better = after.score() > verdict.score();
-            quality.record(developerId, cfg, verdict, better ? "REPAIR" : "REPAIR_REJECTED", model,
-                    response.response(), safe, after, repairCost, repairMs);
-
-            if (!better) {
-                return annotate(response, verdict, false);
-            }
-            return annotate(response.withRevision(safe, repairMs, repairCost,
-                    String.format(" · repaired (%.2f → %.2f): %s",
-                            verdict.score(), after.score(), verdict.summary())),
-                    after, true);
-        } catch (Exception e) {
-            log.warn("Quality gate failed for {}; returning the answer unchecked: {}",
-                    developerId, e.getMessage());
-            return response;
-        }
-    }
 
 
-    /**
-     * The Answer Repair Engine path.
-     *
-     * <p>Differs from the single-shot repair in the guard that makes it safe:
-     * every attempt is re-scored by the same external gate and discarded if it
-     * did not help. Huang et al. (ICLR 2024) showed a model asked to reconsider
-     * will degrade correct work; the point here is that nothing relies on the
-     * model's own judgement of its answer.
-     */
-    private GatewayDtos.ChatResponse withRepairEngine(
-            GatewayDtos.ChatResponse response, String developerId, LlmRequest canonical,
-            String provider, String model, Map<String, String> devKeys, double complexity,
-            io.continuum.persistence.entity.QualityGateSettingEntity cfg,
-            io.continuum.quality.QualityGate.Verdict verdict) {
 
-        var result = repairEngine.repair(developerId, model, canonical, response.response(),
-                verdict, complexity, cfg.getThreshold(), cfg.getMaxRepairs(), cfg.getBudgetMs(),
-                messages -> {
-                    LlmResponse r = chaos(developerId, router.complete(
-                            new LlmRequest(model, messages, canonical.maxTokens(),
-                                    canonical.temperature()),
-                            List.of(provider), keyFor(devKeys, provider)));
-                    String safe = firewall.guardOutbound(developerId, r.content());
-                    double c = router.estimateCost(provider, r.model(),
-                            r.promptTokens(), r.completionTokens());
-                    return new io.continuum.quality.AnswerRepairService.Regenerate.Attempt(safe, c);
-                });
-
-        quality.record(developerId, cfg, verdict, result.improved() ? "REPAIR" : "REPAIR_REJECTED",
-                model, response.response(), result.improved() ? result.answer() : null, null,
-                result.totalCost(), result.totalMs());
-
-        if (!result.improved()) {
-            // Every attempt was discarded, so the original stands. Reported, not
-            // hidden: an engine that never improves anything is one to turn off.
-            return annotate(response, verdict, false);
-        }
-        return response.withRevision(result.answer(), result.totalMs(), result.totalCost(),
-                String.format(" · repaired (%.2f → %.2f) over %d attempt%s",
-                        result.originalScore(), result.finalScore(), result.attempts().size(),
-                        result.attempts().size() == 1 ? "" : "s"));
-    }
-
-    /**
-     * A gateway response carrying everything the provider said beyond the text:
-     * the tool calls, the prompt/completion split, and why it stopped.
-     *
-     * <p>One definition used by every path that calls a provider — direct,
-     * cascaded and hedged. Before this, only the direct path carried tool calls,
-     * so the same request answered differently depending on which routing mode
-     * happened to serve it.
-     */
-    private static GatewayDtos.ChatResponse completed(GatewayDtos.ChatResponse r, LlmResponse resp) {
-        if (resp == null) {
-            return r;
-        }
-        boolean calling = resp.toolCalls() != null && !resp.toolCalls().isEmpty();
-        return r.withCompletion(toToolCallRefs(resp.toolCalls()), resp.promptTokens(), resp.completionTokens())
-                .withFinishReason(FinishReason.normalize(resp.finishReason(), calling));
-    }
 
     /**
      * Whether a provider failure was it refusing the key rather than the model.
@@ -951,361 +784,12 @@ public class GatewayService {
         return false;
     }
 
-    /** Appends the verdict to the routing reason without altering the answer. */
-    private static GatewayDtos.ChatResponse annotate(GatewayDtos.ChatResponse r,
-                                                     io.continuum.quality.QualityGate.Verdict v,
-                                                     boolean alreadyDescribed) {
-        if (alreadyDescribed) {
-            return r;
-        }
-        String note = v.passed()
-                ? String.format(" · quality %.2f", v.score())
-                : String.format(" · quality %.2f (%s): %s", v.score(),
-                        v.action().name().toLowerCase(), v.summary());
-        return r.withNote(note);
-    }
 
-    /**
-     * Attaches a confidence measurement to a finished response.
-     *
-     * <p>Resamples the same question at a non-zero temperature and takes entropy
-     * over the <em>meanings</em> of the samples, so a model that says the same
-     * thing several ways reads as certain and one that says several different
-     * things does not.
-     *
-     * <p>Returns the response untouched on any failure. The answer is already
-     * good; losing it because a measurement failed would be absurd.
-     */
-    private GatewayDtos.ChatResponse withUncertainty(
-            GatewayDtos.ChatResponse response, String developerId, GatewayDtos.ChatRequest req,
-            LlmRequest canonical, String provider, String model, Map<String, String> devKeys,
-            boolean judgeUnsure) {
 
-        boolean requested = Boolean.TRUE.equals(req.measureUncertainty());
-        if (!uncertainty.shouldMeasure(developerId, requested, judgeUnsure)) {
-            return response;
-        }
-        try {
-            var cfg = uncertainty.settingsFor(developerId);
-            int extra = Math.max(1, cfg.getSamples() - 1);
-            long start = System.nanoTime();
 
-            List<String> answers = new ArrayList<>();
-            answers.add(response.response());
-            double extraCost = 0;
-            io.continuum.uncertainty.AdaptiveStopping.Decision stopped = null;
-            for (int i = 0; i < extra; i++) {
-                LlmResponse r = chaos(developerId, router.complete(
-                        new LlmRequest(model, canonical.messages(), canonical.maxTokens(),
-                                cfg.getTemperature()),
-                        List.of(provider), keyFor(devKeys, provider)));
-                answers.add(r.content());
-                extraCost += router.estimateCost(provider, r.model(), r.promptTokens(), r.completionTokens());
 
-                // Adaptive consensus: stop as soon as the answer is decided
-                // rather than always drawing the configured k. Off by default,
-                // in which case this loop behaves exactly as it always has.
-                if (cfg.isAdaptiveEnabled()) {
-                    stopped = io.continuum.uncertainty.AdaptiveStopping.decide(
-                            uncertainty.clusterSizes(answers), answers.size(), cfg.getSamples(),
-                            cfg.getOverturnThreshold());
-                    if (stopped.stop()) {
-                        break;
-                    }
-                }
-            }
-            long extraMs = (System.nanoTime() - start) / 1_000_000;
 
-            var m = uncertainty.measure(developerId, answers);
-            uncertainty.record(developerId, lastUserContent(canonical), model, m, extraCost, extraMs);
 
-            // Second drift channel. The quality gate checks whether an answer
-            // honours its contract, which is deliberately not a check on whether
-            // it is true — a fluent, well-formatted fabrication scores full
-            // marks. Self-agreement is the signal that moves when a model starts
-            // confabulating, so when it is being measured the breaker gets it
-            // too.
-            if (!Double.isNaN(m.confidence())) {
-                breaker.observe(developerId, provider, model, m.confidence(),
-                        m.clusters() > 1 ? m.clusters() + " conflicting answers across samples" : null);
-            }
-
-            return response.withConfidence(
-                    Double.isNaN(m.confidence()) ? null : m.confidence(), m.lowConfidence(), m.clusters(),
-                    extraMs, extraCost,
-                    String.format(" · confidence %.2f over %d samples in %d meaning%s",
-                            m.confidence(), m.samples(), m.clusters(), m.clusters() == 1 ? "" : "s")
-                            + (stopped != null && stopped.stop() && m.samples() < cfg.getSamples()
-                                    ? String.format(" · stopped early, %d of %d drawn",
-                                            m.samples(), cfg.getSamples()) : ""));
-        } catch (Exception e) {
-            log.warn("Uncertainty measurement failed for {}; returning the answer unmeasured: {}",
-                    developerId, e.getMessage());
-            return response;
-        }
-    }
-
-    /**
-     * Answers on the cheap tier, judges it, and escalates only if needed.
-     *
-     * <p>Returns {@code null} when the cascade cannot apply — no meaningful
-     * price gap between models, or the cheap call failed — so the caller falls
-     * through to the ordinary chain. The cascade is an optimisation and must
-     * never be the reason a request fails.
-     */
-    private GatewayDtos.ChatResponse tryCascade(
-            String developerId, GatewayDtos.ChatRequest req, LlmRequest canonical,
-            Map<String, String> devKeys, double complexity, long started,
-            io.continuum.routing.RoutingStrategyService.Decision routingDecision,
-            java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> autopilot,
-            String cacheKey, io.continuum.provenance.ProvenanceService.Recording prov) {
-
-        List<io.continuum.cascade.ResponseCascadeService.Tier> pair = cascade.cheapAndStrong();
-        if (pair.size() < 2) {
-            return null;
-        }
-        var cheap = pair.get(0);
-        var strong = pair.get(1);
-
-        // --- tier 0 -------------------------------------------------------
-        long cheapStart = System.nanoTime();
-        LlmResponse cheapResp;
-        try {
-            cheapResp = chaos(developerId, router.complete(
-                    new LlmRequest(cheap.model(), canonical.messages(), canonical.maxTokens(),
-                            canonical.temperature()),
-                    List.of(cheap.provider()), keyFor(devKeys, cheap.provider())));
-        } catch (Exception e) {
-            // The cheap tier is not special; a failure here is an ordinary
-            // provider failure and the normal chain handles it.
-            log.warn("Cascade tier 0 ({}) failed; falling back to the standard chain: {}",
-                    cheap.model(), e.getMessage());
-            return null;
-        }
-        long cheapMs = (System.nanoTime() - cheapStart) / 1_000_000;
-        double cheapCost = router.estimateCost(cheap.provider(), cheapResp.model(),
-                cheapResp.promptTokens(), cheapResp.completionTokens());
-        health.recordSuccess(cheap.provider(), cheap.model(), cheapMs);
-
-        var assessment = cascade.assess(developerId, canonical, cheapResp.content(), complexity);
-        // A sampled slice runs both tiers whatever the verdict says, which is
-        // the only way to see the escalations the judge did NOT make.
-        boolean audit = !assessment.escalate() && cascade.shouldAudit(developerId);
-        boolean runStrong = assessment.escalate() || audit;
-
-        LlmResponse strongResp = null;
-        double strongCost = 0;
-        if (runStrong) {
-            try {
-                long t = System.nanoTime();
-                strongResp = chaos(developerId, router.complete(
-                        new LlmRequest(strong.model(), canonical.messages(), canonical.maxTokens(),
-                                canonical.temperature()),
-                        List.of(strong.provider()), keyFor(devKeys, strong.provider())));
-                strongCost = router.estimateCost(strong.provider(), strongResp.model(),
-                        strongResp.promptTokens(), strongResp.completionTokens());
-                health.recordSuccess(strong.provider(), strong.model(), (System.nanoTime() - t) / 1_000_000);
-            } catch (Exception e) {
-                // Escalation failing is survivable: the cheap answer exists and
-                // is returned, flagged as un-escalated.
-                log.warn("Cascade escalation to {} failed; returning the tier-0 answer: {}",
-                        strong.model(), e.getMessage());
-            }
-        }
-
-        // On an audit the cheap answer is what the caller was going to get, so
-        // it is what they get — measuring must not change the measurement.
-        boolean served = strongResp != null && assessment.escalate();
-        LlmResponse chosen = served ? strongResp : cheapResp;
-        String chosenProvider = served ? strong.provider() : cheap.provider();
-        double billed = cheapCost + strongCost;
-        long totalMs = (System.nanoTime() - started) / 1_000_000;
-
-        cascade.record(developerId, assessment, served, audit,
-                cheapResp.content(), strongResp == null ? null : strongResp.content(),
-                cheap.model(), strongResp == null ? null : strong.model(),
-                cheapCost, strongCost, cheapMs, totalMs, complexity);
-
-        int tokens = chosen.promptTokens() + chosen.completionTokens();
-        String reason = served
-                ? String.format("cascade: %s escalated to %s — %s", cheap.model(), strong.model(),
-                        assessment.reason())
-                : String.format("cascade: answered by %s — %s%s", cheap.model(), assessment.reason(),
-                        audit ? " (audit sample)" : "");
-
-        // Live metrics and the decision trail, as on the ordinary path. The
-        // cascade answered on its own and skipped both: its traffic was missing
-        // from the gateway metrics, and no provenance trail was ever written.
-        metrics.request(cheap.provider(), cheapResp.model(), true, cheapMs);
-        metrics.tokens(cheap.provider(), cheapResp.promptTokens(), cheapResp.completionTokens());
-        metrics.cost(cheap.provider(), cheapCost);
-        if (strongResp != null) {
-            metrics.request(strong.provider(), strongResp.model(), true, totalMs - cheapMs);
-            metrics.tokens(strong.provider(), strongResp.promptTokens(), strongResp.completionTokens());
-            metrics.cost(strong.provider(), strongCost);
-        }
-        if (prov != null) {
-            prov.add(new io.continuum.provenance.Decision(
-                    io.continuum.provenance.Decision.Stage.CASCADE,
-                    served ? "escalated to " + strong.model() : "kept " + cheap.model(),
-                    assessment.reason() + (audit ? " (audit sample: both tiers ran)" : ""),
-                    runStrong ? List.of(strong.model()) : List.of(), cheapCost, cheapMs));
-            prov.add(new io.continuum.provenance.Decision(
-                    io.continuum.provenance.Decision.Stage.PROVIDER,
-                    chosenProvider + "/" + chosen.model(),
-                    served ? "the stronger tier's answer was served" : "the cheaper tier's answer was good enough",
-                    List.of(), billed, totalMs));
-            prov.add(new io.continuum.provenance.Decision(
-                    io.continuum.provenance.Decision.Stage.OUTPUT,
-                    tokens + " tokens", reason, List.of(), billed, totalMs));
-            prov.commit();
-        }
-
-        var savedLog = logged(new GatewayRequestLogEntity(developerId, req.model(), chosenProvider,
-                chosen.model(), complexity, reason, totalMs, tokens, billed, true, 0)
-                .withTraceId(prov == null ? null : prov.requestId()));
-        labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, billed);
-        recordBandit(complexity, chosenProvider, true, totalMs, billed);
-        routingStrategy.record(developerId, routingDecision, complexity, chosenProvider, true, totalMs, billed);
-
-        String safeContent = firewall.guardOutbound(developerId, chosen.content());
-        godMode.observeExchange(developerId, "gateway", lastUserContent(canonical), safeContent);
-        semanticCache.store(developerId, cacheKey, req.model(), chosenProvider, safeContent, tokens, billed);
-
-        // The judge's ambivalent band is exactly where a second opinion is worth
-        // buying, which is what ADAPTIVE mode targets.
-        boolean judgeUnsure = assessment.confidence() < Math.min(1.0, assessment.threshold() + 0.15);
-        String finalModel = served ? strong.model() : cheap.model();
-        return withUncertainty(
-                withQualityGate(
-                        completed(new GatewayDtos.ChatResponse(safeContent, chosenProvider, chosen.model(),
-                                totalMs, tokens, billed, 0, reason), chosen),
-                        developerId, canonical, chosenProvider, finalModel, devKeys, complexity),
-                developerId, req, canonical, chosenProvider, finalModel, devKeys, judgeUnsure);
-    }
-
-    /**
-     * Applies armed AI-level faults to a provider response.
-     *
-     * <p>Chaos is scoped to the tenant that armed it, so this is safe to run
-     * against production traffic — and it is what makes a hallucination drill
-     * visible on the path an external application actually uses.
-     */
-    private LlmResponse chaos(String developerId, LlmResponse response) {
-        if (developerId == null || !aiChaos.isActive(developerId)) {
-            return response;
-        }
-        try {
-            return aiChaos.applyToResponse(response, "gateway:" + developerId, null);
-        } catch (Exception e) {
-            log.warn("AI chaos injection failed for {}; returning the response untouched: {}",
-                    developerId, e.getMessage());
-            return response;
-        }
-    }
-
-    private static Map<String, String> keyFor(Map<String, String> devKeys, String provider) {
-        return devKeys.containsKey(provider) ? Map.of(provider, devKeys.get(provider)) : null;
-    }
-
-    /**
-     * Races the top providers in the chain and returns the first good answer.
-     *
-     * <p>Returns {@code null} rather than throwing when the race produces
-     * nothing usable, so the caller falls back to the ordinary sequential chain.
-     * Hedging is an optimisation; it must never be the reason a request fails.
-     */
-    private GatewayDtos.ChatResponse tryHedged(
-            String developerId, GatewayDtos.ChatRequest req, LlmRequest canonical,
-            List<ModelFallbackPolicy.ModelCandidate> chain, Map<String, String> devKeys,
-            double complexity, RoutingMode mode, long started,
-            io.continuum.routing.RoutingStrategyService.Decision routingDecision,
-            java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> autopilot,
-            String cacheKey, io.continuum.provenance.ProvenanceService.Recording prov) {
-
-        // One entry per distinct provider, keeping that provider's best model.
-        Map<String, ModelFallbackPolicy.ModelCandidate> byProvider = new java.util.LinkedHashMap<>();
-        for (ModelFallbackPolicy.ModelCandidate c : chain) {
-            byProvider.putIfAbsent(c.provider(), c);
-        }
-        if (byProvider.size() < 2) {
-            return null;
-        }
-        List<String> providers = new ArrayList<>(byProvider.keySet());
-
-        try {
-            io.continuum.hedging.HedgedResult result = hedging.execute(canonical, providers,
-                    (provider, request) -> {
-                        ModelFallbackPolicy.ModelCandidate cand = byProvider.get(provider);
-                        Map<String, String> keys = devKeys.containsKey(provider)
-                                ? Map.of(provider, devKeys.get(provider)) : null;
-                        return router.complete(new LlmRequest(cand.model(), request.messages(),
-                                request.maxTokens(), request.temperature()), List.of(provider), keys);
-                    });
-
-            LlmResponse resp = result.response();
-            if (resp == null) {
-                return null;
-            }
-            String winner = result.winningProvider();
-            ModelFallbackPolicy.ModelCandidate cand = byProvider.get(winner);
-            long totalMs = (System.nanoTime() - started) / 1_000_000;
-
-            health.recordSuccess(winner, cand == null ? resp.model() : cand.model(), result.elapsedMs());
-            int tokens = resp.promptTokens() + resp.completionTokens();
-            double cost = router.estimateCost(winner, resp.model(), resp.promptTokens(), resp.completionTokens());
-            // A hedge that fired paid for two calls; reporting one would make
-            // hedging look free, which is exactly the tradeoff being made.
-            double billedCost = cost * Math.max(1, result.requestsLaunched());
-
-            String reason = String.format("hedged across %s — %s answered first in %dms%s",
-                    result.attemptedProviders(), winner, result.elapsedMs(),
-                    result.hedged() ? " (hedge fired)" : " (no hedge needed)");
-
-            metrics.request(winner, resp.model(), true, totalMs);
-            metrics.tokens(winner, resp.promptTokens(), resp.completionTokens());
-            metrics.cost(winner, billedCost);
-            if (prov != null) {
-                prov.add(new io.continuum.provenance.Decision(
-                        io.continuum.provenance.Decision.Stage.PROVIDER,
-                        winner + "/" + resp.model(),
-                        result.hedged() ? "won a hedged race against " + result.attemptedProviders()
-                                : "answered before a hedge was needed",
-                        providers.stream().filter(pv -> !pv.equals(winner)).toList(), billedCost, totalMs));
-                prov.add(new io.continuum.provenance.Decision(
-                        io.continuum.provenance.Decision.Stage.OUTPUT,
-                        tokens + " tokens", reason, List.of(), billedCost, totalMs));
-                prov.commit();
-            }
-            var savedLog = logged(new GatewayRequestLogEntity(developerId, req.model(), winner,
-                    resp.model(), complexity, reason, totalMs, tokens, billedCost, true, 0)
-                    .withTraceId(prov == null ? null : prov.requestId()));
-            labelForAutopilot(autopilot, savedLog.getId(), developerId, true, totalMs, billedCost);
-            recordBandit(complexity, winner, true, totalMs, billedCost);
-            routingStrategy.record(developerId, routingDecision, complexity, winner, true, totalMs, billedCost);
-
-            String safeContent = firewall.guardOutbound(developerId, resp.content());
-            godMode.observeExchange(developerId, "gateway", lastUserContent(canonical), safeContent);
-            semanticCache.store(developerId, cacheKey, req.model(), winner, safeContent, tokens, billedCost);
-
-            return completed(new GatewayDtos.ChatResponse(safeContent, winner, resp.model(),
-                    totalMs, tokens, billedCost, 0, reason), resp);
-        } catch (Exception e) {
-            log.warn("Hedged execution failed for {}; falling back to the sequential chain: {}",
-                    developerId, e.getMessage());
-            return null;
-        }
-    }
-
-    private static String lastUserContent(LlmRequest canonical) {
-        for (int i = canonical.messages().size() - 1; i >= 0; i--) {
-            var m = canonical.messages().get(i);
-            if ("user".equalsIgnoreCase(m.role().name())) {
-                return m.content();
-            }
-        }
-        return null;
-    }
 
     /** Reorders providers so the Autopilot policy's preferred order takes precedence. */
     private Map<String, Integer> applyAutopilotOrder(List<String> policyOrder, Map<String, Integer> base) {
@@ -1324,18 +808,6 @@ public class GatewayService {
         return out;
     }
 
-    private void labelForAutopilot(java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> ap,
-                                   Long gatewayRequestId, String developerId, boolean success, long latencyMs, double cost) {
-        if (ap.isEmpty()) {
-            return;
-        }
-        try {
-            autopilotLabels.save(new io.continuum.persistence.entity.AutopilotRequestLabelEntity(
-                    gatewayRequestId, developerId, ap.get().bundleId(), ap.get().canary(), success, latencyMs, cost));
-        } catch (Exception ignored) {
-            // Labeling must never break a request.
-        }
-    }
 
     /**
      * Ranks providers: the developer's own configured providers first (ordered by
@@ -1386,7 +858,7 @@ public class GatewayService {
     private GatewayRequestLogEntity logFailure(String developerId, GatewayDtos.ChatRequest req,
                                                double complexity, RoutingMode mode) {
         try {
-            return logged(new GatewayRequestLogEntity(developerId, req.model(), null, null,
+            return requestLog.save(new GatewayRequestLogEntity(developerId, req.model(), null, null,
                     complexity, "no provider succeeded (mode " + mode + ")", 0, 0, 0, false, 0));
         } catch (Exception ignored) {
             return null;
@@ -1439,23 +911,6 @@ public class GatewayService {
 
 
 
-    /**
-     * The provider's tool calls, in the gateway's own shape.
-     *
-     * <p>Null for the ordinary prose answer, so downstream can branch on "the
-     * model asked for a tool" without inspecting an empty list.
-     */
-    private static java.util.List<GatewayDtos.ToolCallRef> toToolCallRefs(
-            java.util.List<io.continuum.provider.model.ToolCall> calls) {
-        if (calls == null || calls.isEmpty()) {
-            return null;
-        }
-        java.util.List<GatewayDtos.ToolCallRef> out = new java.util.ArrayList<>();
-        for (io.continuum.provider.model.ToolCall c : calls) {
-            out.add(new GatewayDtos.ToolCallRef(c.id(), c.name(), c.argumentsJson()));
-        }
-        return out;
-    }
 
     /**
      * The models a caller may name on {@code /v1/models}.
