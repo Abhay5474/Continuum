@@ -323,8 +323,10 @@ class ModelCatalogServiceTest {
 
         catalogue.reportUnavailable("groq", "openai/gpt-oss-120b", true, "HTTP 404: model_not_found");
 
-        await(() -> row("openai/gpt-oss-120b").getStatus() == ModelStatus.UNAVAILABLE);
-        assertThat(resolver.isQuarantined("groq", "openai/gpt-oss-120b")).isFalse();
+        // Both are written by the confirmation on the catalogue's thread, the
+        // status first; waiting for the status alone raced the quarantine lift.
+        await(() -> row("openai/gpt-oss-120b").getStatus() == ModelStatus.UNAVAILABLE
+                && !resolver.isQuarantined("groq", "openai/gpt-oss-120b"));
         assertThat(resolver.defaultFor("groq")).isEqualTo("openai/gpt-oss-20b");
     }
 
