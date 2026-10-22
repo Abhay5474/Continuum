@@ -76,6 +76,12 @@ public class AnswerReview {
         if (!gateOn && !breakerOn) {
             return response;
         }
+        if (callsTools(response)) {
+            // A turn that asks for a tool to be run has no text to judge yet.
+            // Scored, it read as an empty answer, and an enforcing gate
+            // "repaired" the tool call into prose the caller never asked for.
+            return response;
+        }
         try {
             var cfg = quality.settingsFor(developerId);
             var verdict = qualityGate.check(canonical, response.response(), complexity, cfg.getThreshold());
@@ -222,6 +228,13 @@ public class AnswerReview {
         if (!uncertainty.shouldMeasure(developerId, requested, judgeUnsure)) {
             return response;
         }
+        if (callsTools(response)) {
+            // Resampled without the tools, the other answers are prose; set
+            // against an empty tool-call turn they measured disagreement that
+            // was never there. The final answer, after the tools run, is
+            // measured instead.
+            return response;
+        }
         try {
             var cfg = uncertainty.settingsFor(developerId);
             int extra = Math.max(1, cfg.getSamples() - 1);
@@ -286,6 +299,10 @@ public class AnswerReview {
             return response;
         }
     }
+    private static boolean callsTools(GatewayDtos.ChatResponse r) {
+        return r != null && r.toolCalls() != null && !r.toolCalls().isEmpty();
+    }
+
     /** Appends the verdict to the routing reason without altering the answer. */
     private static GatewayDtos.ChatResponse annotate(GatewayDtos.ChatResponse r,
                                                      io.continuum.quality.QualityGate.Verdict v,

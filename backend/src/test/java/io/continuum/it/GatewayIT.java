@@ -239,6 +239,23 @@ class GatewayIT extends PostgresIT {
     }
 
     @Test
+    void anEnforcingQualityGateAndConfidenceLeaveAToolCallAlone() {
+        quality.configure(dev, "ENFORCE", 0.9, 1, 4000, null);
+        uncertainty.configure(dev, "ALWAYS", 3, null, null);
+        GatewayDtos.ChatRequest req = new GatewayDtos.ChatRequest(null, List.of(user("Weather in Paris?")),
+                200, 0.2, null, null, null, null, null,
+                List.of(new GatewayDtos.ToolRef("get_weather", "Weather for a city",
+                        Map.of("type", "object", "properties", Map.of("city", Map.of("type", "string"))))),
+                "auto", null, null);
+        GatewayDtos.ChatResponse r = gateway.chat(dev, req);
+
+        assertThat(r.toolCalls()).isNotEmpty();
+        assertThat(r.finishReason()).isEqualTo("tool_calls");
+        assertThat(r.response() == null || r.response().isBlank()).as("no prose written over the tool call").isTrue();
+        assertThat(r.confidence()).isNull();
+    }
+
+    @Test
     void aStreamedRequestHandsOverPiecesThatMakeUpTheAnswer() {
         List<String> pieces = new ArrayList<>();
         GatewayDtos.ChatResponse r = gateway.chat(dev, ask("Stream me a short answer"), pieces::add);
