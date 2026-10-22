@@ -38,8 +38,11 @@ answer `generateContent` too, so they are told apart by name.
   and at most 20 test calls per provider, spaced 2.5 s (Groq) / 6 s (Gemini)
   apart, in this order: the default; models in use never tested; new models;
   models in use again, longest since their last test first; models not usable on
-  the key. Testing stops after two rate-limited or failed test calls in a row, or
-  at once if the key is refused. What does not fit waits for the next check, and
+  the key. A model that is busy or rate-limited just then is skipped, keeps its
+  last verified date with a note that today's test was not answered, and is
+  tried again at the next check; the next test waits longer. Testing stops after
+  three such refusals in a row (the provider pushing back on the key), or at
+  once if the key is refused. What does not fit waits for the next check, and
   each provider's card says how many. A scheduled check re-tests a model in use
   only when its last test is 30 days old.
 - **Startup:** database only. No provider is called on the startup path.

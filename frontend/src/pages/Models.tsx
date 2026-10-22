@@ -76,6 +76,14 @@ const FILTERS = [
 ] as const;
 type Filter = (typeof FILTERS)[number]["value"];
 
+/** The latest test call got no verdict (busy, rate-limited) after the last success, so its date is older than the check. */
+function retryPending(m: Model): boolean {
+  if (m.probeOutcome !== "RATE_LIMITED" && m.probeOutcome !== "TRANSIENT") return false;
+  const probed = toMillis(m.probedAt);
+  const verified = toMillis(m.verifiedAt);
+  return probed != null && (verified == null || probed > verified);
+}
+
 /** What a status means to someone deciding whether requests can use the model. */
 function statusOf(m: Model): { label: string; tone: Tone } {
   if (m.quarantined) return { label: "set aside", tone: "warn" };
@@ -380,14 +388,14 @@ export default function Models() {
 }
 
 /** What the last check did for one provider: its test calls, and what is left for the next check. */
-type Tested = { tested: number; verified: number; unusable: number; deferred: number; stoppedEarly: boolean; at: unknown };
+type Tested = { tested: number; verified: number; unusable: number; inconclusive: number; deferred: number; stoppedEarly: boolean; at: unknown };
 
 function testedIn(run: { summary?: string; startedAt?: unknown } | null | undefined, provider: string): Tested | null {
   if (!run?.summary) return null;
   try {
     const s = JSON.parse(run.summary)?.[provider];
     if (!s || typeof s.tested !== "number") return null;
-    return { tested: s.tested, verified: s.verified ?? 0, unusable: s.unusable ?? 0, deferred: s.deferred ?? 0, stoppedEarly: !!s.stoppedEarly, at: run.startedAt };
+    return { tested: s.tested, verified: s.verified ?? 0, unusable: s.unusable ?? 0, inconclusive: s.inconclusive ?? 0, deferred: s.deferred ?? 0, stoppedEarly: !!s.stoppedEarly, at: run.startedAt };
   } catch {
     return null;
   }
@@ -455,6 +463,7 @@ function ProviderCard({ p, models, policy, tested, operator, onPinned }: { p: Pr
         <p className="text-[12px] leading-snug text-slate-500">
           Last check {ago(tested.at)}: {tested.tested} test call{tested.tested === 1 ? "" : "s"} · {tested.verified} answered
           {tested.unusable ? ` · ${tested.unusable} not usable` : ""}
+          {tested.inconclusive ? ` · ${tested.inconclusive} busy, retried next check` : ""}
           {tested.deferred
             ? ` · ${tested.deferred} wait${tested.deferred === 1 ? "s" : ""} for the next check${tested.stoppedEarly ? " (the provider pushed back)" : " (test-call limit)"}`
             : ""}
@@ -555,6 +564,11 @@ function ModelTable({ models, defaultModel, pinned }: { models: Model[]; default
                 <span className="text-[12px] text-slate-500">built in</span>
               ) : (
                 <span className="text-[12px] text-slate-500">not yet known</span>
+              )}
+              {retryPending(m) && (
+                <div className="mt-0.5 text-[11.5px]" style={{ color: "var(--state-warning-ink)" }} title={m.statusReason ?? undefined}>
+                  last test {ago(m.probedAt)} not answered · retried next check
+                </div>
               )}
             </TD>
             <TD numeric>

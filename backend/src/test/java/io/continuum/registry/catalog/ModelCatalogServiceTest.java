@@ -243,15 +243,36 @@ class ModelCatalogServiceTest {
     }
 
     @Test
-    void twoRateLimitsInARowStopTestingForThisCheck() {
+    void threeRefusalsInARowStopTestingForThisCheck() {
         groq.listing("a-70b", "b-70b", "c-70b", "d-70b", "e-70b");
         groq.defaultProbe = ProbeResult.of(ProbeResult.Outcome.RATE_LIMITED, "429");
 
         check();
 
-        assertThat(groq.probed).hasSize(2);
+        assertThat(groq.probed).hasSize(3);
         assertThat(rows).allMatch(m -> m.getStatus() == ModelStatus.DISCOVERED);
         assertThat(store.eventTypes()).contains("PROBES_PAUSED");
+    }
+
+    @Test
+    void oneBusyModelDoesNotStopTheOthersBeingConfirmed() {
+        gemini.configured = true;
+        gemini.listing("gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash");
+        catalogue.runNow("MANUAL", "dev", List.of("gemini"), false);
+        clock.advance(Duration.ofDays(1));
+        gemini.probed.clear();
+        Instant earlier = row("gemini-3.6-flash").getVerifiedAt();
+        // Two models busy just now, one after the other: each is skipped, the rest go on.
+        gemini.probes.put("gemini-3.1-flash-lite", ProbeResult.of(ProbeResult.Outcome.TRANSIENT, "Gemini answered HTTP 503"));
+        gemini.probes.put("gemini-3.8-flash", ProbeResult.of(ProbeResult.Outcome.RATE_LIMITED, "Rate-limited just now"));
+
+        catalogue.runNow("MANUAL", "dev", List.of("gemini"), false);
+
+        assertThat(gemini.probed).hasSize(5);
+        assertThat(row("gemini-3.6-flash").getVerifiedAt()).isAfter(earlier);
+        assertThat(row("gemini-3.8-flash").getStatus()).isEqualTo(ModelStatus.ACTIVE);
+        assertThat(row("gemini-3.8-flash").getStatusReason()).contains("today's test was not answered");
+        assertThat(store.eventTypes()).doesNotContain("PROBES_PAUSED");
     }
 
     @Test

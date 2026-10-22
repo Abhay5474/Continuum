@@ -665,7 +665,7 @@ public class ModelCatalogService {
                                 || m.getProbedAt() == null || m.getProbedAt().isBefore(stale))))
                 .sorted(priority(preferred))
                 .toList();
-        int probed = 0, verified = 0, unusable = 0, softInARow = 0;
+        int probed = 0, verified = 0, unusable = 0, softInARow = 0, inconclusive = 0;
         boolean stopped = false;
         for (ModelEntity m : pending) {
             if (probed >= budget) {
@@ -673,7 +673,8 @@ public class ModelCatalogService {
             }
             if (probed > 0) {
                 try {
-                    sleeper.sleep(settings.probeSpacingMs(p));
+                    // After a refusal, a longer pause before the next model.
+                    sleeper.sleep(settings.probeSpacingMs(p) * (softInARow > 0 ? 4 : 1));
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -710,9 +711,16 @@ public class ModelCatalogService {
                     }
                 }
                 case RATE_LIMITED, TRANSIENT -> {
-                    if (before == ModelStatus.DISCOVERED) {
-                        m.setStatusReason("Test deferred — " + r.detail());
-                    }
+                    inconclusive++;
+                    // Said on the model, not only in the timeline: otherwise a
+                    // model in use just keeps last month's date, and nothing
+                    // says this check tried it.
+                    m.setStatusReason(before == ModelStatus.DISCOVERED
+                            ? "Test deferred — " + r.detail()
+                            : before == ModelStatus.ACTIVE && m.getVerifiedAt() != null
+                            ? "Still in use from its last successful test; today's test was not answered ("
+                                    + r.detail() + ") and is tried again at the next check"
+                            : "Not tested yet — " + r.detail() + "; tried again at the next check");
                 }
                 case KEY_REJECTED -> st.lastError = r.detail();
             }
@@ -722,10 +730,13 @@ public class ModelCatalogService {
                 stopped = true;
                 break;
             }
-            // Two soft failures in a row: the provider is pushing back. Stop,
-            // rather than spend the rest of the budget being refused.
+            // A busy or rate-limited model is usually that model alone (Gemini
+            // limits each model separately): skip it and go on, after a longer
+            // pause. It used to end the check after two in a row, so one busy
+            // preview model left every other model in use with last month's
+            // date. Three in a row is the provider pushing back on the key.
             softInARow = r.conclusive() ? 0 : softInARow + 1;
-            if (softInARow >= 2) {
+            if (softInARow >= 3) {
                 event(p, null, "PROBES_PAUSED", "Rate-limited or not answering — remaining tests wait for the next check", runId);
                 stopped = true;
                 break;
@@ -737,6 +748,7 @@ public class ModelCatalogService {
         out.put("unusable", unusable);
         out.put("deferred", Math.max(0, pending.size() - probed));
         out.put("stoppedEarly", stopped ? 1 : 0);
+        out.put("inconclusive", inconclusive);
         return out;
     }
 
