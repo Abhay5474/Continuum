@@ -346,6 +346,31 @@ class ModelCatalogServiceTest {
     }
 
     @Test
+    void withoutAServerKeyCheckNowUsesTheKeySavedInTheConsole() {
+        groq.configured = false;
+        groq.listing("openai/gpt-oss-120b");
+        io.continuum.vault.CredentialVaultService vault = org.mockito.Mockito.mock(io.continuum.vault.CredentialVaultService.class);
+        org.mockito.Mockito.when(vault.decrypt(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(java.util.Optional.empty());
+        org.mockito.Mockito.when(vault.decrypt("dev", "groq")).thenReturn(java.util.Optional.of("gsk_saved_in_console"));
+        catalogue.setVault(vault);
+
+        assertThat(catalogue.requestCheck("dev").outcome()).isEqualTo(ModelCatalogService.StartOutcome.STARTED);
+        await(() -> catalogue.running().isEmpty() && groq.listCalls == 1);
+        assertThat(groq.keysUsed).isNotEmpty().allMatch("gsk_saved_in_console"::equals);
+        assertThat(row("openai/gpt-oss-120b").getStatus()).isEqualTo(ModelStatus.ACTIVE);
+
+        // Someone without a saved key still has nothing to check, and the
+        // scheduled check, which nobody pressed, never borrows a person's key.
+        clock.advance(Duration.ofMinutes(11));
+        assertThat(catalogue.requestCheck("someone-else").outcome())
+                .isEqualTo(ModelCatalogService.StartOutcome.NOTHING_TO_CHECK);
+        clock.advance(Duration.ofDays(30));
+        catalogue.runIfDue();
+        assertThat(groq.listCalls).isEqualTo(1);
+    }
+
+    @Test
     void withNoKeyThereIsNothingToCheckAndNoCallIsMade() {
         groq.configured = false;
         assertThat(catalogue.requestCheck("dev").outcome()).isEqualTo(ModelCatalogService.StartOutcome.NOTHING_TO_CHECK);

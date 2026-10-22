@@ -54,9 +54,15 @@ public class GroqCatalogClient implements ProviderCatalogClient {
 
     @Override
     public ListResult list() {
+        return list(null);
+    }
+
+    @Override
+    public ListResult list(String apiKey) {
+        String key = apiKey != null ? apiKey : config.getApiKey();
         try {
             HttpJson.Result r = http.get(config.getBaseUrl() + "/models",
-                    new String[]{"Authorization", "Bearer " + config.getApiKey()}, 15);
+                    new String[]{"Authorization", "Bearer " + key}, 15);
             if (r.status() == 401 || r.status() == 403) {
                 return ListResult.keyRejected("Groq refused the API key (HTTP " + r.status() + ")");
             }
@@ -109,6 +115,12 @@ public class GroqCatalogClient implements ProviderCatalogClient {
 
     @Override
     public ProbeResult probe(String modelId) {
+        return probe(modelId, null);
+    }
+
+    @Override
+    public ProbeResult probe(String modelId, String apiKey) {
+        String key = apiKey != null ? apiKey : config.getApiKey();
         Map<String, Object> body = Map.of(
                 "model", modelId,
                 "messages", List.of(Map.of("role", "user", "content", "Reply with OK.")),
@@ -116,7 +128,7 @@ public class GroqCatalogClient implements ProviderCatalogClient {
                 "max_tokens", 16);
         try {
             HttpJson.Result r = http.exchange(config.getBaseUrl() + "/chat/completions", body,
-                    new String[]{"Authorization", "Bearer " + config.getApiKey()}, 25);
+                    new String[]{"Authorization", "Bearer " + key}, 25);
             return classify(r);
         } catch (Exception e) {
             return ProbeResult.of(ProbeResult.Outcome.TRANSIENT, "No answer: " + e.getClass().getSimpleName());

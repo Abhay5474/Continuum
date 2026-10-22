@@ -59,7 +59,8 @@ public class ModelCatalogController {
     }
 
     @GetMapping("/catalog")
-    public Map<String, Object> catalog() {
+    public Map<String, Object> catalog(HttpServletRequest req) {
+        String developerId = RequestScope.developerId(req);
         Map<String, ModelCatalogStore.ProviderState> states = new HashMap<>();
         for (ModelCatalogStore.ProviderState s : store.states()) {
             states.put(s.provider, s);
@@ -72,7 +73,11 @@ public class ModelCatalogController {
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("provider", c.provider());
             p.put("label", ModelCatalogService.label(c.provider()));
-            p.put("configured", c.configured());
+            // Configured for this person: the server's key, or one they saved
+            // in the console, which "Check now" uses when the server has none.
+            boolean saved = !c.configured() && catalogue.hasSavedKey(developerId, c.provider());
+            p.put("configured", c.configured() || saved);
+            p.put("keySource", c.configured() ? "server" : saved ? "account" : null);
             p.put("freeTier", c.freeTier());
             p.put("lastListOkAt", st.lastListOkAt);
             p.put("lastAttemptAt", st.lastAttemptAt);

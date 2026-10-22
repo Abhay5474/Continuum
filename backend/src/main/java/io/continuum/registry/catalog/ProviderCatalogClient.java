@@ -23,6 +23,20 @@ public interface ProviderCatalogClient {
 
     ProbeResult probe(String modelId);
 
+    /**
+     * The list read with this key instead of the server's: the key a person
+     * saved in the console, when the server was started without one. Null
+     * means the server's key.
+     */
+    default ListResult list(String apiKey) {
+        return list();
+    }
+
+    /** {@link #probe(String)} with this key instead of the server's; null means the server's. */
+    default ProbeResult probe(String modelId, String apiKey) {
+        return probe(modelId);
+    }
+
     /** Known-good model ids, used only until the first successful list. Never re-asserted after it. */
     List<ListedModel> seeds();
 

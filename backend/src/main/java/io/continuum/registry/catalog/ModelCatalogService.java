@@ -99,6 +99,13 @@ public class ModelCatalogService {
     private final AtomicReference<Running> running = new AtomicReference<>();
     /** What a live request said when it reported a model gone, for the confirming check to record. */
     private final Map<String, String> reported = new ConcurrentHashMap<>();
+    /**
+     * Keys saved in the console by the person who pressed "Check now", for the
+     * run in progress: provider → key. Empty for scheduled runs. Only one run
+     * happens at a time, on one worker thread.
+     */
+    private volatile Map<String, String> runKeys = Map.of();
+    private io.continuum.vault.CredentialVaultService vault;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "model-catalogue");
         t.setDaemon(true);
@@ -126,6 +133,52 @@ public class ModelCatalogService {
         this.sleeper = sleeper;
     }
 
+    @Autowired(required = false)
+    void setVault(io.continuum.vault.CredentialVaultService vault) {
+        this.vault = vault;
+    }
+
+    /**
+     * The provider keys this person saved in the console (API Keys &amp;
+     * Providers), for providers the server has no key of its own for.
+     *
+     * <p>The catalogue used to read only the server's GEMINI_API_KEY and
+     * GROQ_API_KEY. Started without them — keys kept in the console instead,
+     * which chat has always used — "Check now" was greyed out with "No provider
+     * API key is configured" although every chat worked. A provider lists the
+     * same models to every account, so a person's own key can read them.
+     */
+    public Map<String, String> savedKeys(String developerId) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (vault == null || developerId == null) {
+            return out;
+        }
+        for (ProviderCatalogClient c : clients.values()) {
+            if (c.configured()) {
+                continue;
+            }
+            try {
+                vault.decrypt(developerId, c.provider()).filter(k -> !k.isBlank())
+                        .ifPresent(k -> out.put(c.provider(), k));
+            } catch (RuntimeException e) {
+                log.warn("Could not read the saved {} key of {}: {}", c.provider(), developerId, e.getMessage());
+            }
+        }
+        return out;
+    }
+
+    /** Whether this person saved a key for the provider (names only; nothing is decrypted). */
+    public boolean hasSavedKey(String developerId, String provider) {
+        if (vault == null || developerId == null) {
+            return false;
+        }
+        try {
+            return vault.listProviders(developerId).stream().anyMatch(k -> provider.equals(k.provider()));
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     public Collection<ProviderCatalogClient> clients() {
         return clients.values();
     }
@@ -151,12 +204,15 @@ public class ModelCatalogService {
                         "The last check started moments ago; the next one can start in " + humanWait(wait) + ".");
             }
         }
-        List<String> providers = configuredProviders();
+        Map<String, String> saved = savedKeys(requestedBy);
+        List<String> providers = new ArrayList<>(configuredProviders());
+        providers.addAll(saved.keySet());
         if (providers.isEmpty()) {
             return new Start(StartOutcome.NOTHING_TO_CHECK, null, 0,
-                    "No provider API key is configured, so there is nothing to ask.");
+                    "No provider key is set up, so there is nothing to ask. Add a Gemini or Groq key under "
+                            + "API Keys & Providers, or start the server with GEMINI_API_KEY / GROQ_API_KEY.");
         }
-        return startAsync("MANUAL", requestedBy, providers, false);
+        return startAsync("MANUAL", requestedBy, providers, false, saved);
     }
 
     /** When "Check now" can next start; null when it can start now. */
@@ -178,7 +234,7 @@ public class ModelCatalogService {
             }
         }
         if (!due.isEmpty() && running.get() == null) {
-            startAsync("SCHEDULED", null, due, false);
+            startAsync("SCHEDULED", null, due, false, Map.of());
         }
     }
 
@@ -266,7 +322,7 @@ public class ModelCatalogService {
             }
             st.lastConfirmAt = now;
             store.saveState(st);
-            execute("CONFIRM", null, List.of(provider), true);
+            execute("CONFIRM", null, List.of(provider), true, Map.of());
         } catch (RuntimeException e) {
             log.warn("Handling a model report for {}/{} failed: {}", provider, model, e.getMessage());
         }
@@ -332,7 +388,8 @@ public class ModelCatalogService {
 
     // ------------------------------------------------------------------ the check
 
-    private Start startAsync(String trigger, String by, List<String> providers, boolean listOnly) {
+    private Start startAsync(String trigger, String by, List<String> providers, boolean listOnly,
+                             Map<String, String> keys) {
         Instant now = clock.instant();
         if (!running.compareAndSet(null, new Running(trigger, by, now, "Starting"))) {
             Running r = running.get();
@@ -343,7 +400,7 @@ public class ModelCatalogService {
             return new Start(StartOutcome.BUSY, now, 0, "Another instance is running a check.");
         }
         try {
-            worker.submit(() -> execute(trigger, by, providers, listOnly));
+            worker.submit(() -> execute(trigger, by, providers, listOnly, keys));
         } catch (RuntimeException e) {
             running.set(null);
             store.releaseLease(holder);
@@ -361,12 +418,14 @@ public class ModelCatalogService {
             running.set(null);
             return false;
         }
-        execute(trigger, by, providers, listOnly);
+        execute(trigger, by, providers, listOnly, Map.of());
         return true;
     }
 
     /** Assumes {@link #running} is set and the lease is held; clears and releases both. */
-    private void execute(String trigger, String by, List<String> providers, boolean listOnly) {
+    private void execute(String trigger, String by, List<String> providers, boolean listOnly,
+                         Map<String, String> keys) {
+        runKeys = keys == null ? Map.of() : Map.copyOf(keys);
         long runId = -1;
         int[] calls = new int[2]; // lists, probes
         Map<String, Object> summary = new LinkedHashMap<>();
@@ -376,7 +435,7 @@ public class ModelCatalogService {
             runId = store.startRun(trigger, by);
             for (String p : providers) {
                 ProviderCatalogClient c = clients.get(p);
-                if (c == null || !c.configured()) {
+                if (c == null || (!c.configured() && !runKeys.containsKey(p))) {
                     continue;
                 }
                 Map<String, Object> ps = checkProvider(c, runId, listOnly, calls);
@@ -400,6 +459,7 @@ public class ModelCatalogService {
             } catch (RuntimeException e) {
                 log.warn("Could not record the catalogue check: {}", e.getMessage());
             }
+            runKeys = Map.of();
             store.releaseLease(holder);
             running.set(null);
             resolver.refresh();
@@ -413,7 +473,7 @@ public class ModelCatalogService {
         ModelCatalogStore.ProviderState st = store.state(p);
         st.lastAttemptAt = clock.instant();
         phase("Reading " + label(p) + "'s model list");
-        ListResult list = c.list();
+        ListResult list = c.list(runKeys.get(p));
         calls[0]++;
         if (!list.ok()) {
             st.lastError = list.error();
@@ -605,7 +665,7 @@ public class ModelCatalogService {
                 }
             }
             phase("Testing " + m.getModelName() + " (" + (probed + 1) + " of " + Math.min(budget, pending.size()) + ")");
-            ProbeResult r = c.probe(m.getModelName());
+            ProbeResult r = c.probe(m.getModelName(), runKeys.get(c.provider()));
             probed++;
             calls[1]++;
             ModelStatus before = m.getStatus();

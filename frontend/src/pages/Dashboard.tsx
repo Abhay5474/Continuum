@@ -144,13 +144,13 @@ export default function Dashboard() {
                   key={w.workflowId}
                   to={`/workflows/${w.workflowId}`}
                   data-morph
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-edge/50"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-edge/50"
                 >
                   <StatusBadge status={w.stuck ? "STUCK" : w.status} />
-                  <span className="text-sm font-medium">{w.workflowType}</span>
+                  <span className="min-w-0 truncate text-sm font-medium">{w.workflowType}</span>
                   <span className="font-mono text-xs text-slate-400">{w.workflowId.slice(0, 8)}</span>
                   <RunLength w={w} slowest={slowest} delay={wi * 50} />
-                  <span className="ml-auto text-xs text-slate-400">{w.currentSequence} events</span>
+                  <span className="ml-auto whitespace-nowrap text-xs text-slate-400">{w.currentSequence} events</span>
                 </Link>
               ))}
             </div>

@@ -179,10 +179,25 @@ final class Fakes {
             return true;
         }
 
+        /** The key each call was made with: null means the server's own. */
+        final List<String> keysUsed = new ArrayList<>();
+
         @Override
         public ListResult list() {
             listCalls++;
             return list;
+        }
+
+        @Override
+        public ListResult list(String apiKey) {
+            keysUsed.add(apiKey);
+            return list();
+        }
+
+        @Override
+        public ProbeResult probe(String modelId, String apiKey) {
+            keysUsed.add(apiKey);
+            return probe(modelId);
         }
 
         @Override

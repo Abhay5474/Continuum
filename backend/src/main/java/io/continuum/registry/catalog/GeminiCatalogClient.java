@@ -66,13 +66,19 @@ public class GeminiCatalogClient implements ProviderCatalogClient {
 
     @Override
     public ListResult list() {
+        return list(null);
+    }
+
+    @Override
+    public ListResult list(String apiKey) {
+        String key = apiKey != null ? apiKey : config.getApiKey();
         List<JsonNode> raw = new ArrayList<>();
         String pageToken = null;
         try {
             for (int page = 0; page < MAX_PAGES; page++) {
                 String url = config.getBaseUrl() + "/v1beta/models?pageSize=1000"
                         + (pageToken == null ? "" : "&pageToken=" + URLEncoder.encode(pageToken, StandardCharsets.UTF_8));
-                HttpJson.Result r = http.get(url, new String[]{"x-goog-api-key", config.getApiKey()}, 15);
+                HttpJson.Result r = http.get(url, new String[]{"x-goog-api-key", key}, 15);
                 if (r.status() == 401 || r.status() == 403 || (r.status() == 400 && r.body() != null
                         && r.body().contains("API_KEY_INVALID"))) {
                     return ListResult.keyRejected("Google refused the API key (HTTP " + r.status() + ")");
@@ -163,12 +169,18 @@ public class GeminiCatalogClient implements ProviderCatalogClient {
 
     @Override
     public ProbeResult probe(String modelId) {
+        return probe(modelId, null);
+    }
+
+    @Override
+    public ProbeResult probe(String modelId, String apiKey) {
+        String key = apiKey != null ? apiKey : config.getApiKey();
         Map<String, Object> body = Map.of(
                 "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", "Reply with OK.")))),
                 "generationConfig", Map.of("maxOutputTokens", 16));
         try {
             HttpJson.Result r = http.exchange(config.getBaseUrl() + "/v1beta/models/" + modelId + ":generateContent",
-                    body, new String[]{"x-goog-api-key", config.getApiKey()}, 25);
+                    body, new String[]{"x-goog-api-key", key}, 25);
             return classify(r);
         } catch (Exception e) {
             return ProbeResult.of(ProbeResult.Outcome.TRANSIENT, "No answer: " + e.getClass().getSimpleName());

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Chip, Empty, Pill, Segmented, Stat, Stats, type Tone, RecordPanel, Field, rowClick } from "../system/hub";
 import { useOperator } from "../system/OperatorAccess";
@@ -49,6 +50,8 @@ type Provider = {
   provider: string;
   label: string;
   configured: boolean;
+  /** "server": the server's own key; "account": the key you saved in the console. */
+  keySource?: "server" | "account" | null;
   freeTier: boolean;
   lastListOkAt: unknown;
   lastAttemptAt: unknown;
@@ -259,7 +262,13 @@ export default function Models() {
             <button
               onClick={checkNow}
               disabled={asking || running || cooling || !anyConfigured}
-              title={!anyConfigured ? "No provider API key is configured" : cooling ? "One check per ten minutes" : undefined}
+              title={
+                !anyConfigured
+                  ? "No provider key yet: add a Gemini or Groq key under API Keys & Providers"
+                  : cooling
+                    ? "One check per ten minutes"
+                    : undefined
+              }
               className="shrink-0 rounded-[var(--r-md)] bg-[color:var(--accent-strong)] px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {running ? (
@@ -277,6 +286,11 @@ export default function Models() {
               )}
             </button>
           </div>
+          {!anyConfigured && data && (
+            <div className="mt-2 border-t border-edge/60 pt-2 text-[11.5px] text-slate-500">
+              Needs a Gemini or Groq key: add one under <Link to="/portal" className="underline">API Keys &amp; Providers</Link>, or start the server with GEMINI_API_KEY / GROQ_API_KEY.
+            </div>
+          )}
           {lastRun && !running && (
             <div className="mt-2 border-t border-edge/60 pt-2 text-[11.5px] text-slate-500">
               Cost of the last check: {lastRun.listCalls} list call{lastRun.listCalls === 1 ? "" : "s"}, {lastRun.probeCalls} test call
@@ -395,7 +409,7 @@ function ProviderCard({ p, models, policy, operator, onPinned }: { p: Provider; 
         <h2 className="text-[15px] font-semibold text-slate-100">{p.label}</h2>
         {p.configured ? (
           <Pill tone={p.freeTier ? "ok" : "warn"} dot>
-            {p.freeTier ? "free-tier key" : "key not declared free-tier"}
+            {p.keySource === "account" ? "your saved key" : p.freeTier ? "free-tier key" : "key not declared free-tier"}
           </Pill>
         ) : (
           <Pill tone="mute">no API key</Pill>
@@ -414,7 +428,7 @@ function ProviderCard({ p, models, policy, operator, onPinned }: { p: Provider; 
         </div>
         <div>
           <dt className="micro">Next automatic check</dt>
-          <dd className="mt-0.5 text-slate-300">{p.configured ? (p.nextCheckAt ? `${dateOf(p.nextCheckAt)} (${ago(p.nextCheckAt)})` : "—") : "needs an API key"}</dd>
+          <dd className="mt-0.5 text-slate-300">{p.keySource === "account" ? "server has no key · use Check now" : p.configured ? (p.nextCheckAt ? `${dateOf(p.nextCheckAt)} (${ago(p.nextCheckAt)})` : "—") : "needs an API key"}</dd>
         </div>
         <div>
           <dt className="micro">Preferred in config</dt>
