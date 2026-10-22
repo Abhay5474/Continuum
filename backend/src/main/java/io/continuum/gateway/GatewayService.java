@@ -424,7 +424,7 @@ public class GatewayService {
         // again. Placed after the firewall so a cached prompt is already
         // redacted, and before routing/paging/compression — all of which exist
         // to serve the call we are about to skip.
-        String cacheKey = cacheKeyOf(canonical);
+        String cacheKey = cacheKeyOf(req, canonical);
         if (semanticCache.enabledFor(developerId)) {
             var hit = semanticCache.lookup(developerId, cacheKey, req.model());
             metrics.cache(hit.isPresent());
@@ -587,7 +587,10 @@ public class GatewayService {
         // Runs ahead of hedging and the ordinary chain: when it produces an
         // answer, nothing below needs to. Declines silently when the registry
         // offers no meaningful price difference between models.
-        if (cascade.enabledFor(developerId)) {
+        // It steps aside when the mode says not to economise: HIGH_QUALITY asked
+        // for the strong model outright, and LOW_LATENCY cannot afford a second
+        // call. A Careful draft was being answered by the cheap model first.
+        if (cascade.enabledFor(developerId) && mode != RoutingMode.HIGH_QUALITY && mode != RoutingMode.LOW_LATENCY) {
             GatewayDtos.ChatResponse cascaded = cascadeStage.attempt(developerId, req, canonical, devKeys,
                     complexity, started, routingDecision, autopilot, cacheKey, prov);
             if (cascaded != null) {

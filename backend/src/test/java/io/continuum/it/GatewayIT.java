@@ -174,6 +174,18 @@ class GatewayIT extends PostgresIT {
     }
 
     @Test
+    void theCascadeStepsAsideForACallerWhoAskedForQualityOrSpeed() {
+        cascade.setEnabled(dev, true);
+        for (String mode : List.of("HIGH_QUALITY", "LOW_LATENCY")) {
+            GatewayDtos.ChatResponse r = gateway.chat(dev, new GatewayDtos.ChatRequest(null,
+                    List.of(user("Explain event sourcing in one line (" + mode + ")")), 200, 0.2, mode,
+                    null, null, null, null));
+            answered(r);
+            assertThat(r.routingReason().toLowerCase()).as(mode).doesNotContain("cascade");
+        }
+    }
+
+    @Test
     void anEnforcingQualityGateChecksTheAnswer() {
         quality.configure(dev, "ENFORCE", null, null, null, null);
         GatewayDtos.ChatResponse r = chat("Summarise the CAP theorem");

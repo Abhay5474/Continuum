@@ -68,6 +68,53 @@ class SemanticCacheServiceTest {
         assertThat(hit.get().similarity()).isGreaterThanOrEqualTo(0.92);
     }
 
+    private static final String POLICY = "system: You answer for Brightcart, an online store. Returns are accepted "
+            + "within 30 days of delivery for unused items in their original packaging. Refunds go back to the "
+            + "original card within 5 to 7 working days. Delivery within India takes 2 to 4 working days; express "
+            + "delivery takes one day in metro cities. Gold and Platinum members get free returns and priority "
+            + "support. Damaged items are replaced or refunded at no cost, with a courier pickup arranged by us.";
+
+    private static String key(String context, String question) {
+        return context + SemanticCacheService.QUESTION + question;
+    }
+
+    @Test
+    @DisplayName("under a long shared system prompt, a different question is not served the first one's answer")
+    void sharedSystemPromptDoesNotMakeDifferentQuestionsMatch() {
+        cache.store(DEV, key(POLICY, "What is your return policy?"), "gpt-x", "openai", "30 days.", 90, 0.003);
+
+        assertThat(cache.lookup(DEV, key(POLICY, "How long does delivery to Pune take?"), "gpt-x")).isEmpty();
+        // The same question reworded, under the same prompt, still hits.
+        Optional<SemanticCacheService.Hit> hit = cache.lookup(DEV, key(POLICY, "your return policy - what is it?"), "gpt-x");
+        assertThat(hit).isPresent();
+        assertThat(hit.get().exact()).isFalse();
+    }
+
+    @Test
+    @DisplayName("two different questions about the same pasted data do not share an answer")
+    void sameDataDifferentQuestionMisses() {
+        StringBuilder log = new StringBuilder();
+        for (int i = 0; i < 60; i++) {
+            log.append("2026-10-21T09:0").append(i % 10).append(" ERROR payment-gateway timeout calling stripe order BC-50")
+                    .append(i % 10).append('\n');
+        }
+        cache.store(DEV, key(POLICY, "What is breaking checkout?\n\n" + log), "gpt-x", "openai", "Timeouts.", 90, 0.003);
+
+        assertThat(cache.lookup(DEV, key(POLICY, "What is breaking checkout, since when, and which orders are affected?\n\n"
+                + log), "gpt-x")).isEmpty();
+        assertThat(cache.lookup(DEV, key(POLICY, "Checkout: what is breaking it?\n\n" + log), "gpt-x")).isPresent();
+    }
+
+    @Test
+    @DisplayName("the same question in a different conversation is not a near match")
+    void differentConversationDoesNotMatch() {
+        cache.store(DEV, key("user: I found an injured fish\nassistant: Keep it in water.", "and what if it is a bird?"),
+                "gpt-x", "openai", "Keep a fish in water.", 90, 0.003);
+
+        assertThat(cache.lookup(DEV, key("user: I found an injured cat\nassistant: Keep it warm.",
+                "and what if it is a bird?"), "gpt-x")).isEmpty();
+    }
+
     @Test
     @DisplayName("a merely related prompt does not hit")
     void unrelatedPromptMisses() {

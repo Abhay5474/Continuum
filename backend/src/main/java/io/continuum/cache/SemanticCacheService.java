@@ -60,6 +60,21 @@ public class SemanticCacheService {
     /** How many recent entries a similarity scan will consider. */
     private static final int SCAN_LIMIT = 200;
 
+    /**
+     * Separates, in a cache key, the conversation so far from the new question.
+     * A near match needs the conversation to be the same, word for word, and is
+     * scored on the question alone (see {@link #lookup}).
+     */
+    public static final String QUESTION = "\n[question]\n";
+
+    /** A key's conversation so far ("" for a lone question) and its new question. */
+    record Parts(String context, String question) {
+        static Parts of(String key) {
+            int i = key.lastIndexOf(QUESTION);
+            return i < 0 ? new Parts("", key) : new Parts(key.substring(0, i), key.substring(i + QUESTION.length()));
+        }
+    }
+
     private final SemanticCacheEntryRepository entries;
     private final SemanticCacheSettingRepository settings;
 
@@ -106,20 +121,32 @@ public class SemanticCacheService {
                 }
             }
 
-            // Stage two: nearest neighbour above the threshold.
+            // Stage two: nearest neighbour above the threshold, among entries
+            // that follow the same conversation. The whole key used to be
+            // scored, and a long shared system prompt outweighed the question:
+            // "how long does delivery take?" scored 0.97 against "what is your
+            // return policy?" under the same 100-word store policy, and was
+            // served its answer.
             List<SemanticCacheEntryEntity> candidates =
                     entries.liveFor(developerId, now, PageRequest.of(0, SCAN_LIMIT));
-            Map<String, Integer> incoming = TextVectors.termFrequency(prompt);
+            Parts asked = Parts.of(prompt);
+            Map<String, Integer> incoming = TextVectors.termFrequency(asked.question());
             SemanticCacheEntryEntity best = null;
+            Parts bestParts = null;
             double bestScore = 0;
             for (SemanticCacheEntryEntity e : candidates) {
                 if (!sameModel(e.getModel(), model)) {
                     continue;
                 }
-                double score = TextVectors.cosine(incoming, TextVectors.termFrequency(e.getPromptText()));
+                Parts filed = Parts.of(e.getPromptText());
+                if (!filed.context().equals(asked.context())) {
+                    continue;
+                }
+                double score = TextVectors.cosine(incoming, TextVectors.termFrequency(filed.question()));
                 if (score > bestScore) {
                     bestScore = score;
                     best = e;
+                    bestParts = filed;
                 }
             }
             // Word overlap cannot see the details that change an answer: one-
@@ -127,7 +154,8 @@ public class SemanticCacheService {
             // 3+3" scored 1.00), and "can I" and "can't I" differ only by an
             // apostrophe. A near match must agree on its numbers and negations.
             if (best != null && bestScore >= cfg.getSimilarityThreshold()
-                    && sameSpecifics(prompt, best.getPromptText())) {
+                    && sameSpecifics(asked.question(), bestParts.question())
+                    && fewDifferences(asked.question(), bestParts.question())) {
                 return Optional.of(serve(cfg, best, bestScore, false));
             }
 
@@ -226,14 +254,14 @@ public class SemanticCacheService {
                 .map(e -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", e.getId());
-                    m.put("prompt", e.getPromptText().length() > 160
-                            ? e.getPromptText().substring(0, 160) + "…" : e.getPromptText());
+                    String filed = e.getPromptText().replace(QUESTION, "\nuser: ");
+                    m.put("prompt", clip(Parts.of(e.getPromptText()).question(), 160));
                     m.put("model", e.getModel());
                     m.put("provider", e.getProvider());
                     // What a stored entry is, for the console's detail view:
                     // the question as it was filed (already past the firewall)
                     // and the answer it will be served.
-                    m.put("question", clip(e.getPromptText(), 2000));
+                    m.put("question", clip(filed, 2000));
                     m.put("answer", clip(e.getResponse(), 2000));
                     m.put("tokens", e.getTokens());
                     m.put("hitCount", e.getHitCount());
@@ -270,6 +298,26 @@ public class SemanticCacheService {
 
     static boolean sameSpecifics(String a, String b) {
         return specifics(a).equals(specifics(b));
+    }
+
+    /**
+     * How many distinct words a near match may have that the other lacks, both
+     * ways together. A rewording moves words around ("what is your return
+     * policy?" / "your return policy, what is it?" differ by none); a different
+     * question adds its own. Cosine alone could not tell when both questions sat
+     * beside the same pasted log: "what is breaking checkout?" scored 1.00
+     * against "what is breaking checkout, since when, and which orders are
+     * affected?", the log outweighing the five words that make it another
+     * question, and was served that answer.
+     */
+    static final int MAX_DIFFERING_TERMS = 3;
+
+    static boolean fewDifferences(String a, String b) {
+        java.util.Set<String> ta = TextVectors.termFrequency(a).keySet();
+        java.util.Set<String> tb = TextVectors.termFrequency(b).keySet();
+        long differing = ta.stream().filter(t -> !tb.contains(t)).count()
+                + tb.stream().filter(t -> !ta.contains(t)).count();
+        return differing <= MAX_DIFFERING_TERMS;
     }
 
     private static String clip(String s, int max) {

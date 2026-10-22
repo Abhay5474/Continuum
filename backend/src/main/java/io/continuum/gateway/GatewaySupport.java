@@ -104,8 +104,11 @@ public final class GatewaySupport {
      *
      * <p>It used to be the last user message alone, so the same follow-up in two
      * different conversations ("and for a bird?") got whichever answer was stored
-     * first. The whole conversation is the key now. Requests with tools or images
-     * are not cached: the answer depends on what is not in the text.
+     * first. The whole conversation is the key now: what came before, then
+     * {@link io.continuum.cache.SemanticCacheService#QUESTION}, then the new
+     * question, so the cache can insist on the same conversation and compare
+     * questions. Requests with tools or images are not cached: the answer depends
+     * on what is not in the text.
      */
     public static String cacheKeyOf(LlmRequest canonical) {
         if (canonical.tools() != null && !canonical.tools().isEmpty()) {
@@ -119,7 +122,49 @@ public final class GatewaySupport {
         if (!hasEarlierTurns(canonical)) {
             return lastUserContent(canonical);
         }
-        return transcript(canonical, Integer.MAX_VALUE, Integer.MAX_VALUE);
+        return transcriptBeforeLastQuestion(canonical) + io.continuum.cache.SemanticCacheService.QUESTION
+                + lastUserContent(canonical);
+    }
+
+    /**
+     * The cache key for this caller's request: {@link #cacheKeyOf(LlmRequest)},
+     * filed under the routing mode the caller asked for, or null when the
+     * caller asked for a confidence measurement.
+     *
+     * <p>An answer routed for low cost was being served to a caller who asked for
+     * HIGH_QUALITY on the same prompt; and a caller who asked to have the answer
+     * measured got a stored one with no measurement at all.
+     */
+    public static String cacheKeyOf(GatewayDtos.ChatRequest req, LlmRequest canonical) {
+        String key = cacheKeyOf(canonical);
+        if (key == null || Boolean.TRUE.equals(req.measureUncertainty())) {
+            return null;
+        }
+        String mode = req.routingMode() == null ? "" : req.routingMode().strip().toUpperCase(java.util.Locale.ROOT);
+        if (mode.isEmpty()) {
+            return key;
+        }
+        return key.contains(io.continuum.cache.SemanticCacheService.QUESTION)
+                ? "routing: " + mode + "\n" + key
+                : "routing: " + mode + io.continuum.cache.SemanticCacheService.QUESTION + key;
+    }
+
+    /** The system prompt and every turn before the last user message, as "role: text" lines. */
+    static String transcriptBeforeLastQuestion(LlmRequest canonical) {
+        List<Message> all = canonical.messages();
+        int last = -1;
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).role() == io.continuum.provider.model.Role.USER) {
+                last = i;
+            }
+        }
+        List<Message> framed = new java.util.ArrayList<>(last < 0 ? all : all.subList(0, last));
+        // A system prompt placed after the question still frames it, so it is kept.
+        if (framed.stream().noneMatch(m -> m.role() == io.continuum.provider.model.Role.SYSTEM)) {
+            all.stream().filter(m -> m.role() == io.continuum.provider.model.Role.SYSTEM).findFirst()
+                    .ifPresent(m -> framed.add(0, m));
+        }
+        return transcript(canonical.withMessages(framed), Integer.MAX_VALUE, Integer.MAX_VALUE);
     }
 
     /** A system prompt or an earlier turn before the last user message. */

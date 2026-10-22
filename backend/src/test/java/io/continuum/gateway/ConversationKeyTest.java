@@ -29,6 +29,30 @@ class ConversationKeyTest {
     }
 
     @Test
+    void theKeySeparatesTheConversationSoFarFromTheNewQuestion() {
+        LlmRequest req = LlmRequest.of(List.of(
+                Message.system("Answer as a vet."),
+                Message.user("I found an injured fish"), Message.assistant("Keep it in water."),
+                Message.user("and a bird?")));
+        assertThat(GatewaySupport.cacheKeyOf(req)).isEqualTo(
+                "system: Answer as a vet.\nuser: I found an injured fish\nassistant: Keep it in water."
+                        + io.continuum.cache.SemanticCacheService.QUESTION + "and a bird?");
+    }
+
+    @Test
+    void aRoutingModeFilesTheAnswerApartAndAMeasuredRequestIsNotCached() {
+        LlmRequest canonical = LlmRequest.of(List.of(Message.system("Brightcart policy."), Message.user("refunds?")));
+        String plain = GatewaySupport.cacheKeyOf(
+                new GatewayDtos.ChatRequest("auto", List.of(), null, null, null, null, null, null, null), canonical);
+        String careful = GatewaySupport.cacheKeyOf(
+                new GatewayDtos.ChatRequest("auto", List.of(), null, null, "high_quality", null, null, null, null), canonical);
+        assertThat(careful).isNotEqualTo(plain).startsWith("routing: HIGH_QUALITY\n")
+                .endsWith(io.continuum.cache.SemanticCacheService.QUESTION + "refunds?");
+        assertThat(GatewaySupport.cacheKeyOf(
+                new GatewayDtos.ChatRequest("auto", List.of(), null, null, null, null, true, null, null), canonical)).isNull();
+    }
+
+    @Test
     void theVerificationPromptCarriesTheConversationAndTheSystemPrompt() {
         LlmRequest req = LlmRequest.of(List.of(
                 Message.system("Answer as a vet."),
