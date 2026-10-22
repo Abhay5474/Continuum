@@ -148,11 +148,12 @@ public class PromptContextService {
                     out.add(msg);
                 } else {
                     changed = true;
-                    out.add(new Message(msg.role(), rewritten, msg.toolCalls()));
+                    out.add(msg.withContent(rewritten));
                 }
             }
             return changed
-                    ? new LlmRequest(request.model(), out, request.maxTokens(), request.temperature())
+                    // withMessages keeps the caller's tools, JSON mode and images.
+                    ? request.withMessages(out)
                     : request;
         } catch (RuntimeException e) {
             log.warn("context transform skipped for {}: {}", developerId, e.toString());

@@ -141,7 +141,7 @@ public class GodModeService {
             for (int i = newMessages.size() - 1; i >= 0; i--) {
                 Message m = newMessages.get(i);
                 if (m.role() == Role.SYSTEM) {
-                    newMessages.set(i, new Message(m.role(), m.content() + context.toString(), m.toolCalls()));
+                    newMessages.set(i, m.withContent(m.content() + context.toString()));
                     injected = true;
                     break;
                 }
@@ -151,7 +151,8 @@ public class GodModeService {
                 newMessages.add(0, Message.system("Use the following memories to assist the user:" + context.toString()));
             }
 
-            return new LlmRequest(request.model(), newMessages, request.maxTokens(), request.temperature());
+            // Keeps the caller's tools and JSON mode, which a fresh request dropped.
+            return request.withMessages(newMessages);
         } catch (Exception e) {
             log.warn("Twin Gate augmentation failed, proceeding with original request: {}", e.getMessage());
             return request;

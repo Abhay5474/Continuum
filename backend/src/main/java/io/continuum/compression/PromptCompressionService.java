@@ -140,7 +140,9 @@ public class PromptCompressionService {
             for (int i = 0; i < messages.size(); i++) {
                 Message msg = messages.get(i);
                 // Preserve the most recent user instruction verbatim.
-                if (i == lastUserIdx || msg.content() == null) {
+                // A tool result is data a model must read exactly (JSON whose short
+                // keys the compressor would drop as filler), so it is never touched.
+                if (i == lastUserIdx || msg.content() == null || msg.role() == Role.TOOL) {
                     if (adaptive && msg.content() != null) {
                         tally(developerId, CompressionPolicy.Region.QUESTION,
                                 PromptCompressor.estimateTokens(msg.content()),
@@ -164,7 +166,7 @@ public class PromptCompressionService {
                     origTotal += r.originalTokens();
                     compTotal += r.compressedTokens();
                     protectedTotal += r.protectedSpans();
-                    out.add(new Message(msg.role(), r.text(), msg.toolCalls()));
+                    out.add(msg.withContent(r.text()));
                 } else {
                     out.add(msg);
                 }
@@ -173,7 +175,10 @@ public class PromptCompressionService {
                 return request;
             }
             recordMetric(developerId, origTotal, compTotal, protectedTotal);
-            return new LlmRequest(request.model(), out, request.maxTokens(), request.temperature());
+            // withMessages, not a fresh request: rebuilding it dropped the
+            // caller's tools and JSON mode, so a tool-calling app silently got
+            // prose once a long prompt was compressed.
+            return request.withMessages(out);
         } catch (Exception e) {
             log.warn("prompt compression skipped for {}: {}", developerId, e.getMessage());
             return request;

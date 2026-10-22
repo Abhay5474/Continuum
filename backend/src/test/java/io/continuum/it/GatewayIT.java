@@ -46,6 +46,9 @@ class GatewayIT extends PostgresIT {
     @Autowired ChaosMonkey chaos;
     @Autowired JdbcTemplate jdbc;
     @Autowired io.continuum.aichaos.AiChaosEngine aiChaos;
+    @Autowired io.continuum.context.PromptContextService promptContext;
+    @Autowired io.continuum.compression.PromptCompressionService compression;
+    @Autowired io.continuum.mmu.ContextMMU mmu;
 
     private String dev;
 
@@ -235,6 +238,40 @@ class GatewayIT extends PostgresIT {
 
         assertThat(r.toolCalls()).isNotEmpty();
         assertThat(r.toolCalls().get(0).name()).isEqualTo("get_weather");
+        assertThat(r.finishReason()).isEqualTo("tool_calls");
+    }
+
+    @Test
+    void toolsAndJsonModeSurviveEveryStageThatRewritesThePrompt() {
+        promptContext.setEnabled(dev, true);
+        compression.setEnabled(dev, true);
+        mmu.setEnabled(dev, true);
+        StringBuilder csv = new StringBuilder("order_id,city,total,status\n");
+        for (int i = 0; i < 40; i++) {
+            csv.append("BC-").append(5000 + i).append(",Pune,").append(30 + i).append(".00,delivered\n");
+        }
+        String filler = "Please note that I really just wanted to basically say that the order was quite late "
+                + "and that I am very much hoping that you can actually look into it for me again soon. ";
+        List<GatewayDtos.Message> history = new ArrayList<>();
+        history.add(new GatewayDtos.Message("system", "You are a support assistant.", null, null, null));
+        for (int i = 0; i < 8; i++) {
+            history.add(user(filler.repeat(3) + " (turn " + i + ")"));
+            history.add(new GatewayDtos.Message("assistant", "Understood, I am checking. " + filler, null, null, null));
+        }
+        history.add(user("Here is our export:\n" + csv));
+        history.add(new GatewayDtos.Message("assistant", "Thanks, I have the export.", null, null, null));
+        history.add(user("Weather in Paris?"));
+        GatewayDtos.ChatRequest req = new GatewayDtos.ChatRequest(null, history, 200, 0.2, null, null, null, null, null,
+                List.of(new GatewayDtos.ToolRef("get_weather", "Weather for a city",
+                        Map.of("type", "object", "properties", Map.of("city", Map.of("type", "string"))))),
+                "auto", null, null);
+
+        GatewayDtos.ChatResponse r = gateway.chat(dev, req);
+        List<String> applied = io.continuum.gateway.AppliedFeatures.take();
+
+        assertThat(applied).as("the stages that rewrite the prompt did act").anySatisfy(line ->
+                assertThat(line).containsAnyOf("context-transformers", "prompt-compression", "context-optimizer"));
+        assertThat(r.toolCalls()).as("tools still offered after the prompt was rewritten").isNotEmpty();
         assertThat(r.finishReason()).isEqualTo("tool_calls");
     }
 

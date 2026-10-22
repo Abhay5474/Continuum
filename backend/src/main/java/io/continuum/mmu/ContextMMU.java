@@ -170,8 +170,8 @@ public class ContextMMU {
             lastFlushCount.remove(developerId);
             List<Message> evicted = evict(original.messages(), currentTask(original.messages()));
             List<Message> prefetched = prefetch(evicted, original.messages());
-            this.virtualized = new LlmRequest(original.model(), prefetched,
-                    original.maxTokens(), original.temperature());
+            // The caller's request with fewer turns: its tools and JSON mode stay.
+            this.virtualized = original.withMessages(prefetched);
         }
 
         /** The bounded L1 request actually sent to the provider. */
@@ -203,8 +203,7 @@ public class ContextMMU {
                 working.add(Message.system("[PAGE_IN id=\"" + stubId + "\"] Full paged context "
                         + "restored below. Continue the original answer using it; do not emit "
                         + "further PAGE_REQUEST tokens for this id.\n" + page));
-                LlmRequest faultRequest = new LlmRequest(virtualized.model(), List.copyOf(working),
-                        virtualized.maxTokens(), virtualized.temperature());
+                LlmRequest faultRequest = virtualized.withMessages(List.copyOf(working));
                 current = redispatch.apply(faultRequest);
                 faultLatencyMs += (System.nanoTime() - t0) / 1_000_000;
             }

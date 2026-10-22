@@ -100,12 +100,12 @@ public class AiChaosEngine {
         LlmRequest result = request;
         if (fire(AiFailureType.PROMPT_INJECTION)) {
             List<Message> injected = promptInjection.inject(result.messages());
-            result = new LlmRequest(result.model(), injected, result.maxTokens(), result.temperature());
+            result = result.withMessages(injected);
             record(workflowId, AiFailureType.PROMPT_INJECTION, seq, "malicious instruction appended to context");
         }
         if (fire(AiFailureType.CONTEXT_TRUNCATION)) {
             List<Message> truncated = context.truncate(result.messages());
-            result = new LlmRequest(result.model(), truncated, result.maxTokens(), result.temperature());
+            result = result.withMessages(truncated);
             record(workflowId, AiFailureType.CONTEXT_TRUNCATION, seq, "middle context removed");
         }
         return result;
