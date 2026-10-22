@@ -105,6 +105,8 @@ public class ModelCatalogService {
      * happens at a time, on one worker thread.
      */
     private volatile Map<String, String> runKeys = Map.of();
+    /** Each provider's per-model report for the run in progress, added to its summary. */
+    private final Map<String, Object> reports = new ConcurrentHashMap<>();
     private io.continuum.vault.CredentialVaultService vault;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "model-catalogue");
@@ -439,6 +441,10 @@ public class ModelCatalogService {
                     continue;
                 }
                 Map<String, Object> ps = checkProvider(c, runId, listOnly, "MANUAL".equals(trigger), calls);
+                Object report = reports.remove(p);
+                if (report != null) {
+                    ps.put("report", report);
+                }
                 summary.put(p, ps);
                 if (Boolean.TRUE.equals(ps.get("ok"))) {
                     anyOk = true;
@@ -667,6 +673,10 @@ public class ModelCatalogService {
                 .toList();
         int probed = 0, verified = 0, unusable = 0, softInARow = 0, inconclusive = 0;
         boolean stopped = false;
+        // Every test and its answer, in the provider's words, for the check's
+        // report: whether a model was refused by the provider or never reached
+        // used to be guesswork.
+        List<Map<String, String>> results = new ArrayList<>();
         for (ModelEntity m : pending) {
             if (probed >= budget) {
                 break;
@@ -684,6 +694,8 @@ public class ModelCatalogService {
             ProbeResult r = c.probe(m.getModelName(), runKeys.get(c.provider()));
             probed++;
             calls[1]++;
+            results.add(Map.of("model", m.getModelName(), "outcome", r.outcome().name(),
+                    "detail", truncate(String.valueOf(r.detail()), 240)));
             ModelStatus before = m.getStatus();
             m.setProbedAt(clock.instant());
             m.setProbeOutcome(r.outcome().name());
@@ -735,7 +747,9 @@ public class ModelCatalogService {
             // pause. It used to end the check after two in a row, so one busy
             // preview model left every other model in use with last month's
             // date. Three in a row is the provider pushing back on the key.
-            softInARow = r.conclusive() ? 0 : softInARow + 1;
+            // A refusal about this model alone (Gemini: its own daily or
+            // per-minute allowance, or overloaded) says nothing about the next.
+            softInARow = r.conclusive() || r.thisModelOnly() ? 0 : softInARow + 1;
             if (softInARow >= 3) {
                 event(p, null, "PROBES_PAUSED", "Rate-limited or not answering — remaining tests wait for the next check", runId);
                 stopped = true;
@@ -749,23 +763,31 @@ public class ModelCatalogService {
         out.put("deferred", Math.max(0, pending.size() - probed));
         out.put("stoppedEarly", stopped ? 1 : 0);
         out.put("inconclusive", inconclusive);
+        List<Map<String, String>> notReached = new ArrayList<>();
+        for (ModelEntity m : pending.subList(Math.min(probed, pending.size()), pending.size())) {
+            notReached.add(Map.of("model", m.getModelName(),
+                    "reason", stopped ? "testing paused after refusals" : "over this check's test-call limit"));
+        }
+        // The counts above are numbers; the report rides beside them in the summary.
+        reports.put(p, Map.of("results", results, "notReached", notReached));
         return out;
     }
 
     /**
-     * The default first; then models in use that were never tested; then new
-     * ones; then models in use again, longest since their last test first;
-     * then models that could not be used. Within each: the default's family,
-     * stable before preview, strong and recent first.
+     * The default first; then models in use that were never tested; then the
+     * rest in use, longest since their last test first; then new ones; then
+     * models that could not be used. Within each: the default's family, stable
+     * before preview, strong and recent first. Models requests go to come
+     * before new ones: confirming them is what protects traffic.
      */
     private static Comparator<ModelEntity> priority(String preferred) {
         String fam = preferred == null ? null : DefaultModelPicker.family(preferred);
         return Comparator
                 .comparing((ModelEntity m) -> m.getModelName().equals(preferred) ? 0 : 1)
                 .thenComparing(m -> switch (m.getStatus()) {
-                    case ACTIVE -> m.getVerifiedAt() == null ? 0 : 2;
+                    case ACTIVE -> m.getVerifiedAt() == null ? 0 : 1;
                     case UNAVAILABLE -> 3;
-                    default -> 1;
+                    default -> 2;
                 })
                 .thenComparing(m -> m.getVerifiedAt() == null ? Instant.MIN : m.getVerifiedAt())
                 .thenComparing(m -> fam != null && fam.equals(DefaultModelPicker.family(m.getModelName())) ? 0 : 1)

@@ -212,7 +212,7 @@ class ModelCatalogServiceTest {
     }
 
     @Test
-    void checkNowConfirmsTheModelsInUseOldestFirstAfterAnythingNew() {
+    void checkNowConfirmsTheModelsInUseBeforeAnythingNew() {
         groq.listing("openai/gpt-oss-120b", "openai/gpt-oss-20b", "allam-2-7b");
         check();
         clock.advance(Duration.ofDays(2));
@@ -221,10 +221,10 @@ class ModelCatalogServiceTest {
 
         check();
 
-        // The default first, then the new model, then the rest in use. Every
+        // The default first, then the rest in use, then the new model. Every
         // model in use carries today's date, though none was a month old.
         assertThat(groq.probed.get(0)).isEqualTo(resolver.defaultFor("groq"));
-        assertThat(groq.probed.get(1)).isEqualTo("qwen/qwen3.8-27b");
+        assertThat(groq.probed.get(3)).isEqualTo("qwen/qwen3.8-27b");
         assertThat(groq.probed).containsExactlyInAnyOrder(
                 "openai/gpt-oss-120b", "openai/gpt-oss-20b", "allam-2-7b", "qwen/qwen3.8-27b");
         assertThat(rows).filteredOn(m -> m.getStatus() == ModelStatus.ACTIVE)
@@ -252,6 +252,22 @@ class ModelCatalogServiceTest {
         assertThat(groq.probed).hasSize(3);
         assertThat(rows).allMatch(m -> m.getStatus() == ModelStatus.DISCOVERED);
         assertThat(store.eventTypes()).contains("PROBES_PAUSED");
+    }
+
+    @Test
+    void refusalsAboutOneModelEachNeverStopTheCheckAndTheReportSaysWhatTheProviderSaid() {
+        gemini.configured = true;
+        gemini.listing("gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.9-flash");
+        gemini.defaultProbe = ProbeResult.thisModelOnly(ProbeResult.Outcome.RATE_LIMITED,
+                "Google: this model's free requests for today are used up (20 requests)");
+
+        catalogue.runNow("MANUAL", "dev", List.of("gemini"), false);
+
+        assertThat(gemini.probed).hasSize(5);
+        assertThat(store.eventTypes()).doesNotContain("PROBES_PAUSED");
+        assertThat(sleeps).allMatch(ms -> ms == 6000L || ms == 2500L); // no longer pauses between models
+        String summary = store.lastRun().orElseThrow().summary();
+        assertThat(summary).contains("\"report\"", "gemini-3.9-flash", "free requests for today are used up");
     }
 
     @Test

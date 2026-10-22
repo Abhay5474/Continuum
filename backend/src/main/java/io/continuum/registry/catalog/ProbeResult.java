@@ -8,7 +8,22 @@ import java.util.Map;
  * <p>This is how "free" is established without trusting a label: the key is a
  * free-tier key, and the model either answered it or it did not.
  */
-public record ProbeResult(Outcome outcome, String detail, Map<String, Object> limits) {
+public record ProbeResult(Outcome outcome, String detail, Map<String, Object> limits, boolean thisModelOnly) {
+
+    /**
+     * @param thisModelOnly the refusal concerns this model alone (Gemini limits
+     *                      each model separately: its daily allowance used up,
+     *                      the model overloaded), so testing the next model need
+     *                      not wait longer or count it as the provider pushing back
+     */
+    public ProbeResult(Outcome outcome, String detail, Map<String, Object> limits) {
+        this(outcome, detail, limits, false);
+    }
+
+    /** A refusal that says nothing about the other models on the key. */
+    public static ProbeResult thisModelOnly(Outcome outcome, String detail) {
+        return new ProbeResult(outcome, detail, Map.of(), true);
+    }
 
     public enum Outcome {
         /** Answered. On a free-tier key, that is what free means. */

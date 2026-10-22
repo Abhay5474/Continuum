@@ -202,15 +202,29 @@ public class GeminiCatalogClient implements ProviderCatalogClient {
         }
         int s = r.status();
         if (s == 429) {
-            return ZERO_QUOTA.matcher(body).find()
-                    ? ProbeResult.of(ProbeResult.Outcome.NOT_FREE, "No free-tier quota for this model on this key")
-                    : ProbeResult.of(ProbeResult.Outcome.RATE_LIMITED, "Rate-limited just now");
+            if (ZERO_QUOTA.matcher(body).find()) {
+                return ProbeResult.of(ProbeResult.Outcome.NOT_FREE, "No free-tier quota for this model on this key");
+            }
+            // Google says which allowance ran out; "rate-limited" alone could not
+            // tell a busy minute from a day's free requests used up.
+            Matcher limit = QUOTA_LIMIT.matcher(body);
+            String n = limit.find() ? " (" + limit.group(1) + " requests)" : "";
+            if (body.contains("PerDay")) {
+                return ProbeResult.thisModelOnly(ProbeResult.Outcome.RATE_LIMITED,
+                        "Google: this model's free requests for today are used up" + n
+                                + "; they reset at midnight Pacific time");
+            }
+            Matcher retry = RETRY_IN.matcher(body);
+            return ProbeResult.thisModelOnly(ProbeResult.Outcome.RATE_LIMITED,
+                    "Google: this model's per-minute limit was reached" + n
+                            + (retry.find() ? "; retry in " + retry.group(1) + " s" : ""));
         }
         if (s == 401 || (s == 400 && body.contains("API_KEY_INVALID"))) {
             return ProbeResult.of(ProbeResult.Outcome.KEY_REJECTED, "Google refused the API key");
         }
         if (s >= 500) {
-            return ProbeResult.of(ProbeResult.Outcome.TRANSIENT, "Gemini answered HTTP " + s);
+            return ProbeResult.thisModelOnly(ProbeResult.Outcome.TRANSIENT,
+                    "Google answered HTTP " + s + googleMessage(body));
         }
         if (body.contains("location is not supported")) {
             return ProbeResult.of(ProbeResult.Outcome.NO_ACCESS, "Not offered in this deployment's region");
@@ -218,7 +232,23 @@ public class GeminiCatalogClient implements ProviderCatalogClient {
         if (s == 403 || s == 404) {
             return ProbeResult.of(ProbeResult.Outcome.NO_ACCESS, "Listed, but not callable with this key");
         }
-        return ProbeResult.of(ProbeResult.Outcome.REJECTED, "Refused a minimal chat request (HTTP " + s + ")");
+        return ProbeResult.of(ProbeResult.Outcome.REJECTED, "Refused a minimal chat request (HTTP " + s + ")"
+                + googleMessage(body));
+    }
+
+    private static final Pattern QUOTA_LIMIT = Pattern.compile("limit:\\s*(\\d+)");
+    private static final Pattern RETRY_IN = Pattern.compile("retry in ([0-9]+)(?:\\.[0-9]+)?s", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MESSAGE = Pattern.compile("\"message\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.){1,200})");
+
+    /** Google's own words, first sentence, for the record: ": The model is overloaded." */
+    static String googleMessage(String body) {
+        Matcher m = MESSAGE.matcher(body == null ? "" : body);
+        if (!m.find()) {
+            return "";
+        }
+        String msg = m.group(1).replace("\\n", " ").replace("\\\"", "\"").strip();
+        int dot = msg.indexOf(". ");
+        return ": " + (dot > 0 ? msg.substring(0, dot + 1) : msg);
     }
 
     @Override

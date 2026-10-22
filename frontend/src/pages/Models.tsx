@@ -388,14 +388,34 @@ export default function Models() {
 }
 
 /** What the last check did for one provider: its test calls, and what is left for the next check. */
-type Tested = { tested: number; verified: number; unusable: number; inconclusive: number; deferred: number; stoppedEarly: boolean; at: unknown };
+type Tested = {
+  tested: number; verified: number; unusable: number; inconclusive: number; deferred: number; stoppedEarly: boolean; at: unknown;
+  results: { model: string; outcome: string; detail: string }[];
+  notReached: { model: string; reason: string }[];
+};
+
+/** A test call's outcome, in words. */
+const OUTCOME: Record<string, { label: string; tone: Tone }> = {
+  CALLABLE: { label: "answered", tone: "ok" },
+  NOT_FREE: { label: "no free quota", tone: "warn" },
+  NO_ACCESS: { label: "no access", tone: "warn" },
+  REJECTED: { label: "refused", tone: "warn" },
+  RATE_LIMITED: { label: "limit reached", tone: "warn" },
+  TRANSIENT: { label: "no answer", tone: "warn" },
+  KEY_REJECTED: { label: "key refused", tone: "bad" },
+};
 
 function testedIn(run: { summary?: string; startedAt?: unknown } | null | undefined, provider: string): Tested | null {
   if (!run?.summary) return null;
   try {
     const s = JSON.parse(run.summary)?.[provider];
     if (!s || typeof s.tested !== "number") return null;
-    return { tested: s.tested, verified: s.verified ?? 0, unusable: s.unusable ?? 0, inconclusive: s.inconclusive ?? 0, deferred: s.deferred ?? 0, stoppedEarly: !!s.stoppedEarly, at: run.startedAt };
+    return {
+      tested: s.tested, verified: s.verified ?? 0, unusable: s.unusable ?? 0, inconclusive: s.inconclusive ?? 0,
+      deferred: s.deferred ?? 0, stoppedEarly: !!s.stoppedEarly, at: run.startedAt,
+      results: Array.isArray(s.report?.results) ? s.report.results : [],
+      notReached: Array.isArray(s.report?.notReached) ? s.report.notReached : [],
+    };
   } catch {
     return null;
   }
@@ -468,6 +488,30 @@ function ProviderCard({ p, models, policy, tested, operator, onPinned }: { p: Pr
             ? ` · ${tested.deferred} wait${tested.deferred === 1 ? "s" : ""} for the next check${tested.stoppedEarly ? " (the provider pushed back)" : " (test-call limit)"}`
             : ""}
         </p>
+      )}
+      {tested && (tested.results.length > 0 || tested.notReached.length > 0) && (
+        <details className="rounded-[var(--r-md)] border border-edge/70 px-3 py-2">
+          <summary className="cursor-pointer select-none text-[12.5px] font-medium text-slate-300">
+            What the last check did, model by model
+          </summary>
+          <p className="mt-2 text-[11.5px] text-slate-500">Each test call and what {p.label} answered, in its own words.</p>
+          <ul className="mt-1.5 space-y-1.5 text-[12px]">
+            {tested.results.map((r, i) => (
+              <li key={`${r.model}-${i}`} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="font-mono text-slate-200">{r.model}</span>
+                <Pill tone={OUTCOME[r.outcome]?.tone ?? "mute"}>{OUTCOME[r.outcome]?.label ?? r.outcome.toLowerCase()}</Pill>
+                {r.outcome !== "CALLABLE" && <span className="basis-full text-slate-500">{r.detail}</span>}
+              </li>
+            ))}
+            {tested.notReached.map((r) => (
+              <li key={`nr-${r.model}`} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-mono text-slate-400">{r.model}</span>
+                <Pill tone="mute">not reached</Pill>
+                <span className="text-slate-500">{r.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {parts.length > 0 && <StackedBar data={parts} height={20} unit="models" />}

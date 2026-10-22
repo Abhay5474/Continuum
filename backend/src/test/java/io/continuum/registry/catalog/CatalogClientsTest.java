@@ -190,6 +190,30 @@ class CatalogClientsTest {
     }
 
     @Test
+    void geminiRefusalsKeepGooglesReasonAndConcernOneModel() {
+        String perDay = "{\"error\":{\"code\":429,\"message\":\"You exceeded your current quota, please check your plan "
+                + "and billing details.\\n* Quota exceeded for metric: generativelanguage.googleapis.com/"
+                + "generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash\\nPlease retry in 41.24s.\","
+                + "\"status\":\"RESOURCE_EXHAUSTED\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.QuotaFailure\","
+                + "\"violations\":[{\"quotaId\":\"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\"quotaValue\":\"20\"}]},"
+                + "{\"@type\":\"type.googleapis.com/google.rpc.RetryInfo\",\"retryDelay\":\"41s\"}]}}";
+        ProbeResult day = GeminiCatalogClient.classify(res(429, perDay));
+        assertThat(day.outcome()).isEqualTo(ProbeResult.Outcome.RATE_LIMITED);
+        assertThat(day.thisModelOnly()).isTrue();
+        assertThat(day.detail()).contains("used up", "20 requests", "midnight Pacific");
+
+        String perMinute = perDay.replace("PerDay", "PerMinute");
+        ProbeResult minute = GeminiCatalogClient.classify(res(429, perMinute));
+        assertThat(minute.detail()).contains("per-minute", "retry in 41 s");
+
+        ProbeResult busy = GeminiCatalogClient.classify(res(503,
+                "{\"error\":{\"code\":503,\"message\":\"The model is overloaded. Please try again later.\",\"status\":\"UNAVAILABLE\"}}"));
+        assertThat(busy.outcome()).isEqualTo(ProbeResult.Outcome.TRANSIENT);
+        assertThat(busy.thisModelOnly()).isTrue();
+        assertThat(busy.detail()).isEqualTo("Google answered HTTP 503: The model is overloaded.");
+    }
+
+    @Test
     void geminiSaysGoneWithA404NamingTheModel() {
         assertThat(GeminiCatalogClient.gone(404, "{\"error\":{\"code\":404,\"message\":\"models/gemini-2.5-flash is not "
                 + "found for API version v1beta, or is not supported for generateContent.\",\"status\":\"NOT_FOUND\"}}")).isTrue();
