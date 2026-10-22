@@ -84,16 +84,7 @@ public class SagaService {
                 partial++;
             }
             if (recent.size() < 30) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("workflowId", r.getWorkflowId());
-                m.put("definition", r.getDefinition());
-                m.put("failedStep", r.getFailedStep());
-                m.put("compensated", split(r.getCompensated()));
-                m.put("uncompensated", split(r.getUncompensated()));
-                m.put("complete", r.isComplete());
-                m.put("summary", r.getSummary());
-                m.put("at", r.getCreatedAt());
-                recent.add(m);
+                recent.add(view(r));
             }
         }
 
@@ -105,6 +96,31 @@ public class SagaService {
         out.put("partialRollbacks", partial);
         out.put("recent", recent);
         return out;
+    }
+
+    /** The rollback recorded for one run, if it has one. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<Map<String, Object>> rollbackFor(String developerId, String workflowId) {
+        if (developerId == null || workflowId == null) {
+            return java.util.Optional.empty();
+        }
+        return events.findByDeveloperIdOrderByCreatedAtDesc(developerId, PageRequest.of(0, 200)).stream()
+                .filter(r -> workflowId.equals(r.getWorkflowId()))
+                .findFirst()
+                .map(SagaService::view);
+    }
+
+    private static Map<String, Object> view(SagaEventEntity r) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("workflowId", r.getWorkflowId());
+        m.put("definition", r.getDefinition());
+        m.put("failedStep", r.getFailedStep());
+        m.put("compensated", split(r.getCompensated()));
+        m.put("uncompensated", split(r.getUncompensated()));
+        m.put("complete", r.isComplete());
+        m.put("summary", r.getSummary());
+        m.put("at", r.getCreatedAt());
+        return m;
     }
 
     @Transactional

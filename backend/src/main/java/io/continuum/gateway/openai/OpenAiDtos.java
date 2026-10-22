@@ -228,7 +228,22 @@ public final class OpenAiDtos {
              */
             @JsonProperty("stream_mode") String streamMode,
             /** Quote this to find the request in the console's feed and its decision trail. */
-            @JsonProperty("request_id") String requestId) {
+            @JsonProperty("request_id") String requestId,
+            /**
+             * One line per Continuum feature that acted on the request — a
+             * redaction, a cache hit, a cascade — or absent when none did.
+             * Most of them change the prompt and leave no trace in the answer,
+             * so without this a caller cannot tell they ran.
+             */
+            @JsonInclude(JsonInclude.Include.NON_EMPTY) List<String> applied) {
+
+        /** The form every caller used before {@code applied} existed. */
+        public ContinuumMeta(String provider, String routingReason, int failovers, long latencyMs, double costUsd,
+                             Boolean cached, Double confidence, Boolean lowConfidence, String streamMode,
+                             String requestId) {
+            this(provider, routingReason, failovers, latencyMs, costUsd, cached, confidence, lowConfidence,
+                    streamMode, requestId, null);
+        }
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

@@ -35,6 +35,9 @@ public class DeveloperGatewayController {
      * ambiguous-mapping 500 on every request, so this alias could not simply be
      * left in place beside the new one.
      */
+    /** One line per feature that acted on the request, joined with "; ". */
+    public static final String APPLIED_HEADER = "X-Continuum-Applied";
+
     @PostMapping("/api/gateway/chat")
     public ResponseEntity<?> chat(@RequestBody GatewayDtos.ChatRequest request, HttpServletRequest http) {
         DeveloperEntity developer = (DeveloperEntity) http.getAttribute(ApiKeyAuthenticationFilter.DEVELOPER_ATTRIBUTE);
@@ -43,7 +46,14 @@ public class DeveloperGatewayController {
                     .body(Map.of("error", "invalid_api_key", "message", "Authentication required."));
         }
         try {
-            return ResponseEntity.ok(gateway.chat(developer.getId(), request));
+            GatewayDtos.ChatResponse answer = gateway.chat(developer.getId(), request);
+            java.util.List<String> applied = AppliedFeatures.take();
+            // What Continuum did to this request, for a caller that wants to show
+            // it: the redaction, the cache hit, the cascade. Absent when nothing
+            // acted.
+            return applied.isEmpty()
+                    ? ResponseEntity.ok(answer)
+                    : ResponseEntity.ok().header(APPLIED_HEADER, AppliedFeatures.asHeader(applied)).body(answer);
         } catch (io.continuum.admission.CostAdmissionService.CostLimitedException e) {
             // Same 429 as any rate limit, but the body says which resource ran
             // out — a caller told only "too many requests" when they are in fact
@@ -83,6 +93,7 @@ public class DeveloperGatewayController {
                     .body(Map.of("error", e instanceof GatewayService.NoProviderException ? "no_provider" : "not_set_up",
                             "message", e.getMessage()));
         } catch (GatewayService.GatewayException e) {
+            AppliedFeatures.take();
             // Upstream providers failed — generic 502, no provider internals leaked.
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(Map.of("error", "upstream_unavailable",

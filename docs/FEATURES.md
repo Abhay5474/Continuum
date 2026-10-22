@@ -110,3 +110,41 @@ it re-checks after every saved setting.
   mode are kept; hedged answers go through the quality gate and confidence
   checks like every other path. Quality-gate repairs and confidence resamples
   keep the caller's JSON mode.
+
+## What an application can call with an API key
+
+Chat and pipelines were always open to an API key. The engine's other
+features were console-only, so an application could not start a workflow,
+keep long-term memory or ask the loop detector. The program API opens them to
+the key's account (`ProgramApiController`), scoped exactly as the console
+scopes them:
+
+| Endpoint | What it does |
+|---|---|
+| `POST /v1/chat/completions`, `POST /api/gateway/chat` | Chat, streaming, tools, JSON mode, images |
+| `POST /api/gateway/pipeline/{name}` (`/upload`) | Run a pipeline on a payload or a file |
+| `POST /api/gateway/context/transform` | Turn a log, spreadsheet or email thread into what a model reads best |
+| `POST /api/gateway/workflows/{name}/run` | Start a durable run of a published definition (`workflowId` makes it idempotent) |
+| `GET /api/gateway/workflows/{id}` | Status, each step with attempts and outcome, result or error, the rollback if one ran |
+| `POST /api/gateway/workflows/{id}/cancel` | Stop a run; with saga on, its completed steps are undone |
+| `POST /api/gateway/memory/store`, `/retrieve` | Long-term memory, recalled by meaning |
+| `POST /api/gateway/loops/inspect` | Is this agent going round in circles? (409 in HALT mode) |
+| `POST /api/gateway/feedback` | Rate an answer (-1 to 1) for Autopilot |
+
+A key cannot change the account: settings, keys, webhooks and definitions stay
+in the console.
+
+### Which features acted on a request
+
+Most features change a request without leaving a trace in the answer. Every
+chat response now says which ones acted: the `X-Continuum-Applied` header on
+both endpoints, and `continuum.applied` (a list) on `/v1/chat/completions` and
+in pipeline results. For example:
+
+```
+"applied": [
+  "prompt-firewall: personal data or secrets redacted from the prompt (14 -> 12 tokens)",
+  "model-cascade: answered by the cheaper model llama-3.1-8b-instant; the strong model was not needed",
+  "quality-gate: answer checked, score 0.86"
+]
+```

@@ -193,6 +193,12 @@ public class OpenAiTranslator {
     }
 
     public OpenAiDtos.ChatCompletion toCompletion(String id, GatewayDtos.ChatResponse r, String streamMode) {
+        return toCompletion(id, r, streamMode, null);
+    }
+
+    /** As above, carrying the features that acted on the request in {@code continuum.applied}. */
+    public OpenAiDtos.ChatCompletion toCompletion(String id, GatewayDtos.ChatResponse r, String streamMode,
+                                                  List<String> applied) {
         List<OpenAiDtos.ToolCallDto> toolCalls = parseToolCalls(r.toolCalls());
         boolean calling = toolCalls != null && !toolCalls.isEmpty();
 
@@ -223,7 +229,8 @@ public class OpenAiTranslator {
                         r.confidence(),
                         r.lowConfidence(),
                         streamMode,
-                        r.requestId()));
+                        r.requestId(),
+                        applied));
     }
 
     /**

@@ -47,7 +47,11 @@ public class GatewaySecurityConfig {
         // Pipelines are the same kind of endpoint — called by a program, not a
         // person — so they belong here rather than behind the console filter.
         reg.addUrlPatterns("/api/gateway/chat", "/v1/chat/completions",
-                "/api/gateway/pipeline/*", "/api/gateway/context/transform");
+                "/api/gateway/pipeline/*", "/api/gateway/context/transform",
+                // The program API: workflows, memory, loop checks and feedback
+                // for an application holding a key (ProgramApiController).
+                "/api/gateway/workflows/*", "/api/gateway/memory/*", "/api/gateway/loops/*",
+                "/api/gateway/feedback");
         reg.setOrder(1);
         return reg;
     }

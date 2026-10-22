@@ -155,6 +155,10 @@ public class CascadeStage {
                         assessment.reason())
                 : String.format("cascade: answered by %s — %s%s", cheap.model(), assessment.reason(),
                         audit ? " (audit sample)" : "");
+        AppliedFeatures.note(served
+                ? "model-cascade: " + cheap.model() + " answered first; its answer was weak, so " + strong.model()
+                        + " answered"
+                : "model-cascade: answered by the cheaper model " + cheap.model() + "; the strong model was not needed");
 
         // Live metrics and the decision trail, as on the ordinary path. The
         // cascade answered on its own and skipped both: its traffic was missing

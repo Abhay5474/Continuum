@@ -727,6 +727,21 @@
         },
         "type" : "object"
       },
+      "Feedback" : {
+        "properties" : {
+          "comment" : {
+            "type" : "string"
+          },
+          "requestRef" : {
+            "type" : "string"
+          },
+          "score" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
       "FeedbackRequest" : {
         "properties" : {
           "comment" : {
@@ -1082,6 +1097,26 @@
         },
         "type" : "object"
       },
+      "LoopInspect" : {
+        "properties" : {
+          "progress" : {
+            "items" : {
+              "type" : "boolean"
+            },
+            "type" : "array"
+          },
+          "steps" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "workflowId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "LoopRequest" : {
         "properties" : {
           "progress" : {
@@ -1144,6 +1179,39 @@
           },
           "tier" : {
             "enum" : [ "WORKING", "EPISODIC", "LONG_TERM", "ARCHIVED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MemoryQuery" : {
+        "properties" : {
+          "query" : {
+            "type" : "string"
+          },
+          "scope" : {
+            "type" : "string"
+          },
+          "topK" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "MemoryStore" : {
+        "properties" : {
+          "content" : {
+            "type" : "string"
+          },
+          "salience" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "scope" : {
+            "type" : "string"
+          },
+          "tier" : {
             "type" : "string"
           }
         },
@@ -2796,7 +2864,7 @@
     },
     "/api/admin/retention" : {
       "get" : {
-        "operationId" : "status_22",
+        "operationId" : "status_23",
         "responses" : {
           "200" : {
             "content" : {
@@ -3350,9 +3418,40 @@
         "tags" : [ "context-gateway-controller" ]
       }
     },
+    "/api/gateway/feedback" : {
+      "post" : {
+        "operationId" : "feedback_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Feedback"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "program-api-controller" ]
+      }
+    },
     "/api/gateway/healing/status" : {
       "get" : {
-        "operationId" : "status_21",
+        "operationId" : "status_22",
         "responses" : {
           "200" : {
             "content" : {
@@ -3442,9 +3541,102 @@
         "tags" : [ "gateway-stats-controller" ]
       }
     },
+    "/api/gateway/loops/inspect" : {
+      "post" : {
+        "operationId" : "inspect_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoopInspect"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "program-api-controller" ]
+      }
+    },
+    "/api/gateway/memory/retrieve" : {
+      "post" : {
+        "operationId" : "recall",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MemoryQuery"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RetrievedMemory"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "program-api-controller" ]
+      }
+    },
+    "/api/gateway/memory/store" : {
+      "post" : {
+        "operationId" : "remember",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MemoryStore"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "program-api-controller" ]
+      }
+    },
     "/api/gateway/pipeline/{name}" : {
       "post" : {
-        "operationId" : "run_2",
+        "operationId" : "run_3",
         "parameters" : [ {
           "in" : "path",
           "name" : "name",
@@ -3584,6 +3776,110 @@
           }
         },
         "tags" : [ "gateway-stats-controller" ]
+      }
+    },
+    "/api/gateway/workflows/{id}" : {
+      "get" : {
+        "operationId" : "status_21",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "program-api-controller" ]
+      }
+    },
+    "/api/gateway/workflows/{id}/cancel" : {
+      "post" : {
+        "operationId" : "cancel_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "program-api-controller" ]
+      }
+    },
+    "/api/gateway/workflows/{name}/run" : {
+      "post" : {
+        "operationId" : "run_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "name",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "version",
+          "required" : false,
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RunRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "program-api-controller" ]
       }
     },
     "/api/hedging" : {

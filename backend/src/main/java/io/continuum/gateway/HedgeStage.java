@@ -123,6 +123,9 @@ public class HedgeStage {
             String reason = String.format("hedged across %s — %s answered first in %dms%s",
                     result.attemptedProviders(), winner, result.elapsedMs(),
                     result.hedged() ? " (hedge fired)" : " (no hedge needed)");
+            AppliedFeatures.note(result.hedged()
+                    ? "hedging: the first provider was slow, so a second was raced; " + winner + " answered first"
+                    : "hedging: " + winner + " answered before a second provider was needed");
 
             metrics.request(winner, resp.model(), true, totalMs);
             metrics.tokens(winner, resp.promptTokens(), resp.completionTokens());

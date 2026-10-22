@@ -267,6 +267,11 @@ public class AnswerReview {
                         m.clusters() > 1 ? m.clusters() + " conflicting answers across samples" : null);
             }
 
+            AppliedFeatures.note(Double.isNaN(m.confidence())
+                    ? "confidence: measured, but the samples could not be compared"
+                    : String.format("confidence: %.0f%% — %d samples, %d distinct meaning%s%s", m.confidence() * 100,
+                            m.samples(), m.clusters(), m.clusters() == 1 ? "" : "s",
+                            m.lowConfidence() ? " (low: treat this answer with care)" : ""));
             return response.withConfidence(
                     Double.isNaN(m.confidence()) ? null : m.confidence(), m.lowConfidence(), m.clusters(),
                     extraMs, extraCost,
@@ -285,6 +290,11 @@ public class AnswerReview {
     private static GatewayDtos.ChatResponse annotate(GatewayDtos.ChatResponse r,
                                                      io.continuum.quality.QualityGate.Verdict v,
                                                      boolean alreadyDescribed) {
+        AppliedFeatures.note(alreadyDescribed
+                ? String.format("quality-gate: the answer was repaired and now scores %.2f", v.score())
+                : v.passed()
+                        ? String.format("quality-gate: answer checked, score %.2f", v.score())
+                        : String.format("quality-gate: answer scored %.2f (%s)", v.score(), v.summary()));
         if (alreadyDescribed) {
             return r;
         }

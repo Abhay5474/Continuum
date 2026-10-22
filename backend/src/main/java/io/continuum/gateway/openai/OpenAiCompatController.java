@@ -121,12 +121,18 @@ public class OpenAiCompatController {
         if (!body.wantsStream()) {
             try {
                 GatewayDtos.ChatResponse r = gateway.chat(developer.getId(), req);
+                List<String> applied = io.continuum.gateway.AppliedFeatures.take();
                 var ok = ResponseEntity.ok();
                 if (r != null && r.requestId() != null) {
                     ok.header(REQUEST_ID_HEADER, r.requestId());
                 }
-                return ok.body(translator.toCompletion(id, r, null));
+                if (!applied.isEmpty()) {
+                    ok.header(io.continuum.gateway.DeveloperGatewayController.APPLIED_HEADER,
+                            io.continuum.gateway.AppliedFeatures.asHeader(applied));
+                }
+                return ok.body(translator.toCompletion(id, r, null, applied));
             } catch (RuntimeException e) {
+                io.continuum.gateway.AppliedFeatures.take();
                 return errorResponse(e);
             }
         }
@@ -243,10 +249,11 @@ public class OpenAiCompatController {
                         body.wantsUsageInStream() ? translator.usage(r) : null,
                         new OpenAiDtos.ContinuumMeta(r.provider(), r.routingReason(), r.failovers(),
                                 r.latency(), r.cost(), null, r.confidence(), r.lowConfidence(),
-                                mode.wire(), r.requestId())));
+                                mode.wire(), r.requestId(), io.continuum.gateway.AppliedFeatures.take())));
                 send(emitter, "[DONE]");
                 emitter.complete();
             } catch (Exception e) {
+                io.continuum.gateway.AppliedFeatures.take();
                 // The stream has already started, so the status line is long
                 // gone. An error frame is the only way left to tell the client
                 // something went wrong — closing the socket silently would look

@@ -51,7 +51,8 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
             // AdminTokenFilter (operator session or admin token).
             "/api/admin/",
             // ApiKeyAuthenticationFilter: called by programs with an API key.
-            "/api/gateway/chat", "/api/gateway/pipeline/", "/api/gateway/context/transform");
+            "/api/gateway/chat", "/api/gateway/pipeline/", "/api/gateway/context/transform",
+            "/api/gateway/workflows/", "/api/gateway/memory/", "/api/gateway/loops/", "/api/gateway/feedback");
 
     /** True when {@code path} is on the exempt list. */
     public static boolean exempt(String path) {

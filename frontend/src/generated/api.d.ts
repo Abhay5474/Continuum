@@ -107,7 +107,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["status_22"];
+        get: operations["status_23"];
         put?: never;
         post?: never;
         delete?: never;
@@ -452,6 +452,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/gateway/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["feedback_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/gateway/healing/status": {
         parameters: {
             query?: never;
@@ -459,7 +475,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["status_21"];
+        get: operations["status_22"];
         put?: never;
         post?: never;
         delete?: never;
@@ -516,6 +532,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/gateway/loops/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["inspect_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/memory/retrieve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/memory/store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["remember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/gateway/pipeline/{name}": {
         parameters: {
             query?: never;
@@ -525,7 +589,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["run_2"];
+        post: operations["run_3"];
         delete?: never;
         options?: never;
         head?: never;
@@ -574,6 +638,54 @@ export interface paths {
         get: operations["stats_2"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/workflows/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["status_21"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/workflows/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/workflows/{name}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["run_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4255,6 +4367,12 @@ export interface components {
             /** Format: int64 */
             sequenceNumber: number;
         };
+        Feedback: {
+            comment: string;
+            requestRef: string;
+            /** Format: double */
+            score: number;
+        };
         FeedbackRequest: {
             comment: string;
             requestRef: string;
@@ -4391,6 +4509,11 @@ export interface components {
             name: string;
             sessionToken: string;
         };
+        LoopInspect: {
+            progress: boolean[];
+            steps: string[];
+            workflowId: string;
+        };
         LoopRequest: {
             progress: boolean[];
             steps: string[];
@@ -4416,6 +4539,19 @@ export interface components {
             summary: string;
             /** @enum {string} */
             tier: "WORKING" | "EPISODIC" | "LONG_TERM" | "ARCHIVED";
+        };
+        MemoryQuery: {
+            query: string;
+            scope: string;
+            /** Format: int32 */
+            topK: number;
+        };
+        MemoryStore: {
+            content: string;
+            /** Format: double */
+            salience: number;
+            scope: string;
+            tier: string;
         };
         Message: {
             content: string;
@@ -5180,7 +5316,7 @@ export interface operations {
             };
         };
     };
-    status_22: {
+    status_23: {
         parameters: {
             query?: never;
             header?: never;
@@ -5670,7 +5806,33 @@ export interface operations {
             };
         };
     };
-    status_21: {
+    feedback_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
+    status_22: {
         parameters: {
             query?: never;
             header?: never;
@@ -5758,7 +5920,83 @@ export interface operations {
             };
         };
     };
-    run_2: {
+    inspect_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoopInspect"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
+    recall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryQuery"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RetrievedMemory"][];
+                };
+            };
+        };
+    };
+    remember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryStore"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
+    run_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -5846,6 +6084,84 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
+    status_21: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
+    cancel_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
+    run_2: {
+        parameters: {
+            query?: {
+                version?: number;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RunRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

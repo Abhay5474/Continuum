@@ -74,6 +74,15 @@ public class PipelineGatewayController {
 
     private ResponseEntity<?> execute(String name, Map<String, Object> input, String prompt,
                                       HttpServletRequest http) {
+        try {
+            return executeInner(name, input, prompt, http);
+        } finally {
+            AppliedFeatures.take();
+        }
+    }
+
+    private ResponseEntity<?> executeInner(String name, Map<String, Object> input, String prompt,
+                                           HttpServletRequest http) {
         DeveloperEntity developer =
                 (DeveloperEntity) http.getAttribute(ApiKeyAuthenticationFilter.DEVELOPER_ATTRIBUTE);
         if (developer == null) {
@@ -82,7 +91,12 @@ public class PipelineGatewayController {
         }
         try {
             PipelineService.Run r = pipelines.run(developer.getId(), name, input, prompt);
-            return ResponseEntity.ok(PipelineController.describe(r));
+            Map<String, Object> out = new java.util.LinkedHashMap<>(PipelineController.describe(r));
+            java.util.List<String> applied = AppliedFeatures.take();
+            if (!applied.isEmpty()) {
+                out.put("applied", applied);
+            }
+            return ResponseEntity.ok(out);
         } catch (SpecialistConnectionService.InvalidConnectionException e) {
             // Unknown or disabled pipeline, or a misconfiguration the developer
             // can fix. The message is theirs, written for them.

@@ -118,6 +118,22 @@ class GatewayIT extends PostgresIT {
     }
 
     @Test
+    void theCallerIsToldWhichFeaturesActedOnItsRequest() {
+        cache.setEnabled(dev, true);
+        firewall.setEnabled(dev, true);
+        chat("My card number is 4111 1111 1111 1111, what is your returns window?");
+        assertThat(io.continuum.gateway.AppliedFeatures.take())
+                .anySatisfy(line -> assertThat(line).startsWith("prompt-firewall: personal data or secrets redacted"));
+
+        chat("My card number is 4111 1111 1111 1111, what is your returns window?");
+        assertThat(io.continuum.gateway.AppliedFeatures.take())
+                .anySatisfy(line -> assertThat(line).startsWith("semantic-cache: answered from an earlier answer"));
+
+        // Taking clears it: nothing carries over to the next request on this thread.
+        assertThat(io.continuum.gateway.AppliedFeatures.take()).isEmpty();
+    }
+
+    @Test
     void anAnswerCorruptedByAiChaosIsNotServedFromTheCacheAfterwards() {
         cache.setEnabled(dev, true);
         aiChaos.setRate(dev, io.continuum.aichaos.AiFailureType.HALLUCINATION, 1.0);

@@ -231,6 +231,7 @@ public class GatewayService {
 
     public GatewayDtos.ChatResponse chat(String developerId, GatewayDtos.ChatRequest req) {
         requestLog.clear();
+        AppliedFeatures.begin();
         try {
             GatewayDtos.ChatResponse response = admitted(developerId, req);
             Long id = requestLog.lastId();
@@ -278,16 +279,35 @@ public class GatewayService {
     private static void contextStep(io.continuum.provenance.ProvenanceService.Recording prov,
                                     io.continuum.provenance.Decision.Stage stage, String choice,
                                     LlmRequest before, LlmRequest after, String what) {
-        if (prov == null || before == after || before == null || after == null
+        if (before == after || before == null || after == null
                 || java.util.Objects.equals(before.messages(), after.messages())) {
             return;
         }
         int in = tokensOf(before);
         int out = tokensOf(after);
+        // Told to the caller as well as the trail: these stages change the
+        // prompt and leave nothing in the answer that says so.
+        AppliedFeatures.note(appliedLine(stage, choice) + " (" + in + " -> " + out + " tokens)");
+        if (prov == null) {
+            return;
+        }
         int d = Math.abs(in - out);
         String delta = in == out ? "same size"
                 : d + (out < in ? " fewer" : " more") + (d == 1 ? " token" : " tokens");
         prov.add(stage, choice, what + " (" + in + " → " + out + " tokens, " + delta + ")");
+    }
+
+    private static String appliedLine(io.continuum.provenance.Decision.Stage stage, String choice) {
+        if (stage == io.continuum.provenance.Decision.Stage.FIREWALL) {
+            return "prompt-firewall: personal data or secrets redacted from the prompt";
+        }
+        return switch (choice) {
+            case "transformed" -> "context-transformers: pasted data rewritten into a canonical form";
+            case "paged" -> "context-optimizer: older turns paged out of the context window";
+            case "compressed" -> "prompt-compression: low-information words dropped";
+            case "augmented" -> "adaptive-policy: relevant memory added to the prompt";
+            default -> choice;
+        };
     }
 
     private static int tokensOf(LlmRequest r) {
@@ -346,7 +366,10 @@ public class GatewayService {
                 String guarded = firewall.guardOutbound(developerId, verified.response());
                 if (guarded != null && !guarded.equals(verified.response())) {
                     verified = verified.withRevision(guarded, 0, 0, " · secrets redacted from the answer");
+                    AppliedFeatures.note("prompt-firewall: secrets redacted from the answer");
                 }
+                AppliedFeatures.note(String.format("verification-engine: answer verified by a graph of agents"
+                        + " (confidence %.0f%%)", (verified.confidence() == null ? 0 : verified.confidence()) * 100));
                 // Logged like every other request. This path used to return
                 // without a row, so verified requests were missing from usage,
                 // spend and the request feed — and were never counted against
@@ -413,6 +436,8 @@ public class GatewayService {
             }
             if (hit.isPresent()) {
                 var h = hit.get();
+                AppliedFeatures.note(String.format("semantic-cache: answered from an earlier answer (%s match,"
+                        + " similarity %.2f); no model was called", h.exact() ? "exact" : "near", h.similarity()));
                 long cachedMs = (System.nanoTime() - started) / 1_000_000;
                 if (prov != null) {
                     prov.commit();
@@ -430,7 +455,10 @@ public class GatewayService {
         }
 
         // God Mode Twin Gate: Interpose and augment request with memory if enabled
+        before = canonical;
         canonical = godMode.augmentRequest(developerId, canonical);
+        contextStep(prov, io.continuum.provenance.Decision.Stage.CONTEXT, "augmented", before, canonical,
+                "relevant long-term memory was added to the prompt");
         // V7 Context MMU (opt-in, OFF by default): virtualize the context window.
         // open() returns null unless the developer enabled it — null ⇒ the full
         // prompt array below is exactly what it always was.
@@ -458,6 +486,9 @@ public class GatewayService {
         if (autopilot.isPresent() && autopilot.get().policy().routingMode() != null
                 && (req.routingMode() == null || req.routingMode().isBlank())) {
             mode = parseMode(autopilot.get().policy().routingMode());
+        }
+        if (autopilot.isPresent()) {
+            AppliedFeatures.note("autopilot: your tuned routing policy ordered the providers");
         }
 
         // "Use my provider keys as primary" preference (default true).
@@ -506,6 +537,11 @@ public class GatewayService {
                 }
             }
             if (!permitted.isEmpty()) {
+                if (permitted.size() < chain.size()) {
+                    int skipped = chain.size() - permitted.size();
+                    AppliedFeatures.note("semantic-breaker: " + skipped + " model" + (skipped == 1 ? "" : "s")
+                            + " with degrading answers skipped");
+                }
                 chain = permitted;
             }
         }
@@ -679,6 +715,16 @@ public class GatewayService {
                 // V8 Prompt Firewall (opt-in): scan the outbound response for leaked
                 // secrets. Pass-through when off.
                 String safeContent = firewall.guardOutbound(developerId, resp.content());
+                if (safeContent != null && !safeContent.equals(resp.content())) {
+                    AppliedFeatures.note("prompt-firewall: secrets redacted from the answer");
+                }
+                if (failovers > 0) {
+                    AppliedFeatures.note("failover: " + failovers + " failed attempt" + (failovers == 1 ? "" : "s")
+                            + " rerouted before " + c.provider() + "/" + resp.model() + " answered");
+                }
+                if (developerId != null && aiChaos.isActive(developerId)) {
+                    AppliedFeatures.note("ai-chaos: an experiment is armed and may have corrupted this answer");
+                }
                 // God Mode (opt-in): observe the exchange into working memory.
                 // No-op (and can never throw) unless the developer enabled it.
                 godMode.observeExchange(developerId, "gateway",
@@ -762,6 +808,8 @@ public class GatewayService {
             var outcome = io.continuum.degradation.DegradationLadder.descend(
                     cached, lastError == null ? null : lastError.getMessage());
             degradation.record(developerId, outcome);
+            AppliedFeatures.note("degradation-ladder: every model failed; served the " + outcome.rung().name()
+                    .toLowerCase() + " rung instead of an error");
             if (prov != null) {
                 prov.add(io.continuum.provenance.Decision.Stage.OUTPUT,
                         "degraded:" + outcome.rung().name(), outcome.reason());
