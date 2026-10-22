@@ -267,7 +267,7 @@ export default function Models() {
                   ? "No provider key yet: add a Gemini or Groq key under API Keys & Providers"
                   : cooling
                     ? "One check per ten minutes"
-                    : undefined
+                    : "Reads each provider's model list again, then tests the models in use and anything new"
               }
               className="shrink-0 rounded-[var(--r-md)] bg-[color:var(--accent-strong)] px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
@@ -318,6 +318,7 @@ export default function Models() {
                 p={p}
                 models={models.filter((m) => m.provider === p.provider)}
                 policy={data.policies[p.provider]}
+                tested={testedIn(lastRun, p.provider)}
                 operator={operator}
                 onPinned={load}
               />
@@ -378,7 +379,21 @@ export default function Models() {
   );
 }
 
-function ProviderCard({ p, models, policy, operator, onPinned }: { p: Provider; models: Model[]; policy?: Policy; operator: boolean; onPinned: () => void }) {
+/** What the last check did for one provider: its test calls, and what is left for the next check. */
+type Tested = { tested: number; verified: number; unusable: number; deferred: number; stoppedEarly: boolean; at: unknown };
+
+function testedIn(run: { summary?: string; startedAt?: unknown } | null | undefined, provider: string): Tested | null {
+  if (!run?.summary) return null;
+  try {
+    const s = JSON.parse(run.summary)?.[provider];
+    if (!s || typeof s.tested !== "number") return null;
+    return { tested: s.tested, verified: s.verified ?? 0, unusable: s.unusable ?? 0, deferred: s.deferred ?? 0, stoppedEarly: !!s.stoppedEarly, at: run.startedAt };
+  } catch {
+    return null;
+  }
+}
+
+function ProviderCard({ p, models, policy, tested, operator, onPinned }: { p: Provider; models: Model[]; policy?: Policy; tested: Tested | null; operator: boolean; onPinned: () => void }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const chat = models.filter((m) => m.kind === "CHAT");
@@ -436,6 +451,15 @@ function ProviderCard({ p, models, policy, operator, onPinned }: { p: Provider; 
         </div>
       </dl>
       {p.lastError && <p className="text-[12px]" style={{ color: "var(--state-critical-ink)" }}>{p.lastError} — nothing was changed.</p>}
+      {tested && (
+        <p className="text-[12px] leading-snug text-slate-500">
+          Last check {ago(tested.at)}: {tested.tested} test call{tested.tested === 1 ? "" : "s"} · {tested.verified} answered
+          {tested.unusable ? ` · ${tested.unusable} not usable` : ""}
+          {tested.deferred
+            ? ` · ${tested.deferred} wait${tested.deferred === 1 ? "s" : ""} for the next check${tested.stoppedEarly ? " (the provider pushed back)" : " (test-call limit)"}`
+            : ""}
+        </p>
+      )}
 
       {parts.length > 0 && <StackedBar data={parts} height={20} unit="models" />}
 

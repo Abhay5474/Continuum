@@ -28,7 +28,7 @@ public class ModelCatalogSettings {
     private int manualCooldownMinutes;
 
     /** Test calls per provider per check. Untested models stay unrouted and wait for the next check. */
-    @Value("${continuum.models.max-probes-per-provider:12}")
+    @Value("${continuum.models.max-probes-per-provider:20}")
     private int maxProbesPerProvider;
 
     /** Gap between test calls, kept well inside free-tier requests-per-minute limits. */

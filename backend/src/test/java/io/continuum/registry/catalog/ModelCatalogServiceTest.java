@@ -92,6 +92,11 @@ class ModelCatalogServiceTest {
         assertThat(catalogue.runNow("MANUAL", "dev", List.of("groq", "gemini"), false)).isTrue();
     }
 
+    /** The automatic check, which nobody pressed: it leaves recently verified models alone. */
+    private void scheduledCheck() {
+        assertThat(catalogue.runNow("SCHEDULED", null, List.of("groq", "gemini"), false)).isTrue();
+    }
+
     @Test
     void theGroqRetirementIsCaughtAtTheFirstCheckAndRequestsMoveToAReplacement() {
         // What the deployment had: the hardcoded names, one of them retired by Groq.
@@ -161,11 +166,11 @@ class ModelCatalogServiceTest {
         check();
         groq.listing("a-70b");
         clock.advance(Duration.ofDays(10));
-        check();
+        scheduledCheck();
         groq.probed.clear();
         groq.listing("a-70b", "b-70b");
         clock.advance(Duration.ofDays(10));
-        check();
+        scheduledCheck();
 
         assertThat(row("b-70b").getStatus()).isEqualTo(ModelStatus.ACTIVE);
         assertThat(groq.probed).isEmpty();
@@ -199,11 +204,42 @@ class ModelCatalogServiceTest {
         assertThat(rows).filteredOn(m -> m.getStatus() == ModelStatus.DISCOVERED).hasSize(8);
         assertThat(repo.findByProviderAndStatus("groq", ModelStatus.ACTIVE)).hasSize(12);
 
-        // The next check tests the remaining eight, and nothing already verified.
+        // The next automatic check tests the remaining eight, and nothing already verified.
         groq.probed.clear();
         clock.advance(Duration.ofDays(10));
-        check();
+        scheduledCheck();
         assertThat(groq.probed).hasSize(8);
+    }
+
+    @Test
+    void checkNowConfirmsTheModelsInUseOldestFirstAfterAnythingNew() {
+        groq.listing("openai/gpt-oss-120b", "openai/gpt-oss-20b", "allam-2-7b");
+        check();
+        clock.advance(Duration.ofDays(2));
+        groq.probed.clear();
+        groq.listing("openai/gpt-oss-120b", "openai/gpt-oss-20b", "allam-2-7b", "qwen/qwen3.8-27b");
+
+        check();
+
+        // The default first, then the new model, then the rest in use. Every
+        // model in use carries today's date, though none was a month old.
+        assertThat(groq.probed.get(0)).isEqualTo(resolver.defaultFor("groq"));
+        assertThat(groq.probed.get(1)).isEqualTo("qwen/qwen3.8-27b");
+        assertThat(groq.probed).containsExactlyInAnyOrder(
+                "openai/gpt-oss-120b", "openai/gpt-oss-20b", "allam-2-7b", "qwen/qwen3.8-27b");
+        assertThat(rows).filteredOn(m -> m.getStatus() == ModelStatus.ACTIVE)
+                .allSatisfy(m -> assertThat(m.getVerifiedAt()).isEqualTo(clock.instant()));
+    }
+
+    @Test
+    void geminiMusicImageAndAgentModelsAreNotTestedAsChatModels() {
+        assertThat(GeminiCatalogClient.kindOf("lyria-3-clip-preview", List.of("generateContent"))).isEqualTo(ModelKind.AUDIO);
+        assertThat(GeminiCatalogClient.kindOf("gemini-nano-banana-2.1", List.of("generateContent"))).isEqualTo(ModelKind.IMAGE);
+        assertThat(GeminiCatalogClient.kindOf("veo-3.1-generate-preview", List.of("generateContent"))).isEqualTo(ModelKind.IMAGE);
+        assertThat(GeminiCatalogClient.kindOf("deep-research-preview-04-2026", List.of("generateContent"))).isEqualTo(ModelKind.OTHER);
+        assertThat(GeminiCatalogClient.kindOf("antigravity-preview-05-2026", List.of("generateContent"))).isEqualTo(ModelKind.OTHER);
+        assertThat(GeminiCatalogClient.kindOf("gemini-3.1-flash-lite", List.of("generateContent"))).isEqualTo(ModelKind.CHAT);
+        assertThat(GeminiCatalogClient.kindOf("gemini-3.1-pro-preview-customtools", List.of("generateContent"))).isEqualTo(ModelKind.CHAT);
     }
 
     @Test
@@ -256,7 +292,7 @@ class ModelCatalogServiceTest {
         clock.advance(Duration.ofMinutes(11));
         catalogue.runNow("MANUAL", "dev", List.of("gemini"), false);
 
-        assertThat(gemini.probed).containsExactly("gemini-3.8-flash");
+        assertThat(gemini.probed).contains("gemini-3.8-flash");
         assertThat(row("gemini-3.8-flash").getStatus()).isEqualTo(ModelStatus.ACTIVE);
         assertThat(row("gemini-3.8-flash").getVerifiedAt()).isNotNull();
     }
@@ -325,8 +361,11 @@ class ModelCatalogServiceTest {
 
         // Both are written by the confirmation on the catalogue's thread, the
         // status first; waiting for the status alone raced the quarantine lift.
+        // The new default is chosen after both, at the end of the check, so it
+        // is waited for too: asserting it straight away failed now and then.
         await(() -> row("openai/gpt-oss-120b").getStatus() == ModelStatus.UNAVAILABLE
-                && !resolver.isQuarantined("groq", "openai/gpt-oss-120b"));
+                && !resolver.isQuarantined("groq", "openai/gpt-oss-120b")
+                && "openai/gpt-oss-20b".equals(resolver.defaultFor("groq")));
         assertThat(resolver.defaultFor("groq")).isEqualTo("openai/gpt-oss-20b");
     }
 

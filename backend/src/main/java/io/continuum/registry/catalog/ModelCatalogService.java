@@ -438,7 +438,7 @@ public class ModelCatalogService {
                 if (c == null || (!c.configured() && !runKeys.containsKey(p))) {
                     continue;
                 }
-                Map<String, Object> ps = checkProvider(c, runId, listOnly, calls);
+                Map<String, Object> ps = checkProvider(c, runId, listOnly, "MANUAL".equals(trigger), calls);
                 summary.put(p, ps);
                 if (Boolean.TRUE.equals(ps.get("ok"))) {
                     anyOk = true;
@@ -467,7 +467,8 @@ public class ModelCatalogService {
         }
     }
 
-    private Map<String, Object> checkProvider(ProviderCatalogClient c, long runId, boolean listOnly, int[] calls) {
+    private Map<String, Object> checkProvider(ProviderCatalogClient c, long runId, boolean listOnly, boolean manual,
+                                              int[] calls) {
         String p = c.provider();
         Map<String, Object> out = new LinkedHashMap<>();
         ModelCatalogStore.ProviderState st = store.state(p);
@@ -496,7 +497,7 @@ public class ModelCatalogService {
         if (listOnly) {
             budget = usable(p).isEmpty() ? Math.min(3, budget) : 0;
         }
-        Map<String, Integer> probed = probe(c, runId, budget, calls, st);
+        Map<String, Integer> probed = probe(c, runId, budget, manual, calls, st);
         out.putAll(probed);
         chooseDefault(p, st, runId, retiredNow);
         store.saveState(st);
@@ -561,6 +562,12 @@ public class ModelCatalogService {
                 m.setStatusReason(next == ModelStatus.ACTIVE ? "Listed again" : "Listed again; waiting for a test call");
                 returned++;
                 event(p, m.getModelName(), "RETURNED", "Back in " + label(p) + "'s model list", runId);
+            }
+            if (!m.isChat() && (m.getStatus() == ModelStatus.DISCOVERED || m.getStatus() == ModelStatus.UNAVAILABLE)) {
+                // Reclassified (an image or music model taken for a chat
+                // model): listed, never routed, not something to test.
+                m.setStatus(ModelStatus.ACTIVE);
+                m.setStatusReason(lm.note());
             }
             m.setMissCount(0);
             m.setMissingSince(null);
@@ -631,8 +638,16 @@ public class ModelCatalogService {
         return counts;
     }
 
-    /** Test calls, most useful first, within the budget. */
-    private Map<String, Integer> probe(ProviderCatalogClient c, Long runId, int budget, int[] calls,
+    /**
+     * Test calls, most useful first, within the budget.
+     *
+     * <p>A scheduled check re-tests a working model once its last test is a
+     * month old. "Check now" re-tests every model in use as well: someone who
+     * presses it expects the models requests are going to to have just been
+     * confirmed, and they used to keep last month's date while the calls went
+     * to models nobody uses.
+     */
+    private Map<String, Integer> probe(ProviderCatalogClient c, Long runId, int budget, boolean manual, int[] calls,
                                        ModelCatalogStore.ProviderState st) {
         String p = c.provider();
         Instant now = clock.instant();
@@ -642,7 +657,7 @@ public class ModelCatalogService {
         List<ModelEntity> pending = models.findByProvider(p).stream()
                 .filter(m -> m.isChat() && "live".equals(m.getSource()) && SAFE_ID.matcher(m.getModelName()).matches())
                 .filter(m -> m.getStatus() == ModelStatus.DISCOVERED
-                        || (m.getStatus() == ModelStatus.ACTIVE && (m.getVerifiedAt() == null || m.getVerifiedAt().isBefore(stale)))
+                        || (m.getStatus() == ModelStatus.ACTIVE && (manual || m.getVerifiedAt() == null || m.getVerifiedAt().isBefore(stale)))
                         // "No free quota" is re-tested at every check (and every Check now):
                         // free tiers change, and a wrong verdict must not stand for a month.
                         // The refusal is instant and costs no tokens.
@@ -725,12 +740,22 @@ public class ModelCatalogService {
         return out;
     }
 
-    /** Pinned/current default first, then its family, then stable and strong, then the rest. */
+    /**
+     * The default first; then models in use that were never tested; then new
+     * ones; then models in use again, longest since their last test first;
+     * then models that could not be used. Within each: the default's family,
+     * stable before preview, strong and recent first.
+     */
     private static Comparator<ModelEntity> priority(String preferred) {
         String fam = preferred == null ? null : DefaultModelPicker.family(preferred);
         return Comparator
                 .comparing((ModelEntity m) -> m.getModelName().equals(preferred) ? 0 : 1)
-                .thenComparing(m -> m.getStatus() == ModelStatus.UNAVAILABLE ? 2 : m.getStatus() == ModelStatus.ACTIVE ? 1 : 0)
+                .thenComparing(m -> switch (m.getStatus()) {
+                    case ACTIVE -> m.getVerifiedAt() == null ? 0 : 2;
+                    case UNAVAILABLE -> 3;
+                    default -> 1;
+                })
+                .thenComparing(m -> m.getVerifiedAt() == null ? Instant.MIN : m.getVerifiedAt())
                 .thenComparing(m -> fam != null && fam.equals(DefaultModelPicker.family(m.getModelName())) ? 0 : 1)
                 .thenComparing(m -> m.isPreview() ? 1 : 0)
                 .thenComparing(m -> -DefaultModelPicker.strength(m.getModelName()))

@@ -147,10 +147,14 @@ public class GeminiCatalogClient implements ProviderCatalogClient {
         }
         if (s.contains("embedding")) return ModelKind.EMBEDDING;
         if (s.contains("tts")) return ModelKind.TEXT_TO_SPEECH;
-        if (s.contains("image") || s.contains("imagen")) return ModelKind.IMAGE;
-        if (s.contains("native-audio") || s.contains("-live") || s.contains("audio")) return ModelKind.AUDIO;
+        // Image, video and music models answer generateContent too, so the
+        // method alone cannot tell them apart; testing them as chat models
+        // used up a check's test calls on models that never answer a chat.
+        if (s.contains("image") || s.contains("imagen") || s.contains("nano-banana") || s.startsWith("veo")) return ModelKind.IMAGE;
+        if (s.contains("native-audio") || s.contains("-live") || s.contains("audio") || s.startsWith("lyria")) return ModelKind.AUDIO;
         if (s.startsWith("gemma") || s.startsWith("aqa") || s.contains("robotics")
-                || s.contains("computer-use") || s.startsWith("learnlm")) return ModelKind.OTHER;
+                || s.contains("computer-use") || s.startsWith("learnlm") || s.contains("deep-research")
+                || s.startsWith("antigravity") || s.contains("-agent")) return ModelKind.OTHER;
         return ModelKind.CHAT;
     }
 
@@ -158,10 +162,14 @@ public class GeminiCatalogClient implements ProviderCatalogClient {
         return switch (kind) {
             case EMBEDDING -> "Embedding model — not used for chat";
             case TEXT_TO_SPEECH -> "Text-to-speech model — not used for chat";
-            case IMAGE -> "Image model — not used for chat";
-            case AUDIO -> "Live/audio model — not used for text chat";
+            case IMAGE -> id.toLowerCase(Locale.ROOT).startsWith("veo")
+                    ? "Video model — not used for chat" : "Image model — not used for chat";
+            case AUDIO -> id.toLowerCase(Locale.ROOT).startsWith("lyria")
+                    ? "Music model — not used for chat" : "Live/audio model — not used for text chat";
             case OTHER -> id.toLowerCase(Locale.ROOT).startsWith("gemma")
                     ? "Open model without system-instruction support — not routed"
+                    : id.toLowerCase(Locale.ROOT).contains("deep-research") || id.toLowerCase(Locale.ROOT).startsWith("antigravity")
+                    ? "Agent with its own tools and long-running tasks — not routed as a chat model"
                     : "Specialised model — not routed as a general chat model";
             default -> null;
         };

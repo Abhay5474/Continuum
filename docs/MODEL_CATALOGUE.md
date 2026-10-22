@@ -17,8 +17,10 @@ Only the providers' own APIs. Nothing is scraped from web pages.
 | Its limits on this key | Groq's `x-ratelimit-limit-requests` / `x-ratelimit-limit-tokens` response headers |
 | Provider terms (data use, retirements) | Short notes written from the providers' published pages, dated, each linking to its source (`ProviderPolicies`) |
 
-Speech, text-to-speech, safety, embedding, image and alias models are catalogued
-but never tested or routed.
+Speech, text-to-speech, safety, embedding, image, video, music, agent and alias
+models are catalogued but never tested or routed. Gemini's image, video and music
+models (`nano-banana`, `veo`, `lyria`) and agents (`deep-research`, `antigravity`)
+answer `generateContent` too, so they are told apart by name.
 
 ## When it checks, and what it costs
 
@@ -28,12 +30,18 @@ but never tested or routed.
   runs. The hourly tick that decides this reads only the database.
 - **Check now:** any signed-in user. One check at a time across all instances
   (a database lease), and at most one every 10 minutes (`409` while running,
-  `429` during the cooldown).
+  `429` during the cooldown). Uses the server's provider keys, or the key the
+  person saved under API Keys & Providers for a provider the server has none
+  for. Unlike the scheduled check, it re-tests every model in use, so the models
+  requests go to carry the date it was pressed.
 - **Per check:** one list call per provider (Gemini: one per page, at most 3),
-  and at most 12 test calls per provider, spaced 2.5 s (Groq) / 6 s (Gemini)
-  apart. Testing stops after two rate-limited or failed test calls in a row, or
-  at once if the key is refused. Models already verified are not re-tested for
-  30 days.
+  and at most 20 test calls per provider, spaced 2.5 s (Groq) / 6 s (Gemini)
+  apart, in this order: the default; models in use never tested; new models;
+  models in use again, longest since their last test first; models not usable on
+  the key. Testing stops after two rate-limited or failed test calls in a row, or
+  at once if the key is refused. What does not fit waits for the next check, and
+  each provider's card says how many. A scheduled check re-tests a model in use
+  only when its last test is 30 days old.
 - **Startup:** database only. No provider is called on the startup path.
 
 ## What can retire a model
@@ -85,7 +93,7 @@ API: `GET /api/models/catalog`, `GET|POST /api/models/check`,
 | `continuum.models.check-interval-days` | 10 |
 | `continuum.models.retry-after-failure-hours` | 6 |
 | `continuum.models.manual-cooldown-minutes` | 10 |
-| `continuum.models.max-probes-per-provider` | 12 |
+| `continuum.models.max-probes-per-provider` | 20 |
 | `continuum.models.probe-spacing-ms.groq` / `.gemini` | 2500 / 6000 |
 | `continuum.models.confirm-cooldown-minutes` | 30 |
 | `continuum.models.reprobe-after-days` | 30 |
