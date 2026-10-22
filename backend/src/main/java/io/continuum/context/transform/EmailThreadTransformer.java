@@ -85,6 +85,9 @@ public class EmailThreadTransformer implements ContextTransformer {
      * strips trailing whitespace on save, so both are accepted. A longer run of
      * dashes is a horizontal rule and deliberately does not match.
      */
+    /** "Name: value" at the start of a line, as every header field is written. */
+    private static final Pattern HEADER_LINE = Pattern.compile("[A-Za-z][A-Za-z0-9-]*:[ \t]");
+
     private static final Pattern SIGNATURE_DELIMITER =
             Pattern.compile("^--[ \\t]*$", Pattern.MULTILINE);
 
@@ -127,6 +130,13 @@ public class EmailThreadTransformer implements ContextTransformer {
         // A MIME message is recognisable from its headers, which must appear
         // before the body and in the first few lines.
         String head = new String(input, 0, Math.min(input.length, 2048), StandardCharsets.UTF_8);
+        // And a message begins with them (RFC 5322 §2.1). A question followed
+        // by a pasted email ("Summarise this: From: …") used to be claimed, parsed
+        // as one message with the question as its headers, and come out as
+        // "0 participants, From: unknown", with the question lost.
+        if (!HEADER_LINE.matcher(head.stripLeading()).lookingAt()) {
+            return false;
+        }
         int score = 0;
         for (String h : List.of("From:", "To:", "Subject:", "Date:", "Message-ID:",
                 "MIME-Version:", "Received:")) {
@@ -174,7 +184,7 @@ public class EmailThreadTransformer implements ContextTransformer {
         List<String> attachments = new ArrayList<>();
         try {
             subject = mime.getSubject();
-            fromLine = addresses(mime.getFrom());
+            fromLine = sender(mime);
             sent = mime.getSentDate() == null ? null : mime.getSentDate().toInstant();
             body = extractText(mime, attachments);
         } catch (Exception e) {
@@ -251,9 +261,14 @@ public class EmailThreadTransformer implements ContextTransformer {
                             ia.getPersonal(), ia.getAddress(), 0));
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception unparsable) {
             // Recipients are useful context, not essential; a malformed header
-            // must not lose the conversation.
+            // must not lose the conversation. Their names, as written, still help.
+            for (String header : List.of("To", "Cc")) {
+                for (String who : asWritten(mime, header)) {
+                    participants.add(new CanonicalConversation.Participant(who, null, 0));
+                }
+            }
         }
 
         return new CanonicalConversation(source, subject, participants, messages,
@@ -473,6 +488,47 @@ public class EmailThreadTransformer implements ContextTransformer {
                 .replace("&nbsp;", " ").replace("&amp;", "&")
                 .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"");
         return text.replaceAll("\n{3,}", "\n\n").strip();
+    }
+
+    /**
+     * The sender. When the address does not parse — the prompt firewall runs
+     * first and turns {@code priya@acme.example} into {@code [REDACTED_EMAIL]},
+     * which is no address at all — the name as written is kept. Strict parsing
+     * used to throw there, and every email pasted into a chat with redaction on
+     * came out as "The message headers could not be read".
+     */
+    private static String sender(MimeMessage mime) {
+        try {
+            return addresses(mime.getFrom());
+        } catch (Exception unparsable) {
+            List<String> names = asWritten(mime, "From");
+            return names.isEmpty() ? null : String.join(", ", names);
+        }
+    }
+
+    /** A header's mailboxes as written: the display name, else the text inside the angle brackets. */
+    private static List<String> asWritten(MimeMessage mime, String header) {
+        List<String> out = new ArrayList<>();
+        try {
+            String raw = mime.getHeader(header, ",");
+            if (raw == null) {
+                return out;
+            }
+            for (String part : raw.split(",")) {
+                String p = part.strip();
+                int lt = p.indexOf('<');
+                String name = (lt >= 0 ? p.substring(0, lt) : p).strip().replaceAll("^\"|\"$", "");
+                if (name.isEmpty() && lt >= 0) {
+                    name = p.substring(lt).replaceAll("[<>]", "").strip();
+                }
+                if (!name.isEmpty()) {
+                    out.add(name);
+                }
+            }
+        } catch (Exception ignored) {
+            // Nothing readable: no names, which the caller already handles.
+        }
+        return out;
     }
 
     private static String addresses(Address[] addresses) {

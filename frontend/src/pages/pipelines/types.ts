@@ -94,7 +94,8 @@ export type Run = {
   response: string;
   traceId: string;
   findings: number;
-  evidenceConfidence: number;
+  /** Null when the evidence carried no confidence figures (fields, text). */
+  evidenceConfidence: number | null;
   anythingFound: boolean;
   analysisRan: boolean;
   model: string;

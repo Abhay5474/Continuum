@@ -151,11 +151,13 @@ export function TryIt({ pipeline, onRan }: { pipeline: Pipeline; onRan: () => vo
                 <Stat label="Findings used" value={run.findings} />
                 <Stat
                   label="Evidence"
-                  value={run.anythingFound ? run.evidenceConfidence.toFixed(2) : "—"}
+                  value={
+                    !run.anythingFound ? "—" : run.evidenceConfidence == null ? "unscored" : run.evidenceConfidence.toFixed(2)
+                  }
                   tone={
                     !run.analysisRan
                       ? "bad"
-                      : !run.anythingFound
+                      : !run.anythingFound || run.evidenceConfidence == null
                         ? undefined
                         : run.evidenceConfidence >= 0.7
                           ? "ok"

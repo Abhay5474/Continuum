@@ -226,4 +226,24 @@ class EmailThreadTransformerTest {
         assertThat(EmailThreadTransformer.heuristicSignatureStart(signed)).isPositive();
         assertThat(EmailThreadTransformer.heuristicSignatureStart(prose)).isEqualTo(-1);
     }
+
+    @Test
+    @DisplayName("a question with an email pasted under it is not taken for an email")
+    void aQuestionAboveAnEmailIsNotAnEmail() {
+        String message = "Summarise what the customer wants.\n\nHere is the thread:\n\n"
+                + new String(thread(), StandardCharsets.UTF_8);
+        assertThat(transformer.supports(message.getBytes(StandardCharsets.UTF_8), null)).isFalse();
+        assertThat(transformer.supports(thread(), null)).isTrue();
+    }
+
+    @Test
+    @DisplayName("addresses the firewall redacted still leave the sender's name")
+    void redactedAddressesKeepTheNames() {
+        String eml = new String(thread(), StandardCharsets.UTF_8)
+                .replace("priya@acme.example", "[REDACTED_EMAIL]")
+                .replace("support@vendor.example", "[REDACTED_EMAIL]");
+        CanonicalConversation c = (CanonicalConversation) transformer.transform(
+                eml.getBytes(StandardCharsets.UTF_8), "thread.eml");
+        assertThat(c.render(RenderBudget.standard())).contains("Participants: Priya Nair, Support", "From: Priya Nair");
+    }
 }

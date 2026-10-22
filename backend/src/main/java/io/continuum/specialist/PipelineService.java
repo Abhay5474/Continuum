@@ -66,11 +66,13 @@ public class PipelineService {
     /**
      * What the calling application gets back.
      *
+     * @param topConfidence the strongest scored finding, or null when no finding
+     *                   carried a confidence (fields, text) — "not scored" is not "0%"
      * @param policy     the confidence decision, or null when the policy is off
      * @param compliance whether the model actually did what the policy asked,
      *                   or null when nothing was asked of it
      */
-    public record Run(String response, String traceId, int findings, double topConfidence,
+    public record Run(String response, String traceId, int findings, Double topConfidence,
                       boolean anythingFound, boolean analysisRan, String model, double cost,
                       long latencyMs, List<Map<String, Object>> chain,
                       Map<String, Object> policy, Map<String, Object> compliance,
@@ -207,7 +209,7 @@ public class PipelineService {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> declinedSteps =
                     (List<Map<String, Object>>) declinedChain.get("steps");
-            return new Run(canned, traceId, ctx.totalFindings(), ctx.topConfidence(),
+            return new Run(canned, traceId, ctx.totalFindings(), scoredConfidence(ctx),
                     ctx.anythingFound(), ctx.analysisRan(), null, 0, ms, declinedSteps,
                     decision.describe(), null, null);
         }
@@ -284,7 +286,7 @@ public class PipelineService {
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> steps = (List<Map<String, Object>>) chain.get("steps");
-        return new Run(finalAnswer, traceId, ctx.totalFindings(), ctx.topConfidence(),
+        return new Run(finalAnswer, traceId, ctx.totalFindings(), scoredConfidence(ctx),
                 ctx.anythingFound(), ctx.analysisRan(), answer.model(), answer.cost(), totalMs, steps,
                 decision == null ? null : decision.describe(),
                 compliance == null || !compliance.checked() ? null : compliance.describe(),
@@ -512,9 +514,14 @@ public class PipelineService {
         };
     }
 
+    private static Double scoredConfidence(ContextBuilder.Context ctx) {
+        return ctx.scoredCount() == 0 ? null : ctx.topConfidence();
+    }
+
     private static String describeInput(String kind) {
         return switch (kind == null ? "image" : kind) {
             case "text" -> "Text received";
+            case "document" -> "Document received";
             case "json" -> "Data received";
             case "audio" -> "Audio received";
             default -> "Image received";
