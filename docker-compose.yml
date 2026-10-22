@@ -24,9 +24,15 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/continuum
       SPRING_DATASOURCE_USERNAME: continuum
       SPRING_DATASOURCE_PASSWORD: continuum
-      # Optional — leave blank to use the built-in mock provider:
+      # A model provider: set either, or add a key in the console later.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      # Lets workflow steps, specialists and webhooks call private addresses,
+      # such as an app on this machine (demo-app/README.md). Off by default.
+      CONTINUUM_DECLARATIVE_ALLOW_PRIVATE_TARGETS: ${CONTINUUM_DECLARATIVE_ALLOW_PRIVATE_TARGETS:-false}
+    extra_hosts:
+      # host.docker.internal on Linux too, so the backend can reach the host.
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     depends_on:

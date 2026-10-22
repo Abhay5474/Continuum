@@ -45,6 +45,10 @@ curl -X POST https://your-continuum/api/gateway/pipeline/animal-triage \
 }
 ```
 
+`evidenceConfidence` is the strongest scored finding. It is `null` when the
+specialists found things that carry no confidence figure (OCR text, extracted
+fields): not scored is not the same as 0%.
+
 **Nothing in that response names Roboflow, the endpoint, or the credential.**
 Verified by assertion, not by inspection — swapping a hosted detector for your
 own FastAPI is invisible to every application you have shipped.

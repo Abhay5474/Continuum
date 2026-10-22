@@ -102,10 +102,27 @@ it re-checks after every saved setting.
   when any of them is on alongside it. It is given the conversation and the
   system prompt, not only the last message.
 - **Semantic Cache** is keyed on the whole conversation, not the last message,
-  and skips requests with tools or images. It stores the answer the caller
-  actually got, after the quality gate and confidence checks, and never one
-  that failed the gate, came back with low confidence, or was corrupted by AI
-  chaos.
+  and skips requests with tools or images. A near match must follow the same
+  conversation word for word (system prompt included) and is scored on the new
+  question alone, so a long shared system prompt or pasted file cannot make two
+  different questions look alike; it may also differ by at most three words. A
+  routing mode files the answer apart (a HIGH_QUALITY request is never served a
+  low-cost answer), and a request that asks for a confidence measurement is
+  never served from the cache. It stores the answer the caller actually got,
+  after the quality gate and confidence checks, and never one that failed the
+  gate, came back with low confidence, or was corrupted by AI chaos.
+- **Cascade** steps aside when the caller asks for `HIGH_QUALITY` (they want the
+  strong model) or `LOW_LATENCY` (a second call costs time).
+- **Prompt Firewall** runs before the **Context Transformers**, so a pasted
+  email reaches its transformer with addresses already masked; the sender's and
+  recipients' names are kept. In chat, a transformer rewrites the whole message
+  or a fenced block (```` ```csv ````, ```` ```log ````, ```` ```eml ````), never
+  data loose inside prose.
+- **Memory** keeps one copy of a fact per scope: storing it again strengthens
+  it (`"reinforced": true`) instead of taking a second retrieval slot.
+- **Compensation** treats a `GET` step like a timer: a lookup changed nothing,
+  so it is neither undone nor reported as an effect that remains. A cancelled
+  run whose completed steps were only lookups and timers starts no rollback.
 - **Cascade** and **hedging** answer the caller's own request, so tools and JSON
   mode are kept; hedged answers go through the quality gate and confidence
   checks like every other path. Quality-gate repairs and confidence resamples
@@ -126,13 +143,16 @@ scopes them:
 | `POST /api/gateway/context/transform` | Turn a log, spreadsheet or email thread into what a model reads best |
 | `POST /api/gateway/workflows/{name}/run` | Start a durable run of a published definition (`workflowId` makes it idempotent) |
 | `GET /api/gateway/workflows/{id}` | Status, each step with attempts and outcome, result or error, the rollback if one ran |
-| `POST /api/gateway/workflows/{id}/cancel` | Stop a run; with saga on, its completed steps are undone |
+| `POST /api/gateway/workflows/{id}/cancel` | Stop a run (status `CANCELLED`); with saga on, its completed steps are undone and the rollback run's id comes back |
 | `POST /api/gateway/memory/store`, `/retrieve` | Long-term memory, recalled by meaning |
 | `POST /api/gateway/loops/inspect` | Is this agent going round in circles? (409 in HALT mode) |
 | `POST /api/gateway/feedback` | Rate an answer (-1 to 1) for Autopilot |
 
 A key cannot change the account: settings, keys, webhooks and definitions stay
 in the console.
+
+`demo-app/` is a complete example application built this way: a store's
+support desk that uses every feature through one API key. See its README.
 
 ### Which features acted on a request
 
