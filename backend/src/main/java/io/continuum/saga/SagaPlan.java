@@ -101,6 +101,11 @@ public final class SagaPlan {
                 // to undo — listing it as "effects remain" was a false alarm.
                 continue;
             }
+            if (step.getCompensate() == null && reads(step)) {
+                // GET, HEAD and OPTIONS are safe methods (RFC 9110 §9.2.1): a
+                // lookup changed nothing, so it has no effects to remain.
+                continue;
+            }
             if (step.getCompensate() == null || step.getCompensate().getUrl() == null
                     || step.getCompensate().getUrl().isBlank()) {
                 gaps.add(id);
@@ -119,5 +124,11 @@ public final class SagaPlan {
                                 + gaps.size() + " cannot be (" + String.join(", ", gaps)
                                 + ") and their effects remain.";
         return new Plan(List.copyOf(out), List.copyOf(gaps), complete, summary);
+    }
+
+    private static boolean reads(WorkflowSpec.Step step) {
+        String method = step.getCall() == null || step.getCall().getMethod() == null
+                ? "POST" : step.getCall().getMethod().trim().toUpperCase(java.util.Locale.ROOT);
+        return method.equals("GET") || method.equals("HEAD") || method.equals("OPTIONS");
     }
 }

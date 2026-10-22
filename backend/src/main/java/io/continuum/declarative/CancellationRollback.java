@@ -71,6 +71,13 @@ public class CancellationRollback {
         if (p.completed().isEmpty() && p.inFlight().isEmpty()) {
             return Optional.empty(); // nothing had happened yet
         }
+        if (p.inFlight().isEmpty()) {
+            io.continuum.saga.SagaPlan.Plan plan = io.continuum.saga.SagaPlan.forFailure(
+                    mapper.convertValue(run.spec(), WorkflowSpec.class), p.completed(), null);
+            if (plan.compensations().isEmpty() && plan.uncompensated().isEmpty()) {
+                return Optional.empty(); // only lookups and timers had run: nothing out there to undo
+            }
+        }
         DeclarativeRollbackWorkflow.Input input = new DeclarativeRollbackWorkflow.Input(
                 workflowId, run.definition(), run.version(), run.developerId(), run.spec(), run.input(),
                 p.results(), p.completed(), p.inFlight(), reason);

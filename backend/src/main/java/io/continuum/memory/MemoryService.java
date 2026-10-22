@@ -44,7 +44,33 @@ public class MemoryService {
 
     @Transactional
     public MemoryEntryEntity store(String scope, MemoryTier tier, String content, double salience) {
-        return repo.save(new MemoryEntryEntity(scope, tier, content, salience));
+        return storeOrReinforce(scope, tier, content, salience).entry();
+    }
+
+    /** @param reinforced the scope already held this memory; it was strengthened, not duplicated */
+    public record Stored(MemoryEntryEntity entry, boolean reinforced) {
+    }
+
+    /**
+     * Stores a memory, or strengthens the one already there. An agent that is
+     * told the same fact twice should know it once: a copy would take a second
+     * top-k slot on retrieval and crowd out something else it knows.
+     */
+    @Transactional
+    public Stored storeOrReinforce(String scope, MemoryTier tier, String content, double salience) {
+        String key = normalise(content);
+        for (MemoryEntryEntity existing : repo.findByScope(scope)) {
+            if (existing.getContent() != null && normalise(existing.getContent()).equals(key)) {
+                existing.setSalience(Math.max(existing.getSalience(), salience));
+                existing.markAccessed();
+                return new Stored(repo.save(existing), true);
+            }
+        }
+        return new Stored(repo.save(new MemoryEntryEntity(scope, tier, content, salience)), false);
+    }
+
+    private static String normalise(String content) {
+        return content.strip().replaceAll("\\s+", " ").toLowerCase(java.util.Locale.ROOT);
     }
 
     /** Rank all of a scope's memories for the query and return the top-k (access-counted). */

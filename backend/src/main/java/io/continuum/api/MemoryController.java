@@ -46,9 +46,10 @@ public class MemoryController {
         if (req.content().length() > MAX_CONTENT) {
             throw new IllegalArgumentException("content is limited to " + MAX_CONTENT + " characters");
         }
-        var saved = memory.store(scoped(http, req.scope()), tierOf(req.tier()), req.content(),
+        var saved = memory.storeOrReinforce(scoped(http, req.scope()), tierOf(req.tier()), req.content(),
                 req.salience() == null ? 0.5 : Math.max(0, Math.min(1, req.salience())));
-        return Map.of("id", saved.getId(), "tier", saved.getTier().name());
+        return Map.of("id", saved.entry().getId(), "tier", saved.entry().getTier().name(),
+                "reinforced", saved.reinforced());
     }
 
     @PostMapping("/retrieve")

@@ -130,4 +130,14 @@ class SagaPlanTest {
         assertThat(plan.uncompensated()).isEmpty();
         assertThat(plan.complete()).isTrue();
     }
+
+    @Test
+    @DisplayName("A GET lookup changed nothing, so it is not a gap; a POST without an undo still is")
+    void readsAreNotGaps() {
+        WorkflowSpec s = spec("lookup", "charge*", "email");
+        s.getSteps().get(0).getCall().setMethod("get");
+        var plan = SagaPlan.forFailure(s, List.of("lookup", "charge", "email"), "ship");
+        assertThat(ids(plan)).containsExactly("charge");
+        assertThat(plan.uncompensated()).containsExactly("email");
+    }
 }

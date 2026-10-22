@@ -109,10 +109,21 @@ public class ProgramApiController {
         Dtos.WorkflowDetail d = query.detail(id);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("workflowId", id);
-        out.put("status", d.summary().cancelled() ? "CANCELLED" : d.summary().stuck() ? "STUCK" : d.summary().status());
+        String status = publicStatus(d.summary());
+        out.put("status", status);
         out.put("createdAt", d.summary().createdAt());
         out.put("updatedAt", d.summary().updatedAt());
-        out.put("steps", steps(d.events()));
+        List<Map<String, Object>> steps = steps(d.events());
+        if (!"RUNNING".equals(status) && !"STUCK".equals(status)) {
+            // The run is over: a step still waiting or in flight will never finish.
+            String never = "CANCELLED".equals(status) ? "cancelled" : "abandoned";
+            for (Map<String, Object> row : steps) {
+                if (List.of("scheduled", "running", "retrying").contains(row.get("state"))) {
+                    row.put("state", never);
+                }
+            }
+        }
+        out.put("steps", steps);
         if (d.result() != null) {
             out.put("result", d.result());
         }
@@ -136,15 +147,20 @@ public class ProgramApiController {
             reason = reason.substring(0, 500);
         }
         String before = query.find(id).map(WorkflowQueryService.Existing::status).orElse(null);
-        String after = engine.cancel(id, reason).name();
+        engine.cancel(id, reason);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("workflowId", id);
-        out.put("status", after);
+        // The engine records a cancelled run as failed; callers are told it was cancelled.
+        out.put("status", publicStatus(query.detail(id).summary()));
         if ("RUNNING".equals(before)) {
             rollback.afterCancel(id, reason == null ? "cancelled" : reason)
                     .ifPresent(r -> out.put("rollbackWorkflowId", r));
         }
         return out;
+    }
+
+    private static String publicStatus(Dtos.WorkflowSummary summary) {
+        return summary.cancelled() ? "CANCELLED" : summary.stuck() ? "STUCK" : summary.status();
     }
 
     private void requireOwned(String developerId, String workflowId) {
@@ -294,8 +310,9 @@ public class ProgramApiController {
             throw new IllegalArgumentException("tier must be one of " + java.util.Arrays.toString(MemoryTier.values()));
         }
         double salience = body.salience() == null ? 0.5 : Math.max(0, Math.min(1, body.salience()));
-        var saved = memory.store(scoped(dev(http), body.scope()), tier, body.content(), salience);
-        return Map.of("id", saved.getId(), "tier", saved.getTier().name());
+        var saved = memory.storeOrReinforce(scoped(dev(http), body.scope()), tier, body.content(), salience);
+        return Map.of("id", saved.entry().getId(), "tier", saved.entry().getTier().name(),
+                "reinforced", saved.reinforced());
     }
 
     @PostMapping("/api/gateway/memory/retrieve")

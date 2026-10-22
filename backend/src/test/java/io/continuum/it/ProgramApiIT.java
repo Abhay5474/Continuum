@@ -34,6 +34,7 @@ class ProgramApiIT extends PostgresIT {
     @Autowired ObjectMapper json;
     @Autowired io.continuum.core.engine.WorkflowWorker workflowWorker;
     @Autowired io.continuum.core.engine.ActivityWorker activityWorker;
+    @Autowired io.continuum.saga.SagaService saga;
 
     private final HttpClient http = HttpClient.newHttpClient();
     private String dev;
@@ -129,6 +130,86 @@ class ProgramApiIT extends PostgresIT {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void aCancelledRunIsReportedAsCancelledAndItsWaitingStepNeverRuns() throws Exception {
+        saga.configure(dev, true);
+        definitions.publish(dev, "held", Map.of("steps", List.of(
+                Map.of("id", "first", "call", Map.of("method", "GET", "url", "http://localhost:" + port + "/api/meta")),
+                Map.of("id", "hold", "type", "WAIT", "waitSeconds", 600, "dependsOn", List.of("first")))));
+        String id = (String) read(call("POST", "/api/gateway/workflows/held/run", Map.of(), key)).get("workflowId");
+        for (int i = 0; i < 100; i++) {
+            workflowWorker.poll();
+            activityWorker.poll();
+            List<Map<String, Object>> steps = (List<Map<String, Object>>)
+                    read(call("GET", "/api/gateway/workflows/" + id, null, key)).get("steps");
+            if (steps.stream().anyMatch(s -> "hold".equals(s.get("step")))) {
+                break;
+            }
+            Thread.sleep(100);
+        }
+
+        Map<String, Object> cancelled = read(call("POST", "/api/gateway/workflows/" + id + "/cancel",
+                Map.of("reason", "customer changed their mind"), key));
+        assertThat(cancelled.get("status")).isEqualTo("CANCELLED");
+        // Only a GET and a timer had run: nothing out there to undo, so no rollback run.
+        assertThat(cancelled).doesNotContainKey("rollbackWorkflowId");
+
+        Map<String, Object> status = read(call("GET", "/api/gateway/workflows/" + id, null, key));
+        assertThat(status.get("status")).isEqualTo("CANCELLED");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) status.get("steps");
+        assertThat(steps).filteredOn(s -> "hold".equals(s.get("step")))
+                .singleElement().satisfies(s -> assertThat(s.get("state")).isEqualTo("cancelled"));
+        // Asking again changes nothing and still says how it ended.
+        assertThat(read(call("POST", "/api/gateway/workflows/" + id + "/cancel", Map.of(), key)).get("status"))
+                .isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void cancellingAfterAStepWithEffectsStartsTheRollbackThatUndoesIt() throws Exception {
+        java.util.List<String> calls = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        com.sun.net.httpserver.HttpServer target = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        target.createContext("/", ex -> {
+            calls.add(ex.getRequestMethod() + " " + ex.getRequestURI().getPath());
+            byte[] ok = "{\"ok\":true}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            ex.getResponseHeaders().add("Content-Type", "application/json");
+            ex.sendResponseHeaders(200, ok.length);
+            ex.getResponseBody().write(ok);
+            ex.close();
+        });
+        target.start();
+        try {
+            saga.configure(dev, true); // pinned into each run when it starts
+            String base = "http://127.0.0.1:" + target.getAddress().getPort();
+            definitions.publish(dev, "charge-then-hold", Map.of("steps", List.of(
+                    Map.of("id", "charge", "call", Map.of("method", "POST", "url", base + "/charge"),
+                            "compensate", Map.of("method", "POST", "url", base + "/refund")),
+                    Map.of("id", "hold", "type", "WAIT", "waitSeconds", 600, "dependsOn", List.of("charge")))));
+            String id = (String) read(call("POST", "/api/gateway/workflows/charge-then-hold/run", Map.of(), key))
+                    .get("workflowId");
+            for (int i = 0; i < 100 && !calls.contains("POST /charge"); i++) {
+                workflowWorker.poll();
+                activityWorker.poll();
+                Thread.sleep(100);
+            }
+            for (int i = 0; i < 20; i++) { // let the run record the charge and schedule the hold
+                workflowWorker.poll();
+                Thread.sleep(50);
+            }
+            Map<String, Object> cancelled = read(call("POST", "/api/gateway/workflows/" + id + "/cancel", Map.of(), key));
+            assertThat(cancelled.get("rollbackWorkflowId")).isEqualTo(id + ":rollback");
+            for (int i = 0; i < 100 && !calls.contains("POST /refund"); i++) {
+                workflowWorker.poll();
+                activityWorker.poll();
+                Thread.sleep(100);
+            }
+            assertThat(calls).containsSubsequence("POST /charge", "POST /refund");
+        } finally {
+            target.stop(0);
+        }
+    }
+
+    @Test
     void anotherAccountsKeyCannotSeeOrStopTheRun() throws Exception {
         definitions.publish(dev, "one-step", Map.of("steps", List.of(
                 Map.of("id", "only", "call", Map.of("method", "GET", "url", "http://localhost:" + port + "/api/meta")))));
@@ -163,6 +244,14 @@ class ProgramApiIT extends PostgresIT {
         List<Map<String, Object>> rows = json.readValue(recalled.body(), List.class);
         assertThat(rows).isNotEmpty();
         assertThat(recalled.body()).contains("Prefers refunds");
+
+        // Told the same thing again, it knows it once, a little more firmly.
+        Map<String, Object> again = read(call("POST", "/api/gateway/memory/store",
+                Map.of("scope", "customer-7", "content", "  prefers refunds to store  credit", "tier", "LONG_TERM"), key));
+        assertThat(again.get("reinforced")).isEqualTo(true);
+        List<Map<String, Object>> once = json.readValue(call("POST", "/api/gateway/memory/retrieve",
+                Map.of("scope", "customer-7", "query", "refund", "topK", 10), key).body(), List.class);
+        assertThat(once).hasSize(1);
 
         String other = portal.signup("Other", "mem-" + UUID.randomUUID() + "@example.com", "correct-horse-9").developerId();
         String otherKey = developers.issueKey(other, "other").plaintextKey();
