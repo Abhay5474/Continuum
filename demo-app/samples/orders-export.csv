@@ -1,0 +1,61 @@
+order_id,order_date,city,sku,product,qty,unit_price,total,status,returned,refund_amount,return_reason
+BC-5000,2026-10-20,Delhi,LMP-LUM-1,"Lumen Desk Lamp",1,42.50,42.50,shipped,no,0.00,
+BC-5001,2026-09-04,Mumbai,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,no,0.00,
+BC-5002,2026-10-19,Pune,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5003,2026-09-06,Delhi,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5004,2026-10-04,Pune,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,shipped,no,0.00,
+BC-5005,2026-10-11,Bengaluru,TNT-SUM-4,"Summit 4-Person Tent",1,249.00,249.00,delivered,no,0.00,
+BC-5006,2026-09-03,Hyderabad,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,yes,34.00,damaged in transit
+BC-5007,2026-08-31,Mumbai,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5008,2026-10-16,Hyderabad,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",2,38.00,76.00,delivered,no,0.00,
+BC-5009,2026-09-06,Chennai,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5010,2026-08-27,Hyderabad,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",1,38.00,38.00,delivered,no,0.00,
+BC-5011,2026-09-29,Bengaluru,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,yes,34.00,damaged in transit
+BC-5012,2026-10-06,Delhi,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5013,2026-08-29,Pune,LMP-LUM-1,"Lumen Desk Lamp",1,42.50,42.50,shipped,no,0.00,
+BC-5014,2026-10-19,Kolkata,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,shipped,no,0.00,
+BC-5015,2026-10-08,Hyderabad,JKT-TRL-M,"Trailblazer Rain Jacket (M)",1,89.00,89.00,processing,no,0.00,
+BC-5016,2026-09-20,Jaipur,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,no,0.00,
+BC-5017,2026-10-13,Chennai,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,no,0.00,
+BC-5018,2026-09-24,Kolkata,TNT-SUM-4,"Summit 4-Person Tent",1,249.00,249.00,shipped,no,0.00,
+BC-5019,2026-10-13,Mumbai,JKT-TRL-M,"Trailblazer Rain Jacket (M)",1,89.00,89.00,delivered,yes,89.00,damaged in transit
+BC-5020,2026-10-11,Kolkata,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,shipped,no,0.00,
+BC-5021,2026-09-27,Chennai,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5022,2026-09-08,Chennai,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",1,38.00,38.00,delivered,no,0.00,
+BC-5023,2026-09-30,Jaipur,TNT-SUM-4,"Summit 4-Person Tent",1,249.00,249.00,delivered,no,0.00,
+BC-5024,2026-09-05,Chennai,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,shipped,no,0.00,
+BC-5025,2026-09-19,Chennai,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",1,38.00,38.00,processing,no,0.00,
+BC-5026,2026-09-19,Bengaluru,TNT-SUM-4,"Summit 4-Person Tent",1,249.00,249.00,delivered,no,0.00,
+BC-5027,2026-09-02,Pune,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,processing,no,0.00,
+BC-5028,2026-09-20,Chennai,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5029,2026-10-06,Mumbai,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,shipped,no,0.00,
+BC-5030,2026-09-20,Bengaluru,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,shipped,no,0.00,
+BC-5031,2026-09-21,Bengaluru,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,processing,no,0.00,
+BC-5032,2026-08-27,Delhi,JKT-TRL-M,"Trailblazer Rain Jacket (M)",1,89.00,89.00,delivered,no,0.00,
+BC-5033,2026-09-26,Hyderabad,LMP-LUM-1,"Lumen Desk Lamp",1,42.50,42.50,processing,no,0.00,
+BC-5034,2026-09-18,Mumbai,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5035,2026-09-14,Pune,JKT-TRL-M,"Trailblazer Rain Jacket (M)",1,89.00,89.00,delivered,no,0.00,
+BC-5036,2026-09-11,Hyderabad,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,yes,34.00,damaged in transit
+BC-5037,2026-10-06,Bengaluru,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,no,0.00,
+BC-5038,2026-08-26,Jaipur,LMP-LUM-1,"Lumen Desk Lamp",1,42.50,42.50,delivered,no,0.00,
+BC-5039,2026-10-09,Hyderabad,TNT-SUM-4,"Summit 4-Person Tent",1,249.00,249.00,delivered,no,0.00,
+BC-5040,2026-09-22,Pune,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,shipped,no,0.00,
+BC-5041,2026-09-10,Hyderabad,LMP-LUM-1,"Lumen Desk Lamp",1,42.50,42.50,delivered,no,0.00,
+BC-5042,2026-10-15,Jaipur,TNT-SUM-4,"Summit 4-Person Tent",1,249.00,249.00,delivered,no,0.00,
+BC-5043,2026-10-10,Mumbai,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,yes,34.00,defective
+BC-5044,2026-09-17,Mumbai,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,shipped,no,0.00,
+BC-5045,2026-10-11,Kolkata,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",1,38.00,38.00,delivered,no,0.00,
+BC-5046,2026-09-27,Jaipur,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",1,38.00,38.00,delivered,no,0.00,
+BC-5047,2026-09-07,Jaipur,JKT-TRL-M,"Trailblazer Rain Jacket (M)",1,89.00,89.00,processing,no,0.00,
+BC-5048,2026-10-03,Hyderabad,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,yes,34.00,damaged in transit
+BC-5049,2026-09-14,Bengaluru,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,no,0.00,
+BC-5050,2026-09-19,Delhi,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,yes,34.00,damaged in transit
+BC-5051,2026-08-26,Pune,JKT-TRL-M,"Trailblazer Rain Jacket (M)",1,89.00,89.00,delivered,no,0.00,
+BC-5052,2026-09-25,Hyderabad,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5053,2026-09-09,Kolkata,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",1,38.00,38.00,delivered,no,0.00,
+BC-5054,2026-09-10,Pune,MUG-AUR-4,"Aurora Ceramic Mug Set (4)",1,34.00,34.00,delivered,yes,34.00,damaged in transit
+BC-5055,2026-09-15,Mumbai,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,processing,no,0.00,
+BC-5056,2026-09-19,Mumbai,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,no,0.00,
+BC-5057,2026-10-03,Chennai,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",2,38.00,76.00,delivered,no,0.00,
+BC-5058,2026-08-31,Chennai,AUD-NMB-1,"Nimbus Wireless Earbuds",1,59.99,59.99,delivered,yes,59.99,late delivery
+BC-5059,2026-08-26,Bengaluru,BTL-GLC-2,"Glacier Insulated Bottle (2-pack)",1,38.00,38.00,delivered,yes,38.00,damaged in transit

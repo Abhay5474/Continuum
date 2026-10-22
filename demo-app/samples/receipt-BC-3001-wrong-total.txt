@@ -1,0 +1,16 @@
+BRIGHTCART
+Order receipt
+
+Order: BC-3001
+Customer: Emily Carter
+Order date: 2026-10-15
+Delivered: 2026-10-18
+
+1 x Summit 4-Person Tent (TNT-SUM-4)
+Subtotal: 199.00
+Shipping: 0.00
+Total: 199.00
+Paid with Amex ending 1007
+
+Returns accepted within 30 days of delivery.
+brightcart.example  ·  support@brightcart.example

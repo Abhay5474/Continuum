@@ -1,0 +1,16 @@
+BRIGHTCART
+Order receipt
+
+Order: BC-1042
+Customer: Aisha Khan
+Order date: 2026-10-09
+Delivered: 2026-10-12
+
+1 x Aurora Ceramic Mug Set (4) (MUG-AUR-4)
+Subtotal: 34.00
+Shipping: 0.00
+Total: 34.00
+Paid with Visa ending 4242
+
+Returns accepted within 30 days of delivery.
+brightcart.example  ·  support@brightcart.example

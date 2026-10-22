@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brightcart Support Desk</title>
+  <meta name="description" content="An example application built on Continuum: a support desk for an online store.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff6b4a'/%3E%3Cpath d='M9 11h14l-2 10H11z' fill='white'/%3E%3Ccircle cx='13' cy='24' r='1.6' fill='white'/%3E%3Ccircle cx='20' cy='24' r='1.6' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><path d="M9 11h14l-2 10H11z"/><circle cx="13" cy="24" r="1.6"/><circle cx="20" cy="24" r="1.6"/></svg>
+      </span>
+      <span class="brand-name">Brightcart</span>
+      <span class="brand-sub">Support Desk</span>
+    </div>
+    <label class="customer-pick">
+      <span>Signed-in customer</span>
+      <select id="customer"></select>
+    </label>
+    <div class="top-right">
+      <span id="status" class="status" role="status">Connecting…</span>
+      <button id="toggle-inspector" class="btn ghost" aria-expanded="true">Inspector</button>
+    </div>
+  </header>
+
+  <div class="shell" id="shell">
+    <nav class="sidebar" aria-label="Scenes">
+      <a href="#chat" data-scene="chat"><span class="ico">💬</span><span>Live chat</span></a>
+      <a href="#inbox" data-scene="inbox"><span class="ico">📥</span><span>Ticket inbox</span></a>
+      <a href="#refunds" data-scene="refunds"><span class="ico">↩️</span><span>Refunds</span></a>
+      <a href="#receipts" data-scene="receipts"><span class="ico">🧾</span><span>Receipts &amp; photos</span></a>
+      <a href="#files" data-scene="files"><span class="ico">📊</span><span>Data files</span></a>
+      <a href="#coverage" data-scene="coverage"><span class="ico">✅</span><span>Feature coverage</span><span id="coverage-count" class="count"></span></a>
+      <div class="sidebar-note">
+        This app is <b>not</b> part of Continuum. It is what a developer builds with a Continuum API key —
+        every <span class="c-dot"></span> marker is something Continuum did.
+      </div>
+    </nav>
+
+    <main id="view" tabindex="-1"></main>
+
+    <aside class="inspector" id="inspector" aria-label="Continuum inspector">
+      <div class="insp-head">
+        <div>
+          <div class="insp-title"><span class="c-logo">C</span> Continuum inspector</div>
+          <div class="insp-sub" id="insp-sub">Every call this app makes to Continuum</div>
+        </div>
+        <button id="clear-calls" class="btn ghost small">Clear</button>
+      </div>
+      <ol class="calls" id="calls"></ol>
+    </aside>
+  </div>
+
+  <dialog id="dialog">
+    <form method="dialog" class="dialog-head">
+      <h2 id="dialog-title">Call</h2>
+      <button class="btn ghost small" aria-label="Close">✕</button>
+    </form>
+    <div id="dialog-body" class="dialog-body"></div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

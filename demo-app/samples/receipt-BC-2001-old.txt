@@ -1,0 +1,16 @@
+BRIGHTCART
+Order receipt
+
+Order: BC-2001
+Customer: Rohan Mehta
+Order date: 2026-08-29
+Delivered: 2026-09-01
+
+1 x Nimbus Wireless Earbuds (AUD-NMB-1)
+Subtotal: 59.99
+Shipping: 0.00
+Total: 59.99
+Paid with Mastercard ending 8812
+
+Returns accepted within 30 days of delivery.
+brightcart.example  ·  support@brightcart.example

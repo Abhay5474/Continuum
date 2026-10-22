@@ -1,0 +1,7 @@
+# Holds the Continuum API key and the webhook and specialist secrets.
+demo.config.json
+__pycache__/
+*.pyc
+
+# A sample file, not a log of this app.
+!samples/checkout-errors.log

@@ -1,0 +1,76 @@
+2026-10-21T09:00:12.606Z INFO  checkout-api  checkout started order=BC-5100 cart_items=2
+2026-10-21T09:00:14.937Z INFO  payment-gateway  charge ok in 785ms order=BC-5100
+2026-10-21T09:00:14.640Z INFO  checkout-api  order placed order=BC-5100
+2026-10-21T09:00:37.067Z INFO  checkout-api  checkout started order=BC-5101 cart_items=1
+2026-10-21T09:00:39.265Z INFO  payment-gateway  charge ok in 864ms order=BC-5101
+2026-10-21T09:00:39.239Z INFO  checkout-api  order placed order=BC-5101
+2026-10-21T09:00:50.734Z INFO  checkout-api  checkout started order=BC-5102 cart_items=4
+2026-10-21T09:00:53.856Z INFO  payment-gateway  charge ok in 862ms order=BC-5102
+2026-10-21T09:00:53.487Z INFO  checkout-api  order placed order=BC-5102
+2026-10-21T09:01:10.654Z INFO  checkout-api  checkout started order=BC-5103 cart_items=2
+2026-10-21T09:01:11.650Z INFO  payment-gateway  charge ok in 455ms order=BC-5103
+2026-10-21T09:01:11.888Z INFO  checkout-api  order placed order=BC-5103
+2026-10-21T09:01:32.399Z INFO  checkout-api  checkout started order=BC-5104 cart_items=1
+2026-10-21T09:02:50.386Z INFO  deploy  payment-gateway v2.14.0 rolled out (connection pool 50 -> 5)
+2026-10-21T09:01:35.795Z INFO  payment-gateway  charge ok in 365ms order=BC-5104
+2026-10-21T09:01:35.163Z INFO  checkout-api  order placed order=BC-5104
+2026-10-21T09:01:58.043Z INFO  checkout-api  checkout started order=BC-5105 cart_items=3
+2026-10-21T09:01:59.843Z INFO  payment-gateway  charge ok in 575ms order=BC-5105
+2026-10-21T09:01:59.484Z INFO  checkout-api  order placed order=BC-5105
+2026-10-21T09:02:23.736Z INFO  checkout-api  checkout started order=BC-5106 cart_items=4
+2026-10-21T09:02:26.807Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5106
+2026-10-21T09:02:28.404Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5106
+2026-10-21T09:02:28.745Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5106
+2026-10-21T09:02:51.455Z INFO  checkout-api  checkout started order=BC-5107 cart_items=2
+2026-10-21T09:02:53.099Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5107
+2026-10-21T09:02:54.139Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5107
+2026-10-21T09:02:54.506Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5107
+2026-10-21T09:03:05.264Z INFO  checkout-api  checkout started order=BC-5108 cart_items=4
+2026-10-21T09:03:08.875Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5108
+2026-10-21T09:03:10.431Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5108
+2026-10-21T09:03:10.519Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5108
+2026-10-21T09:03:10.853Z ERROR checkout-api  java.net.SocketTimeoutException: Read timed out
+2026-10-21T09:03:10.395Z     at com.brightcart.pay.GatewayClient.charge(GatewayClient.java:212)
+2026-10-21T09:03:10.587Z     at com.brightcart.checkout.CheckoutService.pay(CheckoutService.java:88)
+2026-10-21T09:03:26.546Z INFO  checkout-api  checkout started order=BC-5109 cart_items=4
+2026-10-21T09:03:29.237Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5109
+2026-10-21T09:03:31.698Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5109
+2026-10-21T09:03:31.937Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5109
+2026-10-21T09:03:36.876Z INFO  checkout-api  checkout started order=BC-5110 cart_items=3
+2026-10-21T09:03:39.687Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5110
+2026-10-21T09:03:42.167Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5110
+2026-10-21T09:03:42.715Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5110
+2026-10-21T09:03:57.987Z INFO  checkout-api  checkout started order=BC-5111 cart_items=1
+2026-10-21T09:04:00.671Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5111
+2026-10-21T09:04:01.648Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5111
+2026-10-21T09:04:01.851Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5111
+2026-10-21T09:04:24.273Z INFO  checkout-api  checkout started order=BC-5112 cart_items=3
+2026-10-21T09:04:25.064Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5112
+2026-10-21T09:04:27.874Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5112
+2026-10-21T09:04:27.654Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5112
+2026-10-21T09:04:27.495Z ERROR checkout-api  java.net.SocketTimeoutException: Read timed out
+2026-10-21T09:04:27.090Z     at com.brightcart.pay.GatewayClient.charge(GatewayClient.java:212)
+2026-10-21T09:04:27.352Z     at com.brightcart.checkout.CheckoutService.pay(CheckoutService.java:88)
+2026-10-21T09:04:34.420Z INFO  checkout-api  checkout started order=BC-5113 cart_items=2
+2026-10-21T09:04:35.300Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5113
+2026-10-21T09:04:37.787Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5113
+2026-10-21T09:04:37.425Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5113
+2026-10-21T09:04:45.045Z INFO  checkout-api  checkout started order=BC-5114 cart_items=1
+2026-10-21T09:04:47.735Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5114
+2026-10-21T09:04:50.338Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5114
+2026-10-21T09:04:50.564Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5114
+2026-10-21T09:05:03.517Z INFO  checkout-api  checkout started order=BC-5115 cart_items=2
+2026-10-21T09:05:04.317Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5115
+2026-10-21T09:05:05.078Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5115
+2026-10-21T09:05:05.110Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5115
+2026-10-21T09:05:29.548Z INFO  checkout-api  checkout started order=BC-5116 cart_items=1
+2026-10-21T09:05:30.994Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5116
+2026-10-21T09:05:32.298Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5116
+2026-10-21T09:05:32.625Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5116
+2026-10-21T09:05:32.269Z ERROR checkout-api  java.net.SocketTimeoutException: Read timed out
+2026-10-21T09:05:32.159Z     at com.brightcart.pay.GatewayClient.charge(GatewayClient.java:212)
+2026-10-21T09:05:32.706Z     at com.brightcart.checkout.CheckoutService.pay(CheckoutService.java:88)
+2026-10-21T09:05:38.888Z INFO  checkout-api  checkout started order=BC-5117 cart_items=3
+2026-10-21T09:05:40.368Z WARN  payment-gateway  upstream latency 28450ms region=ap-south-1 order=BC-5117
+2026-10-21T09:05:41.918Z ERROR payment-gateway  timeout after 30000ms calling https://pay.example/charge order=BC-5117
+2026-10-21T09:05:41.882Z ERROR checkout-api  checkout aborted code=PGW-504 order=BC-5117
