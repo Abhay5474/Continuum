@@ -94,6 +94,41 @@ class ProgramApiIT extends PostgresIT {
     }
 
     @Test
+    void theCompletionCallbackCarriesTheBodyTheAuthorWrote() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<String> received = new java.util.concurrent.atomic.AtomicReference<>();
+        com.sun.net.httpserver.HttpServer receiver = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        receiver.createContext("/done", ex -> {
+            received.set(new String(ex.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+        });
+        receiver.start();
+        try {
+            definitions.publish(dev, "with-callback", Map.of(
+                    "steps", List.of(Map.of("id", "only",
+                            "call", Map.of("method", "GET", "url", "http://localhost:" + port + "/api/meta"))),
+                    "onComplete", Map.of("method", "POST",
+                            "url", "http://127.0.0.1:" + receiver.getAddress().getPort() + "/done",
+                            "body", Map.of("orderId", "${input.orderId}", "note", "refund for ${input.orderId}"))));
+            String id = (String) read(call("POST", "/api/gateway/workflows/with-callback/run",
+                    Map.of("input", Map.of("orderId", "BC-7")), key)).get("workflowId");
+            for (int i = 0; i < 100 && received.get() == null; i++) {
+                workflowWorker.poll();
+                activityWorker.poll();
+                Thread.sleep(100);
+            }
+            Map<?, ?> body = json.readValue(received.get(), Map.class);
+            assertThat(body.get("orderId")).isEqualTo("BC-7");
+            assertThat(body.get("note")).isEqualTo("refund for BC-7");
+            assertThat(body.get("workflowId")).isEqualTo(id);
+            assertThat(body.get("status")).isEqualTo("COMPLETED");
+        } finally {
+            receiver.stop(0);
+        }
+    }
+
+    @Test
     void anotherAccountsKeyCannotSeeOrStopTheRun() throws Exception {
         definitions.publish(dev, "one-step", Map.of("steps", List.of(
                 Map.of("id", "only", "call", Map.of("method", "GET", "url", "http://localhost:" + port + "/api/meta")))));

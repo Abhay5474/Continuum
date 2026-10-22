@@ -131,10 +131,29 @@ public class DeclarativeWorkflow implements Workflow {
         // Push the result instead of making the caller poll. Delivered as a step,
         // so it retries and carries an idempotency key like any other call.
         if (spec.getOnComplete() != null) {
-            Map<String, Object> payload = new LinkedHashMap<>(out);
-            payload.put("workflowId", ctx.workflowId());
-            payload.put("status", "COMPLETED");
             WorkflowSpec.Call cb = spec.getOnComplete();
+            Object payload;
+            if (cb.getBody() == null) {
+                Map<String, Object> result = new LinkedHashMap<>(out);
+                result.put("workflowId", ctx.workflowId());
+                result.put("status", "COMPLETED");
+                payload = result;
+            } else {
+                // The author's body, resolved like any step's. It used to be
+                // ignored without a word: the callback always carried the raw
+                // result, so a receiver expecting the fields it was promised
+                // (an order id, say) got nulls. The run's id and status are
+                // added unless the author already named them.
+                Object resolved = Templates.resolve(cb.getBody(), scope);
+                if (resolved instanceof Map<?, ?> m) {
+                    Map<String, Object> merged = new LinkedHashMap<>();
+                    m.forEach((k, v) -> merged.put(String.valueOf(k), v));
+                    merged.putIfAbsent("workflowId", ctx.workflowId());
+                    merged.putIfAbsent("status", "COMPLETED");
+                    resolved = merged;
+                }
+                payload = resolved;
+            }
             Map<String, String> headers = new LinkedHashMap<>();
             cb.getHeaders().forEach((k, v) -> headers.put(k, String.valueOf(Templates.resolve(v, scope))));
             Map<String, Object> delivery = ctx.executeActivity(HttpStepActivity.TYPE,
