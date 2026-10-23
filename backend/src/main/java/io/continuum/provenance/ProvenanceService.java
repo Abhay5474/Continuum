@@ -44,11 +44,36 @@ public class ProvenanceService {
 
     private final DecisionRecordRepository records;
     private final ProvenanceSettingRepository settings;
+    private final io.continuum.persistence.repository.GatewayRequestLogRepository requestLog;
 
     public ProvenanceService(DecisionRecordRepository records,
-                             ProvenanceSettingRepository settings) {
+                             ProvenanceSettingRepository settings,
+                             io.continuum.persistence.repository.GatewayRequestLogRepository requestLog) {
         this.records = records;
         this.settings = settings;
+        this.requestLog = requestLog;
+    }
+
+    /** The public request id a caller is handed, as in {@code X-Continuum-Request-Id}. */
+    private static final java.util.regex.Pattern PUBLIC_ID = java.util.regex.Pattern.compile("req_(\\d{1,18})");
+
+    /**
+     * The trail's own id for a request.
+     *
+     * <p>A caller only ever sees the public id ({@code req_42}) on the answer it
+     * got, while the trail is filed under an internal one. Looking a trail up by
+     * the id on the answer found nothing, so the request log, which holds both,
+     * translates. Someone else's request reads as one with no trail.
+     */
+    private String trailId(String developerId, String requestId) {
+        var m = PUBLIC_ID.matcher(requestId == null ? "" : requestId.trim());
+        if (!m.matches()) {
+            return requestId;
+        }
+        return requestLog.findById(Long.parseLong(m.group(1)))
+                .filter(r -> r.getTraceId() != null && java.util.Objects.equals(r.getDeveloperId(), developerId))
+                .map(io.continuum.persistence.entity.GatewayRequestLogEntity::getTraceId)
+                .orElse(requestId);
     }
 
     /**
@@ -163,8 +188,9 @@ public class ProvenanceService {
     /** One request's decisions, in order. */
     @Transactional(readOnly = true)
     public Map<String, Object> graph(String developerId, String requestId) {
+        String trail = trailId(developerId, requestId);
         List<DecisionRecordEntity> rows =
-                records.findByRequestIdAndDeveloperIdOrderBySeqAsc(requestId, developerId);
+                records.findByRequestIdAndDeveloperIdOrderBySeqAsc(trail, developerId);
         List<Map<String, Object>> nodes = new ArrayList<>();
         double cost = 0;
         long latency = 0;
@@ -184,6 +210,7 @@ public class ProvenanceService {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("requestId", requestId);
+        out.put("traceId", trail);
         out.put("decisions", nodes);
         out.put("totalCost", cost);
         out.put("totalLatencyMs", latency);
@@ -199,8 +226,9 @@ public class ProvenanceService {
      */
     @Transactional(readOnly = true)
     public Map<String, Object> spans(String developerId, String requestId) {
+        String trail = trailId(developerId, requestId);
         List<DecisionRecordEntity> rows =
-                records.findByRequestIdAndDeveloperIdOrderBySeqAsc(requestId, developerId);
+                records.findByRequestIdAndDeveloperIdOrderBySeqAsc(trail, developerId);
         List<Map<String, Object>> spans = new ArrayList<>();
         for (DecisionRecordEntity r : rows) {
             Decision d = new Decision(Decision.Stage.valueOf(r.getStage()), r.getChoice(),
@@ -208,8 +236,8 @@ public class ProvenanceService {
                     r.getAlternatives() == null ? List.of() : List.of(r.getAlternatives().split(", ")),
                     r.getCostDelta(), r.getLatencyMs());
             Map<String, Object> span = new LinkedHashMap<>(d.asSpan());
-            span.put("traceId", requestId);
-            span.put("spanId", requestId + "-" + r.getSeq());
+            span.put("traceId", trail);
+            span.put("spanId", trail + "-" + r.getSeq());
             spans.add(span);
         }
         Map<String, Object> out = new LinkedHashMap<>();
