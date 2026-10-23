@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { visibleInterval } from "../system/poll";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { api, API_ORIGIN } from "../api";
 import { Chip } from "../system/hub";
 import { Donut } from "../system/charts";
 import type { CostReport, Meta, Stats, WorkflowSummary } from "../types";
@@ -128,7 +128,8 @@ export default function Dashboard() {
               >
                 <CodeBlock
                   language="bash"
-                  code={`curl -X POST localhost:8080/api/workflows \\
+                  code={`curl -X POST ${API_ORIGIN}/api/workflows \\
+  -H "Authorization: Bearer $CONTINUUM_SESSION" \\
   -H 'Content-Type: application/json' \\
   -d '{"workflowType":"DurableDemo","input":{"name":"demo"}}'`}
                 />

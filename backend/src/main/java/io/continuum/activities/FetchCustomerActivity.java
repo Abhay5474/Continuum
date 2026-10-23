@@ -30,7 +30,8 @@ public class FetchCustomerActivity implements Activity {
         chaos.maybeFailActivity(TYPE);
         Input in = ctx.input(inputJson, Input.class);
         String id = in.customerId();
-        long seed = Math.abs(id.hashCode());
+        // Widened first: Math.abs(Integer.MIN_VALUE) is still negative.
+        long seed = Math.abs((long) id.hashCode());
         String tier = switch ((int) (seed % 3)) {
             case 0 -> "FREE";
             case 1 -> "PRO";

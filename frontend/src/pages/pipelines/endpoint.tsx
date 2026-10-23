@@ -1,6 +1,7 @@
 import { Micro, Note, Switch } from "../../system/primitives";
 import { Code } from "../../system/hub";
 import { Pipeline } from "./types";
+import { API_ORIGIN } from "../../api";
 
 /* -------------------------------------------------------------------------- *
  * Endpoint
@@ -28,7 +29,7 @@ export function Endpoint({
         <Micro>The call your application makes</Micro>
         <div className="mt-1.5">
           <Code>
-{`curl -X POST https://your-continuum/api/gateway/pipeline/${p.name} \\
+{`curl -X POST ${API_ORIGIN}/api/gateway/pipeline/${p.name} \\
   -H "Authorization: Bearer cnt_live_..." \\
   -H "content-type: application/json" \\
   -d '{"input":{"image":"<base64>"},"prompt":"What should I do?"}'`}

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { CodeBlock, ThemeToggle } from "../components/ui";
+import { API_ORIGIN } from "../api";
 import { Magnetic } from "../system/motion";
 import { BrandMark } from "../system/brand";
 import { useLiquidSurface } from "../system/primitives";
@@ -250,7 +251,7 @@ export default function Landing() {
         <div className="mx-auto max-w-2xl text-left">
           <CodeBlock
             language="bash"
-            code={`curl https://your-continuum/api/gateway/chat \\
+            code={`curl ${API_ORIGIN}/api/gateway/chat \\
   -H "Authorization: Bearer cnt_live_…" \\
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello!"}]}'`}
           />

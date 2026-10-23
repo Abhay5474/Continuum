@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CodeBlock, ThemeToggle } from "../components/ui";
+import { API_ORIGIN } from "../api";
 
 /**
  * Developer docs — Quickstart (curl + JS + Python), API reference, and a short
@@ -65,7 +66,7 @@ export default function Docs() {
               <div className="mt-3 grid gap-3">
                 <CodeBlock
                   language="bash"
-                  code={`curl https://your-continuum/api/gateway/chat \\
+                  code={`curl ${API_ORIGIN}/api/gateway/chat \\
   -H "Authorization: Bearer $CONTINUUM_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -113,7 +114,7 @@ export default function Docs() {
                 <CodeBlock
                   language="javascript"
                   code={`const res = await fetch(
-  "https://your-continuum/api/gateway/chat",
+  "${API_ORIGIN}/api/gateway/chat",
   {
     method: "POST",
     headers: {
@@ -143,7 +144,7 @@ console.log(data.response); // or data.choices[0].message.content`}
                   code={`import os, requests
 
 r = requests.post(
-    "https://your-continuum/api/gateway/chat",
+    "${API_ORIGIN}/api/gateway/chat",
     headers={"Authorization": f"Bearer {os.environ['CONTINUUM_KEY']}"},
     json={
         "model": "auto",
@@ -219,12 +220,12 @@ print(data["response"])  # or data["choices"][0]["message"]["content"]`}
               language="bash"
               code={`# Publish appends a new version; in-flight runs keep executing the
 # version they started with, which is what makes replay deterministic.
-curl -X POST https://api.continuum.dev/api/portal/developer/workflows/definitions/order-flow \\
+curl -X POST ${API_ORIGIN}/api/portal/developer/workflows/definitions/order-flow \\
   -H "Authorization: Bearer $CONTINUUM_SESSION" \\
   -H "Content-Type: application/json" \\
   -d @order-flow.json
 
-curl -X POST https://api.continuum.dev/api/portal/developer/workflows/definitions/order-flow/run \\
+curl -X POST ${API_ORIGIN}/api/portal/developer/workflows/definitions/order-flow/run \\
   -H "Authorization: Bearer $CONTINUUM_SESSION" \\
   -H "Content-Type: application/json" \\
   -d '{"input": {"sku": "WIDGET-1", "amount": 4999}}'

@@ -9,6 +9,11 @@ import type {
 
 // A pasted URL often ends in "/"; every path below starts with one.
 export const BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
+
+/** The API's address as an outside caller writes it, for copyable examples. */
+export const API_ORIGIN = /^https?:\/\//.test(BASE)
+  ? BASE
+  : (typeof window === "undefined" ? "" : window.location.origin) + BASE;
 const SESSION_KEY = "continuum.portal.session";
 const OPERATOR_KEY = "continuum.portal.operator";
 
