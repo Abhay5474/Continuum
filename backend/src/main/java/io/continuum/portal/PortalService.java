@@ -61,18 +61,33 @@ public class PortalService {
                 .orElse(developerId);
     }
 
+    /** One "@", something on each side, a dot in the domain; deliverability is not checked. */
+    private static final java.util.regex.Pattern EMAIL =
+            java.util.regex.Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
+
     @Transactional
     public LoginResult signup(String name, String email, String password) {
         if (email == null || email.isBlank() || password == null || password.length() < 6) {
             throw new IllegalArgumentException("Email and a password of at least 6 characters are required");
         }
+        email = email.trim();
+        if (!EMAIL.matcher(email).matches() || email.length() > 200) {
+            throw new IllegalArgumentException("Enter a valid email address (up to 200 characters)");
+        }
+        if (password.length() > 1024) {
+            throw new IllegalArgumentException("Passwords can be up to 1024 characters");
+        }
+        if (name != null && name.strip().length() > 200) {
+            throw new IllegalArgumentException("Names can be up to 200 characters");
+        }
+        name = name == null || name.isBlank() ? null : name.strip();
         if (emailLock != null) {
             emailLock.lock(email); // check-then-insert, made atomic per address
         }
         if (developers.existsByEmailIgnoreCase(email)) {
             throw new IllegalArgumentException("An account with this email already exists");
         }
-        DeveloperEntity dev = developers.save(new DeveloperEntity(name == null ? email : name, email.trim()));
+        DeveloperEntity dev = developers.save(new DeveloperEntity(name == null ? email : name, email));
         auth.save(new DeveloperAuthEntity(dev.getId(), passwordHasher.hash(password)));
         return new LoginResult(dev.getId(), dev.getName(), dev.getEmail(),
                 sessions.issue(dev.getId(), PortalSessionService.Role.DEVELOPER));

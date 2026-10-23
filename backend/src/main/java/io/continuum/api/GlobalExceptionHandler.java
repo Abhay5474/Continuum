@@ -119,9 +119,33 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> conflict(org.springframework.dao.DataIntegrityViolationException e) {
         log.warn("Write conflict: {}", e.getMostSpecificCause().getMessage());
+        // Every integrity error used to read as a duplicate that is safe to
+        // retry, including a value too long for its column, where retrying
+        // can never succeed. The SQL state says which it was.
+        String state = sqlState(e);
+        if ("22001".equals(state)) {
+            return ResponseEntity.badRequest().body(body(
+                    "A value in this request is longer than allowed. Shorten it and try again.", 400));
+        }
+        if ("23502".equals(state)) {
+            return ResponseEntity.badRequest().body(body("A required value is missing from this request.", 400));
+        }
+        if ("23503".equals(state)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body(
+                    "This refers to something that does not exist (any more).", 409));
+        }
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body(
                 "This conflicts with a record that was just written, probably by the same request sent twice. "
                         + "Retrying is safe.", 409));
+    }
+
+    private static String sqlState(Throwable e) {
+        for (Throwable t = e; t != null && t.getCause() != t; t = t.getCause()) {
+            if (t instanceof java.sql.SQLException sql && sql.getSQLState() != null) {
+                return sql.getSQLState();
+            }
+        }
+        return null;
     }
 
     private static String fieldPath(com.fasterxml.jackson.databind.exc.MismatchedInputException mi) {
