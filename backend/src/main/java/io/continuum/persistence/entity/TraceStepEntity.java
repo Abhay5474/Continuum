@@ -74,7 +74,10 @@ public class TraceStepEntity {
         this.developerId = developerId;
         this.ordinal = ordinal;
         this.kind = kind;
-        this.label = label;
+        // Clipped to the column. A failed insert here would not just lose the
+        // step: it aborts the transaction the whole pipeline run is in.
+        String l = label == null || label.isBlank() ? kind.name() : label;
+        this.label = l.length() > 200 ? l.substring(0, 199) + "…" : l;
         this.detail = detail;
         this.status = status == null ? "OK" : status;
         this.confidence = confidence;

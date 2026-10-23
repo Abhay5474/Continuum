@@ -159,11 +159,6 @@ public class PipelineEntity {
         return Math.max(0, Math.min(1, v));
     }
 
-    public void recordRun() {
-        this.runs++;
-        touch();
-    }
-
     private void touch() {
         this.updatedAt = Instant.now();
     }

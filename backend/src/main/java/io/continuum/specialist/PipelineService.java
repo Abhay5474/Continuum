@@ -79,7 +79,11 @@ public class PipelineService {
                       Map<String, Object> verification) {
     }
 
-    @Transactional
+    /**
+     * Not one transaction: a run waits on specialists and a model for as long as
+     * they take, and holding a database connection all that time empties the
+     * pool under a handful of concurrent runs. Each write commits on its own.
+     */
     public Run run(String developerId, String pipelineName, Map<String, Object> input,
                    String userPrompt) {
         long start = System.nanoTime();
@@ -92,6 +96,17 @@ public class PipelineService {
         }
 
         String traceId = traces.newTrace();
+        try {
+            return run(p, developerId, traceId, start, input, userPrompt);
+        } finally {
+            // On every exit, a failed model call included. The step counter is
+            // kept per trace and nothing else would ever release it.
+            traces.finish(traceId);
+        }
+    }
+
+    private Run run(PipelineEntity p, String developerId, String traceId, long start,
+                    Map<String, Object> input, String userPrompt) {
         traces.step(traceId, developerId, TraceStepEntity.Kind.INPUT,
                 describeInput(p.getInputKind()),
                 Map.of("kind", p.getInputKind(), "pipeline", p.getName()), "OK", null, 0, 0);
@@ -202,10 +217,8 @@ public class PipelineService {
             traces.step(traceId, developerId, TraceStepEntity.Kind.OUTPUT,
                     "Declined without calling a model",
                     Map.of("characters", canned.length()), "DECLINED", null, 0, 0);
-            p.recordRun();
-            repo.save(p);
+            repo.recordRun(p.getId(), java.time.Instant.now());
             Map<String, Object> declinedChain = traces.trace(developerId, traceId);
-            traces.finish(traceId);
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> declinedSteps =
                     (List<Map<String, Object>>) declinedChain.get("steps");
@@ -279,10 +292,8 @@ public class PipelineService {
                 Map.of("characters", finalAnswer == null ? 0 : finalAnswer.length()),
                 "OK", null, 0, 0);
 
-        p.recordRun();
-        repo.save(p);
+        repo.recordRun(p.getId(), java.time.Instant.now());
         Map<String, Object> chain = traces.trace(developerId, traceId);
-        traces.finish(traceId);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> steps = (List<Map<String, Object>>) chain.get("steps");
