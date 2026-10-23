@@ -91,8 +91,8 @@ def port_in_use(host: str, port: int) -> bool:
         return s.connect_ex(("127.0.0.1" if host in ("0.0.0.0", "") else host, port)) == 0
 
 
-SAMPLE_RECEIPT = ("BRIGHTCART Order receipt\nOrder: BC-1042\nCustomer: Aisha Khan\n"
-                  "1 x Aurora Ceramic Mug Set (4)\nTotal: 34.00\n")
+SAMPLE_RECEIPT = ("BRIGHTCART Order receipt\nOrder: BC-1042\nCustomer: Priya Deshpande\n"
+                  "1 x Jaipur Blue Pottery Mug Set (4)\nTotal: ₹1,199.00\n")
 
 
 def main() -> None:

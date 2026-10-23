@@ -1,16 +1,17 @@
 BRIGHTCART
-Order receipt
+Tax invoice / order receipt
 
 Order: BC-2001
 Customer: Rohan Mehta
 Order date: 2026-08-29
-Delivered: 2026-09-01
+Delivered: 2026-09-02
 
-1 x Nimbus Wireless Earbuds (AUD-NMB-1)
-Subtotal: 59.99
-Shipping: 0.00
-Total: 59.99
-Paid with Mastercard ending 8812
+1 x Wireless Earbuds, 40 h battery (AUD-WLS-1)
+Subtotal: ₹1,499.00
+Delivery: ₹0.00
+Total: ₹1,499.00
+Paid with ICICI Mastercard ending 8812
+GSTIN 27AABCB1234C1Z5 (prices include GST)
 
-Returns accepted within 30 days of delivery.
-brightcart.example  ·  support@brightcart.example
+Easy returns within 30 days of delivery.
+brightcart.in  ·  support@brightcart.in  ·  1800-123-4567

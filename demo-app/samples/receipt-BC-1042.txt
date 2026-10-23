@@ -1,16 +1,17 @@
 BRIGHTCART
-Order receipt
+Tax invoice / order receipt
 
 Order: BC-1042
-Customer: Aisha Khan
-Order date: 2026-10-09
-Delivered: 2026-10-12
+Customer: Priya Deshpande
+Order date: 2026-10-10
+Delivered: 2026-10-13
 
-1 x Aurora Ceramic Mug Set (4) (MUG-AUR-4)
-Subtotal: 34.00
-Shipping: 0.00
-Total: 34.00
-Paid with Visa ending 4242
+1 x Jaipur Blue Pottery Mug Set (4) (MUG-JBP-4)
+Subtotal: ₹1,199.00
+Delivery: ₹0.00
+Total: ₹1,199.00
+Paid with UPI (priya.d@okhdfc)
+GSTIN 27AABCB1234C1Z5 (prices include GST)
 
-Returns accepted within 30 days of delivery.
-brightcart.example  ·  support@brightcart.example
+Easy returns within 30 days of delivery.
+brightcart.in  ·  support@brightcart.in  ·  1800-123-4567

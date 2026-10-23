@@ -23,43 +23,43 @@ from datetime import datetime, timezone
 # the order the coverage panel lists them.
 # ---------------------------------------------------------------------------
 FEATURES = [
-    # key, name, how this app triggers it, where it shows in Continuum's console
-    ("gateway", "AI gateway", "Any chat message", "Gateway → request feed"),
-    ("streaming", "Streaming", "Chat with “Stream” on", "Gateway"),
-    ("tools", "Tool calling", "Ask about an order in chat", "Gateway"),
-    ("json-mode", "JSON mode", "Triage a ticket", "Gateway"),
-    ("vision", "Vision", "Ask about a photo", "Gateway"),
-    ("routing-modes", "Routing modes", "Pick a mode in chat, or draft a careful reply", "Routing"),
-    ("failover", "Provider failover", "Console Chaos Lab: fail the primary provider, then chat", "Gateway, Chaos Lab"),
-    ("model-catalogue", "Model catalogue", "Chat → Models", "Models"),
-    ("prompt-firewall", "Prompt firewall", "Send a card number or PIN; triage T-503 or T-504", "Prompt Guard"),
-    ("prompt-compression", "Prompt compression", "Console: turn Prompt Compression on, then triage T-505 (a pasted log)", "Prompt Guard"),
-    ("context-transformers", "Context transformers", "Data files → Transform, or ask about a file", "Context"),
-    ("semantic-cache", "Semantic cache", "Live chat → Help centre: ask a question twice, or reworded", "Semantic Cache"),
-    ("context-optimizer", "Context optimizer", "Keep one chat going for a while: older turns get paged out", "Context Optimizer"),
-    ("memory", "Long-term memory", "Tell the assistant a preference", "Memory"),
-    ("adaptive-policy", "Adaptive policy", "Console: turn Adaptive Policy on, then chat", "Adaptive Policy"),
-    ("model-cascade", "Model cascade", "Any chat message (setup turns the cascade on)", "Model Cascade"),
-    ("quality-gate", "Quality gate", "Any chat message (setup turns the gate on, monitoring)", "Answer Assurance → Quality gate"),
-    ("confidence", "Confidence", "Draft a careful reply", "Answer Assurance → Confidence"),
-    ("verification-engine", "Verification engine", "Console: turn the Verification Engine on, then chat", "Verification Engine"),
-    ("semantic-breaker", "Semantic breaker", "Watches every answer; trips when a model degrades (try AI Chaos Lab)", "Answer Assurance → Breaker"),
-    ("hedging", "Hedging", "Operator console: turn hedging on, then chat", "Routing → Dispatch"),
-    ("degradation", "Degradation ladder", "Console Chaos Lab: fail every provider, then chat", "Decision Provenance"),
-    ("admission", "Admission control", "Triage all tickets at once (bulk)", "Traffic Control → Admission"),
-    ("priority-deadlines", "Priority & deadlines", "Urgent tickets carry a deadline", "Traffic Control → Priority"),
-    ("cost-limits", "Cost limits", "Console: set a tight cost limit, then Triage all", "Traffic Control → Cost limits"),
-    ("workflows", "Durable workflows", "Refunds → Start refund", "Workflows"),
-    ("saga", "Saga compensation", "Refund with the courier down, or cancel during the hold", "Workflows → Compensation"),
-    ("webhooks", "Signed webhooks", "Any refund finishing", "Developer portal → Webhooks"),
-    ("exactly-once", "Exactly-once steps", "Refund with payments losing responses", "Workflows → run page"),
-    ("loop-detection", "Loop detection", "Chat → Loop drill, or an agent repeating itself", "Loop Detection"),
-    ("pipelines", "Pipelines", "Receipts → Check a receipt", "Pipelines"),
-    ("specialists", "Specialists", "Receipts → Check a receipt (this app's own reader)", "Specialists"),
-    ("autopilot", "Autopilot feedback", "Rate an answer 👍 / 👎", "Routing → Optimization"),
-    ("ai-chaos", "AI chaos", "Console AI Chaos Lab: arm an experiment, then chat", "AI Chaos Lab"),
-    ("provenance", "Decision provenance", "Any answer: quote its request id", "Decision Provenance"),
-    ("billing", "Plans & quota", "Every request counts against the plan", "Billing"),
+    # key, name, how the tour shows it, where it shows in Continuum's console
+    ("gateway", "AI gateway", "Ask the shop assistant anything", "Gateway → request feed"),
+    ("streaming", "Streaming", "The assistant types its answer as it arrives", "Gateway"),
+    ("tools", "Tool calling", "Ask the assistant where an order is", "Gateway"),
+    ("json-mode", "JSON mode", "Support desk → AI triage", "Gateway"),
+    ("vision", "Vision", "Send the assistant a photo of a cracked mug", "Gateway"),
+    ("model-catalogue", "Model catalogue", "Back office → AI models", "Models"),
+    ("prompt-firewall", "Prompt firewall", "Paste a card number, or triage the injection ticket", "Prompt Guard"),
+    ("loop-detection", "Loop detection", "An agent that keeps repeating itself is stopped", "Loop Detection"),
+    ("cost-limits", "Cost limits", "A tight limit, then AI triage of the whole inbox", "Traffic Control → Cost limits"),
+    ("semantic-cache", "Semantic cache", "Help centre: the same question, reworded", "Semantic Cache"),
+    ("model-cascade", "Model cascade", "An easy question answered by a small model", "Model Cascade"),
+    ("prompt-compression", "Prompt compression", "A chat with a long system prompt", "Prompt Compression"),
+    ("context-optimizer", "Context optimizer", "A question at the end of a 62-message chat", "Context Optimizer"),
+    ("context-transformers", "Context transformers", "Back office → prepare a CSV for AI", "Context"),
+    ("routing-modes", "Routing modes", "Support desk → careful reply draft", "Routing"),
+    ("quality-gate", "Quality gate", "Every answer gets a quality score", "Answer Assurance → Quality gate"),
+    ("confidence", "Confidence", "Support desk → careful reply draft", "Answer Assurance → Confidence"),
+    ("verification-engine", "Verification engine", "A team of AI agents checks the answer", "Verification Engine"),
+    ("semantic-breaker", "Semantic breaker", "A model starts giving bad answers and is benched", "Answer Assurance → Breaker"),
+    ("failover", "Provider failover", "The main AI provider goes down mid-demo", "Gateway, Chaos Lab"),
+    ("degradation", "Degradation ladder", "Every AI provider fails at once", "Decision Provenance"),
+    ("hedging", "Hedging", "A slow provider is raced by a second one", "Routing → Dispatch"),
+    ("ai-chaos", "AI chaos", "A hallucination drill on the live assistant", "AI Chaos Lab"),
+    ("admission", "Admission control", "AI triage of the whole inbox at once", "Traffic Control → Admission"),
+    ("priority-deadlines", "Priority & deadlines", "An urgent ticket with a deadline", "Traffic Control → Priority"),
+    ("billing", "Plans & quota", "Back office → plan and usage", "Billing"),
+    ("memory", "Long-term memory", "Tell the assistant a delivery preference", "Memory"),
+    ("adaptive-policy", "Adaptive policy", "Teach a house rule, then chat", "Adaptive Policy"),
+    ("autopilot", "Autopilot feedback", "Rate an answer 👍 or 👎", "Routing → Optimization"),
+    ("workflows", "Durable workflows", "Return an order: the refund runs step by step", "Workflows"),
+    ("saga", "Saga compensation", "The courier is down: completed steps are undone", "Workflows → Compensation"),
+    ("exactly-once", "Exactly-once steps", "Payments lose a reply: refunded once, not twice", "Workflows → run page"),
+    ("webhooks", "Signed webhooks", "Continuum tells the store the refund is done", "Developer portal → Webhooks"),
+    ("pipelines", "Pipelines", "Back office → check a receipt", "Pipelines"),
+    ("specialists", "Specialists", "The store's own receipt reader finds a wrong total", "Specialists"),
+    ("provenance", "Decision provenance", "“Why this answer?” on any reply", "Decision Provenance"),
 ]
 FEATURE_NAMES = {k: n for k, n, _, _ in FEATURES}
 
@@ -474,26 +474,23 @@ def detect(path: str, body, status: int, parsed, applied: list) -> list:
 
     if path.startswith("/v1/chat/completions") or path.startswith("/api/gateway/chat"):
         add("gateway", "OpenAI-compatible chat")
-        add("billing", "counted against the plan")
         if body.get("stream"):
             add("streaming", "first token after %s ms" % (parsed or {}).get("first_token_ms") if isinstance(parsed, dict) else "")
         if body.get("tools"):
             calls = _tool_calls(parsed)
-            add("tools", ("asked to run " + ", ".join(calls)) if calls else "tools offered")
+            if calls:
+                add("tools", "the model asked the store to run " + ", ".join(calls))
         if body.get("response_format"):
             add("json-mode", "answer constrained to JSON")
         if _has_image(body):
             add("vision", "image sent with the question")
         if body.get("continuum_routing_mode"):
             add("routing-modes", body["continuum_routing_mode"])
-        if body.get("continuum_deadline_ms") or body.get("continuum_criticality"):
-            add("priority-deadlines", "%s, deadline %s ms" % (body.get("continuum_criticality", "NORMAL"),
-                                                             body.get("continuum_deadline_ms", "none")))
-        if body.get("continuum_criticality"):
-            add("admission", "criticality " + body["continuum_criticality"])
-        rid = meta.get("request_id")
-        if rid:
-            add("provenance", rid)
+        crit = body.get("continuum_criticality")
+        deadline = body.get("continuum_deadline_ms")
+        if deadline or crit in ("CRITICAL", "BACKGROUND"):
+            words = {"CRITICAL": "critical priority", "BACKGROUND": "background priority"}.get(crit, "normal priority")
+            add("priority-deadlines", words + (f", answer needed within {deadline / 1000:g} s" if deadline else ""))
         reason = str(meta.get("routing_reason") or "")
         if meta.get("failovers"):
             add("failover", f"{meta['failovers']} failover(s) absorbed")

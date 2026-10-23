@@ -23,7 +23,7 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "lookup_order",
         "description": "Look up one Brightcart order by its id (like BC-1042): item, status, delivery, "
-                       "amount and whether it can be returned.",
+                       "amount in rupees and whether it can be returned.",
         "parameters": {"type": "object", "properties": {"order_id": {"type": "string"}}, "required": ["order_id"]}}},
     {"type": "function", "function": {
         "name": "list_my_orders",
@@ -52,8 +52,8 @@ def memory_scope(customer_id: str) -> str:
 
 
 def system_prompt(cust: dict | None, memories: list) -> str:
-    who = (f"You are helping {cust['name']} ({cust['tier']} member since {cust['since']}, {cust['city']}, "
-           f"customer id {cust['id']})." if cust else "The customer is not signed in.")
+    who = (f"You are helping {cust['name']} ({cust['tier']} member since {cust['since']}, {cust['city']} "
+           f"{cust['pin']}, customer id {cust['id']})." if cust else "The customer is not signed in.")
     known = ""
     if memories:
         known = "\nWhat we remember about this customer from earlier conversations:\n" + \
@@ -62,8 +62,9 @@ def system_prompt(cust: dict | None, memories: list) -> str:
         "You are Brightcart's customer support assistant. Be warm, brief and specific. "
         "Use the tools to look up orders instead of guessing; never invent order details. "
         f"{who}{known}\n\n{store.POLICY}\n\n"
-        "If a message contains a placeholder like [REDACTED_CARD_NUMBER] or [REDACTED_CREDENTIAL], the customer "
-        "shared sensitive data that our privacy filter removed: tell them kindly you never need it, and carry on."
+        "Prices are in Indian rupees (₹). If a message contains a placeholder like [REDACTED_CARD_NUMBER] or "
+        "[REDACTED_CREDENTIAL], the customer shared sensitive data that our privacy filter removed: tell them kindly "
+        "you never need it, and carry on."
     )
 
 
@@ -130,8 +131,8 @@ class Assistant:
                 return {"error": f"No order {args.get('order_id')}"}
             if o["customer"] != customer_id:
                 return {"error": "That order belongs to a different customer; ask them to sign in."}
-            view = {k: o[k] for k in ("id", "item", "status", "amount", "card", "returnable", "returnable_reason")
-                    if k in o}
+            view = {k: o[k] for k in ("id", "item", "status", "amount_text", "card", "returnable",
+                                      "returnable_reason") if k in o}
             view.update({k: o[k] for k in ("delivered_on", "eta", "refund") if o.get(k)})
             return view
         if name == "list_my_orders":
@@ -175,6 +176,27 @@ class Assistant:
             "loop": loop,
         }
 
+    # ---- a long conversation -------------------------------------------------
+
+    def long_conversation(self, customer_id: str, question: str) -> dict:
+        """One more question at the end of a 40-message conversation.
+
+        Long chats are where context costs pile up: every new question resends
+        everything said so far. Continuum's context optimizer pages the old
+        turns out and keeps what the new question needs.
+        """
+        cust = store.customer(customer_id) or store.customer("C-1002")
+        transcript = long_transcript(cust)
+        question = question or ("Going back to the very start of our chat: which of my orders was stuck, and what "
+                                "did you say you would do about it?")
+        messages = [{"role": "system", "content": system_prompt(cust, [])}] + transcript + \
+                   [{"role": "user", "content": question}]
+        answer = self.c.chat(messages, action=f"Assistant answers {cust['name']} after a long chat")
+        msg = ((answer.get("choices") or [{}])[0].get("message") or {})
+        return {"reply": (msg.get("content") or "").strip(), "meta": answer.get("continuum") or {},
+                "model": answer.get("model"), "question": question,
+                "transcript": transcript, "chars": sum(len(m["content"]) for m in transcript)}
+
     # ---- loop drill --------------------------------------------------------
 
     def loop_drill(self) -> dict:
@@ -195,11 +217,11 @@ class Assistant:
 
     # ---- triage ------------------------------------------------------------
 
-    def triage(self, ticket: dict, *, bulk: bool = False) -> dict:
+    def triage(self, ticket: dict, *, bulk: bool = False, deadline_ms: int | None = None) -> dict:
         cust = store.customer(ticket.get("customer"))
         urgent_hint = bool(cust and cust.get("tier") == "Platinum") or ticket.get("channel") == "live chat"
         criticality = "BACKGROUND" if bulk else ("CRITICAL" if urgent_hint else "NORMAL")
-        deadline = 15000 if (urgent_hint and not bulk) else None
+        deadline = deadline_ms or (15000 if (urgent_hint and not bulk) else None)
         prompt = [
             {"role": "system", "content":
                 "You triage Brightcart support tickets. Reply with JSON only: "
@@ -220,10 +242,10 @@ class Assistant:
                 "criticality": criticality, "deadlineMs": deadline, "meta": answer.get("continuum") or {},
                 "model": answer.get("model")}
 
-    def draft_reply(self, ticket: dict, careful: bool) -> dict:
+    def draft_reply(self, ticket: dict, careful: bool, quick: bool = False) -> dict:
         cust = store.customer(ticket.get("customer"))
         orders = store.orders_for(cust["id"]) if cust else []
-        context = "\n".join(f"- {o['id']}: {o['item']}, {o['status']}, {o['amount']:.2f}, "
+        context = "\n".join(f"- {o['id']}: {o['item']}, {o['status']}, {o['amount_text']}, "
                             f"{'returnable' if o['returnable'] else 'not returnable'} ({o['returnable_reason']})"
                             for o in orders)
         messages = [
@@ -233,10 +255,11 @@ class Assistant:
                                         f"Their orders:\n{context or '- none'}\n\n"
                                         f"Ticket {ticket['id']}: {ticket['subject']}\n{ticket['body']}"},
         ]
-        answer = self.c.chat(messages, action=f"Draft {'a careful' if careful else 'a'} reply to {ticket['id']}",
-                             routing_mode="HIGH_QUALITY" if careful else None, measure=careful)
+        mode = "HIGH_QUALITY" if careful else ("LOW_COST" if quick else None)
+        answer = self.c.chat(messages, action=f"Draft {'a careful' if careful else 'a quick' if quick else 'a'} "
+                                              f"reply to {ticket['id']}", routing_mode=mode, measure=careful)
         msg = ((answer.get("choices") or [{}])[0].get("message") or {})
-        return {"ticket": ticket["id"], "draft": (msg.get("content") or "").strip(),
+        return {"ticket": ticket["id"], "draft": (msg.get("content") or "").strip(), "mode": mode,
                 "meta": answer.get("continuum") or {}, "model": answer.get("model")}
 
     # ---- help centre ----------------------------------------------------------
@@ -287,6 +310,85 @@ class Assistant:
         msg = ((answer.get("choices") or [{}])[0].get("message") or {})
         return {"answer": (msg.get("content") or "").strip(), "meta": answer.get("continuum") or {},
                 "model": answer.get("model")}
+
+
+_CARE = {
+    "Kitchen": "In the box you get the product, a printed user manual in English and Hindi, and the warranty card; "
+               "register it on our website within 15 days to activate the brand warranty. Wash removable parts by "
+               "hand with mild soap, dry them fully before storing, and avoid steel scrubbers on painted or glazed "
+               "surfaces. For anything electrical, use a grounded socket and do not run it continuously for more "
+               "than a few minutes at a time, which keeps the motor cool and lasting longer.",
+    "Fashion": "It is made in small batches by artisan clusters we work with directly, so slight variations in "
+               "colour and print are part of the craft rather than defects. Dry clean the first wash, then hand "
+               "wash in cold water with a mild detergent, dry in the shade and iron on the reverse at medium heat. "
+               "Our size guide lists chest, length and shoulder measurements for every size, and exchanges for a "
+               "different size are free within 30 days as long as the tags are still attached.",
+    "Electronics": "In the box you get the earbuds, the charging case, a USB-C cable and three sizes of ear tips. "
+                   "The brand warranty is one year from delivery and covers battery and charging faults; register "
+                   "it with the invoice we email you. Charge the case fully before first use, keep it away from "
+                   "moisture, and update the firmware from the companion app for better call quality and "
+                   "fewer connection drops.",
+    "Outdoor": "Everything comes in a carry bag with a printed setup guide, and the brand covers manufacturing "
+               "defects for one year. Before a trip, pitch or test it once at home so you know every part is "
+               "there, dry it completely before packing it away to prevent mildew, and keep it out of direct "
+               "sun when stored. Spare parts such as poles, pegs and lids can be ordered from the brand's "
+               "service centre with your order number.",
+    "Home": "It is block-printed or hand-finished by artisans in Rajasthan and Uttar Pradesh, so each piece is "
+            "slightly different. Wash in cold water separately for the first few washes, dry in the shade and "
+            "avoid bleach. Brass items can be cleaned with a paste of tamarind or lemon with salt and wiped dry "
+            "to keep their shine through the festive season and for years after it.",
+}
+
+
+def long_transcript(cust: dict) -> list:
+    """Forty messages of a customer planning their Diwali shopping, opening with a stuck order."""
+    first = cust["name"].split()[0]
+    turns = [
+        ("Hi, my mixer grinder order BC-2002 has been stuck on 'processing' for five days. What is going on?",
+         f"Hello {first}, I'm sorry about the wait. I checked BC-2002: the Mixer Grinder 750 W is held at our "
+         "Bhiwandi warehouse because the 3-jar box failed a packing check. I have escalated it to the warehouse "
+         "team as urgent and asked them to ship it within 24 hours with express delivery at no extra cost. You "
+         "will get the tracking link by SMS and email as soon as it leaves the warehouse."),
+    ]
+    for p in store.PRODUCTS:
+        save = p["mrp"] - p["price"]
+        pct = round(100 * save / p["mrp"])
+        turns.append((
+            f"While I wait, tell me about the {p['name']}. Is it good value, and what do other buyers say?",
+            f"The {p['name']} is one of our most popular {p['category'].lower()} picks this Diwali, rated "
+            f"{p['rating']} out of 5 by {p['reviews']:,} buyers. It costs {store.inr(p['price'])} against an MRP of "
+            f"{store.inr(p['mrp'])}, so you save {store.inr(save)} ({pct}% off). Buyers mostly praise the finish and "
+            "the value for money; the few complaints are about delivery times during the festive rush, which we "
+            "have added extra courier capacity for this year. It is covered by our 30-day easy returns, and damaged "
+            "or faulty items are always refundable. Metro deliveries take 2 to 3 business days, other cities 4 to 6, "
+            "and express next-day delivery is available for ₹99. Cash on delivery works for orders up to ₹10,000, "
+            "and UPI, cards and net banking are all accepted at checkout. " + _CARE[p["category"]]))
+        turns.append((
+            f"If I buy the {p['name']} as a gift, can it be gift-wrapped and sent to my parents in another city?",
+            "Yes. At checkout choose 'This is a gift' and we wrap it in our Diwali packaging with a printed message "
+            "card, and the invoice is left out of the box so the price is not shown. You can send it to any address "
+            "in India; just add the delivery PIN code to see the expected date. If the gift needs to be returned or "
+            "exchanged, your parents can start the return with the order number, and the refund goes back to your "
+            "original payment method within 5 to 7 business days of approval. Gold and Platinum members also get a "
+            "free return pickup from the door; others can drop the parcel at any partner courier point. If you "
+            "would like, I can also add a second gift message for another relative, schedule the delivery for a "
+            "particular day before Diwali, or split a larger order into separate parcels for different family "
+            "members; each parcel then gets its own tracking link and its own return window."))
+        turns.append((
+            f"And how does the {p['name']} compare with the cheaper ones I see on other sites?",
+            f"Cheaper listings usually save money on the parts you notice later. For the {p['name']} the "
+            "differences buyers report most are material thickness, finishing, and how long the product keeps "
+            "looking and working like new. Ours is sourced directly from the maker, checked at our warehouse "
+            "before dispatch, and backed by our own 30-day returns on top of any brand warranty, so if anything "
+            "is wrong you deal with one support team instead of a marketplace seller. We also price-match "
+            "identical items sold and shipped by authorised sellers: share the link in this chat before you order "
+            "and we will match the price if the listing is genuine and in stock. During the Diwali sale, Gold and "
+            "Platinum members get an extra 5% off on top of the listed discount."))
+    out = []
+    for user, assistant in turns:
+        out.append({"role": "user", "content": user})
+        out.append({"role": "assistant", "content": assistant})
+    return out
 
 
 def _fence_tag(filename: str) -> str:

@@ -271,6 +271,15 @@ cd backend && mvn spring-boot:run
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
+## The store demo (every feature, live)
+
+`demo-app/` is an example application an outside company would build on
+Continuum: **Brightcart**, an Indian online store whose chat assistant, support
+desk, refunds and back office all run through Continuum with one API key. A
+live **X-ray** shows what Continuum did on each call, and a **Feature tour**
+shows all 36 features on the store, one click each. See
+[demo-app/README.md](demo-app/README.md) to run and present it.
+
 ## The flagship demo (crash recovery)
 
 ```bash
@@ -291,6 +300,7 @@ curl -s localhost:8080/api/workflows/$WID | jq '.result, .events[].eventType'
 ```
 backend/    Spring Boot engine (event store, replay, queue, outbox, providers)
 frontend/   React + TypeScript + Tailwind dashboard
+demo-app/   Brightcart, an example store built on Continuum (Python, no dependencies)
 docs/        DEPLOYMENT.md, USAGE.md, ARCHITECTURE.md
 docker-compose.yml, render.yaml   deployment blueprints
 ```

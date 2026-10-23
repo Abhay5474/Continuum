@@ -17,7 +17,9 @@ import zlib
 from . import store
 
 ORDER_RE = re.compile(r"\b(BC-\d{4})\b", re.I)
-TOTAL_RE = re.compile(r"(?:grand\s+)?total[^0-9]{0,20}(\d+(?:[.,]\d{2}))", re.I)
+# "Total: ₹1,199.00" or "Grand total Rs. 7,499": Indian digit grouping, and
+# not the "Subtotal" line above it.
+TOTAL_RE = re.compile(r"\b(?:grand\s+)?total\b[^0-9\n]{0,20}(\d{1,3}(?:,\d{2,3})+(?:\.\d{2})?|\d+(?:\.\d{2})?)", re.I)
 DATE_RE = re.compile(r"\b(20\d\d-\d\d-\d\d)\b")
 
 
@@ -46,7 +48,7 @@ def read(payload: dict) -> tuple[int, dict]:
         fields["order_id"] = m.group(1).upper()
     t = TOTAL_RE.search(text)
     if t:
-        fields["receipt_total"] = t.group(1).replace(",", ".")
+        fields["receipt_total"] = t.group(1).replace(",", "")
     d = DATE_RE.search(text)
     if d:
         fields["receipt_date"] = d.group(1)
@@ -56,6 +58,7 @@ def read(payload: dict) -> tuple[int, dict]:
         fields["customer"] = cust.get("name", "")
         fields["item"] = order["item"]
         fields["order_total"] = f"{order['amount']:.2f}"
+        fields["paid_with"] = order["card"]
         if "receipt_total" in fields:
             fields["totals_match"] = "yes" if abs(float(fields["receipt_total"]) - order["amount"]) < 0.005 else "no"
         fields["order_status"] = order["status"]

@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import config, services, specialist, store, webhooks
 from .continuum import FEATURES, LOG, Continuum, ContinuumError, collected, start_collecting
+from .presenter import Presenter, PresenterError
 from .support import Assistant, memory_scope
 
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -37,6 +38,7 @@ class Desk:
         self.cfg = cfg
         self.continuum = Continuum(cfg["continuum_url"], cfg["api_key"])
         self.assistant = Assistant(self.continuum, self.start_refund)
+        self.presenter = Presenter(cfg["continuum_url"], cfg["api_key"])
         self._refunds: list = []
         self._lock = threading.Lock()
 
@@ -112,10 +114,16 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
 
     def _raw_body(self) -> bytes:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > MAX_BODY:
-            raise ValueError("That upload is too large for the demo (30 MB limit).")
-        return self.rfile.read(length) if length else b""
+        # Read once and kept: a handler that ignores its body must still take
+        # it off the connection, or the next request on this keep-alive
+        # connection is read starting with it ("{}GET /app/...").
+        if getattr(self, "_body", None) is None:
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > MAX_BODY:
+                self.close_connection = True
+                raise ValueError("That upload is too large for the demo (30 MB limit).")
+            self._body = self.rfile.read(length) if length else b""
+        return self._body
 
     def _json(self, raw: bytes | None = None):
         raw = self._raw_body() if raw is None else raw
@@ -139,10 +147,13 @@ class Handler(BaseHTTPRequestHandler):
         self._route("DELETE")
 
     def _route(self, method: str):
+        self._body = None
         url = urlparse(self.path)
         path = url.path
         query = {k: v[-1] for k, v in parse_qs(url.query).items()}
         try:
+            if method == "POST":
+                self._raw_body()
             if path.startswith("/app/"):
                 return self._app(method, path, query)
             if path.startswith("/svc/") and method in ("GET", "POST"):
@@ -207,6 +218,10 @@ class Handler(BaseHTTPRequestHandler):
             # Continuum's answer, shown as it is: a firewall refusal, a missing
             # key, a deadline that could not be met.
             return self._send(200, {"ok": False, "error": e.as_dict(), "calls": collected()})
+        except PresenterError as e:
+            return self._send(200, {"ok": False, "error": {"status": e.status, "error": "presenter",
+                                                           "message": e.message},
+                                    "presenter": DESK.presenter.status(), "calls": collected()})
 
     def _app_route(self, method: str, path: str, q: dict):
         d = DESK
@@ -217,6 +232,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._status()
         if head == "customers" and method == "GET":
             return {"customers": store.customers()}
+        if head == "products" and method == "GET":
+            return {"products": store.products()}
+        if head == "presenter":
+            return self._presenter(method, parts[1] if len(parts) > 1 else "")
+        if head == "long-chat" and method == "POST":
+            body = self._json()
+            return d.assistant.long_conversation(str(body.get("customerId") or "C-1002"),
+                                                 str(body.get("question") or "").strip()[:500])
         if head == "orders" and method == "GET":
             return {"orders": store.orders_for(q["customer"]) if q.get("customer") else store.all_orders(),
                     "inventory": store.inventory()}
@@ -275,13 +298,15 @@ class Handler(BaseHTTPRequestHandler):
             t = store.ticket(str(body.get("ticketId") or ""))
             if not t:
                 return 404, {"ok": False, "error": {"code": "not_found", "message": "No such ticket"}}
-            return d.assistant.triage(t, bulk=bool(body.get("bulk")))
+            deadline = body.get("deadlineMs")
+            deadline = int(deadline) if isinstance(deadline, (int, float)) and 1 <= deadline <= 60000 else None
+            return d.assistant.triage(t, bulk=bool(body.get("bulk")), deadline_ms=deadline)
         if head == "draft" and method == "POST":
             body = self._json()
             t = store.ticket(str(body.get("ticketId") or ""))
             if not t:
                 return 404, {"ok": False, "error": {"code": "not_found", "message": "No such ticket"}}
-            return d.assistant.draft_reply(t, careful=bool(body.get("careful")))
+            return d.assistant.draft_reply(t, careful=bool(body.get("careful")), quick=bool(body.get("quick")))
 
         if head == "refunds":
             return self._refunds(method, parts[1:])
@@ -324,10 +349,26 @@ class Handler(BaseHTTPRequestHandler):
             return d.assistant.ask_file(name, text, str(body.get("question") or "Summarise this file."))
         return 404, {"ok": False, "error": {"code": "not_found", "message": f"No route {method} {path}"}}
 
+    def _presenter(self, method: str, what: str):
+        p = DESK.presenter
+        if what == "login" and method == "POST":
+            body = self._json()
+            return {"presenter": p.login(str(body.get("email") or ""), str(body.get("password") or ""))}
+        if what == "logout" and method == "POST":
+            return {"presenter": p.logout()}
+        if what == "status" and method == "GET":
+            return {"presenter": p.status()}
+        if what == "do" and method == "POST":
+            body = self._json()
+            return {"result": p.run(str(body.get("action") or ""), body.get("args") or {}),
+                    "presenter": p.status()}
+        return 404, {"ok": False, "error": {"code": "not_found", "message": "No such presenter route"}}
+
     def _status(self):
         d = DESK
         cfg = d.cfg
         return {
+            "presenter": d.presenter.status(),
             "continuum": {"url": cfg["continuum_url"], "reachable": d.continuum.reachable(),
                           "keyConfigured": bool(cfg["api_key"]), "keyHint": config.key_hint(cfg["api_key"])},
             "publicUrl": cfg["public_url"],

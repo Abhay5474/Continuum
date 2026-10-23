@@ -25,7 +25,7 @@ FAULT_MODES = {
 }
 FAULT_HELP = {
     ("payments", "lost-response"): "The refund goes through but the reply is lost (HTTP 500). Continuum retries "
-                                   "with the same Idempotency-Key, so the card is refunded once.",
+                                   "with the same Idempotency-Key, so the customer is refunded once.",
     ("courier", "flaky"): "The first two pickup calls fail (HTTP 503), then it works. Continuum retries with backoff.",
     ("courier", "down"): "Every pickup call fails. Continuum gives up after its retries and, with saga rollback on, "
                          "undoes the refund and the restock in reverse order.",
@@ -114,7 +114,7 @@ def _verify(body, oid, attempt):
     out = {"orderId": o["id"], "sku": o["sku"], "qty": o["qty"], "amount": o["amount"], "item": o["item"],
            "customerEmail": cust.get("email"), "customerName": cust.get("name"), "tier": cust.get("tier"),
            "card": o["card"]}
-    return 200, out, f"order verified: {o['item']}, {o['amount']:.2f}", None
+    return 200, out, f"order verified: {o['item']}, {store.inr(o['amount'])}", None
 
 
 def _refund(body, oid, attempt):
@@ -123,8 +123,8 @@ def _refund(body, oid, attempt):
     store.set_refund(oid, refund)
     if faults()["payments"] == "lost-response" and attempt == 1:
         return 500, {"error": "gateway timeout"}, \
-            f"refunded {amount:.2f} to the card, then the reply was lost (HTTP 500)", refund
-    return 200, refund, f"refunded {amount:.2f} to the card ({refund['refundId']})", None
+            f"refunded {store.inr(amount)}, then the reply was lost (HTTP 500)", refund
+    return 200, refund, f"refunded {store.inr(amount)} to the original payment method ({refund['refundId']})", None
 
 
 def _reverse(body, oid, attempt):

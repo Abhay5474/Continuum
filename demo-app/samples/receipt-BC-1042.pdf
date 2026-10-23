@@ -9,7 +9,7 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
 endobj
 4 0 obj
-<< /Length 572 >>
+<< /Length 684 >>
 stream
 BT
 /F1 20 Tf
@@ -17,35 +17,37 @@ BT
 (BRIGHTCART) Tj
 /F1 11 Tf
 0 -18 Td
-(Order receipt) Tj
+(Tax invoice / order receipt) Tj
 0 -18 Td
 () Tj
 0 -18 Td
 (Order: BC-1042) Tj
 0 -18 Td
-(Customer: Aisha Khan) Tj
+(Customer: Priya Deshpande) Tj
 0 -18 Td
-(Order date: 2026-10-09) Tj
+(Order date: 2026-10-10) Tj
 0 -18 Td
-(Delivered: 2026-10-12) Tj
-0 -18 Td
-() Tj
-0 -18 Td
-(1 x Aurora Ceramic Mug Set \(4\) \(MUG-AUR-4\)) Tj
-0 -18 Td
-(Subtotal: 34.00) Tj
-0 -18 Td
-(Shipping: 0.00) Tj
-0 -18 Td
-(Total: 34.00) Tj
-0 -18 Td
-(Paid with Visa ending 4242) Tj
+(Delivered: 2026-10-13) Tj
 0 -18 Td
 () Tj
 0 -18 Td
-(Returns accepted within 30 days of delivery.) Tj
+(1 x Jaipur Blue Pottery Mug Set \(4\) \(MUG-JBP-4\)) Tj
 0 -18 Td
-(brightcart.example  -  support@brightcart.example) Tj
+(Subtotal: Rs. 1,199.00) Tj
+0 -18 Td
+(Delivery: Rs. 0.00) Tj
+0 -18 Td
+(Total: Rs. 1,199.00) Tj
+0 -18 Td
+(Paid with UPI \(priya.d@okhdfc\)) Tj
+0 -18 Td
+(GSTIN 27AABCB1234C1Z5 \(prices include GST\)) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Easy returns within 30 days of delivery.) Tj
+0 -18 Td
+(brightcart.in  -  support@brightcart.in  -  1800-123-4567) Tj
 ET
 endstream
 endobj
@@ -59,9 +61,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000241 00000 n 
-0000000864 00000 n 
+0000000975 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-934
+1045
 %%EOF
