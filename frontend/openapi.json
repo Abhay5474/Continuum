@@ -2985,7 +2985,7 @@
           "name" : "type",
           "required" : true,
           "schema" : {
-            "enum" : [ "HALLUCINATION", "SCHEMA_CORRUPTION", "TOOL_CORRUPTION", "PROMPT_INJECTION", "CONTEXT_TRUNCATION", "MEMORY_CORRUPTION", "PROVIDER_DRIFT" ],
+            "enum" : [ "HALLUCINATION", "SCHEMA_CORRUPTION", "TOOL_CORRUPTION", "PROMPT_INJECTION", "CONTEXT_TRUNCATION", "MEMORY_CORRUPTION", "PROVIDER_DRIFT", "DEGRADED_ANSWER" ],
             "type" : "string"
           }
         }, {

@@ -18,5 +18,7 @@ public enum AiFailureType {
     /** Retrieved memory corrupted before use. */
     MEMORY_CORRUPTION,
     /** Output reworded to simulate a model version/behavior change (semantic drift). */
-    PROVIDER_DRIFT
+    PROVIDER_DRIFT,
+    /** Output replaced with a vague, off-topic, unfinished answer: a model quietly degrading. */
+    DEGRADED_ANSWER
 }

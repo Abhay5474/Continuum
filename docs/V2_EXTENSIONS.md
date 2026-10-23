@@ -136,6 +136,7 @@ covers crashes/latency/outages; V2 covers AI-native failures.
 | `CONTEXT_TRUNCATION` | drop critical middle context |
 | `MEMORY_CORRUPTION` | corrupt retrieved memory (Extension 5 hook) |
 | `PROVIDER_DRIFT` | reword output to simulate a model revision (drift, no reversal) |
+| `DEGRADED_ANSWER` | replace output with a vague, off-topic, unfinished answer: the quality gate scores it low, so it is the drill that trips the semantic breaker |
 
 **Metrics are real**, derived by joining injection events to actual workflow
 outcomes: total injections, by type, affected workflows, survived/failed, and

@@ -14,6 +14,7 @@ const FAILURE_TYPES = [
   "CONTEXT_TRUNCATION",
   "MEMORY_CORRUPTION",
   "PROVIDER_DRIFT",
+  "DEGRADED_ANSWER",
 ];
 
 interface AiChaosState {

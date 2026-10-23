@@ -40,14 +40,22 @@ public class DagPlanActivity implements Activity {
     private static final int MAX_CLAIMS = 4;
 
     private final ProviderRouter router;
+    private final io.continuum.provider.OwnProviderKeys ownKeys;
     private final Json json;
 
-    public DagPlanActivity(ProviderRouter router, Json json) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public DagPlanActivity(ProviderRouter router, Json json, io.continuum.provider.OwnProviderKeys ownKeys) {
         this.router = router;
         this.json = json;
+        this.ownKeys = ownKeys;
     }
 
-    public record Input(String prompt) {
+    /** Without an account's keys: the server's only (tests and callers with no account). */
+    public DagPlanActivity(ProviderRouter router, Json json) {
+        this(router, json, null);
+    }
+
+    public record Input(String prompt, String developerId) {
     }
 
     @Override
@@ -59,13 +67,14 @@ public class DagPlanActivity implements Activity {
     public Object execute(String inputJson, ActivityContext ctx) {
         Input in = ctx.input(inputJson, Input.class);
         try {
+            java.util.Map<String, String> keys = ownKeys == null ? java.util.Map.of() : ownKeys.forDeveloper(in.developerId());
             LlmResponse resp = router.complete(LlmRequest.of(List.of(
                     Message.system("You decompose tasks into verifiable claims. Reply ONLY with JSON: "
                             + "{\"claims\":[{\"id\":1,\"statement\":\"...\",\"dependsOn\":[],"
                             + "\"checks\":[\"LOGIC_CONSISTENCY\",\"SCHEMA_ALIGNMENT\","
                             + "\"EVIDENCE_GROUNDING\",\"CONSTRAINT_CHECK\"]}]} — at most "
                             + MAX_CLAIMS + " atomic claims."),
-                    Message.user(in.prompt()))));
+                    Message.user(in.prompt()))), router.chainFor(keys), keys);
             Plan parsed = parse(in.prompt(), resp.content());
             if (parsed != null) {
                 return parsed;

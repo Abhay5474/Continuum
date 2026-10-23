@@ -45,18 +45,20 @@ public class AiChaosEngine {
     private final PromptInjectionSimulator promptInjection;
     private final ContextCorruptionSimulator context;
     private final ProviderDriftSimulator drift;
+    private final DegradedAnswerInjector degraded;
     private final AiChaosEventRepository eventRepo;
 
     public AiChaosEngine(HallucinationInjector hallucination, SchemaCorruptionInjector schema,
                          ToolCorruptionInjector tool, PromptInjectionSimulator promptInjection,
                          ContextCorruptionSimulator context, ProviderDriftSimulator drift,
-                         AiChaosEventRepository eventRepo) {
+                         DegradedAnswerInjector degraded, AiChaosEventRepository eventRepo) {
         this.hallucination = hallucination;
         this.schema = schema;
         this.tool = tool;
         this.promptInjection = promptInjection;
         this.context = context;
         this.drift = drift;
+        this.degraded = degraded;
         this.eventRepo = eventRepo;
     }
 
@@ -111,7 +113,7 @@ public class AiChaosEngine {
         return result;
     }
 
-    /** Applied after the LLM call: hallucination, drift, schema and tool corruption. */
+    /** Applied after the LLM call: hallucination, drift, degradation, schema and tool corruption. */
     public LlmResponse applyToResponse(LlmResponse response, String workflowId, Long seq) {
         String content = response.content();
         var tools = response.toolCalls();
@@ -123,6 +125,10 @@ public class AiChaosEngine {
         if (fire(AiFailureType.PROVIDER_DRIFT)) {
             content = drift.drift(content);
             record(workflowId, AiFailureType.PROVIDER_DRIFT, seq, "output reworded to simulate model revision");
+        }
+        if (fire(AiFailureType.DEGRADED_ANSWER)) {
+            content = degraded.degrade(content);
+            record(workflowId, AiFailureType.DEGRADED_ANSWER, seq, "output replaced with a vague, off-topic, unfinished answer");
         }
         if (fire(AiFailureType.SCHEMA_CORRUPTION)) {
             content = schema.corrupt(content);

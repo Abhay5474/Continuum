@@ -5429,7 +5429,7 @@ export interface operations {
     setRate: {
         parameters: {
             query: {
-                type: "HALLUCINATION" | "SCHEMA_CORRUPTION" | "TOOL_CORRUPTION" | "PROMPT_INJECTION" | "CONTEXT_TRUNCATION" | "MEMORY_CORRUPTION" | "PROVIDER_DRIFT";
+                type: "HALLUCINATION" | "SCHEMA_CORRUPTION" | "TOOL_CORRUPTION" | "PROMPT_INJECTION" | "CONTEXT_TRUNCATION" | "MEMORY_CORRUPTION" | "PROVIDER_DRIFT" | "DEGRADED_ANSWER";
                 rate: number;
             };
             header?: never;

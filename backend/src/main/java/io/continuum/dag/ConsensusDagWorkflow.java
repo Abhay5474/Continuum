@@ -47,14 +47,22 @@ public class ConsensusDagWorkflow implements Workflow {
         Input in = ctx.input(Input.class);
 
         // Step 1 — compile the task into a typed verification plan.
-        Plan plan = ctx.executeActivity(DagPlanActivity.TYPE,
-                Map.of("prompt", in.prompt()), Plan.class);
+        // The account rides along so its agents use the account's own provider
+        // keys, as the gateway does. Not the keys themselves: inputs are history.
+        Map<String, Object> planInput = new java.util.HashMap<>();
+        planInput.put("prompt", in.prompt());
+        planInput.put("developerId", in.developerId());
+        Plan plan = ctx.executeActivity(DagPlanActivity.TYPE, planInput, Plan.class);
 
         // Step 2a — fan out one solver node per claim (parallel, DB-backed).
         List<WorkflowContext.ParallelCall> solverCalls = new ArrayList<>();
         for (Claim c : plan.claims()) {
-            solverCalls.add(new WorkflowContext.ParallelCall(DagSolverActivity.TYPE,
-                    Map.of("claimId", c.id(), "statement", c.statement(), "task", plan.task())));
+            Map<String, Object> solverInput = new java.util.HashMap<>();
+            solverInput.put("claimId", c.id());
+            solverInput.put("statement", c.statement());
+            solverInput.put("task", plan.task());
+            solverInput.put("developerId", in.developerId());
+            solverCalls.add(new WorkflowContext.ParallelCall(DagSolverActivity.TYPE, solverInput));
         }
         List<SolverOutput> solvers = ctx.executeActivitiesParallel(solverCalls, SolverOutput.class);
 

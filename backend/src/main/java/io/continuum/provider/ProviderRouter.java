@@ -55,6 +55,26 @@ public class ProviderRouter {
         return chain;
     }
 
+    /**
+     * The failover order for a caller with its own keys: a provider is in it
+     * when the platform has a key for it or the caller does.
+     */
+    public List<String> chainFor(Map<String, String> keys) {
+        List<String> chain = new ArrayList<>();
+        for (String name : props.getFailoverOrder()) {
+            LlmProvider p = providers.get(name);
+            if (p != null && (p.isAvailable() || (keys != null && keys.containsKey(name)))) {
+                chain.add(name);
+            }
+        }
+        return chain;
+    }
+
+    /** Whether this is the name of a model provider (and not, say, a specialist's credential). */
+    public boolean isProvider(String name) {
+        return providers.containsKey(name);
+    }
+
     /** V1 behavior: try providers in the static configured failover order. */
     public LlmResponse complete(LlmRequest request) {
         return complete(request, availableChain());

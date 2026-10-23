@@ -26,12 +26,14 @@ public class DagSolverActivity implements Activity {
             Pattern.CASE_INSENSITIVE);
 
     private final ProviderRouter router;
+    private final io.continuum.provider.OwnProviderKeys ownKeys;
 
-    public DagSolverActivity(ProviderRouter router) {
+    public DagSolverActivity(ProviderRouter router, io.continuum.provider.OwnProviderKeys ownKeys) {
         this.router = router;
+        this.ownKeys = ownKeys;
     }
 
-    public record Input(int claimId, String statement, String task) {
+    public record Input(int claimId, String statement, String task, String developerId) {
     }
 
     @Override
@@ -42,12 +44,13 @@ public class DagSolverActivity implements Activity {
     @Override
     public Object execute(String inputJson, ActivityContext ctx) {
         Input in = ctx.input(inputJson, Input.class);
+        java.util.Map<String, String> keys = ownKeys == null ? java.util.Map.of() : ownKeys.forDeveloper(in.developerId());
         LlmResponse resp = router.complete(LlmRequest.of(List.of(
                 Message.system("You are a solver in a verification pipeline. Reason step by step "
                         + "about the claim, end with a one-sentence conclusion, then a line "
                         + "'Confidence: 0.NN' with your honest confidence."),
                 Message.user("Task context: " + in.task() + "\n\nClaim to solve/prove: "
-                        + in.statement()))));
+                        + in.statement()))), router.chainFor(keys), keys);
         String content = resp.content() == null ? "" : resp.content();
         return new SolverOutput(in.claimId(), content, conclusionOf(content),
                 confidenceOf(content), resp.provider(), resp.model(),
