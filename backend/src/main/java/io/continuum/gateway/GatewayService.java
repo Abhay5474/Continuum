@@ -989,9 +989,27 @@ public class GatewayService {
      * one dependency instead of two, and so "what can I ask for" always matches
      * what routing would actually accept.
      */
-    public java.util.List<String> routableModelNames() {
+    public java.util.List<String> routableModelNames(String developerId) {
         try {
-            return router.availableChain();
+            // A model is reachable on the platform's key or on one the caller
+            // saved. Listing provider names instead told a caller to send
+            // "groq" as a model, which routing never matches and silently
+            // ignores.
+            java.util.Set<String> providers = new java.util.LinkedHashSet<>(router.availableChain());
+            if (developerId != null) {
+                for (CredentialVaultService.CredentialInfo c : vault.listProviders(developerId)) {
+                    if (router.isProvider(c.provider())) {
+                        providers.add(c.provider());
+                    }
+                }
+            }
+            java.util.List<String> names = new ArrayList<>();
+            for (ModelEntity m : registry.active()) {
+                if (providers.contains(m.getProvider()) && !names.contains(m.getModelName())) {
+                    names.add(m.getModelName());
+                }
+            }
+            return names;
         } catch (RuntimeException e) {
             log.debug("Model listing unavailable: {}", e.getMessage());
             return java.util.List.of();

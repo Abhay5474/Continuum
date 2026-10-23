@@ -88,6 +88,10 @@ public class OpenAiCompatController {
         return t;
     });
 
+    /** Optional: resolves a key on the public model listing. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.continuum.developer.DeveloperService developers;
+
     public OpenAiCompatController(GatewayService gateway, OpenAiTranslator translator,
                                   StreamPolicy streamPolicy) {
         this.gateway = gateway;
@@ -192,10 +196,23 @@ public class OpenAiCompatController {
      * not really OpenAI-compatible" long before anyone sends a completion.
      */
     @GetMapping("/v1/models")
-    public Map<String, Object> models() {
+    public Map<String, Object> models(HttpServletRequest http) {
+        // Public, because SDKs list models before they send a key. A caller that
+        // does send one sees the models its own saved provider keys reach too;
+        // a key that does not check out is treated as no key.
+        String developerId = null;
+        String auth = http.getHeader("Authorization");
+        if (developers != null && auth != null && auth.startsWith("Bearer ")) {
+            try {
+                developerId = developers.authenticate(auth.substring(7).trim())
+                        .map(DeveloperEntity::getId).orElse(null);
+            } catch (RuntimeException e) {
+                developerId = null;
+            }
+        }
         List<Map<String, Object>> data = new ArrayList<>();
         data.add(modelEntry("auto"));
-        for (String m : gateway.routableModelNames()) {
+        for (String m : gateway.routableModelNames(developerId)) {
             data.add(modelEntry(m));
         }
         return Map.of("object", "list", "data", data);
