@@ -207,7 +207,7 @@ public class EmailThreadTransformer implements ContextTransformer {
         // A thread arrives as one message containing every earlier one quoted
         // inside it. Splitting on the quote markers recovers the messages;
         // failing to split would leave the whole thread as one blob.
-        List<String> segments = splitThread(body);
+        List<Segment> segments = splitThread(body);
 
         List<CanonicalConversation.Message> messages = new ArrayList<>();
         Set<String> seenParagraphs = new LinkedHashSet<>();
@@ -217,7 +217,7 @@ public class EmailThreadTransformer implements ContextTransformer {
         int signaturesRemoved = 0;
 
         for (int i = 0; i < segments.size(); i++) {
-            String raw = segments.get(i);
+            String raw = segments.get(i).text();
             int before = raw.length();
 
             Stripped s = stripNoise(raw);
@@ -225,14 +225,17 @@ public class EmailThreadTransformer implements ContextTransformer {
                 signaturesRemoved++;
             }
             String deduped = dropSeenParagraphs(s.text(), seenParagraphs);
-            if (deduped.length() < s.text().length()) {
+            if (deduped.length() < s.text().length() || i > 0) {
+                // A repeated paragraph dropped, or an earlier message lifted out
+                // of its quote markup: either way quoted history was removed.
                 quotedRemoved++;
             }
 
-            // The first segment is the newest message in a top-posted thread;
-            // the sender of the older ones is not reliably recoverable from the
-            // quote header, so it is left unattributed rather than guessed.
-            String from = i == 0 ? fromLine : null;
+            // The first segment is the newest message in a top-posted thread,
+            // sent by the From header. An older one is attributed to the name
+            // its quote header gives ("On …, Priya Nair wrote:"), as written,
+            // and left unattributed when the header names nobody.
+            String from = i == 0 ? fromLine : segments.get(i).sender();
             if (from != null) {
                 senderCounts.merge(from, 1, Integer::sum);
             } else {
@@ -243,7 +246,9 @@ public class EmailThreadTransformer implements ContextTransformer {
             }
 
             SourceRef ref = new SourceRef(source, "message " + (i + 1),
-                    i == 0 ? "top-level message" : "recovered from quoted history");
+                    i == 0 ? "top-level message"
+                            : from == null ? "recovered from quoted history"
+                            : "recovered from quoted history; sender from its quote header");
             provenance.add(ref);
             messages.add(new CanonicalConversation.Message(i + 1, from,
                     i == 0 ? sent : null, deduped.strip(),
@@ -251,13 +256,22 @@ public class EmailThreadTransformer implements ContextTransformer {
                     Math.max(0, before - deduped.length()), ref));
         }
 
-        List<CanonicalConversation.Participant> participants = new ArrayList<>();
-        senderCounts.forEach((who, count) ->
-                participants.add(new CanonicalConversation.Participant(who, null, count)));
+        // One entry per person: the same address seen as a sender, in a quote
+        // header and in To is one participant, not three.
+        Map<String, CanonicalConversation.Participant> people = new LinkedHashMap<>();
+        senderCounts.forEach((who, count) -> {
+            String[] na = nameAndAddress(who);
+            people.merge(na[1] != null ? na[1].toLowerCase(Locale.ROOT) : who.toLowerCase(Locale.ROOT),
+                    new CanonicalConversation.Participant(na[0], na[1], count),
+                    (a, b) -> new CanonicalConversation.Participant(a.name() != null ? a.name() : b.name(),
+                            a.address(), a.sent() + b.sent()));
+        });
         try {
             for (Address a : orEmpty(mime.getAllRecipients())) {
                 if (a instanceof InternetAddress ia) {
-                    participants.add(new CanonicalConversation.Participant(
+                    String key = ia.getAddress() == null ? String.valueOf(ia.getPersonal())
+                            : ia.getAddress().toLowerCase(Locale.ROOT);
+                    people.putIfAbsent(key, new CanonicalConversation.Participant(
                             ia.getPersonal(), ia.getAddress(), 0));
                 }
             }
@@ -266,10 +280,12 @@ public class EmailThreadTransformer implements ContextTransformer {
             // must not lose the conversation. Their names, as written, still help.
             for (String header : List.of("To", "Cc")) {
                 for (String who : asWritten(mime, header)) {
-                    participants.add(new CanonicalConversation.Participant(who, null, 0));
+                    people.putIfAbsent(who.toLowerCase(Locale.ROOT),
+                            new CanonicalConversation.Participant(who, null, 0));
                 }
             }
         }
+        List<CanonicalConversation.Participant> participants = new ArrayList<>(people.values());
 
         return new CanonicalConversation(source, subject, participants, messages,
                 quotedRemoved, signaturesRemoved, ambiguities, provenance);
@@ -277,40 +293,151 @@ public class EmailThreadTransformer implements ContextTransformer {
 
     // --- splitting and stripping ---------------------------------------------
 
+    /** One message recovered from a thread, and who its quote header says wrote it. */
+    record Segment(String text, String sender) {
+    }
+
     /**
-     * Splits a top-posted thread into its messages at the quote markers.
+     * Splits a top-posted thread into its messages, newest first.
      *
-     * <p>The markers are the reply boundaries every mail client writes. Where
-     * none is present the whole body is one message, which is the correct answer
-     * for a first email.
+     * <p>A reply carries the message it answers below a quote header, every
+     * line prefixed with {@code >}; that message carries the one before it one
+     * level deeper. So the thread is read one level at a time: the text above a
+     * header is this message, and the quoted block below it, with one level of
+     * {@code >} removed, is read the same way. Dropping the quoted lines
+     * instead, as this used to, deleted every earlier message: a three-email
+     * thread came out as its last email and an empty one.
+     *
+     * <p>Where no marker is present the whole body is one message, which is the
+     * correct answer for a first email.
      */
-    static List<String> splitThread(String body) {
-        List<Integer> cuts = new ArrayList<>();
+    static List<Segment> splitThread(String body) {
+        List<Segment> out = new ArrayList<>();
+        collect(body, null, out, 0);
+        return out.isEmpty() ? List.of(new Segment(body.strip(), null)) : out;
+    }
+
+    private static final int MAX_DEPTH = 25;
+
+    private static void collect(String text, String sender, List<Segment> out, int depth) {
+        List<int[]> cuts = new ArrayList<>();
         for (Pattern p : QUOTE_MARKERS) {
-            java.util.regex.Matcher m = p.matcher(body);
+            java.util.regex.Matcher m = p.matcher(text);
             while (m.find()) {
-                cuts.add(m.start());
+                cuts.add(new int[]{m.start(), m.end()});
             }
         }
-        cuts.sort(Integer::compareTo);
+        cuts.sort((a, b) -> Integer.compare(a[0], b[0]));
 
-        List<String> out = new ArrayList<>();
         int last = 0;
-        for (int cut : cuts) {
-            if (cut <= last) {
+        String who = sender;
+        boolean afterOutlookHeader = false;
+        for (int[] cut : cuts) {
+            if (cut[0] < last) {
                 continue;
             }
-            String segment = body.substring(last, cut).strip();
-            if (!segment.isBlank()) {
-                out.add(segment);
+            addSegment(text.substring(last, cut[0]), who, afterOutlookHeader, out, depth);
+            String marker = text.substring(cut[0], cut[1]);
+            String named = senderOf(marker);
+            // "-----Original Message-----" names nobody; the From:/Sent: block
+            // right after it does, so a name already found is kept.
+            if (named != null || !ORIGINAL_MESSAGE.matcher(marker).find()) {
+                who = named;
             }
-            last = cut;
+            afterOutlookHeader = OUTLOOK_HEADER.matcher(marker).find();
+            last = cut[1];
         }
-        String tail = body.substring(last).strip();
-        if (!tail.isBlank()) {
-            out.add(tail);
+        addSegment(text.substring(last), who, afterOutlookHeader, out, depth);
+    }
+
+    private static void addSegment(String segment, String who, boolean afterOutlookHeader,
+                                   List<Segment> out, int depth) {
+        if (afterOutlookHeader) {
+            segment = dropHeaderBlock(segment);
         }
-        return out.isEmpty() ? List.of(body.strip()) : out;
+        StringBuilder own = new StringBuilder();
+        StringBuilder quoted = new StringBuilder();
+        for (String line : segment.split("\n", -1)) {
+            String t = line.stripLeading();
+            if (t.startsWith(">")) {
+                String inner = t.substring(1);
+                quoted.append(inner.startsWith(" ") ? inner.substring(1) : inner).append('\n');
+            } else {
+                own.append(line).append('\n');
+            }
+        }
+        boolean hasOwn = !own.toString().isBlank();
+        if (hasOwn) {
+            out.add(new Segment(own.toString().strip(), who));
+        }
+        if (!quoted.toString().isBlank() && depth < MAX_DEPTH) {
+            // A quoted block straight under a header belongs to whoever the
+            // header named; one under text of its own has no header to go by.
+            collect(quoted.toString(), hasOwn ? null : who, out, depth + 1);
+        }
+    }
+
+    private static final Pattern ORIGINAL_MESSAGE =
+            Pattern.compile("-{2,}\\s*(Original|Forwarded) message", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OUTLOOK_HEADER =
+            Pattern.compile("^\\s*From:", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
+    private static final Pattern WROTE =
+            Pattern.compile("^\\s*(?:On|Le)\\s+(.+?)\\s*(?:wrote|a écrit)\\s*:?\\s*$",
+                    Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern FROM_FIELD =
+            Pattern.compile("^\\s*From:\\s*(.+?)\\s*$", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
+
+    /**
+     * Who a quote header says wrote the quoted message, as written: "Priya Nair
+     * &lt;priya@acme.example&gt;" from "On Sun, 2 Aug 2026 at 12:10, Priya Nair
+     * &lt;priya@acme.example&gt; wrote:". The date in front has commas of its
+     * own, so the name is what follows the last one. Null when it names nobody.
+     */
+    static String senderOf(String marker) {
+        java.util.regex.Matcher m = WROTE.matcher(marker);
+        String who = null;
+        if (m.find()) {
+            String inner = m.group(1).strip();
+            int angle = inner.indexOf('<');
+            int comma = inner.lastIndexOf(',', angle < 0 ? inner.length() : angle);
+            who = (comma < 0 ? inner : inner.substring(comma + 1)).strip();
+        } else {
+            java.util.regex.Matcher f = FROM_FIELD.matcher(marker);
+            if (f.find()) {
+                who = f.group(1).strip();
+            }
+        }
+        if (who == null || who.isEmpty() || who.length() > 120 || !who.matches("(?s).*\\p{L}.*")) {
+            return null;
+        }
+        return who;
+    }
+
+    private static final Pattern NAME_ADDRESS = Pattern.compile("^\\s*\"?(.*?)\"?\\s*<([^<>\\s]+@[^<>\\s]+)>\\s*$");
+
+    /** "Priya Nair &lt;priya@acme.example&gt;" as {name, address}; either may be null. */
+    static String[] nameAndAddress(String who) {
+        java.util.regex.Matcher m = NAME_ADDRESS.matcher(who);
+        if (m.matches()) {
+            String name = m.group(1).strip();
+            return new String[]{name.isEmpty() ? null : name, m.group(2)};
+        }
+        String t = who.strip();
+        return t.matches("[^\\s@<>]+@[^\\s@<>]+") ? new String[]{null, t} : new String[]{t, null};
+    }
+
+    /** The rest of an Outlook header block (the Sent date, To, Cc, Subject) is not content. */
+    private static String dropHeaderBlock(String segment) {
+        String[] lines = segment.split("\n", -1);
+        int i = 0;
+        // The remainder of the "Sent:" line the marker stopped inside.
+        if (lines.length > 0 && !lines[0].isBlank()) {
+            i = 1;
+        }
+        while (i < lines.length && HEADER_LINE.matcher(lines[i].stripLeading()).lookingAt()) {
+            i++;
+        }
+        return String.join("\n", java.util.Arrays.copyOfRange(lines, i, lines.length));
     }
 
     /** @param removedSignature whether a signature block was identified and cut */

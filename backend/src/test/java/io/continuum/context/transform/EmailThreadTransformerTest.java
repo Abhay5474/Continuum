@@ -104,7 +104,65 @@ class EmailThreadTransformerTest {
         // answer toward the beginning of a thread whose point is at the end.
         String rendered = c.render(RenderBudget.standard());
         int occurrences = rendered.split("purchase", -1).length - 1;
-        assertThat(occurrences).isLessThanOrEqualTo(1);
+        // Once: removed as a repeat, but not deleted as a message.
+        assertThat(occurrences).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("every message of the thread survives, oldest last, each with its sender")
+    void recoversEachQuotedMessage() {
+        CanonicalConversation c =
+                (CanonicalConversation) transformer.transform(thread(), "thread.eml");
+
+        // The quoted replies used to be dropped with their ">" lines: the
+        // thread came out as its newest email and an empty one.
+        assertThat(c.messages()).hasSize(3);
+        assertThat(c.messages().get(1).body()).contains("amount billed is 15,200 as agreed");
+        assertThat(c.messages().get(1).body()).doesNotContain(">").doesNotContain("Vendor Support");
+        assertThat(c.messages().get(1).from()).isEqualTo("Support <support@vendor.example>");
+        assertThat(c.messages().get(2).body()).contains("different total to our purchase\norder");
+        assertThat(c.messages().get(2).from()).isEqualTo("Priya Nair <priya@acme.example>");
+        assertThat(c.ambiguities()).noneMatch(a -> a.detail().contains("sender could not"));
+    }
+
+    @Test
+    @DisplayName("an Outlook reply keeps the message below its header block")
+    void readsOutlookStyleHistory() {
+        String eml = """
+                From: Rohan Mehta <rohan@example.in>
+                To: Support <support@shop.example>
+                Subject: RE: Order 2002
+                Date: Wed, 21 Oct 2026 18:42:10 +0530
+                MIME-Version: 1.0
+                Content-Type: text/plain; charset=UTF-8
+
+                Still nothing. Please cancel it.
+
+                -----Original Message-----
+                From: Support <support@shop.example>
+                Sent: Monday, 19 October 2026 11:05
+                To: Rohan Mehta <rohan@example.in>
+                Subject: RE: Order 2002
+
+                It will ship within 24 hours.
+                """;
+        CanonicalConversation c = (CanonicalConversation) transformer.transform(
+                eml.getBytes(StandardCharsets.UTF_8), "reply.eml");
+
+        assertThat(c.messages()).extracting(CanonicalConversation.Message::body)
+                .containsExactly("Still nothing. Please cancel it.", "It will ship within 24 hours.");
+        assertThat(c.messages().get(1).from()).isEqualTo("Support <support@shop.example>");
+    }
+
+    @Test
+    @DisplayName("a quote header's date commas are not mistaken for the sender")
+    void senderComesAfterTheDate() {
+        assertThat(EmailThreadTransformer.senderOf(
+                "On Mon, 19 Oct 2026 at 11:05, Brightcart Support <support@brightcart.in> wrote:"))
+                .isEqualTo("Brightcart Support <support@brightcart.in>");
+        assertThat(EmailThreadTransformer.senderOf("On 2 Aug 2026, at 12:10, priya@acme.example wrote:"))
+                .isEqualTo("priya@acme.example");
+        assertThat(EmailThreadTransformer.senderOf("-----Original Message-----")).isNull();
     }
 
     @Test
