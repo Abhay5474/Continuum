@@ -37,6 +37,8 @@ public interface GatewayRequestLogRepository extends JpaRepository<GatewayReques
 
     Page<GatewayRequestLogEntity> findByDeveloperIdOrderByCreatedAtDesc(String developerId, Pageable pageable);
 
+    java.util.Optional<GatewayRequestLogEntity> findFirstByTraceIdAndDeveloperId(String traceId, String developerId);
+
     long countByDeveloperIdAndSuccess(String developerId, boolean success);
 
     @Query("select coalesce(sum(g.failoverCount),0) from GatewayRequestLogEntity g where g.developerId = :dev")

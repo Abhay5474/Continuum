@@ -360,7 +360,17 @@ public class AutopilotService {
 
     @Transactional
     public void addFeedback(String developerId, String requestRef, double score, String comment) {
-        feedback.save(new AutopilotFeedbackEntity(developerId, requestRef, Math.max(-1, Math.min(1, score)), comment));
+        // Rated answers feed the telemetry the next proposal is built from, so a
+        // rating must name one of this account's own answers. Any string used to
+        // be accepted, and "recorded" was the reply even for an id that does not
+        // exist or belongs to someone else.
+        var rated = aggregator.ownRequest(developerId, requestRef).orElseThrow(() ->
+                new io.continuum.portal.RequestScope.NotFoundException(
+                        "No request " + requestRef + " in this account. Rate an answer by the request id it came with."));
+        // Kept under the public id whatever form it arrived in (trace id, log
+        // id), so reading ratings back is a primary-key lookup.
+        feedback.save(new AutopilotFeedbackEntity(developerId, "req_" + rated.getId(),
+                Math.max(-1, Math.min(1, score)), comment));
     }
 
     // ---- reads ----

@@ -14,7 +14,7 @@ public record TelemetrySnapshot(
         double p95LatencyMs,
         double avgCostUsd,
         long failuresPrevented,
-        double platformReplayPassRate,       // global semantic-replay quality signal
+        double platformReplayPassRate,       // this developer's semantic-replay pass rate
         Map<String, Arm> providerArms) {
 
     /** Bandit arm statistics for one provider. */

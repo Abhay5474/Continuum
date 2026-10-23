@@ -35,6 +35,7 @@ class ProgramApiIT extends PostgresIT {
     @Autowired io.continuum.core.engine.WorkflowWorker workflowWorker;
     @Autowired io.continuum.core.engine.ActivityWorker activityWorker;
     @Autowired io.continuum.saga.SagaService saga;
+    @Autowired io.continuum.persistence.repository.GatewayRequestLogRepository requestLog;
 
     private final HttpClient http = HttpClient.newHttpClient();
     private String dev;
@@ -273,9 +274,22 @@ class ProgramApiIT extends PostgresIT {
 
     @Test
     void anAnswerCanBeRatedWithTheKey() throws Exception {
+        long id = requestLog.save(new io.continuum.persistence.entity.GatewayRequestLogEntity(
+                dev, "auto", "groq", "m", 0.1, "r", 10, 5, 0, true, 0)).getId();
         HttpResponse<String> r = call("POST", "/api/gateway/feedback",
-                Map.of("requestRef", "req_1", "score", 1, "comment", "solved it"), key);
+                Map.of("requestRef", "req_" + id, "score", 1, "comment", "solved it"), key);
         assertThat(r.statusCode()).isEqualTo(200);
         assertThat(call("POST", "/api/gateway/feedback", Map.of("score", 1), key).statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    void onlyYourOwnAnswersCanBeRated() throws Exception {
+        String other = portal.signup("Other", "rate-" + UUID.randomUUID() + "@example.com", "correct-horse-9").developerId();
+        long theirs = requestLog.save(new io.continuum.persistence.entity.GatewayRequestLogEntity(
+                other, "auto", "groq", "m", 0.1, "r", 10, 5, 0, true, 0)).getId();
+        assertThat(call("POST", "/api/gateway/feedback", Map.of("requestRef", "req_" + theirs, "score", -1), key)
+                .statusCode()).isEqualTo(404);
+        assertThat(call("POST", "/api/gateway/feedback", Map.of("requestRef", "req_999999999", "score", 1), key)
+                .statusCode()).isEqualTo(404);
     }
 }
