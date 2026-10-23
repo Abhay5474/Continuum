@@ -83,7 +83,7 @@ public class CascadeStage {
             java.util.Optional<io.continuum.autopilot.PolicyResolver.ResolvedPolicy> autopilot,
             String cacheKey, io.continuum.provenance.ProvenanceService.Recording prov) {
 
-        List<io.continuum.cascade.ResponseCascadeService.Tier> pair = cascade.cheapAndStrong();
+        List<io.continuum.cascade.ResponseCascadeService.Tier> pair = cascade.cheapAndStrong(developerId);
         if (pair.size() < 2) {
             return null;
         }

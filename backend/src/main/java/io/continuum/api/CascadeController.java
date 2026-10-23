@@ -46,8 +46,8 @@ public class CascadeController {
 
     /** The tiers the cascade would use, cheapest first — derived from the registry. */
     @GetMapping("/tiers")
-    public List<ResponseCascadeService.Tier> tiers() {
-        return cascade.tiers();
+    public List<ResponseCascadeService.Tier> tiers(HttpServletRequest req) {
+        return cascade.tiers(dev(req));
     }
 
     @GetMapping("/decisions")

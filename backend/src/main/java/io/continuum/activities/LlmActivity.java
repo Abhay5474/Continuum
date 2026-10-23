@@ -61,9 +61,23 @@ public class LlmActivity implements Activity {
         this.json = json;
     }
 
+    /** The keys the workflow's owner saved in the console; optional so tests can leave it out. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.continuum.provider.OwnProviderKeys ownKeys;
+
     @Override
     public String type() {
         return TYPE;
+    }
+
+    /**
+     * The workflow owner's saved provider keys. A model step used to reach the
+     * providers with the server's keys only, so an account running on its own
+     * keys had every LLM step of its workflows fail.
+     */
+    private java.util.Map<String, String> ownerKeys() {
+        String owner = io.continuum.portal.TenantContext.developerId();
+        return ownKeys == null || owner == null ? java.util.Map.of() : ownKeys.forDeveloper(owner);
     }
 
     @Override
@@ -97,19 +111,27 @@ public class LlmActivity implements Activity {
 
     /** Chooses how to call the model based on which V2 features are enabled. */
     private LlmResponse invoke(LlmRequest request, String workflowId) {
+        java.util.Map<String, String> keys = ownerKeys();
         // Default V1 path: static failover order, no routing, no hedging.
         if (!routingState.isEnabled() && !hedging.isEnabled()) {
-            return router.complete(request);
+            return keys.isEmpty() ? router.complete(request) : router.complete(request, router.chainFor(keys), keys);
         }
 
         // Extension 2: pick an optimal provider chain before execution.
         List<String> chain;
         if (routingState.isEnabled()) {
             SelectionResult selection = selectionEngine.select(request, routingState.currentPolicy());
-            chain = selection.chosenChain();
+            chain = new ArrayList<>(selection.chosenChain());
             recordRoutingDecision(workflowId, selection);
+            // The router scores the providers the server has keys for; the
+            // owner's own come after them rather than not at all.
+            for (String p : router.chainFor(keys)) {
+                if (!chain.contains(p)) {
+                    chain.add(p);
+                }
+            }
         } else {
-            chain = router.availableChain();
+            chain = router.chainFor(keys);
         }
 
         // Extension 4: race the chain with tail-latency hedging.
@@ -117,7 +139,7 @@ public class LlmActivity implements Activity {
             HedgedResult hedged = hedging.execute(request, chain);
             return hedged.response();
         }
-        return router.complete(request, chain);
+        return router.complete(request, chain, keys);
     }
 
     private void recordRoutingDecision(String workflowId, SelectionResult selection) {

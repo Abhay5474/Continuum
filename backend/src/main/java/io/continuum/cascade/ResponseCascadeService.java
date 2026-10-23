@@ -85,6 +85,10 @@ public class ResponseCascadeService {
         this.clusterer = clusterer;
     }
 
+    /** The keys an account saved in the console; optional so tests can leave it out. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.continuum.provider.OwnProviderKeys ownKeys;
+
     /** A tier of the cascade: a concrete (provider, model) with its input price. */
     public record Tier(String provider, String model, double costPer1k, String label) {
     }
@@ -117,11 +121,23 @@ public class ResponseCascadeService {
      * and what it costs.
      */
     public List<Tier> tiers() {
-        // Only providers the router can actually call. The registry lists every
-        // model it knows about, including ones whose provider has no credential
-        // configured; offering one of those as a tier would produce a cascade
-        // that escalates into a guaranteed failure.
-        java.util.Set<String> reachable = new java.util.HashSet<>(router.availableChain());
+        return tiers(null);
+    }
+
+    /**
+     * The tiers for one account, cheapest first.
+     *
+     * <p>Only providers the router can actually call for it: with the server's
+     * key, or with one the account saved. The registry lists every model it
+     * knows about, including ones whose provider has no credential configured;
+     * offering one of those as a tier would produce a cascade that escalates
+     * into a guaranteed failure. Counting only the server's keys, as this used
+     * to, meant an account running on its own keys never got a cascade at all.
+     */
+    public List<Tier> tiers(String developerId) {
+        Map<String, String> keys = ownKeys == null || developerId == null
+                ? Map.of() : ownKeys.forDeveloper(developerId);
+        java.util.Set<String> reachable = new java.util.HashSet<>(router.chainFor(keys));
         List<Tier> out = new ArrayList<>();
         for (ModelEntity m : registry.active()) {
             if (!reachable.contains(m.getProvider())) {
@@ -137,8 +153,8 @@ public class ResponseCascadeService {
     }
 
     /** The cheap tier and the strong tier, or empty when there is no real choice. */
-    public List<Tier> cheapAndStrong() {
-        List<Tier> all = tiers();
+    public List<Tier> cheapAndStrong(String developerId) {
+        List<Tier> all = tiers(developerId);
         if (all.size() < 2) {
             return List.of();
         }
@@ -244,7 +260,7 @@ public class ResponseCascadeService {
         CascadeSettingEntity cfg = settings.findById(developerId)
                 .orElseGet(() -> new CascadeSettingEntity(developerId));
         List<CascadeDecisionEntity> rows = decisions.recentFor(developerId, PageRequest.of(0, 1000));
-        List<Tier> pair = cheapAndStrong();
+        List<Tier> pair = cheapAndStrong(developerId);
 
         long total = rows.size();
         long escalated = rows.stream().filter(CascadeDecisionEntity::isEscalated).count();
