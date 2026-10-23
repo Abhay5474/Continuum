@@ -30,3 +30,9 @@ services:
       # master key in application.yml is public, so it must never sign.
       - key: CONTINUUM_SESSION_KEY
         generateValue: true
+      # Encrypts the provider keys accounts save and peppers API-key hashes.
+      # Generated once and kept: changing it later makes every saved provider
+      # key unreadable and every issued API key invalid. Without it the server
+      # falls back to the public value in application.yml.
+      - key: CONTINUUM_MASTER_KEY
+        generateValue: true

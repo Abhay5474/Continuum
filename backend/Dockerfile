@@ -10,6 +10,9 @@ RUN mvn -B -q -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/continuum.jar app.jar
+# Not root: nothing here needs it, and a compromised process should not have it.
+RUN useradd --system --uid 10001 --no-create-home continuum
+USER 10001
 EXPOSE 8080
 # Render/containers inject PORT; Spring reads it via ${PORT}.
 ENTRYPOINT ["sh", "-c", "java -XX:MaxRAMPercentage=75 -jar app.jar"]

@@ -90,6 +90,7 @@ configure both Gemini and Groq.
 | `CONTINUUM_MASTER_KEY` | _(empty)_ | AES-256-GCM key for the provider-credential vault and API-key pepper. **Required in production** — and must not be the placeholder in `application.yml`, which is public (the server warns at startup). If unset, the vault uses an ephemeral key (logs a loud warning) and stored secrets won't survive a restart. |
 | `CONTINUUM_ADMIN_TOKEN` | _(empty)_ | Optional break-glass `X-Admin-Token` for `/api/admin/**` and token-based operator sign-in. Not needed day to day: operators are accounts (first one claims the setup code printed in the server log at start-up; see README → *Operator access*). If unset, token access is refused (fails closed). |
 | `CONTINUUM_SESSION_KEY` | _(empty)_ | Signs console session tokens. If unset, a private `CONTINUUM_MASTER_KEY` is used; if that is also unset or is the value committed in `application.yml`, sessions are signed with a per-process random key and end on restart. The Render blueprint generates one. |
+| `CONTINUUM_METRICS_TOKEN` | _(empty)_ | `/actuator/metrics` and `/actuator/prometheus` answer only callers on the same machine, or a caller sending this as `Authorization: Bearer …` (for a Prometheus scraping a hosted instance). `/actuator/health` is always public. |
 | `continuum.registry.discovery-cron` | `0 0 3 1 * *` | Model discovery schedule (monthly). |
 
 See **[docs/V3_GATEWAY.md](V3_GATEWAY.md)** for the full gateway feature set.
@@ -132,7 +133,10 @@ GEMINI_API_KEY=xxx GROQ_API_KEY=yyy docker compose up --build
    - a free PostgreSQL instance (`continuum-db`)
    - the Dockerized API (`continuum-api`) wired to it via `DATABASE_URL`
 3. (Optional) In the service's **Environment**, set `GEMINI_API_KEY` and
-   `GROQ_API_KEY`.
+   `GROQ_API_KEY`. The blueprint generates `CONTINUUM_SESSION_KEY` and
+   `CONTINUUM_MASTER_KEY` for you; keep the master key as it is once accounts
+   have saved provider keys or been issued API keys (changing it makes both
+   unreadable).
 4. Deploy. Health check: `GET /actuator/health`.
 
 > Using **Neon** instead of Render Postgres? Create a Neon database, copy its
@@ -195,4 +199,5 @@ VITE_API_BASE=https://api.example.com npm run build
 - [ ] Outbound network egress allowed to provider APIs (if using real LLMs).
 - [ ] `GEMINI_API_KEY` / `GROQ_API_KEY` set (at least one, or developers add their own keys).
 - [ ] `VITE_API_BASE` points at the deployed API for the dashboard.
+- [ ] `CONTINUUM_MASTER_KEY` and `CONTINUUM_SESSION_KEY` set to private values (the Render blueprint generates both); the startup log has no warning about either.
 - [ ] `GET /actuator/health` returns `UP` after first boot (Flyway migration ran).

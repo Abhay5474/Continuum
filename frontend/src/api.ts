@@ -7,7 +7,8 @@ import type {
   WorkflowSummary,
 } from "./types";
 
-export const BASE = import.meta.env.VITE_API_BASE ?? "";
+// A pasted URL often ends in "/"; every path below starts with one.
+export const BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
 const SESSION_KEY = "continuum.portal.session";
 const OPERATOR_KEY = "continuum.portal.operator";
 
