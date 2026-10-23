@@ -49,4 +49,20 @@ class ModelFallbackPolicyTest {
         assertEquals("cheap", chain.get(0).model(), "explicitly requested model must be tried first");
         assertEquals(2, chain.size(), "other models remain as fallbacks");
     }
+
+    @Test
+    void bestQualityPrefersTheStrongerModelEvenForAnEasyRequest() {
+        var chain = policy.buildChain(List.of(
+                opt("strong", "versatile", 0.00005, false),
+                opt("cheap", "instant", 0.00001, false)), 0.1, io.continuum.routing.RoutingMode.HIGH_QUALITY, null, false);
+        assertEquals("strong", chain.get(0).model());
+    }
+
+    @Test
+    void lowestCostPrefersTheCheaperModelEvenForAHardRequest() {
+        var chain = policy.buildChain(List.of(
+                opt("strong", "versatile", 0.00005, false),
+                opt("cheap", "instant", 0.00001, false)), 0.9, io.continuum.routing.RoutingMode.LOW_COST, null, false);
+        assertEquals("cheap", chain.get(0).model());
+    }
 }

@@ -524,7 +524,7 @@ public class GatewayService {
                     health.healthScore(m.getProvider(), m.getModelName())));
         }
         List<ModelFallbackPolicy.ModelCandidate> chain =
-                fallbackPolicy.buildChain(options, complexity, canonical.model(), requireVision);
+                fallbackPolicy.buildChain(options, complexity, mode, canonical.model(), requireVision);
 
         // Divert away from models whose quality has drifted. Filtered rather than
         // excluded from scoring, so if EVERY model is tripped the request still
@@ -1027,7 +1027,10 @@ public class GatewayService {
      */
 
     private String routingReason(double complexity, RoutingMode mode, ModelFallbackPolicy.ModelCandidate c, int failovers) {
-        String basis = complexity >= 0.5 ? "high complexity → stronger model" : "low complexity → cheaper model";
+        String basis = mode == RoutingMode.HIGH_QUALITY ? "best quality asked for → stronger model"
+                : mode == RoutingMode.LOW_COST ? "lowest cost asked for → cheaper model"
+                : mode == RoutingMode.LOW_LATENCY ? "lowest latency asked for → smaller model"
+                : complexity >= 0.5 ? "high complexity → stronger model" : "low complexity → cheaper model";
         return String.format("mode=%s, complexity=%.2f, %s → %s/%s%s",
                 mode, complexity, basis, c.provider(), c.model(),
                 failovers > 0 ? " (after " + failovers + " failover(s))" : "");

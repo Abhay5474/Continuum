@@ -32,6 +32,21 @@ public class ModelFallbackPolicy {
 
     public List<ModelCandidate> buildChain(List<ModelOption> options, double complexity,
                                            String requestedModel, boolean requireVision) {
+        return buildChain(options, complexity, null, requestedModel, requireVision);
+    }
+
+    /**
+     * As above, honouring the caller's routing mode within each provider.
+     *
+     * <p>HIGH_QUALITY prefers the strongest model even for an easy-looking
+     * request, and LOW_COST and LOW_LATENCY the cheapest (the small models are
+     * the fast ones) even for a hard one; the rest follow the estimated
+     * complexity. The mode used to reorder providers only, so asking one
+     * provider for "best quality" or "lowest cost" got the same model.
+     */
+    public List<ModelCandidate> buildChain(List<ModelOption> options, double complexity,
+                                           io.continuum.routing.RoutingMode mode,
+                                           String requestedModel, boolean requireVision) {
         List<ModelOption> filtered = new ArrayList<>();
         for (ModelOption o : options) {
             if (requireVision && !o.caps().vision()) {
@@ -40,7 +55,9 @@ public class ModelFallbackPolicy {
             filtered.add(o);
         }
 
-        boolean complex = complexity >= 0.5;
+        boolean complex = mode == io.continuum.routing.RoutingMode.HIGH_QUALITY
+                || (mode != io.continuum.routing.RoutingMode.LOW_COST
+                && mode != io.continuum.routing.RoutingMode.LOW_LATENCY && complexity >= 0.5);
         Comparator<ModelOption> cmp = Comparator
                 .comparingInt(ModelOption::providerRank)                 // measured provider preference first
                 .thenComparing(o -> pref(o.caps(), complex), Comparator.reverseOrder())
