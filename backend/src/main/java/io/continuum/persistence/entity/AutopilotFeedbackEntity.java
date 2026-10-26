@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -8,7 +10,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "autopilot_feedback",
         indexes = @Index(name = "idx_apfeedback_dev", columnList = "developer_id, created_at"))
-public class AutopilotFeedbackEntity {
+public class AutopilotFeedbackEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

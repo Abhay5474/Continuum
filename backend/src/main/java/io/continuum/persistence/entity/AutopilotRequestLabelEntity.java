@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -12,7 +14,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "autopilot_request_labels",
         indexes = @Index(name = "idx_aplabel_bundle", columnList = "bundle_id"))
-public class AutopilotRequestLabelEntity {
+public class AutopilotRequestLabelEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

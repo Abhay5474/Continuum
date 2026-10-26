@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -8,7 +10,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "memory_archives",
         indexes = @Index(name = "idx_mem_archives_dev", columnList = "developer_id"))
-public class MemoryArchiveEntity {
+public class MemoryArchiveEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

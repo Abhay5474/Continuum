@@ -41,6 +41,10 @@ public class DeveloperApiKeyEntity {
     @Column(name = "label", length = 120)
     private String label;
 
+    /** The application this key belongs to; what it captures is tagged with it. */
+    @Column(name = "app_id")
+    private Long appId;
+
     protected DeveloperApiKeyEntity() {
     }
 
@@ -63,4 +67,6 @@ public class DeveloperApiKeyEntity {
     public void touch() { this.lastUsedAt = Instant.now(); }
     public String getLabel() { return label; }
     public void setLabel(String label) { this.label = label; }
+    public Long getAppId() { return appId; }
+    public void setAppId(Long appId) { this.appId = appId; }
 }

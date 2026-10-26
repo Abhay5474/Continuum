@@ -189,7 +189,10 @@ public class PromptCompressionService {
         if (region == null) {
             return;
         }
-        RegionTally t = regionTallies.computeIfAbsent(developerId + "|" + region.name(),
+        // Kept per app, like everything else captured, so the console can show
+        // one app's regions without another's mixed in.
+        RegionTally t = regionTallies.computeIfAbsent(
+                developerId + "|" + io.continuum.apps.AppContext.writeKey() + "|" + region.name(),
                 k -> new RegionTally());
         t.messages.incrementAndGet();
         t.tokensIn.addAndGet(in);
@@ -197,7 +200,19 @@ public class PromptCompressionService {
     }
 
     private void countSkip(String developerId, String reason) {
-        skips.computeIfAbsent(developerId + "|" + reason, k -> new AtomicLong()).incrementAndGet();
+        skips.computeIfAbsent(developerId + "|" + io.continuum.apps.AppContext.writeKey() + "|" + reason,
+                k -> new AtomicLong()).incrementAndGet();
+    }
+
+    /** The part after "developer|app|" of a tally key this thread may see, or null. */
+    private static String visibleRest(String key, String developerId) {
+        String prefix = developerId + "|";
+        if (!key.startsWith(prefix)) {
+            return null;
+        }
+        String[] parts = key.substring(prefix.length()).split("\\|", 2);
+        return parts.length == 2 && io.continuum.apps.AppContext.visible(io.continuum.apps.AppContext.fromKey(parts[0]))
+                ? parts[1] : null;
     }
 
     /**
@@ -218,16 +233,26 @@ public class PromptCompressionService {
         out.put("shortPromptTokens", CompressionPolicy.SHORT_PROMPT_TOKENS);
         out.put("targets", CompressionPolicy.ratios());
 
+        Map<String, long[]> byRegion = new java.util.HashMap<>();
+        regionTallies.forEach((k, t) -> {
+            String region = visibleRest(k, developerId);
+            if (region != null) {
+                long[] sum = byRegion.computeIfAbsent(region, x -> new long[3]);
+                sum[0] += t.messages.get();
+                sum[1] += t.tokensIn.get();
+                sum[2] += t.tokensOut.get();
+            }
+        });
         List<Map<String, Object>> regions = new ArrayList<>();
         for (CompressionPolicy.Region r : CompressionPolicy.Region.values()) {
-            RegionTally t = regionTallies.get(developerId + "|" + r.name());
-            long in = t == null ? 0 : t.tokensIn.get();
-            long comp = t == null ? 0 : t.tokensOut.get();
+            long[] t = byRegion.get(r.name());
+            long in = t == null ? 0 : t[1];
+            long comp = t == null ? 0 : t[2];
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("region", r.name());
             m.put("label", CompressionPolicy.label(r));
             m.put("target", r.keepRatio());
-            m.put("messages", t == null ? 0 : t.messages.get());
+            m.put("messages", t == null ? 0 : t[0]);
             m.put("tokensIn", in);
             m.put("tokensOut", comp);
             m.put("achieved", in == 0 ? null : (double) comp / in);
@@ -235,15 +260,19 @@ public class PromptCompressionService {
         }
         out.put("regions", regions);
 
-        List<Map<String, Object>> skipped = new ArrayList<>();
-        String prefix = developerId + "|";
+        Map<String, Long> byReason = new java.util.TreeMap<>();
         skips.forEach((k, v) -> {
-            if (k.startsWith(prefix)) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("reason", k.substring(prefix.length()));
-                m.put("count", v.get());
-                skipped.add(m);
+            String reason = visibleRest(k, developerId);
+            if (reason != null) {
+                byReason.merge(reason, v.get(), Long::sum);
             }
+        });
+        List<Map<String, Object>> skipped = new ArrayList<>();
+        byReason.forEach((reason, count) -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("reason", reason);
+            m.put("count", count);
+            skipped.add(m);
         });
         out.put("skipped", skipped);
         return out;
@@ -262,8 +291,8 @@ public class PromptCompressionService {
 
     /** Clears the live per-region tallies. Persisted totals are untouched. */
     public Map<String, Object> resetPolicyTallies(String developerId) {
-        regionTallies.keySet().removeIf(k -> k.startsWith(developerId + "|"));
-        skips.keySet().removeIf(k -> k.startsWith(developerId + "|"));
+        regionTallies.keySet().removeIf(k -> visibleRest(k, developerId) != null);
+        skips.keySet().removeIf(k -> visibleRest(k, developerId) != null);
         return policyStatus(developerId);
     }
 

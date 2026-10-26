@@ -154,6 +154,34 @@ in the console.
 `demo-app/` is a complete example application built this way: a store's
 support desk that uses every feature through one API key. See its README.
 
+### Apps: one account, several applications
+
+Every API key belongs to an **app**, named in the console (*API Keys &
+Providers → Apps & API keys*) and renamable at any time. What a request made
+with a key captures — the request log, traces, cascade and routing decisions,
+cached answers, memory, the experience graph, workflows started with it — is
+tagged with that key's app.
+
+- **Apart.** An app recalls only its own memory, cache and experience, plus
+  untagged data (made in the console, or captured before apps existed). One
+  app's customers never surface in another app's answers.
+- **One view at a time.** The app picker next to the logo (*Continuum /
+  Brightcart*) scopes every console page to one app, to everything, or to
+  untagged data. The console sends the choice as `X-Continuum-App`.
+- **Keys rotate, history stays.** *Add key* issues another key for the same
+  app, so a leaked key can be replaced without losing what the app has learned.
+- **Shared by the account.** Settings, the plan's token quota, provider keys,
+  pipelines, specialists, workflow definitions and webhooks belong to the
+  account, whichever app is in view.
+
+How: captured entities extend `AppScopedEntity`, whose Hibernate filter is on
+for every session and reads `AppContext` — set by the API-key filter, by
+workers from the workflow's app, and by the console from its picker. Lookups
+by primary key, and the few by an engine's own id (a workflow's lock, an MMU
+stub's event stream), read across apps. Background memory consolidation runs
+once per app. Existing keys each became an app (`V55__apps.sql`); an account
+that only ever had one key has its history moved into that app.
+
 ### Which features acted on a request
 
 Most features change a request without leaving a trace in the answer. Every

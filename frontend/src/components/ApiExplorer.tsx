@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { BASE, portal } from "../api";
+import { useApps, useSelectedApp } from "../system/apps";
 import { Field, Pill, RecordPanel } from "../system/hub";
 import { Input, Labelled, Select, Table, TD, TH, TR } from "../system/controls";
 import { BarChart, ChartFrame, Histogram, type Datum } from "../system/charts";
@@ -245,6 +246,11 @@ export default function ApiExplorer({ issuedKey }: { issuedKey?: string }) {
 /** Your recent gateway requests, as your key saw them. */
 export function RequestLog() {
   const [rows, setRows] = useState<any[] | null>(null);
+  // Looking at every app, say which app each request came from.
+  const { apps } = useApps();
+  const showApp = useSelectedApp() === "all";
+  const appName = (id: number | null) =>
+    id == null ? "Console" : apps?.find((a) => a.id === id)?.name ?? `App ${id}`;
   const [openReq, setOpenReq] = useState<any | null>(null);
   useEffect(() => {
     portal.requests(100).then(setRows).catch(() => setRows([]));
@@ -285,7 +291,7 @@ export function RequestLog() {
         record={openReq}
         title={openReq ? `${openReq.chosenProvider}/${openReq.chosenModel}` : ""}
         subtitle={openReq ? dateTimeOf(openReq.createdAt) : undefined}
-        hide={["id", "routingReason"]}
+        hide={["id", "routingReason", "appId"]}
         onClose={() => setOpenReq(null)}
         lead={openReq?.routingReason && <Field label="Why this model">{openReq.routingReason}</Field>}
       />
@@ -295,6 +301,7 @@ export function RequestLog() {
         head={
           <tr>
             <TH>When</TH>
+            {showApp && <TH>App</TH>}
             <TH>Answered by</TH>
             <TH>Why</TH>
             <TH align="right">Latency</TH>
@@ -308,6 +315,11 @@ export function RequestLog() {
             <TD>
               <span className="whitespace-nowrap text-slate-400">{dateTimeOf(r.createdAt)}</span>
             </TD>
+            {showApp && (
+              <TD>
+                <span className="whitespace-nowrap text-[12px] text-slate-300">{appName(r.appId)}</span>
+              </TD>
+            )}
             <TD>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: r.success ? "var(--state-healthy-ink)" : "var(--state-critical-ink)" }} aria-hidden />

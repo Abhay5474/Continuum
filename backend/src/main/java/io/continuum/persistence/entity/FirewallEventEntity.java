@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -8,7 +10,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "firewall_events",
         indexes = @Index(name = "idx_firewall_dev", columnList = "developer_id, created_at"))
-public class FirewallEventEntity {
+public class FirewallEventEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

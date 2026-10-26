@@ -63,6 +63,14 @@ public class MemoryEngine {
         this.json = json;
     }
 
+    /** Optional so the engine can be built by hand; without it, memory is consolidated as one pool. */
+    private io.continuum.persistence.repository.AppRepository apps;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setApps(io.continuum.persistence.repository.AppRepository apps) {
+        this.apps = apps;
+    }
+
     // ---- ingestion (called from the gateway observe hook; enabled tenants only) ----
 
     @Transactional
@@ -86,12 +94,38 @@ public class MemoryEngine {
     @Transactional
     public Map<String, Object> consolidate(GodModeConfigEntity config) {
         Map<String, Object> report = new LinkedHashMap<>();
-        report.put("summarized", consolidateWorking(config, false));
-        report.put("promoted", promoteEpisodic(config));
-        report.put("pruned", pruneSemanticDuplicates(config));
-        report.put("archived", archiveDecayed(config));
+        for (String step : List.of("summarized", "promoted", "pruned", "archived")) {
+            report.put(step, 0);
+        }
+        // One app at a time. This runs on a background thread that would
+        // otherwise read every app's memory as one pool, merge one app's
+        // experience into another's and write the result untagged — so every
+        // app would end up recalling, and the console showing, one shared graph.
+        for (Long app : appsOf(config.getDeveloperId())) {
+            io.continuum.apps.AppContext.callAs(app, () -> {
+                add(report, "summarized", consolidateWorking(config, false));
+                add(report, "promoted", promoteEpisodic(config));
+                add(report, "pruned", pruneSemanticDuplicates(config));
+                add(report, "archived", archiveDecayed(config));
+                return null;
+            });
+        }
         report.put("expired", expireAll());
         return report;
+    }
+
+    /** The account's apps, and null for its untagged memory. */
+    private List<Long> appsOf(String developerId) {
+        List<Long> ids = new ArrayList<>();
+        ids.add(null);
+        if (apps != null) {
+            apps.findByDeveloperIdOrderByCreatedAtAsc(developerId).forEach(a -> ids.add(a.getId()));
+        }
+        return ids;
+    }
+
+    private static void add(Map<String, Object> report, String step, int n) {
+        report.merge(step, n, (a, b) -> (Integer) a + (Integer) b);
     }
 
     /** Working → Episodic: MemAct decides when; summarization is the reward signal. */

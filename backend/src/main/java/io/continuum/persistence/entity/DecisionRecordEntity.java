@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -9,7 +11,7 @@ import java.time.Instant;
 @Table(name = "decision_record",
         indexes = {@Index(name = "idx_decision_dev", columnList = "developer_id,created_at"),
                    @Index(name = "idx_decision_request", columnList = "request_id,seq")})
-public class DecisionRecordEntity {
+public class DecisionRecordEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

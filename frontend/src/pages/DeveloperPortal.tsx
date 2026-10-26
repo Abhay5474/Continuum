@@ -8,6 +8,8 @@ import { useRecentRequests } from "../system/traffic";
 import { useToast, Spinner, CopyButton, CodeBlock } from "../components/ui";
 import GatewayResult from "../components/GatewayResult";
 import Webhooks from "../components/Webhooks";
+import AppKeys from "../components/AppKeys";
+import { appsChanged } from "../system/apps";
 
 const PROVIDERS = ["gemini", "groq", "openai"];
 
@@ -133,19 +135,10 @@ function Portal({ onLogout }: { onLogout: () => void }) {
       const r = await portal.issueKey();
       setNewKey(r.apiKey);
       toast("API key created ✓", "success");
+      appsChanged();
       refresh();
     } catch (e: any) {
       toast(e.message ?? "Could not issue key", "error");
-    }
-  };
-  const revokeKey = async (id: number) => {
-    if (!confirm("Revoke this key? Apps using it will stop working immediately.")) return;
-    try {
-      await portal.revokeKey(id);
-      toast("Key revoked", "success");
-      refresh();
-    } catch (e: any) {
-      toast(e.message ?? "Could not revoke key", "error");
     }
   };
   const storeCred = async (provider: string) => {
@@ -309,35 +302,15 @@ function Portal({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* api keys */}
-      <div>
-        <div className="flex items-center">
-          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Continuum API keys</h2>
-          <button onClick={issueKey} style={{ height: "var(--h-md)", borderRadius: "var(--r-md)", borderColor: "rgb(var(--card-edge))" }}
-            className="ml-auto inline-flex items-center border px-3 text-[12.5px] font-medium text-slate-200 transition-colors hover:border-slate-500/60 hover:bg-[color:rgb(var(--card-hover))]">Issue new key</button>
+      {/* apps and their keys */}
+      <AppKeys keys={keys} onIssued={setNewKey} onChanged={refresh} />
+      {newKey && (
+        <div className="-mt-3 flex items-center gap-2 rounded bg-ink p-2">
+          <code className="min-w-0 flex-1 break-all font-mono text-xs text-emerald-300">{newKey}</code>
+          <span className="whitespace-nowrap text-[10px] text-slate-500">shown once</span>
+          <CopyButton text={newKey} />
         </div>
-        {newKey && (
-          <div className="mt-2 flex items-center gap-2 rounded bg-ink p-2">
-            <code className="min-w-0 flex-1 break-all font-mono text-xs text-emerald-300">{newKey}</code>
-            <span className="whitespace-nowrap text-[10px] text-slate-500">shown once</span>
-            <CopyButton text={newKey} />
-          </div>
-        )}
-        <div className="mt-2 space-y-1 text-sm">
-          {keys.map((k) => (
-            <div key={k.id} className="flex items-center gap-2 text-xs">
-              <span className="font-mono">{k.prefix}…</span>
-              <span className={k.active ? "text-emerald-300" : "text-rose-300"}>{k.active ? "active" : "revoked"}</span>
-              {k.active && (
-                <button onClick={() => revokeKey(k.id)} className="ml-auto rounded border border-edge px-2 py-0.5 text-rose-300 transition-colors hover:bg-rose-500/10">
-                  Revoke
-                </button>
-              )}
-            </div>
-          ))}
-          {keys.length === 0 && <div className="text-xs text-slate-500">no keys yet — issue one above ↑</div>}
-        </div>
-      </div>
+      )}
 
       <Webhooks />
 

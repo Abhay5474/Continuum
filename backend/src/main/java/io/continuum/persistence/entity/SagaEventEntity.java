@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -15,7 +17,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "saga_event",
         indexes = @Index(name = "idx_saga_event_dev", columnList = "developer_id,created_at"))
-public class SagaEventEntity {
+public class SagaEventEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

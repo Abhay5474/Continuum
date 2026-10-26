@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -14,7 +16,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "routing_strategy_decision",
         indexes = @Index(name = "idx_routing_decision_dev", columnList = "developer_id, created_at"))
-public class RoutingStrategyDecisionEntity {
+public class RoutingStrategyDecisionEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

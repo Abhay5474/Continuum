@@ -171,7 +171,10 @@ public class BillingService {
         }
         try {
             DeveloperBillingEntity b = getOrCreate(developerId);
-            long used = requests.tokensForDeveloperSince(developerId, monthStart());
+            // The quota is the account's, however many apps share it. Counted per
+            // app, every app would get the whole quota to itself.
+            long used = io.continuum.apps.AppContext.unscoped(
+                    () -> requests.tokensForDeveloperSince(developerId, monthStart()));
             if (used >= b.getMonthlyTokenQuota()) {
                 throw new QuotaExceededException("Monthly token quota exceeded ("
                         + used + "/" + b.getMonthlyTokenQuota() + "). Upgrade your plan to continue.");
@@ -188,9 +191,12 @@ public class BillingService {
     public Map<String, Object> usage(String developerId) {
         DeveloperBillingEntity b = getOrCreate(developerId);
         Instant since = monthStart();
-        long usedTokens = requests.tokensForDeveloperSince(developerId, since);
-        double usedCost = requests.costForDeveloperSince(developerId, since);
-        long reqs = requests.countByDeveloperIdAndCreatedAtGreaterThanEqual(developerId, since);
+        // Plan usage is measured against the account's quota, so it is the
+        // account's usage whichever app the console is looking at.
+        long usedTokens = io.continuum.apps.AppContext.unscoped(() -> requests.tokensForDeveloperSince(developerId, since));
+        double usedCost = io.continuum.apps.AppContext.unscoped(() -> requests.costForDeveloperSince(developerId, since));
+        long reqs = io.continuum.apps.AppContext.unscoped(
+                () -> requests.countByDeveloperIdAndCreatedAtGreaterThanEqual(developerId, since));
         long quota = b.getMonthlyTokenQuota();
         double fraction = quota == 0 ? 1.0 : Math.min(1.0, (double) usedTokens / quota);
 

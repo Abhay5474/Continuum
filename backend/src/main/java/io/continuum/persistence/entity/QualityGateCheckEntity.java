@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -14,7 +16,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "quality_gate_check",
         indexes = @Index(name = "idx_quality_check_dev", columnList = "developer_id, created_at"))
-public class QualityGateCheckEntity {
+public class QualityGateCheckEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

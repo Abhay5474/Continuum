@@ -64,10 +64,12 @@ public class PortalAuthFilter extends OncePerRequestFilter {
         request.setAttribute(DEVELOPER_ID_ATTRIBUTE, session.get().subject());
         request.setAttribute(ACTOR_ID_ATTRIBUTE, session.get().actor());
         TenantContext.set(session.get().subject());
+        io.continuum.apps.AppContext.forConsole(request.getHeader(ConsoleAuthFilter.APP_HEADER));
         try {
             chain.doFilter(request, response);
         } finally {
             TenantContext.clear();
+            io.continuum.apps.AppContext.clear();
         }
     }
 

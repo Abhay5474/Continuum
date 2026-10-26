@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -8,7 +10,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "mmu_semantic_stubs",
         indexes = @Index(name = "idx_mmu_stubs_dev", columnList = "developer_id, created_at"))
-public class MmuStubEntity {
+public class MmuStubEntity extends AppScopedEntity {
 
     @Id
     @Column(name = "stub_id", length = 64)

@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -17,7 +19,7 @@ import java.time.Instant;
                 @Index(name = "idx_cache_entry_lookup", columnList = "developer_id, expires_at"),
                 @Index(name = "idx_cache_entry_hash", columnList = "developer_id, prompt_hash")
         })
-public class SemanticCacheEntryEntity {
+public class SemanticCacheEntryEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

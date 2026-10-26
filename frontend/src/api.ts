@@ -16,6 +16,48 @@ export const API_ORIGIN = /^https?:\/\//.test(BASE)
   : (typeof window === "undefined" ? "" : window.location.origin) + BASE;
 const SESSION_KEY = "continuum.portal.session";
 const OPERATOR_KEY = "continuum.portal.operator";
+const APP_KEY = "continuum.app";
+
+/** Fired on window when the console switches app. */
+export const APP_CHANGED = "continuum:app-changed";
+
+/**
+ * Which app the console is looking at: "all", "untagged" (made in the console,
+ * or before apps existed), or an app id. Sent with every console request, so
+ * every page shows that app's data without each one having to ask for it.
+ */
+export function selectedApp(): string {
+  try {
+    return localStorage.getItem(APP_KEY) || "all";
+  } catch {
+    return "all";
+  }
+}
+
+export function selectApp(app: string) {
+  try {
+    if (app === "all") localStorage.removeItem(APP_KEY);
+    else localStorage.setItem(APP_KEY, app);
+  } catch {
+    /* private window: the choice lasts until reload */
+  }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(APP_CHANGED));
+}
+
+function appHeader(): Record<string, string> {
+  const app = selectedApp();
+  return app === "all" ? {} : { "X-Continuum-App": app };
+}
+
+/** One application calling Continuum with its own keys. */
+export type AppSummary = {
+  id: number;
+  name: string;
+  keys: number;
+  activeKeys: number;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
 
 /** Raised when the server rejects the session, so pages can prompt a sign-in. */
 export class UnauthorizedError extends Error {
@@ -125,6 +167,7 @@ async function http<T>(path: string, init?: RequestInit, asOperator = false): Pr
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...appHeader(),
       ...(init?.headers ?? {}),
     },
   });
@@ -228,7 +271,7 @@ export const api = {
 
 function authHeaders(): Record<string, string> {
   const t = localStorage.getItem(SESSION_KEY);
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  return t ? { Authorization: `Bearer ${t}`, ...appHeader() } : {};
 }
 
 async function portalHttp<T>(path: string, method: string, body?: unknown): Promise<T> {
@@ -376,6 +419,8 @@ export const portal = {
     endedAt = 0;
     portal.setSession(null);
     portal.dropOperator();
+    // An app id means nothing to the next account to sign in here.
+    selectApp("all");
   },
 
   // --- Operator elevation -------------------------------------------------
@@ -434,7 +479,15 @@ export const portal = {
 
   me: () => portalHttp<any>("/api/portal/developer/me", "GET"),
   keys: () => portalHttp<any[]>("/api/portal/developer/keys", "GET"),
-  issueKey: (label?: string) => portalHttp<any>("/api/portal/developer/keys", "POST", { label }),
+  /** A key for a new app named {@code label}, or one more key for an existing app. */
+  issueKey: (label?: string, appId?: number) =>
+    portalHttp<any>("/api/portal/developer/keys", "POST", { label, appId }),
+  /** Renames the app a key belongs to. */
+  renameKey: (id: number, name: string) =>
+    portalHttp<any>(`/api/portal/developer/keys/${id}`, "PATCH", { name }),
+  apps: () => portalHttp<AppSummary[]>("/api/portal/developer/apps", "GET"),
+  renameApp: (id: number, name: string) =>
+    portalHttp<AppSummary>(`/api/portal/developer/apps/${id}`, "PATCH", { name }),
   revokeKey: (id: number) => portalHttp<any>(`/api/portal/developer/keys/${id}`, "DELETE"),
   credentials: () => portalHttp<any[]>("/api/portal/developer/credentials", "GET"),
   storeCredential: (provider: string, secret: string) =>

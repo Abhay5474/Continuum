@@ -1284,6 +1284,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/developer/apps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["apps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/developer/apps/{appId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["renameApp"];
+        trace?: never;
+    };
     "/api/portal/developer/autopilot/active-bundle": {
         parameters: {
             query?: never;
@@ -2513,7 +2545,7 @@ export interface paths {
         delete: operations["revokeKey"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["renameKey"];
         trace?: never;
     };
     "/api/portal/developer/login": {
@@ -4108,6 +4140,8 @@ export interface components {
         };
         AiChaosEventEntity: {
             /** Format: int64 */
+            appId: number;
+            /** Format: int64 */
             commandSeq: number;
             /** @description Epoch seconds, possibly fractional */
             createdAt: number;
@@ -4273,6 +4307,8 @@ export interface components {
             updatedAt: string;
         };
         DagRunEntity: {
+            /** Format: int64 */
+            appId: number;
             /** Format: int32 */
             claimCount: number;
             /** @description Epoch seconds, possibly fractional */
@@ -4391,6 +4427,8 @@ export interface components {
             };
         };
         GatewayRequestLogEntity: {
+            /** Format: int64 */
+            appId: number;
             chosenModel: string;
             chosenProvider: string;
             /** Format: double */
@@ -4415,6 +4453,8 @@ export interface components {
         };
         GodModeActionEntity: {
             action: string;
+            /** Format: int64 */
+            appId: number;
             /** @description Epoch seconds, possibly fractional */
             createdAt: number;
             detail: string;
@@ -4487,6 +4527,8 @@ export interface components {
             email: string;
         };
         IssueKey: {
+            /** Format: int64 */
+            appId: number;
             label: string;
         };
         Item: {
@@ -4526,6 +4568,8 @@ export interface components {
         MemoryEntryEntity: {
             /** Format: int64 */
             accessCount: number;
+            /** Format: int64 */
+            appId: number;
             content: string;
             /** @description Epoch seconds, possibly fractional */
             createdAt: number;
@@ -4565,6 +4609,8 @@ export interface components {
             workflowTypes: string[];
         };
         MmuStubEntity: {
+            /** Format: int64 */
+            appId: number;
             /** @description Epoch seconds, possibly fractional */
             createdAt: number;
             developerId: string;
@@ -4776,6 +4822,9 @@ export interface components {
             /** @description Epoch seconds, possibly fractional */
             updatedAt: number;
         };
+        Rename: {
+            name: string;
+        };
         ReplayVerificationReport: {
             /** Format: double */
             decisionConsistency: number;
@@ -4796,6 +4845,8 @@ export interface components {
         };
         ReplayVerificationReportEntity: {
             activityType: string;
+            /** Format: int64 */
+            appId: number;
             /** Format: int64 */
             commandSeq: number;
             /** Format: double */
@@ -4861,6 +4912,8 @@ export interface components {
             tier: string;
         };
         RoutingDecisionEntity: {
+            /** Format: int64 */
+            appId: number;
             chain: string;
             chosenProvider: string;
             /** Format: double */
@@ -7084,6 +7137,56 @@ export interface operations {
             };
         };
     };
+    apps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    }[];
+                };
+            };
+        };
+    };
+    renameApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["Rename"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
     activeBundle: {
         parameters: {
             query?: never;
@@ -8918,6 +9021,34 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
+    renameKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                keyId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["Rename"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

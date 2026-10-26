@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -14,7 +16,7 @@ import java.time.Instant;
         uniqueConstraints = @UniqueConstraint(name = "uq_mmu_stub_seq",
                 columnNames = {"stub_id", "seq"}),
         indexes = @Index(name = "idx_mmu_events_stub", columnList = "stub_id, seq"))
-public class MmuStubEventEntity {
+public class MmuStubEventEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

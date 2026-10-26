@@ -72,10 +72,12 @@ public class ActivityExecutor {
                 task.getWorkflowId(), task.getIdempotencyKey(), task.getRetryCount() + 1, json);
         // A worker thread is doing this tenant's work, so anything tenant-scoped
         // that runs underneath — fault injection especially — sees the right one.
-        String owner = instances.findById(task.getWorkflowId())
-                .map(WorkflowInstanceEntity::getDeveloperId)
-                .orElse(null);
+        var instance = instances.findById(task.getWorkflowId());
+        String owner = instance.map(WorkflowInstanceEntity::getDeveloperId).orElse(null);
         TenantContext.set(owner);
+        // And as the app that started the workflow, so an activity's memory and
+        // model calls are that app's.
+        io.continuum.apps.AppContext.forApp(instance.map(WorkflowInstanceEntity::getAppId).orElse(null));
         try {
             Object result = activity.execute(task.getInput(), ctx);
             return ActivityOutcome.success(json.write(result), ctx);
@@ -85,6 +87,7 @@ public class ActivityExecutor {
             // Workers are pooled and long-lived; a tenant left set here would
             // follow this thread onto the next customer's activity.
             TenantContext.clear();
+            io.continuum.apps.AppContext.clear();
         }
     }
 

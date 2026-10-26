@@ -231,7 +231,9 @@ public class OpenAiCompatController {
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
         StreamPolicy.Mode mode = streamPolicy.modeFor(developerId);
 
-        streams.execute(() -> {
+        // The stream runs on its own thread; the request's tenant and app go with
+        // it, or its capture would be untagged and fault drills would miss it.
+        streams.execute(io.continuum.apps.AppContext.carry(() -> {
             try {
                 String opening = req.model() == null ? "auto" : req.model();
                 send(emitter, translator.openingChunk(id, opening));
@@ -287,7 +289,7 @@ public class OpenAiCompatController {
                 }
                 emitter.complete();
             }
-        });
+        }));
         return emitter;
     }
 

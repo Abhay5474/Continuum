@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -9,7 +11,7 @@ import java.time.Instant;
 @Table(name = "memory_working", indexes = {
         @Index(name = "idx_mem_working_dev", columnList = "developer_id, session_id"),
         @Index(name = "idx_mem_working_exp", columnList = "expires_at")})
-public class MemoryWorkingEntity {
+public class MemoryWorkingEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

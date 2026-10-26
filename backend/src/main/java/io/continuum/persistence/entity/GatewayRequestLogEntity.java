@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -11,7 +13,7 @@ import java.time.Instant;
                 @Index(name = "idx_gwreq_dev", columnList = "developer_id"),
                 @Index(name = "idx_gwreq_created", columnList = "created_at")
         })
-public class GatewayRequestLogEntity {
+public class GatewayRequestLogEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

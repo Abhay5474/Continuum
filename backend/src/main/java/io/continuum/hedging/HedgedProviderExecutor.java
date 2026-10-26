@@ -127,7 +127,9 @@ public class HedgedProviderExecutor {
                        List<String> chain, int idx, LlmRequest request, ProviderCaller caller) {
         String provider = chain.get(idx);
         attempted.add(provider);
-        inflight.add(ecs.submit(() -> {
+        // Carried onto the worker: a provider call records events and consults
+        // the tenant's fault drills, and must do both as the caller's tenant and app.
+        inflight.add(ecs.submit(io.continuum.apps.AppContext.carry(() -> {
             long s = System.nanoTime();
             try {
                 LlmResponse r = caller.call(provider, request);
@@ -135,7 +137,7 @@ public class HedgedProviderExecutor {
             } catch (Exception e) {
                 return Attempt.failure(provider, e, (System.nanoTime() - s) / 1_000_000);
             }
-        }));
+        })));
         return idx + 1;
     }
 

@@ -3,7 +3,8 @@ import { MenuSurface } from "./system/MenuSurface";
 import { PageStage } from "./system/PageStage";
 import { NavProgress } from "./system/NavProgress";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { portal } from "./api";
+import { portal, selectApp, type AppSummary } from "./api";
+import { appLabel, useApps, useSelectedApp } from "./system/apps";
 import { ThemeToggle } from "./components/ui";
 import { useOperator } from "./system/OperatorAccess";
 import { GuideButton } from "./system/guide";
@@ -75,6 +76,15 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const { operator, request: requestOperator, drop: dropOperator } = useOperator();
+  // Which app's data every page shows. One choice for the whole console,
+  // rather than a filter on each page that would disagree with the next.
+  const { apps } = useApps();
+  const app = useSelectedApp();
+  const pickApp = (next: string) => {
+    selectApp(next);
+    setOpenMenu(null);
+    setMobileOpen(false);
+  };
 
   // Close any open menu on outside click, Escape, or navigation.
   useEffect(() => {
@@ -182,12 +192,35 @@ export default function App() {
       </a>
       <header className="glass-bar sticky top-0 z-30">
         <div ref={navRef} onKeyDown={onMenuKey} className="relative mx-auto flex max-w-[1200px] items-center gap-2 px-5 py-2.5">
-          <Link to="/dashboard" className="mr-2 flex shrink-0 items-center gap-2.5">
+          <Link to="/dashboard" className="flex shrink-0 items-center gap-2.5">
             <BrandMark />
-            <span className="hidden text-[14.5px] font-semibold tracking-tight text-slate-100 sm:block">
+            {/* Wordmark off between lg and xl, where the full nav and the app
+                picker leave no room for it; the mark still names the product. */}
+            <span className="hidden text-[14.5px] font-semibold tracking-tight text-slate-100 sm:block lg:hidden xl:block">
               Continuum
             </span>
           </Link>
+          {/* Continuum / <app>: the app in view, as a breadcrumb, because it
+              scopes everything to its right. */}
+          <span aria-hidden className="select-none text-[15px] font-light text-slate-600">/</span>
+          <button
+            data-menu-trigger="app"
+            onClick={() => setOpenMenu(openMenu === "app" ? null : "app")}
+            onKeyDown={onTriggerKey("app")}
+            aria-haspopup="true"
+            aria-expanded={openMenu === "app"}
+            aria-label={`App in view: ${appLabel(app, apps)}. Change app`}
+            data-tip="Which app's data the console shows"
+            className={`${topLink(app !== "all")} mr-2 inline-flex min-w-0 max-w-[9rem] items-center gap-1.5 xl:max-w-[11rem]`}
+          >
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: app === "all" ? "rgb(148 163 184 / 0.7)" : "var(--accent)" }}
+            />
+            <span className="truncate">{appLabel(app, apps)}</span>
+            <Chevron open={openMenu === "app"} />
+          </button>
 
           {/* primary nav */}
           <nav className="hidden items-center gap-0.5 lg:flex">
@@ -224,7 +257,9 @@ export default function App() {
             root={navRef}
             align={(k) => (k === "account" ? "right" : "left")}
             render={(k) =>
-              k === "account" ? (
+              k === "app" ? (
+                <AppMenu apps={apps} selected={app} onPick={pickApp} />
+              ) : k === "account" ? (
                 <MenuItems
                   items={operator ? [...ACCOUNT, OPERATOR_ACCOUNTS] : ACCOUNT}
                   footer={
@@ -315,6 +350,11 @@ export default function App() {
         {/* mobile menu */}
         {mobileOpen && (
           <nav className="mx-auto max-h-[70vh] max-w-[1200px] overflow-y-auto border-t border-edge/60 px-5 py-3 lg:hidden">
+            <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+              App in view
+            </div>
+            <AppMenu apps={apps} selected={app} onPick={pickApp} />
+            <div className="my-3 border-t border-edge/60" />
             <MobileLink to="/dashboard" label="Command Centre" />
             {GROUPS.map((g) => (
               <div key={g.label} className="mt-3">
@@ -357,7 +397,8 @@ export default function App() {
           came from — see PageStage. */}
       <PageStage className="mx-auto max-w-[1200px] px-5 pb-16 pt-6">
         <FeatureTabs />
-        <Outlet />
+        {/* Keyed on the app, so switching app reloads the page's data. */}
+        <Outlet key={app} />
       </PageStage>
       <Advisor />
     </div>
@@ -365,7 +406,7 @@ export default function App() {
 }
 
 function topLink(isActive: boolean) {
-  return `press rounded-full px-3 py-1.5 text-[13px] font-medium ${
+  return `press whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-medium ${
     isActive
       ? "bg-slate-500/[0.13] text-slate-100"
       : "text-slate-400 hover:bg-slate-500/[0.08] hover:text-slate-200"
@@ -428,6 +469,79 @@ function MenuItems({
       {footer && <div className="mt-1 border-t border-edge/60 pt-1">{footer}</div>}
     </>
   );
+}
+
+/**
+ * The app picker. "All apps" is the account; each app is one key's worth of
+ * traffic (or several, when a key was replaced); "Console & earlier" is what
+ * was made here, or captured before apps were told apart.
+ */
+function AppMenu({
+  apps,
+  selected,
+  onPick,
+}: {
+  apps: AppSummary[] | null;
+  selected: string;
+  onPick: (app: string) => void;
+}) {
+  const option = (value: string, label: string, desc: string) => (
+    <button
+      key={value}
+      role="menuitemradio"
+      aria-checked={selected === value}
+      onClick={() => onPick(value)}
+      className={`press flex w-full items-start gap-2.5 rounded-[12px] px-3 py-2 text-left ${
+        selected === value ? "bg-slate-500/[0.13]" : "hover:bg-slate-500/[0.08]"
+      }`}
+    >
+      <span
+        aria-hidden
+        className="mt-[5px] h-2 w-2 shrink-0 rounded-full border"
+        style={
+          selected === value
+            ? { background: "var(--accent)", borderColor: "var(--accent)" }
+            : { borderColor: "rgb(148 163 184 / 0.5)" }
+        }
+      />
+      <span className="min-w-0">
+        <span className="block truncate text-[13px] font-medium text-slate-200">{label}</span>
+        <span className="block text-[11.5px] leading-relaxed text-slate-500">{desc}</span>
+      </span>
+    </button>
+  );
+  return (
+    <>
+      {option("all", "All apps", "Everything this account has captured")}
+      {(apps ?? []).map((a) =>
+        option(
+          String(a.id),
+          a.name,
+          `${a.activeKeys === 1 ? "1 active key" : `${a.activeKeys} active keys`}` +
+            (a.lastUsedAt ? ` · used ${since(a.lastUsedAt)}` : " · not used yet"),
+        ),
+      )}
+      {option("untagged", "Console & earlier", "Made in this console, or before apps were told apart")}
+      <div className="mt-1 border-t border-edge/60 pt-1">
+        <Link
+          to="/portal#keys"
+          role="menuitem"
+          className="press block rounded-[12px] px-3 py-2 text-[12.5px] text-slate-400 hover:bg-slate-500/[0.08] hover:text-slate-200"
+        >
+          Name apps or add one…
+        </Link>
+      </div>
+    </>
+  );
+}
+
+/** "3h ago", for the app picker. */
+function since(iso: string): string {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 90) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
 }
 
 function MobileLink({ to, label }: { to: string; label: string }) {

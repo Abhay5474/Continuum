@@ -60,7 +60,9 @@ public class CalibrationStore {
         if (developerId == null) {
             return;
         }
-        Bin[] bins = byDeveloper.computeIfAbsent(developerId, k -> newBins());
+        // Per app: how often a cheap model's answer is good enough depends on
+        // what the app asks, so one app's evidence must not tune another's cascade.
+        Bin[] bins = byDeveloper.computeIfAbsent(key(developerId), k -> newBins());
         Bin b = bins[index(rawScore)];
         synchronized (b) {
             b.total++;
@@ -72,7 +74,7 @@ public class CalibrationStore {
 
     /** Maps a raw score to a calibrated probability that the cheap answer suffices. */
     public double calibrate(String developerId, double rawScore) {
-        Bin[] bins = byDeveloper.get(developerId);
+        Bin[] bins = byDeveloper.get(key(developerId));
         if (bins == null) {
             return rawScore;
         }
@@ -84,7 +86,7 @@ public class CalibrationStore {
     /** How much evidence backs this tenant's curve, for the console. */
     public Map<String, Object> profile(String developerId) {
         Map<String, Object> out = new LinkedHashMap<>();
-        Bin[] bins = byDeveloper.get(developerId);
+        Bin[] bins = visible(developerId);
         if (bins == null) {
             out.put("observations", 0L);
             out.put("calibrated", false);
@@ -111,7 +113,37 @@ public class CalibrationStore {
     }
 
     public void reset(String developerId) {
-        byDeveloper.remove(developerId);
+        byDeveloper.keySet().removeIf(k -> visibleApp(k, developerId));
+    }
+
+    private static String key(String developerId) {
+        return developerId + "|" + io.continuum.apps.AppContext.writeKey();
+    }
+
+    private static boolean visibleApp(String key, String developerId) {
+        String prefix = developerId + "|";
+        return key.startsWith(prefix)
+                && io.continuum.apps.AppContext.visible(io.continuum.apps.AppContext.fromKey(key.substring(prefix.length())));
+    }
+
+    /** The bins of every app this thread may see, summed; null when there are none. */
+    private Bin[] visible(String developerId) {
+        Bin[] sum = null;
+        for (Map.Entry<String, Bin[]> e : byDeveloper.entrySet()) {
+            if (!visibleApp(e.getKey(), developerId)) {
+                continue;
+            }
+            if (sum == null) {
+                sum = newBins();
+            }
+            for (int i = 0; i < BINS; i++) {
+                synchronized (e.getValue()[i]) {
+                    sum[i].total += e.getValue()[i].total;
+                    sum[i].sufficient += e.getValue()[i].sufficient;
+                }
+            }
+        }
+        return sum;
     }
 
     /**

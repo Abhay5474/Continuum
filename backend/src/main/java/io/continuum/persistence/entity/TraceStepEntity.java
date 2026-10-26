@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -19,7 +21,7 @@ import java.time.Instant;
                 @Index(name = "idx_trace_step_trace", columnList = "trace_id, ordinal"),
                 @Index(name = "idx_trace_step_dev", columnList = "developer_id, created_at")
         })
-public class TraceStepEntity {
+public class TraceStepEntity extends AppScopedEntity {
 
     public enum Kind {
         /** POLICY sits between enrichment and the model: it reads how strong the

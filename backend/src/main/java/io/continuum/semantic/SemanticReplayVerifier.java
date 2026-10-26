@@ -131,6 +131,9 @@ public class SemanticReplayVerifier {
             // Stamped with the run's owner: without it the per-account history
             // (the drift trends a developer sees) came back empty for everyone.
             report.setDeveloperId(instance.getDeveloperId());
+            // And with the run's app: a replay started from the console checks
+            // an app's workflow, and belongs with that app's history.
+            report.setAppId(instance.getAppId());
             items.add(reports.save(report));
         }
 

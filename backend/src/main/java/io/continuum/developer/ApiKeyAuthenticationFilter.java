@@ -26,6 +26,8 @@ import java.util.Optional;
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     public static final String DEVELOPER_ATTRIBUTE = "continuum.developer";
+    /** The app the presented key belongs to, or absent for a key that has none. */
+    public static final String APP_ATTRIBUTE = "continuum.app";
 
     private final DeveloperService developerService;
     private final ObjectMapper mapper;
@@ -48,7 +50,8 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         String auth = request.getHeader("Authorization");
         String token = (auth != null && auth.startsWith("Bearer ")) ? auth.substring(7).trim() : null;
 
-        Optional<DeveloperEntity> developer = token == null ? Optional.empty() : safeAuthenticate(token);
+        Optional<DeveloperService.Authenticated> key = token == null ? Optional.empty() : safeAuthenticate(token);
+        Optional<DeveloperEntity> developer = key.map(DeveloperService.Authenticated::developer);
         if (developer.isEmpty()) {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -58,19 +61,27 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         request.setAttribute(DEVELOPER_ATTRIBUTE, developer.get());
+        Long app = key.get().appId();
+        if (app != null) {
+            request.setAttribute(APP_ATTRIBUTE, app);
+        }
         // Gateway traffic is the main thing a tenant's fault drill should affect,
         // so the tenant travels with the request thread.
         io.continuum.portal.TenantContext.set(developer.get().getId());
+        // So does the app: what this request captures is tagged with it, and it
+        // recalls its own memory and cache, never another app's.
+        io.continuum.apps.AppContext.forApp(app);
         try {
             chain.doFilter(request, response);
         } finally {
             io.continuum.portal.TenantContext.clear();
+            io.continuum.apps.AppContext.clear();
         }
     }
 
-    private Optional<DeveloperEntity> safeAuthenticate(String token) {
+    private Optional<DeveloperService.Authenticated> safeAuthenticate(String token) {
         try {
-            return developerService.authenticate(token);
+            return developerService.authenticateKey(token);
         } catch (Exception e) {
             // Never leak internal errors as auth signal.
             return Optional.empty();

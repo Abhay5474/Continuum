@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -11,7 +13,7 @@ import java.time.Instant;
                 @Index(name = "idx_aichaos_workflow", columnList = "workflow_id"),
                 @Index(name = "idx_aichaos_type", columnList = "failure_type")
         })
-public class AiChaosEventEntity {
+public class AiChaosEventEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

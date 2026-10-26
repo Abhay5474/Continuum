@@ -30,8 +30,9 @@ public class WebConfig {
     public FilterRegistrationBean<CorsFilter> corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Admin-Token", "X-Continuum-Session"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Admin-Token", "X-Continuum-Session",
+                "X-Continuum-App"));
         config.setExposedHeaders(List.of("X-Continuum-Session", "X-Continuum-Request-Id", "X-Continuum-Applied", "Retry-After", "X-RateLimit-Remaining"));
         config.setMaxAge(3600L);
 

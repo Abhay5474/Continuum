@@ -422,7 +422,10 @@ public class ContextMMU {
          */
         private String materialize(String stubId) {
             long t0 = System.nanoTime();
-            List<MmuStubEventEntity> stream = stubEvents.findByStubIdOrderBySeqAsc(stubId);
+            // Whole, whichever app is asking: a stub is named by a hash of its
+            // content, so two apps paging out the same text share it.
+            List<MmuStubEventEntity> stream = io.continuum.apps.AppContext.unscoped(
+                    () -> stubEvents.findByStubIdOrderBySeqAsc(stubId));
             if (stream.isEmpty()) {
                 return null;
             }
@@ -477,9 +480,15 @@ public class ContextMMU {
             if (stub == null || !stub.getDeveloperId().equals(developerId)) {
                 continue;
             }
-            int nextSeq = stubEvents.countByStubId(stub.getStubId()) + 1;
-            stubEvents.save(new MmuStubEventEntity(stub.getStubId(), developerId,
-                    nextSeq, "UPDATED", entry.getValue()));
+            // Counted whole for the same reason; counting one app's share would
+            // repeat a sequence number and fail the insert.
+            int nextSeq = io.continuum.apps.AppContext.unscoped(() -> stubEvents.countByStubId(stub.getStubId())) + 1;
+            MmuStubEventEntity event = new MmuStubEventEntity(stub.getStubId(), developerId,
+                    nextSeq, "UPDATED", entry.getValue());
+            // The checkpoint runs on whichever request comes next, possibly
+            // another app's; the event belongs to the stub's app.
+            event.setAppId(stub.getAppId());
+            stubEvents.save(event);
             stub.setSummary(stub.getSummary() + " [updated: " + entry.getValue() + "]");
             stub.setDirty(false);
             stub.bumpVersion();

@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import io.continuum.memory.MemoryTier;
 import jakarta.persistence.*;
 
@@ -16,7 +18,7 @@ import java.time.Instant;
                 @Index(name = "idx_memory_scope", columnList = "scope"),
                 @Index(name = "idx_memory_tier", columnList = "scope, tier")
         })
-public class MemoryEntryEntity {
+public class MemoryEntryEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -47,6 +47,10 @@
       },
       "AiChaosEventEntity" : {
         "properties" : {
+          "appId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "commandSeq" : {
             "format" : "int64",
             "type" : "integer"
@@ -488,6 +492,10 @@
       },
       "DagRunEntity" : {
         "properties" : {
+          "appId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "claimCount" : {
             "format" : "int32",
             "type" : "integer"
@@ -787,6 +795,10 @@
       },
       "GatewayRequestLogEntity" : {
         "properties" : {
+          "appId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "chosenModel" : {
             "type" : "string"
           },
@@ -843,6 +855,10 @@
         "properties" : {
           "action" : {
             "type" : "string"
+          },
+          "appId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "createdAt" : {
             "description" : "Epoch seconds, possibly fractional",
@@ -1040,6 +1056,10 @@
       },
       "IssueKey" : {
         "properties" : {
+          "appId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "label" : {
             "type" : "string"
           }
@@ -1149,6 +1169,10 @@
       "MemoryEntryEntity" : {
         "properties" : {
           "accessCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "appId" : {
             "format" : "int64",
             "type" : "integer"
           },
@@ -1262,6 +1286,10 @@
       },
       "MmuStubEntity" : {
         "properties" : {
+          "appId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "createdAt" : {
             "description" : "Epoch seconds, possibly fractional",
             "type" : "number"
@@ -1783,6 +1811,14 @@
         },
         "type" : "object"
       },
+      "Rename" : {
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ReplayVerificationReport" : {
         "properties" : {
           "decisionConsistency" : {
@@ -1831,6 +1867,10 @@
         "properties" : {
           "activityType" : {
             "type" : "string"
+          },
+          "appId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "commandSeq" : {
             "format" : "int64",
@@ -1986,6 +2026,10 @@
       },
       "RoutingDecisionEntity" : {
         "properties" : {
+          "appId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "chain" : {
             "type" : "string"
           },
@@ -4965,6 +5009,69 @@
         "tags" : [ "advisor-controller" ]
       }
     },
+    "/api/portal/developer/apps" : {
+      "get" : {
+        "operationId" : "apps",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "additionalProperties" : {
+                      "type" : "object"
+                    },
+                    "type" : "object"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "portal-developer-controller" ]
+      }
+    },
+    "/api/portal/developer/apps/{appId}" : {
+      "patch" : {
+        "operationId" : "renameApp",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "appId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Rename"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "portal-developer-controller" ]
+      }
+    },
     "/api/portal/developer/autopilot/active-bundle" : {
       "get" : {
         "operationId" : "activeBundle",
@@ -7045,6 +7152,43 @@
             "type" : "integer"
           }
         } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "object"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "portal-developer-controller" ]
+      },
+      "patch" : {
+        "operationId" : "renameKey",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "keyId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Rename"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "content" : {

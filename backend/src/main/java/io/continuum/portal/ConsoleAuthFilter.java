@@ -43,6 +43,9 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
      * Anything not listed needs a console session — deny by default. Exact
      * paths, or prefixes ending in "/".
      */
+    /** The console's app selector: "all", "untagged", or an app id. */
+    public static final String APP_HEADER = "X-Continuum-App";
+
     public static final java.util.List<String> EXEMPT = java.util.List.of(
             // Public: build info and liveness for the landing page.
             "/api/meta", "/api/health",
@@ -101,10 +104,14 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
         // Also published thread-locally, for cross-cutting concerns that run far
         // from the controller. Cleared unconditionally: this is a pooled thread.
         TenantContext.set(s.role() == PortalSessionService.Role.OPERATOR ? null : s.subject());
+        // Which app the console is looking at. Only narrows what is read; the
+        // console's own writes stay untagged.
+        io.continuum.apps.AppContext.forConsole(request.getHeader(APP_HEADER));
         try {
             chain.doFilter(request, response);
         } finally {
             TenantContext.clear();
+            io.continuum.apps.AppContext.clear();
         }
     }
 

@@ -74,11 +74,15 @@ public class PortalDeveloperController {
 
     @GetMapping("/keys")
     public List<Map<String, Object>> keys(HttpServletRequest req) {
+        Map<Long, String> appNames = new java.util.HashMap<>();
+        developers.appsFor(dev(req)).forEach(a -> appNames.put(a.getId(), a.getName()));
         return developers.keysFor(dev(req)).stream().map(k -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", k.getId());
             m.put("prefix", k.getKeyPrefix());
             m.put("label", k.getLabel());
+            m.put("appId", k.getAppId());
+            m.put("appName", k.getAppId() == null ? null : appNames.get(k.getAppId()));
             m.put("active", k.isActive());
             m.put("createdAt", k.getCreatedAt().toString());
             m.put("lastUsedAt", k.getLastUsedAt() == null ? null : k.getLastUsedAt().toString());
@@ -89,12 +93,66 @@ public class PortalDeveloperController {
     @PostMapping("/keys")
     public Map<String, Object> issueKey(HttpServletRequest req, @RequestBody(required = false) IssueKey body) {
         String label = body == null ? null : body.label();
-        DeveloperService.IssuedKey issued = developers.issueKey(dev(req), label);
+        Long appId = body == null ? null : body.appId();
+        DeveloperService.IssuedKey issued = developers.issueKey(dev(req), label, appId);
         return Map.of("id", issued.id(), "apiKey", issued.plaintextKey(),
                 "warning", "Store this key now — it will not be shown again.");
     }
 
-    public record IssueKey(String label) {
+    /**
+     * @param label the app's name when a new app is started
+     * @param appId an existing app the key joins — to replace a key and keep
+     *              the app's history; absent starts a new app
+     */
+    public record IssueKey(String label, Long appId) {
+    }
+
+    /** Renames a key, which is renaming the app it speaks for. */
+    @PatchMapping("/keys/{keyId}")
+    public Map<String, Object> renameKey(HttpServletRequest req, @PathVariable Long keyId,
+                                         @RequestBody(required = false) Rename body) {
+        var key = developers.keysFor(dev(req)).stream().filter(k -> k.getId().equals(keyId)).findFirst()
+                .orElseThrow(() -> new io.continuum.portal.RequestScope.NotFoundException("No such key."));
+        if (key.getAppId() == null) {
+            throw new io.continuum.portal.RequestScope.NotFoundException("This key belongs to no app.");
+        }
+        return describe(developers.renameApp(dev(req), key.getAppId(), body == null ? null : body.name()),
+                developers.keysFor(dev(req)));
+    }
+
+    /**
+     * The account's apps: one per application calling Continuum. The console's
+     * app selector is built from this.
+     */
+    @GetMapping("/apps")
+    public List<Map<String, Object>> apps(HttpServletRequest req) {
+        var keys = developers.keysFor(dev(req));
+        return developers.appsFor(dev(req)).stream().map(a -> describe(a, keys)).toList();
+    }
+
+    @PatchMapping("/apps/{appId}")
+    public Map<String, Object> renameApp(HttpServletRequest req, @PathVariable Long appId,
+                                         @RequestBody(required = false) Rename body) {
+        return describe(developers.renameApp(dev(req), appId, body == null ? null : body.name()),
+                developers.keysFor(dev(req)));
+    }
+
+    public record Rename(String name) {
+    }
+
+    private static Map<String, Object> describe(io.continuum.persistence.entity.AppEntity a,
+                                                List<io.continuum.persistence.entity.DeveloperApiKeyEntity> keys) {
+        var mine = keys.stream().filter(k -> a.getId().equals(k.getAppId())).toList();
+        java.time.Instant lastUsed = mine.stream().map(k -> k.getLastUsedAt())
+                .filter(java.util.Objects::nonNull).max(java.util.Comparator.naturalOrder()).orElse(null);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", a.getId());
+        m.put("name", a.getName());
+        m.put("keys", mine.size());
+        m.put("activeKeys", mine.stream().filter(k -> k.isActive()).count());
+        m.put("createdAt", a.getCreatedAt().toString());
+        m.put("lastUsedAt", lastUsed == null ? null : lastUsed.toString());
+        return m;
     }
 
     @DeleteMapping("/keys/{keyId}")

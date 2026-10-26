@@ -1,5 +1,7 @@
 package io.continuum.persistence.entity;
 
+import io.continuum.apps.AppScopedEntity;
+
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -9,7 +11,7 @@ import java.time.Instant;
 @Table(name = "memory_experience_nodes", indexes = {
         @Index(name = "idx_mem_nodes_dev", columnList = "developer_id"),
         @Index(name = "idx_mem_nodes_exp", columnList = "expires_at")})
-public class ExperienceNodeEntity {
+public class ExperienceNodeEntity extends AppScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

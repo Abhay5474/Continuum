@@ -21,7 +21,16 @@ public interface WorkflowInstanceRepository extends JpaRepository<WorkflowInstan
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select w from WorkflowInstanceEntity w where w.workflowId = :id")
-    Optional<WorkflowInstanceEntity> findByIdForUpdate(@Param("id") String id);
+    Optional<WorkflowInstanceEntity> lockById(@Param("id") String id);
+
+    /**
+     * {@link #lockById}, whichever app the caller is looking at. A lookup by id
+     * is the engine's, and the console's app selector must not hide a workflow
+     * from the code that runs it.
+     */
+    default Optional<WorkflowInstanceEntity> findByIdForUpdate(String id) {
+        return io.continuum.apps.AppContext.unscoped(() -> lockById(id));
+    }
 
     Page<WorkflowInstanceEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
