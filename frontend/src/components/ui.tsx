@@ -247,6 +247,27 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
 
+  // A safety net for every button in the console: an action whose failure
+  // nobody caught used to end as an unhandled rejection, so the click simply
+  // did nothing. Shown once per message a few seconds apart, so a poll that
+  // keeps failing cannot fill the screen. A lapsed session is not an error
+  // to show — the console sends the user to sign in instead.
+  useEffect(() => {
+    const last = new Map<string, number>();
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const reason: any = e.reason;
+      const name = reason?.name;
+      if (name === "UnauthorizedError" || name === "AbortError") return;
+      const message = (typeof reason === "string" ? reason : reason?.message) || "Something went wrong";
+      const now = Date.now();
+      if (now - (last.get(message) ?? 0) < 8000) return;
+      last.set(message, now);
+      push(message, "error");
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => window.removeEventListener("unhandledrejection", onRejection);
+  }, [push]);
+
   return (
     <ToastContext.Provider value={push}>
       {children}

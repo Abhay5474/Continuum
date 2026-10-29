@@ -35,9 +35,13 @@ public class PortalAuthFilter extends OncePerRequestFilter {
             "/api/portal/developer/account/invites/preview",
             "/api/portal/developer/account/invites/accept");
 
-    public PortalAuthFilter(PortalSessionService sessions, ObjectMapper mapper) {
+    private final io.continuum.apps.AppDirectory apps;
+
+    public PortalAuthFilter(PortalSessionService sessions, ObjectMapper mapper,
+                            io.continuum.apps.AppDirectory apps) {
         this.sessions = sessions;
         this.mapper = mapper;
+        this.apps = apps;
     }
 
     @Override
@@ -64,7 +68,8 @@ public class PortalAuthFilter extends OncePerRequestFilter {
         request.setAttribute(DEVELOPER_ID_ATTRIBUTE, session.get().subject());
         request.setAttribute(ACTOR_ID_ATTRIBUTE, session.get().actor());
         TenantContext.set(session.get().subject());
-        io.continuum.apps.AppContext.forConsole(request.getHeader(ConsoleAuthFilter.APP_HEADER));
+        io.continuum.apps.AppContext.forConsole(request.getHeader(ConsoleAuthFilter.APP_HEADER),
+                app -> apps.belongs(session.get().subject(), app));
         try {
             chain.doFilter(request, response);
         } finally {

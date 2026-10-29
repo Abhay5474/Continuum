@@ -37,6 +37,13 @@ public class MemoryEngine {
     private static final double DUPLICATE_SIMILARITY = 0.92;
     private static final double EDGE_SIMILARITY = 0.55;
     private static final int PROMOTE_MIN_SUMMARY_TOKENS = 20;
+    /**
+     * Below this a memory is not about the question. Related pairs measure
+     * 0.25-0.63 on this embedder and unrelated ones 0, with hashing collisions
+     * reaching about 0.14 — so the top three used to be injected as "relevant
+     * memories" into every prompt even when none of them was.
+     */
+    static final double MIN_RETRIEVE_SIMILARITY = 0.2;
 
     private final MemoryWorkingRepository working;
     private final MemoryEpisodicRepository episodic;
@@ -285,16 +292,25 @@ public class MemoryEngine {
         for (MemoryEpisodicEntity e : episodic.findByDeveloperIdOrderByCreatedAtDesc(dev)) {
             double[] emb = e.getEmbeddingJson() != null
                     ? json.read(e.getEmbeddingJson(), double[].class) : embedder.embed(e.getSummaryText());
-            hits.add(new Hit("EPISODIC", e.getSummaryText(), TextEmbedder.cosine(q, emb), null));
+            double sim = TextEmbedder.cosine(q, emb);
+            if (sim >= MIN_RETRIEVE_SIMILARITY) {
+                hits.add(new Hit("EPISODIC", e.getSummaryText(), sim, null));
+            }
         }
         for (ExperienceNodeEntity n : nodes.findByDeveloperIdOrderByUtilityScoreDesc(dev)) {
             double sim = TextEmbedder.cosine(q, embeddingOf(n));
-            hits.add(new Hit("SEMANTIC", n.getText(), sim * (0.7 + 0.3 * n.getUtilityScore()), n));
+            // Also keeps an unrelated node from being credited with a use, which
+            // inflated the utility of whatever happened to rank in the top three.
+            if (sim >= MIN_RETRIEVE_SIMILARITY) {
+                hits.add(new Hit("SEMANTIC", n.getText(), sim * (0.7 + 0.3 * n.getUtilityScore()), n));
+            }
         }
         for (MemoryWorkingEntity w : working.findByDeveloperIdOrderByCreatedAtAsc(dev)) {
             double sim = TextEmbedder.cosine(q, embedder.embed(w.getContent()));
-            // Give recent working memory a slight relevance boost
-            hits.add(new Hit("WORKING", w.getContent(), sim * 1.1, null));
+            if (sim >= MIN_RETRIEVE_SIMILARITY) {
+                // Give recent working memory a slight relevance boost
+                hits.add(new Hit("WORKING", w.getContent(), sim * 1.1, null));
+            }
         }
         hits.sort((a, b) -> Double.compare(b.score(), a.score()));
         List<Map<String, Object>> out = new ArrayList<>();

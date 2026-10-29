@@ -87,6 +87,14 @@ public class MemoryService {
                 .toList();
 
         List<RelevanceRanker.Ranked> ranked = ranker.rank(query, candidates);
+        // Asked about something, only what shares something with it comes back.
+        // Recency and salience used to carry a memory with nothing in common
+        // with the question into the results — and into the context built from
+        // them, so an app was handed memories unrelated to what it asked. With
+        // no question at all, the ranking is a browse and everything qualifies.
+        if (query != null && !query.isBlank()) {
+            ranked = ranked.stream().filter(r -> r.relevance() > 0).toList();
+        }
         List<RetrievedMemory> out = new ArrayList<>();
         for (int i = 0; i < Math.min(topK, ranked.size()); i++) {
             RelevanceRanker.Ranked r = ranked.get(i);

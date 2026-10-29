@@ -66,9 +66,9 @@ public class GatewaySecurityConfig {
      */
     @Bean
     public FilterRegistrationBean<ConsoleAuthFilter> consoleAuthFilter(
-            PortalSessionService sessions, ObjectMapper mapper) {
+            PortalSessionService sessions, ObjectMapper mapper, io.continuum.apps.AppDirectory apps) {
         FilterRegistrationBean<ConsoleAuthFilter> reg = new FilterRegistrationBean<>();
-        reg.setFilter(new ConsoleAuthFilter(sessions, mapper));
+        reg.setFilter(new ConsoleAuthFilter(sessions, mapper, apps));
         // Everything under /api, not a list of known paths: a controller added
         // at a new path is signed-in-only from its first commit. The few paths
         // that answer to another credential, or to nobody, are named in
@@ -91,9 +91,9 @@ public class GatewaySecurityConfig {
 
     @Bean
     public FilterRegistrationBean<PortalAuthFilter> portalAuthFilter(
-            PortalSessionService sessions, ObjectMapper mapper) {
+            PortalSessionService sessions, ObjectMapper mapper, io.continuum.apps.AppDirectory apps) {
         FilterRegistrationBean<PortalAuthFilter> reg = new FilterRegistrationBean<>();
-        reg.setFilter(new PortalAuthFilter(sessions, mapper));
+        reg.setFilter(new PortalAuthFilter(sessions, mapper, apps));
         reg.addUrlPatterns("/api/portal/developer/*");
         reg.setOrder(1);
         return reg;

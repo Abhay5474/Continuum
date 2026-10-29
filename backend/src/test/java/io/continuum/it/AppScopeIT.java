@@ -181,13 +181,69 @@ class AppScopeIT extends PostgresIT {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void whatTheConsoleMakesWhileLookingAtAnAppBelongsToThatApp() throws Exception {
+        var issued = issue(Map.of("label", "Shop"));
+        String key = (String) issued.get("apiKey");
+        String shop = String.valueOf(appOf(issued.get("id")));
+
+        // The Memory page with an app in view: store, then list the scope. The
+        // memory was saved untagged and the view hid it, so every button on
+        // the page appeared to do nothing.
+        var stored = call("POST", "/api/memory/store",
+                Map.of("scope", "hello", "tier", "EPISODIC", "content", "Diwali orders ship by the 28th"), session, shop);
+        assert stored.statusCode() == 200 : stored.body();
+        assertThat(list("/api/memory/hello", shop)).extracting(m -> m.get("content"))
+                .containsExactly("Diwali orders ship by the 28th");
+        var found = call("POST", "/api/memory/retrieve", Map.of("scope", "hello", "query", "Diwali orders"), session, shop);
+        assertThat(found.body()).contains("28th");
+        // It is the app's now: the app recalls it through the program API's own
+        // scope only if stored there, so check the tag directly instead.
+        assertThat(((Number) list("/api/memory/hello", shop).get(0).get("appId")).longValue())
+                .isEqualTo(Long.parseLong(shop));
+
+        // Another account's app id tags nothing and shows nothing.
+        var theirs = portal.signup("Other", "other-" + UUID.randomUUID() + "@example.com", "correct-horse-9");
+        var theirKey = call("POST", "/api/portal/developer/keys", Map.of("label", "Theirs"), theirs.sessionToken(), null);
+        var theirApps = call("GET", "/api/portal/developer/apps", null, theirs.sessionToken(), null);
+        String theirApp = String.valueOf(((Number) ((List<Map<String, Object>>) json.readValue(theirApps.body(), List.class))
+                .get(0).get("id")).longValue());
+        assertThat(theirKey.statusCode()).isEqualTo(200);
+        call("POST", "/api/memory/store", Map.of("scope", "probe", "content", "planted"), session, theirApp);
+        assertThat(list("/api/memory/probe", theirApp)).isEmpty();
+        assertThat(list("/api/memory/probe", null)).extracting(m -> m.get("appId")).containsOnlyNulls();
+        assertThat(key).startsWith("cnt_live_");
+    }
+
+    @Test
+    void recallReturnsOnlyWhatRelatesToTheQuestion() throws Exception {
+        // Long-term memory: a memory with nothing in common with the question
+        // came back on recency alone, and was built into the context.
+        call("POST", "/api/memory/store", Map.of("scope", "s", "content", "Customer prefers evening delivery"), session, null);
+        assertThat(call("POST", "/api/memory/retrieve", Map.of("scope", "s", "query", "zebra crossing"), session, null).body())
+                .isEqualTo("[]");
+        assertThat(call("POST", "/api/memory/retrieve", Map.of("scope", "s", "query", "evening delivery"), session, null).body())
+                .contains("evening delivery");
+
+        // Adaptive Policy memory: the top three were injected into every prompt
+        // as "relevant memories" whatever the prompt was about.
+        call("POST", "/api/portal/developer/godmode/enable", Map.of(), session, null);
+        call("POST", "/api/portal/developer/godmode/memory/ingest",
+                Map.of("sessionId", "s1", "role", "user", "content", "The dog has a deep cut on its front paw"), session, null);
+        assertThat(call("POST", "/api/portal/developer/godmode/memory/retrieve",
+                Map.of("query", "How do I reset my password", "limit", 3), session, null).body()).isEqualTo("[]");
+        assertThat(call("POST", "/api/portal/developer/godmode/memory/retrieve",
+                Map.of("query", "my dog cut its paw", "limit", 3), session, null).body()).contains("front paw");
+    }
+
+    @Test
     void theQuotaIsTheAccountsWhicheverAppIsInView() throws Exception {
         Long shop = appOf(issue(Map.of("label", "Shop")).get("id"));
         Long vet = appOf(issue(Map.of("label", "Vet")).get("id"));
         save(shop, "a");
         save(vet, "b");
 
-        AppContext.forConsole(String.valueOf(shop));
+        AppContext.forConsole(String.valueOf(shop), id -> true);
         // The filter is live on this thread: the log alone shows one app ...
         assertThat(requestLog.countByDeveloperIdAndSuccess(dev, true)).isEqualTo(1);
         // ... but the plan's usage is the whole account's.

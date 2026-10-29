@@ -104,12 +104,26 @@ public final class AppContext {
     }
 
     /**
-     * The console: writes untagged, reads what the selector names. {@code null}
-     * or {@code "all"} is every app; {@code "untagged"} is console-made and older
-     * data; a number is one app.
+     * The console: reads what the selector names. {@code null} or {@code "all"}
+     * is every app; {@code "untagged"} is console-made and older data; a number
+     * is one app.
+     *
+     * <p>Looking at one app, the console also writes as it. Otherwise a memory
+     * stored, a workflow started or a test request sent from the console while
+     * an app is in view is saved untagged and then hidden by that same view: the
+     * button appears to do nothing. Only an app the account owns is written as;
+     * any other id shows nothing and tags nothing.
      */
+    public static void forConsole(String selector, java.util.function.Predicate<Long> owned) {
+        Read read = parseRead(selector);
+        Long app = parseApp(selector);
+        Long write = read == Read.ONLY && app != null && owned.test(app) ? app : null;
+        CURRENT.set(new State(write, read, read == Read.ONLY && write == null ? null : app));
+    }
+
+    /** As {@link #forConsole(String, java.util.function.Predicate)}, trusting no app: for reads only. */
     public static void forConsole(String selector) {
-        CURRENT.set(new State(null, parseRead(selector), parseApp(selector)));
+        forConsole(selector, id -> false);
     }
 
     public static void clear() {

@@ -4,7 +4,9 @@ import io.continuum.semantic.TextVectors;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Ranks candidate memories for a query by blending three measured signals:
@@ -25,9 +27,10 @@ public class RelevanceRanker {
     }
 
     public List<Ranked> rank(String query, List<Candidate> candidates) {
+        Map<String, Integer> q = stemmed(query);
         return candidates.stream()
                 .map(c -> {
-                    double relevance = TextVectors.cosine(query, c.content());
+                    double relevance = TextVectors.cosine(q, stemmed(c.content()));
                     double recency = recencyDecay(c.ageMillis());
                     double score = W_RELEVANCE * relevance
                             + W_SALIENCE * clamp(c.salience())
@@ -36,6 +39,43 @@ public class RelevanceRanker {
                 })
                 .sorted(Comparator.comparingDouble(Ranked::score).reversed())
                 .toList();
+    }
+
+    /**
+     * Term frequencies with each word reduced to a rough stem. Exact words
+     * missed the obvious: asked about a "refund", the memory "prefers refunds"
+     * shared nothing with the question. Kept to memory ranking; the other users
+     * of {@link TextVectors} have thresholds tuned to exact words.
+     */
+    static Map<String, Integer> stemmed(String text) {
+        Map<String, Integer> out = new HashMap<>();
+        TextVectors.termFrequency(text).forEach((w, n) -> out.merge(stem(w), n, Integer::sum));
+        return out;
+    }
+
+    static String stem(String word) {
+        String w = suffixless(word);
+        // "damage" and "damaged" meet at "damag", "store" and "stores" at "stor".
+        return w.length() > 4 && w.endsWith("e") ? w.substring(0, w.length() - 1) : w;
+    }
+
+    private static String suffixless(String w) {
+        if (w.length() > 4 && w.endsWith("ies")) {
+            return w.substring(0, w.length() - 3) + "y";
+        }
+        if (w.length() > 5 && w.endsWith("ing")) {
+            return w.substring(0, w.length() - 3);
+        }
+        if (w.length() > 4 && w.endsWith("ed") && !w.endsWith("eed")) {
+            return w.substring(0, w.length() - 2);
+        }
+        if (w.length() > 4 && (w.endsWith("ches") || w.endsWith("shes") || w.endsWith("xes") || w.endsWith("sses"))) {
+            return w.substring(0, w.length() - 2);
+        }
+        if (w.length() > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us")) {
+            return w.substring(0, w.length() - 1);
+        }
+        return w;
     }
 
     /** Half-life style decay: ~1.0 when fresh, 0.5 at 24h, approaching 0 when old. */

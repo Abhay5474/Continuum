@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { useToast } from "../components/ui";
 import { Card, CardHead, Empty, Pill, Primary, toneInk, type Tone, RecordPanel, Excerpt, openable } from "../system/hub";
 import { PageHeader } from "../system/primitives";
 
@@ -36,21 +37,65 @@ export default function Memory() {
   const [retrieved, setRetrieved] = useState<any[]>([]);
   const [only, setOnly] = useState<string | null>(null);
   const [openMem, setOpenMem] = useState<any | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  // null until a retrieval has run, so "no matches" is said only when true.
+  const [retrievedFor, setRetrievedFor] = useState<string | null>(null);
+  const toast = useToast();
 
-  const list = async () => setEntries(await api.get<any[]>(`/api/memory/${scope}`));
-  const store = async () => {
-    if (!content.trim()) return;
-    await api.post("/api/memory/store", { scope, tier, content, salience: 0.6 });
-    setContent("");
-    list();
+  // Every action says what happened. Before, each one was a bare await: a
+  // failure vanished as an unhandled rejection and a success that changed
+  // nothing on screen looked exactly like a button that does nothing.
+  const run = async (name: string, body: () => Promise<void>) => {
+    setBusy(name);
+    try {
+      await body();
+    } catch (e: any) {
+      toast(e?.message ?? `Could not ${name}`, "error");
+    } finally {
+      setBusy(null);
+    }
   };
-  const retrieve = async () => {
-    setRetrieved(await api.post("/api/memory/retrieve", { scope, query, topK: 5 }));
-  };
-  const compress = async () => {
-    await api.post(`/api/memory/compress?scope=${scope}&useLlm=false`);
-    list();
-  };
+
+  const path = (s: string) => encodeURIComponent(s.trim() || "default");
+  const load = useCallback(
+    async (s: string) => setEntries(await api.get<any[]>(`/api/memory/${path(s)}`)),
+    [],
+  );
+  const list = () => run("load", () => load(scope));
+  // The scope's memories, as soon as the page opens and whenever the scope
+  // changes; "Load" is still there to refresh by hand.
+  useEffect(() => {
+    const id = setTimeout(() => load(scope).catch(() => setEntries([])), 300);
+    return () => clearTimeout(id);
+  }, [scope, load]);
+
+  const store = () =>
+    run("store", async () => {
+      if (!content.trim()) {
+        toast("Write something to remember first.", "info");
+        return;
+      }
+      const r = await api.post<any>("/api/memory/store", { scope, tier, content, salience: 0.6 });
+      setContent("");
+      toast(r?.reinforced ? "Already remembered: that memory was reinforced" : `Stored in ${tierLabel(r?.tier ?? tier)}`, "success");
+      await load(scope);
+    });
+  const retrieve = () =>
+    run("retrieve", async () => {
+      if (!query.trim()) {
+        toast("Type what to look for first.", "info");
+        return;
+      }
+      setRetrieved(await api.post<any[]>("/api/memory/retrieve", { scope, query, topK: 5 }));
+      setRetrievedFor(query.trim());
+    });
+  const compress = () =>
+    run("compress", async () => {
+      const r = await api.post<any>(`/api/memory/compress?scope=${path(scope)}&useLlm=false`);
+      toast(r?.compressed ? "Episodic memories compressed into one summary" : `Nothing compressed: ${r?.reason ?? "not enough episodic memories"}`,
+        r?.compressed ? "success" : "info");
+      await load(scope);
+    });
 
   return (
     <div className="space-y-8">
@@ -68,11 +113,11 @@ export default function Memory() {
           onChange={(e) => setScope(e.target.value)}
           className="min-w-0 flex-1 font-mono sm:flex-none field"
         />
-        <button onClick={list} className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge">
-          Load
+        <button onClick={list} disabled={busy !== null} className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge disabled:opacity-60">
+          {busy === "load" ? "Loading…" : "Load"}
         </button>
-        <button onClick={compress} className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge">
-          Compress episodic
+        <button onClick={compress} disabled={busy !== null} className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge disabled:opacity-60">
+          {busy === "compress" ? "Compressing…" : "Compress episodic"}
         </button>
       </div>
 
@@ -111,7 +156,7 @@ export default function Memory() {
               })}
             </div>
             <span className="flex-1" />
-            <Primary onClick={store}>Store</Primary>
+            <Primary onClick={store} disabled={busy !== null}>{busy === "store" ? "Storing…" : "Store"}</Primary>
           </div>
         </Card>
 
@@ -124,10 +169,16 @@ export default function Memory() {
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Retrieval query"
               placeholder="query…"
+              onKeyDown={(e) => e.key === "Enter" && retrieve()}
               className="min-w-0 flex-1 field"
             />
-            <Primary onClick={retrieve}>Retrieve</Primary>
+            <Primary onClick={retrieve} disabled={busy !== null}>{busy === "retrieve" ? "Retrieving…" : "Retrieve"}</Primary>
           </div>
+          {retrievedFor !== null && retrieved.length === 0 && (
+            <p className="mt-3 text-xs text-slate-500">
+              Nothing in <span className="font-mono">{scope.trim() || "default"}</span> matches “{retrievedFor}”.
+            </p>
+          )}
           <div className="mt-3 space-y-2">
             {retrieved.map((m) => (
               <div key={m.id} className="flex min-w-0 items-center gap-3 text-xs">

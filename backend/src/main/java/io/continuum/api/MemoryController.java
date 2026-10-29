@@ -67,7 +67,7 @@ public class MemoryController {
     public Object compress(@RequestParam String scope, @RequestParam(defaultValue = "false") boolean useLlm,
                            HttpServletRequest http) {
         MemoryEntryEntity summary = memory.compress(scoped(http, scope), useLlm);
-        return summary == null ? Map.of("compressed", false, "reason", "not enough episodic memories")
+        return summary == null ? Map.of("compressed", false, "reason", "it takes at least 2 episodic memories in this scope")
                 : Map.of("compressed", true, "summaryId", summary.getId(), "summary", summary.getSummary());
     }
 

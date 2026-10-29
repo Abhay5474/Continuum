@@ -69,10 +69,13 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
 
     private final PortalSessionService sessions;
     private final ObjectMapper mapper;
+    private final io.continuum.apps.AppDirectory apps;
 
-    public ConsoleAuthFilter(PortalSessionService sessions, ObjectMapper mapper) {
+    public ConsoleAuthFilter(PortalSessionService sessions, ObjectMapper mapper,
+                             io.continuum.apps.AppDirectory apps) {
         this.sessions = sessions;
         this.mapper = mapper;
+        this.apps = apps;
     }
 
     @Override
@@ -104,9 +107,14 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
         // Also published thread-locally, for cross-cutting concerns that run far
         // from the controller. Cleared unconditionally: this is a pooled thread.
         TenantContext.set(s.role() == PortalSessionService.Role.OPERATOR ? null : s.subject());
-        // Which app the console is looking at. Only narrows what is read; the
-        // console's own writes stay untagged.
-        io.continuum.apps.AppContext.forConsole(request.getHeader(APP_HEADER));
+        // Which app the console is looking at: what it reads, and what it
+        // writes as. The operator's view is the engine's, not one app's.
+        if (s.role() == PortalSessionService.Role.OPERATOR) {
+            io.continuum.apps.AppContext.forConsole(null);
+        } else {
+            io.continuum.apps.AppContext.forConsole(request.getHeader(APP_HEADER),
+                    app -> apps.belongs(s.subject(), app));
+        }
         try {
             chain.doFilter(request, response);
         } finally {
