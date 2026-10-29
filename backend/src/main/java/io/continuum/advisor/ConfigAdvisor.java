@@ -143,6 +143,11 @@ public class ConfigAdvisor {
     }
 
     public Map<String, Object> advise(String developerId) {
+        // Advice is about settings, and settings are the account's.
+        return io.continuum.apps.AppContext.asAccount(() -> adviseAccount(developerId));
+    }
+
+    private Map<String, Object> adviseAccount(String developerId) {
         List<Advice> out = new ArrayList<>();
         Traffic traffic = traffic(developerId);
         int checks = 0;

@@ -145,6 +145,31 @@ public final class AppContext {
         }
     }
 
+    /**
+     * Runs {@code body} as the account rather than any one app: reading every
+     * app's rows and tagging nothing. For work whose result belongs to the
+     * whole account — the autopilot choosing a policy every app runs under, the
+     * digital twin judging that policy, the advisor recommending a setting —
+     * which must not be decided from whichever app the console has in view.
+     */
+    public static <T> T asAccount(Supplier<T> body) {
+        State previous = CURRENT.get();
+        CURRENT.set(NONE);
+        try {
+            return body.get();
+        } finally {
+            restore(previous);
+        }
+    }
+
+    /** As {@link #asAccount(Supplier)}, for work with no result. */
+    public static void asAccount(Runnable body) {
+        asAccount(() -> {
+            body.run();
+            return null;
+        });
+    }
+
     /** Reads every app's rows while {@code body} runs: for limits that belong to the whole account. */
     public static <T> T unscoped(Supplier<T> body) {
         State previous = CURRENT.get();

@@ -3,6 +3,7 @@ import { ActiveBundle, FeedbackForm, TargetsEditor } from "../components/Autopil
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Note } from "../system/primitives";
+import { AccountWide } from "../system/AccountWide";
 import { StackedBar, BarChart } from "../system/charts";
 import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone, RecordPanel, Field, openable, rowClick } from "../system/hub";
 
@@ -92,6 +93,7 @@ export default function Autopilot() {
           </div>
         }
       />
+      <AccountWide what="The autopilot's policy" />
       {err && <div className="text-sm text-rose-400">{err}</div>}
 
       {/* what does it do — explainer cards */}

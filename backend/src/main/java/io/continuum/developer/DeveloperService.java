@@ -194,8 +194,14 @@ public class DeveloperService {
         }
         for (DeveloperApiKeyEntity key : keys.findByKeyPrefix(prefix)) {
             if (key.isActive() && hasher.matches(plaintextKey, key.getHashedKey())) {
-                key.touch();
-                keys.save(key);
+                // Written at most once a minute. Every request of an app uses
+                // the same key, so writing on each one made concurrent requests
+                // queue on this one row's lock; "last used" needs no finer grain.
+                if (key.getLastUsedAt() == null
+                        || key.getLastUsedAt().isBefore(java.time.Instant.now().minusSeconds(60))) {
+                    key.touch();
+                    keys.save(key);
+                }
                 return developers.findById(key.getDeveloperId())
                         .map(d -> new Authenticated(d, key.getId(), key.getAppId()));
             }

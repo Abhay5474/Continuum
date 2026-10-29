@@ -116,7 +116,10 @@ public class WorkflowEngine {
             // Idempotent start: the same caller repeating the same start gets the
             // existing run. Anyone else naming this id is refused.
             if (!java.util.Objects.equals(existing.get().getDeveloperId(), developerId)
-                    || !existing.get().getWorkflowType().equals(workflowType)) {
+                    || !existing.get().getWorkflowType().equals(workflowType)
+                    // Another app's run, even in the same account: handing its
+                    // id back would let an app adopt a run it cannot see.
+                    || !io.continuum.apps.AppContext.visible(existing.get().getAppId())) {
                 throw new WorkflowIdInUseException(workflowId);
             }
             return workflowId;

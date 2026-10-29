@@ -58,7 +58,11 @@ public class TelemetryAggregator {
         Optional<GatewayRequestLogEntity> found = m.matches()
                 ? gatewayLogs.findById(Long.parseLong(m.group(1)))
                 : gatewayLogs.findFirstByTraceIdAndDeveloperId(r, developerId);
-        return found.filter(g -> developerId.equals(g.getDeveloperId()));
+        // A lookup by id is not filtered by app, so the app is checked here: one
+        // app rating another's answers would steer the autopilot with feedback
+        // on traffic it never saw.
+        return found.filter(g -> developerId.equals(g.getDeveloperId()))
+                .filter(g -> io.continuum.apps.AppContext.visible(g.getAppId()));
     }
 
     @Transactional(readOnly = true)

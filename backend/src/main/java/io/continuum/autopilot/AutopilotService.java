@@ -143,6 +143,12 @@ public class AutopilotService {
 
     @Transactional
     public void runLoopFor(String developerId) {
+        // The policy chosen here is every app's, so it is chosen from every
+        // app's traffic, also when the console runs a cycle with one app in view.
+        io.continuum.apps.AppContext.asAccount(() -> runLoopForAccount(developerId));
+    }
+
+    private void runLoopForAccount(String developerId) {
         try {
             runCycle(developerId);
         } finally {
@@ -250,6 +256,11 @@ public class AutopilotService {
 
     @Transactional
     public AutopilotCanaryRunEntity startCanary(String developerId, Long candidateBundleId) {
+        // The pre-flight replays the account's traffic: every app runs the bundle.
+        return io.continuum.apps.AppContext.asAccount(() -> startCanaryForAccount(developerId, candidateBundleId));
+    }
+
+    private AutopilotCanaryRunEntity startCanaryForAccount(String developerId, Long candidateBundleId) {
         // The bundle must be this account's. Nothing checked before: any tenant
         // could start a canary on another's policy bundle — running that policy
         // on its own traffic, flipping the owner's bundle to CANARY, and, when
@@ -403,7 +414,8 @@ public class AutopilotService {
     }
 
     public TelemetrySnapshot snapshot(String developerId) {
-        return aggregator.snapshot(developerId);
+        // What the autopilot decides from, which is the whole account.
+        return io.continuum.apps.AppContext.asAccount(() -> aggregator.snapshot(developerId));
     }
 
     // ---- helpers ----

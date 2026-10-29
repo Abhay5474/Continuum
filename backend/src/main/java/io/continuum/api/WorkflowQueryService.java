@@ -83,6 +83,19 @@ public class WorkflowQueryService {
                 .orElseThrow(io.continuum.portal.RequestScope.NotFoundException::new);
     }
 
+    /**
+     * Whether the caller may act on a run: it is their account's, and an app
+     * the caller can see — its own, or one started untagged. A lookup by id is
+     * not filtered by app, so this is where that is checked.
+     */
+    @Transactional(readOnly = true)
+    public boolean visibleTo(String developerId, String workflowId) {
+        return instances.findById(workflowId)
+                .filter(w -> developerId != null && developerId.equals(w.getDeveloperId()))
+                .filter(w -> io.continuum.apps.AppContext.visible(w.getAppId()))
+                .isPresent();
+    }
+
     /** The owning developer of a workflow, for authorization checks. */
     @Transactional(readOnly = true)
     public String ownerOf(String workflowId) {

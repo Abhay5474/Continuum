@@ -35,6 +35,7 @@ class AppScopeIT extends PostgresIT {
     @Autowired io.continuum.godmode.memory.MemoryEngine memory;
     @Autowired io.continuum.persistence.repository.ExperienceNodeRepository nodes;
     @Autowired io.continuum.persistence.repository.MemoryEpisodicRepository episodic;
+    @Autowired io.continuum.core.engine.WorkflowEngine engine;
 
     private final HttpClient http = HttpClient.newHttpClient();
     private String dev;
@@ -237,6 +238,52 @@ class AppScopeIT extends PostgresIT {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void theAutopilotSeesTheWholeAccountWhicheverAppIsInView() throws Exception {
+        Long shop = appOf(issue(Map.of("label", "Shop")).get("id"));
+        Long vet = appOf(issue(Map.of("label", "Vet")).get("id"));
+        save(shop, "a");
+        save(vet, "b");
+        // The autopilot picks one policy for every app; looking at one app in
+        // the console used to make it decide from that app's traffic alone.
+        var status = call("GET", "/api/portal/developer/autopilot/status", null, session, String.valueOf(shop));
+        assertThat(status.statusCode()).as(status.body()).isEqualTo(200);
+        Map<String, Object> telemetry = (Map<String, Object>) ((Map<String, Object>) json.readValue(status.body(), Map.class))
+                .get("telemetry");
+        assertThat(((Number) telemetry.get("totalRequests")).longValue()).isEqualTo(2);
+        assertThat(call("POST", "/api/portal/developer/autopilot/propose", null, session, String.valueOf(shop))
+                .statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void anAppCanActOnlyOnItsOwnAnswersAndRuns() throws Exception {
+        var shopIssued = issue(Map.of("label", "Shop"));
+        String shopKey = (String) shopIssued.get("apiKey");
+        String vetKey = (String) issue(Map.of("label", "Vet")).get("apiKey");
+        Long shop = appOf(shopIssued.get("id"));
+
+        // A rating names its answer by id, a lookup the app filter does not see.
+        long answer = save(shop, "a");
+        assertThat(call("POST", "/api/gateway/feedback", Map.of("requestRef", "req_" + answer, "score", -1), vetKey, null)
+                .statusCode()).isEqualTo(404);
+        assertThat(call("POST", "/api/gateway/feedback", Map.of("requestRef", "req_" + answer, "score", 1), shopKey, null)
+                .statusCode()).isEqualTo(200);
+
+        // A run, likewise: following or cancelling another app's is a 404, and
+        // reusing its id to start one is refused rather than handed back.
+        String run = AppContext.callAs(shop, () -> engine.startWorkflow("DurableDemo", "{\"name\":\"x\"}", null, dev));
+        assertThat(call("GET", "/api/gateway/workflows/" + run, null, vetKey, null).statusCode()).isEqualTo(404);
+        assertThat(call("POST", "/api/gateway/workflows/" + run + "/cancel", Map.of(), vetKey, null).statusCode())
+                .isEqualTo(404);
+        assertThat(call("GET", "/api/gateway/workflows/" + run, null, shopKey, null).statusCode()).isEqualTo(200);
+        Long vet = appOf(list("/api/portal/developer/keys", null).stream()
+                .filter(k -> "Vet".equals(k.get("appName"))).findFirst().orElseThrow().get("id"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        AppContext.callAs(vet, () -> engine.startWorkflow("DurableDemo", "{}", run, dev)))
+                .isInstanceOf(io.continuum.core.engine.WorkflowIdInUseException.class);
+    }
+
+    @Test
     void theQuotaIsTheAccountsWhicheverAppIsInView() throws Exception {
         Long shop = appOf(issue(Map.of("label", "Shop")).get("id"));
         Long vet = appOf(issue(Map.of("label", "Vet")).get("id"));
@@ -279,10 +326,10 @@ class AppScopeIT extends PostgresIT {
         episodic.save(e);
     }
 
-    private void save(Long app, String model) {
+    private long save(Long app, String model) {
         var e = new GatewayRequestLogEntity(dev, "auto", "gemini", model, 0.1, "test", 5, 100, 0.001, true, 0);
         e.setAppId(app);
-        requestLog.save(e);
+        return requestLog.save(e).getId();
     }
 
     private List<Object> models(String app) throws Exception {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Note } from "../system/primitives";
 import { portal } from "../api";
+import { AccountWide } from "../system/AccountWide";
 import { Chip, Pill } from "../system/hub";
 import { ProjectionChart } from "../system/charts";
 import { SkeletonRows, ErrorState, useToast, Spinner } from "../components/ui";
@@ -127,6 +128,7 @@ export default function Billing() {
         </div>
         <p className="mt-1 text-[13px] text-slate-500">Plan, usage and quota</p>
       </div>
+      <AccountWide what="Your plan and its quota" />
 
       {/* usage meter */}
       <div className="plane p-6">

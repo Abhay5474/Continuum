@@ -205,7 +205,7 @@ export default function CommandCenter() {
 
         {/* ---- the three panels: what the fleet is made of, what it is
             doing, and what just happened ---- */}
-        <div className="mt-4 grid gap-3 lg:grid-cols-3" data-guide="cc-panels">
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-3" data-guide="cc-panels">
           <Card>
             <CardHead
               glyph="layers"

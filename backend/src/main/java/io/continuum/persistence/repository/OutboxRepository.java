@@ -24,11 +24,15 @@ public interface OutboxRepository extends JpaRepository<OutboxEntity, Long> {
 
     List<OutboxEntity> findByWorkflowIdOrderByCreatedAtAsc(String workflowId);
 
-    /** Messages delivered on behalf of one account's runs. */
-    @Query(value = """
-            SELECT count(*) FROM outbox o
-            JOIN workflow_instances w ON w.workflow_id = o.workflow_id
-            WHERE w.developer_id = :dev AND o.status = 'SENT'
-            """, nativeQuery = true)
+    /**
+     * Messages delivered on behalf of one account's runs. JPQL rather than SQL so
+     * the app the console has in view narrows the runs, as it narrows the run
+     * counts shown beside this number.
+     */
+    @Query("""
+            select count(o) from OutboxEntity o, WorkflowInstanceEntity w
+            where w.workflowId = o.workflowId and w.developerId = :dev
+              and o.status = io.continuum.persistence.entity.OutboxStatus.SENT
+            """)
     long countSentForDeveloper(@Param("dev") String dev);
 }

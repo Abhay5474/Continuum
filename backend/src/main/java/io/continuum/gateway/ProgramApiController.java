@@ -164,8 +164,9 @@ public class ProgramApiController {
     }
 
     private void requireOwned(String developerId, String workflowId) {
-        String owner = query.ownerOf(workflowId);
-        if (owner == null || !owner.equals(developerId)) {
+        // Another app's run is answered exactly like another account's: an app
+        // must not follow, let alone cancel, a run it did not start.
+        if (!query.visibleTo(developerId, workflowId)) {
             throw new RequestScope.NotFoundException("No workflow " + workflowId + " in this account.");
         }
     }

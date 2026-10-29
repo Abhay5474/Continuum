@@ -84,6 +84,14 @@ public class DigitalTwinSimulator {
     @Transactional
     public GodModeSimulationEntity simulate(String developerId, Long candidateBundleId,
                                             Long baselineBundleId, Scenario scenario) {
+        // A bundle is the account's policy, so it is judged on the account's
+        // traffic, not on whichever app the console has in view.
+        return io.continuum.apps.AppContext.asAccount(
+                () -> simulateForAccount(developerId, candidateBundleId, baselineBundleId, scenario));
+    }
+
+    private GodModeSimulationEntity simulateForAccount(String developerId, Long candidateBundleId,
+                                                       Long baselineBundleId, Scenario scenario) {
         PolicyBundle candidate = bundleOf(developerId, candidateBundleId);
         PolicyBundle baseline = bundleOf(developerId, baselineBundleId);
         List<GatewayRequestLogEntity> history = requests
