@@ -1,5 +1,8 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { m } from "motion/react";
 import { duration, type ExecutionModel, type Work } from "../system/execution/model";
+import { useHoverHighlight } from "../system/interaction/HoverHighlight";
+import { transitions } from "../system/physics";
 import type { Finding } from "../system/execution/findings";
 import { Micro } from "../system/primitives";
 
@@ -88,11 +91,22 @@ export function ExecutionFacts({ work, model }: { work: Work; model: ExecutionMo
  * The findings: what to look at first, each one a way into the part of the run
  * it is about. Overview first, details on demand.
  */
-export function Findings({ findings, onSelect, hint = "Choose a finding to show it in the graph and the timeline." }: {
+export function Findings({
+  findings,
+  onSelect,
+  hint = "Choose a finding to show it in the graph and the timeline.",
+  morph = false,
+}: {
   findings: Finding[];
   onSelect: (id: string) => void;
   /** Where choosing a finding shows it. */
   hint?: string;
+  /**
+   * Each finding with a target is a shared surface ({@code finding-<target>}):
+   * the panel that shows the target grows out of the finding chosen, and
+   * shrinks back into it on return.
+   */
+  morph?: boolean;
 }) {
   const ink: Record<Finding["tone"], string> = {
     ok: "var(--state-healthy-ink)",
@@ -100,10 +114,13 @@ export function Findings({ findings, onSelect, hint = "Choose a finding to show 
     bad: "var(--state-critical-ink)",
     info: "var(--state-active-ink)",
   };
+  const list = useRef<HTMLOListElement>(null);
+  const { bind, highlight } = useHoverHighlight(list, "[data-hl]");
   return (
     <div>
       <Micro>Findings</Micro>
-      <ol className="mt-2 divide-y divide-edge/50">
+      <ol ref={list} className="relative -mx-2 mt-2" {...bind}>
+        {highlight}
         {findings.map((f) => {
           const body = (
             <>
@@ -115,14 +132,23 @@ export function Findings({ findings, onSelect, hint = "Choose a finding to show 
             </>
           );
           return (
-            <li key={f.id}>
+            <li key={f.id} className="relative z-[1]">
               {f.target ? (
-                <button type="button" onClick={() => onSelect(f.target!)}
-                        className="flex w-full items-start gap-2.5 py-2.5 text-left transition-colors hover:bg-edge/30">
-                  {body}
-                </button>
+                <m.div layoutId={morph ? `finding-${f.target}` : undefined} transition={transitions.standard} style={{ borderRadius: 10 }}>
+                  {/* Corrected for the scale its surface travels through, so
+                      the words never stretch on the way back from the panel. */}
+                  <m.button type="button" data-hl onClick={() => onSelect(f.target!)} layout={morph ? "position" : undefined}
+                          transition={transitions.standard}
+                          className="group flex w-full items-start gap-2.5 rounded-[10px] px-2 py-2.5 text-left">
+                    {body}
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
+                         aria-hidden className="ml-auto mt-[3px] shrink-0 text-slate-500 opacity-0 transition-[opacity,transform] duration-300 group-hover:translate-x-0.5 group-hover:opacity-100">
+                      <path d="M6 3.5 10.5 8 6 12.5" />
+                    </svg>
+                  </m.button>
+                </m.div>
               ) : (
-                <div className="flex items-start gap-2.5 py-2.5">{body}</div>
+                <div className="flex items-start gap-2.5 px-2 py-2.5">{body}</div>
               )}
             </li>
           );

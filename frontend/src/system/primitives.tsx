@@ -156,14 +156,14 @@ export function PageHeader({
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 pb-1">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2.5">
-          {glyph && <Chip glyph={glyph} tone={tone} size={28} />}
-          <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">{title}</h1>
+          {glyph && <Chip glyph={glyph} tone={tone} size={32} />}
+          <h1 className="text-[24px] font-semibold leading-[1.15] tracking-[-0.028em] text-slate-100 sm:text-[27px]">{title}</h1>
           {badge}
         </div>
         {/* One line: what the page is for. Anything longer is the guide's. */}
         {subtitle && (
           <p
-            className="mt-1 max-w-2xl truncate text-[13px] text-slate-500"
+            className="mt-1.5 max-w-2xl truncate text-[13.5px] text-slate-500"
             title={typeof subtitle === "string" ? subtitle : undefined}
           >
             {typeof subtitle === "string" ? firstSentence(subtitle) : subtitle}

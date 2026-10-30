@@ -1,6 +1,8 @@
 import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
 import type { ReactElement, ReactNode, SelectHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { AnimatePresence, m, useAnimate } from "motion/react";
 import { toneInk, toneWash, type Tone } from "./hub";
+import { prefersReducedMotion, transitions } from "./physics";
 
 /**
  * Controls.
@@ -86,15 +88,15 @@ export function Button({
   };
   let tone = "";
   if (variant === "primary") {
-    style.background = "var(--accent-strong)";
+    style.backgroundColor = "var(--accent-strong)";
     style.color = "var(--accent-on)";
     // Filled, so it catches white light where it is pressed, in both themes.
-    tone = "press-on-accent font-medium hover:brightness-110";
+    tone = "btn-primary press-on-accent font-medium hover:brightness-105";
   } else if (variant === "secondary") {
     style.borderColor = "rgb(var(--card-edge))";
     style.background = "rgb(var(--card))";
     tone =
-      "border font-medium text-slate-200 hover:border-slate-500/60 hover:bg-[color:rgb(var(--card-hover))]";
+      "btn-secondary border font-medium text-slate-200 hover:border-slate-500/60 hover:bg-[color:rgb(var(--card-hover))]";
   } else if (variant === "danger") {
     style.color = "var(--state-critical-ink)";
     style.borderColor = "var(--state-critical-ink)";
@@ -114,6 +116,7 @@ export function Button({
       disabled={off}
       title={title}
       aria-busy={busy || undefined}
+      data-magnetic={variant === "primary" ? "0.18" : undefined}
       style={style}
       // .press: compresses under the finger, springs back with a small
       // overshoot, and lights from the point that was touched. The timing
@@ -176,6 +179,154 @@ function Spinner() {
       <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.6" opacity="0.25" />
       <path d="M10.5 6A4.5 4.5 0 0 0 6 1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
+  );
+}
+
+/**
+ * A button for an action that takes a moment and can fail.
+ *
+ * <p>The button itself reports how it went: pressed, its label gives way to a
+ * spinner and "Working…"; done, a check draws in and the label says so; failed,
+ * it shakes once, turns the colour of an error and says that. Then it settles
+ * back to what it was. Its width follows its words on a spring, so the row it
+ * sits in never jumps.
+ *
+ * <p>{@code onAction} returns a promise. Whatever the caller already does with
+ * a failure (a toast, an inline error) still happens: the rejection is
+ * reported here and then passed on.
+ */
+type ActionState = "idle" | "busy" | "done" | "failed";
+
+export function ActionButton({
+  children,
+  onAction,
+  variant = "primary",
+  size = "md",
+  icon,
+  doneLabel = "Done",
+  failedLabel = "Failed",
+  disabled,
+  title,
+  type = "button",
+  className = "",
+}: {
+  children: ReactNode;
+  onAction: () => Promise<unknown> | unknown;
+  variant?: ButtonVariant;
+  size?: ControlSize;
+  icon?: ReactNode;
+  doneLabel?: string;
+  failedLabel?: string;
+  disabled?: boolean;
+  title?: string;
+  type?: "button" | "submit";
+  className?: string;
+}) {
+  const [state, setState] = useState<ActionState>("idle");
+  const [scope, animate] = useAnimate<HTMLButtonElement>();
+  const timer = useRef<number>();
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const settle = (next: ActionState, after: number) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState("idle"), after);
+    setState(next);
+  };
+  const run = async () => {
+    if (state === "busy" || disabled) return;
+    setState("busy");
+    try {
+      await onAction();
+      settle("done", 1500);
+    } catch (e) {
+      settle("failed", 1900);
+      if (!prefersReducedMotion() && scope.current) {
+        animate(scope.current, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.42, ease: "easeOut" });
+      }
+      throw e;
+    }
+  };
+
+  const filled = variant === "primary" || state === "done" || state === "failed";
+  const style: Record<string, string> = { height: HEIGHT[size], borderRadius: "var(--r-md)" };
+  if (state === "failed") {
+    style.backgroundColor = "var(--state-critical-ink)";
+    style.color = "#fff";
+  } else if (state === "done" && variant !== "primary") {
+    style.backgroundColor = "var(--state-healthy-ink)";
+    style.color = "#fff";
+  } else if (variant === "primary") {
+    style.backgroundColor = "var(--accent-strong)";
+    style.color = "var(--accent-on)";
+  } else if (variant === "secondary") {
+    style.borderColor = "rgb(var(--card-edge))";
+    style.background = "rgb(var(--card))";
+  }
+  const tone = filled
+    ? "btn-primary press-on-accent font-medium"
+    : variant === "secondary"
+      ? "btn-secondary border font-medium text-slate-200 hover:border-slate-500/60"
+      : "text-slate-400 hover:bg-slate-500/10 hover:text-slate-100";
+
+  const label =
+    state === "busy" ? (
+      <>
+        <Spinner />
+        Working…
+      </>
+    ) : state === "done" ? (
+      <>
+        <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden>
+          <path className="draw-in" d="M2.5 6.4 5 8.8l4.5-5.3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {doneLabel}
+      </>
+    ) : state === "failed" ? (
+      <>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+          <path d="M3 3l6 6M9 3 3 9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+        {failedLabel}
+      </>
+    ) : (
+      <>
+        {icon}
+        {children}
+      </>
+    );
+
+  return (
+    <m.button
+      ref={scope}
+      layout
+      type={type}
+      onClick={(e) => {
+        e.stopPropagation();
+        run().catch(() => {});
+      }}
+      disabled={disabled}
+      title={title}
+      aria-busy={state === "busy" || undefined}
+      aria-live="polite"
+      data-magnetic={filled ? "0.18" : undefined}
+      transition={transitions.standard}
+      style={style}
+      className={`press relative inline-flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-45 ${PAD[size]} ${tone} ${className}`}
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        <m.span
+          key={state}
+          layout="position"
+          className="inline-flex items-center gap-1.5"
+          initial={{ opacity: 0, y: 10, filter: "blur(3px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          exit={{ opacity: 0, y: -10, filter: "blur(3px)" }}
+          transition={transitions.standard}
+        >
+          {label}
+        </m.span>
+      </AnimatePresence>
+    </m.button>
   );
 }
 

@@ -24,12 +24,15 @@ export function Card({
   onClick,
   selected = false,
   guide,
+  surface = false,
 }: {
   children: ReactNode;
   className?: string;
   pad?: boolean;
   onClick?: () => void;
   selected?: boolean;
+  /** Opens something without being a button itself (it sits inside a link). */
+  surface?: boolean;
   /**
    * Names this card as a target for the feature guide's spotlight.
    *
@@ -41,6 +44,7 @@ export function Card({
   guide?: string;
 }) {
   const interactive = !!onClick;
+  const lively = interactive || surface;
   return (
     <div
       role={interactive ? "button" : undefined}
@@ -56,11 +60,11 @@ export function Card({
       // Only a card you can open behaves like one: lifts toward the cursor,
       // catches its light, gives under a press. A read-only card doing the same
       // would be claiming to be clickable.
-      data-surface={interactive ? "" : undefined}
+      data-surface={lively ? "" : undefined}
       data-selected={selected ? "" : undefined}
       className={`card relative border bg-card shadow-card ${selected ? "" : "border-card-edge"} ${
         pad ? "p-4" : ""
-      } ${interactive ? "cursor-pointer hover:border-slate-500/40 hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}
+      } ${lively ? "cursor-pointer hover:border-slate-500/40 hover:bg-[color:rgb(var(--card-hover))]" : ""} ${className}`}
       style={{
         borderRadius: "var(--r-lg)",
         borderColor: selected ? "var(--accent-edge)" : undefined,
@@ -102,10 +106,10 @@ export function CardHead({
     >
       {glyph && <Chip glyph={glyph} tone={tone} />}
       <div className="min-w-0 flex-1">
-        <h2 className="truncate text-[13px] font-semibold tracking-tight text-slate-100">
+        <h2 className="truncate text-[13.5px] font-semibold tracking-[-0.012em] text-slate-100">
           {title}
         </h2>
-        {sub && <p className="mt-0.5 truncate text-[11.5px] leading-relaxed text-slate-500">{sub}</p>}
+        {sub && <p className="mt-0.5 truncate text-[12px] leading-relaxed text-slate-500">{sub}</p>}
       </div>
       {right && <div className="flex shrink-0 items-center gap-2">{right}</div>}
     </div>

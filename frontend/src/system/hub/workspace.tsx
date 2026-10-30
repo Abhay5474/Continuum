@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Children, cloneElement, isValidElement, useRef } from "react";
 import type { ReactNode } from "react";
 import { useLiquidIndicator } from "../physics";
@@ -238,7 +239,10 @@ export function Stat({
   series,
   delta,
   deltaNote,
+  to,
 }: {
+  /** Where the figure comes from: the card opens that page, growing into it. */
+  to?: string;
   label: string;
   value: ReactNode;
   unit?: string;
@@ -257,8 +261,8 @@ export function Stat({
   // would read as eight different severities.
   const stateTone = tone && !HUES.includes(tone as Hue) ? tone : undefined;
   const colour = stateTone && stateTone !== "mute" ? toneInk(stateTone) : undefined;
-  return (
-    <Card className="flex min-w-0 flex-col" pad={false}>
+  const card = (
+    <Card className="flex h-full min-w-0 flex-col" pad={false} surface={!!to}>
       <div className="flex items-start gap-3 p-4 pb-3">
         <div className="min-w-0 flex-1">
           <div className="micro truncate" title={hint}>
@@ -303,6 +307,13 @@ export function Stat({
         </div>
       )}
     </Card>
+  );
+  return to ? (
+    <Link to={to} data-morph className="block min-w-0 rounded-[18px]">
+      {card}
+    </Link>
+  ) : (
+    card
   );
 }
 

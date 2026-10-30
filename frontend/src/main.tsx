@@ -1,7 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, matchRoutes, RouterProvider } from "react-router-dom";
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import "./index.css";
+import "./shell/shell.css";
 import App from "./App";
 import RequireAuth from "./components/RequireAuth";
 import Landing from "./pages/Landing";
@@ -9,7 +12,9 @@ import SignIn from "./pages/SignIn";
 import { ToastProvider } from "./components/ui";
 import { NotFound, RouteError } from "./system/RouteError";
 import { OperatorProvider } from "./system/OperatorAccess";
-import { installMotionTokens, installRipple, installSurfaceLight, installTooltips } from "./system/physics";
+import { installMagnet, installMotionTokens, installRipple, installSurfaceLight, installTooltips } from "./system/physics";
+import { installViewTransitions } from "./system/navigation";
+import { MotionRoot } from "./system/MotionRoot";
 
 // Before the first render, so the first frame already speaks the motion
 // language: every --ease-* and --dur-* the stylesheet reads comes from here.
@@ -17,6 +22,7 @@ installMotionTokens();
 installSurfaceLight();
 installTooltips();
 installRipple();
+installMagnet();
 
 /**
  * A route whose page is downloaded when first visited. The public landing page
@@ -102,12 +108,35 @@ const router = createBrowserRouter([
   },
 ]);
 
+// Every navigation is a view transition: the shell stays, the page moves.
+installViewTransitions(router);
+
+/**
+ * A page starts downloading when the pointer reaches a link to it, or the
+ * keyboard focuses one, so by the time the click lands the page is usually
+ * here and the transition starts at once rather than after the download.
+ */
+const warmed = new Set<string>();
+function warm(target: EventTarget | null) {
+  const a = (target as Element | null)?.closest?.<HTMLAnchorElement>("a[href]");
+  if (!a || a.origin !== location.origin || warmed.has(a.pathname)) return;
+  warmed.add(a.pathname);
+  for (const m of matchRoutes(router.routes, a.pathname) ?? []) {
+    const lazy = (m.route as { lazy?: () => Promise<unknown> }).lazy;
+    lazy?.().catch(() => warmed.delete(a.pathname));
+  }
+}
+document.addEventListener("pointerover", (e) => warm(e.target), { passive: true });
+document.addEventListener("focusin", (e) => warm(e.target));
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ToastProvider>
-      <OperatorProvider>
-        <RouterProvider router={router} />
-      </OperatorProvider>
-    </ToastProvider>
+    <MotionRoot>
+      <ToastProvider>
+        <OperatorProvider>
+          <RouterProvider router={router} />
+        </OperatorProvider>
+      </ToastProvider>
+    </MotionRoot>
   </React.StrictMode>
 );

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, LayoutGroup, m } from "motion/react";
+import { transitions } from "../system/physics";
 import { visibleInterval } from "../system/poll";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { api, portal } from "../api";
 import { Chip, Explain, Pill } from "../system/hub";
 import { Micro, Readout, Plane, StateDot } from "../system/primitives";
+import { useHoverHighlight } from "../system/interaction/HoverHighlight";
 import { STATE, type StateKey } from "../system/tokens";
 import DataView from "../system/DataView";
 import FeatureToggle from "../system/FeatureToggle";
@@ -78,12 +81,24 @@ function statusState(status: string): StateKey {
   return "idle";
 }
 
+/**
+ * The last list seen, so coming back to it draws it at once — and the run you
+ * opened is there for its header to shrink back into — while it refreshes.
+ */
+let lastRuns: any[] = [];
+
 export default function DagCommandCenter() {
   const { workflowId } = useParams();
-  const [runs, setRuns] = useState<any[]>([]);
+  const [runs, setRuns] = useState<any[]>(lastRuns);
+  const list = useRef<HTMLDivElement>(null);
+  const { bind, highlight } = useHoverHighlight(list, "[data-row]");
 
   useEffect(() => {
-    const load = () => api.get<any[]>("/api/dag/runs").then(setRuns).catch(() => {});
+    const load = () =>
+      api.get<any[]>("/api/dag/runs").then((r) => {
+        lastRuns = r;
+        setRuns(r);
+      }).catch(() => {});
     load();
     return visibleInterval(load, 5000);
   }, []);
@@ -91,14 +106,14 @@ export default function DagCommandCenter() {
   if (workflowId) return <Constellation workflowId={workflowId} />;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2.5">
-            <Chip glyph="check" tone="accent" size={28} />
-            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">Verification Engine</h1>
+          <div className="flex items-center gap-3">
+            <Chip glyph="check" tone="accent" size={32} />
+            <h1 className="text-[27px] font-semibold tracking-[-0.028em]">Verification Engine</h1>
           </div>
-          <p className="mt-0.5 text-sm text-slate-500 max-w-2xl leading-relaxed">
+          <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-slate-500">
             Claims solved in parallel · verified independently · resolved by Bayesian aggregation
           </p>
         </div>
@@ -116,16 +131,20 @@ export default function DagCommandCenter() {
       </header>
 
       {runs.length === 0 ? (
-        <div className="text-center">
-          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">No verification runs</h2>
+        <div className="card p-10 text-center">
+          <h2 className="text-[14px] font-semibold tracking-tight text-slate-200">No verification runs</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-Turn it on above, then send a gateway request.
+            Turn it on above, then send a gateway request.
           </p>
         </div>
       ) : (
         <section>
-          <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">Runs · newest first</h2>
-          <div className="mt-2 divide-y divide-edge/50">
+          <div className="flex items-baseline justify-between px-1">
+            <h2 className="text-[15px] font-semibold tracking-[-0.015em] text-slate-100">Runs</h2>
+            <span className="text-[12px] text-slate-500">{runs.length} · newest first</span>
+          </div>
+          <div ref={list} className="card relative mt-3 p-1.5" {...bind}>
+            {highlight}
             {runs.map((r) => {
               const conf = r.finalConfidence ?? 0;
               const s: StateKey =
@@ -140,35 +159,41 @@ Turn it on above, then send a gateway request.
                 <Link
                   key={r.workflowId}
                   to={`/dag/${r.workflowId}`}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-3 transition-colors hover:bg-edge/40"
+                  state={{ title: r.prompt }}
+                  data-row
+                  data-morph
+                  className="run-row press group relative z-[1] grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-[12px] px-3.5 py-3.5 md:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto_auto]"
                 >
                   <StateDot state={s} />
-                  <span className="min-w-0 flex-1 truncate text-sm text-slate-300">
-                    {r.prompt || <span className="text-slate-600">no prompt recorded</span>}
+                  <span className="min-w-0">
+                    <span data-morph-title className="block w-fit max-w-full truncate text-[14px] font-medium tracking-[-0.01em] text-slate-100">
+                      {r.prompt || <span className="text-slate-500">no prompt recorded</span>}
+                    </span>
+                    <span className="readout mt-0.5 block text-[11.5px] text-slate-500">
+                      {r.claimCount} claims · {r.nodeCount} nodes
+                      <span className="md:hidden"> · {timeOf(r.createdAt)}</span>
+                    </span>
                   </span>
                   {/* Confidence as a length, so a run to be wary of is found by
                       its short bar before its number is read. */}
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2.5">
                     <span className="relative hidden h-1.5 w-24 overflow-hidden rounded-full sm:inline-block" style={{ background: "rgb(var(--card-rule))" }} aria-hidden>
                       <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${conf * 100}%`, background: STATE[s].ink }} />
                     </span>
-                    <span className="readout text-sm font-semibold" style={{ color: STATE[s].ink }}>
+                    <span className="readout w-[52px] text-right text-[14px] font-semibold" style={{ color: STATE[s].ink }}>
                       {r.finalConfidence != null ? `${(conf * 100).toFixed(1)}%` : "—"}
                     </span>
                   </span>
-                  <span className="w-24 text-right">
+                  <span className="hidden w-[112px] text-right md:block">
                     {r.uncertainty ? (
                       <Pill tone={r.uncertainty === "LOW" ? "ok" : r.uncertainty === "MEDIUM" ? "warn" : "bad"}>
                         {String(r.uncertainty).toLowerCase()} uncertainty
                       </Pill>
                     ) : "—"}
                   </span>
-                  <span className="readout w-24 text-right text-[10px] text-slate-600">
-                    {r.claimCount} claims · {r.nodeCount} nodes
-                  </span>
                   {/* How long it took, and when: a slow run is found by its time
                       before its graph is opened. */}
-                  <span className="readout hidden w-32 text-right text-[10.5px] text-slate-500 md:inline">
+                  <span className="readout hidden w-[128px] text-right text-[11.5px] text-slate-500 md:block">
                     {r.status === "RUNNING" ? (
                       <span style={{ color: "var(--state-active-ink)" }}>running</span>
                     ) : r.completedAt ? (
@@ -176,7 +201,12 @@ Turn it on above, then send a gateway request.
                     ) : (
                       String(r.status ?? "").toLowerCase()
                     )}
-                    <span className="text-slate-600"> · {timeOf(r.createdAt)}</span>
+                    <span className="text-slate-500"> · {timeOf(r.createdAt)}</span>
+                  </span>
+                  <span aria-hidden className="hidden text-slate-500 transition-[transform,opacity] duration-300 group-hover:translate-x-0.5 group-hover:text-slate-200 md:block">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 3.5 10.5 8 6 12.5" />
+                    </svg>
                   </span>
                 </Link>
               );
@@ -189,6 +219,9 @@ Turn it on above, then send a gateway request.
 }
 
 function Constellation({ workflowId }: { workflowId: string }) {
+  // The question, as the list that opened this run knew it: the header has its
+  // title from the first frame, so the row it grew out of has somewhere to land.
+  const title = (useLocation().state as { title?: string } | null)?.title;
   const [trace, setTrace] = useState<(Trace & { run?: any }) | null>(null);
   const [sel, setSel] = useState<string | null>(null);
 
@@ -301,21 +334,22 @@ function Constellation({ workflowId }: { workflowId: string }) {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-start gap-4">
-        <div className="min-w-0 flex-1">
-          <Link to="/dag" className="micro transition-colors hover:text-slate-300">
-            ← All runs
-          </Link>
-          <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">
-            {run?.prompt || "Verification run"}
-          </h1>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
-            {model && <RunState model={model} />}
-            <span className="font-mono text-[10px] text-slate-600">{workflowId}</span>
-          </div>
+      <Link to="/dag" data-nav="back" className="micro inline-flex items-center gap-1.5 transition-colors hover:text-slate-300">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M10 3.5 5.5 8l4.5 4.5" />
+        </svg>
+        All runs
+      </Link>
+      <header className="card p-6" data-morph-target>
+        <h1 data-morph-title className="w-fit max-w-full text-[24px] font-semibold leading-[1.2] tracking-[-0.026em] text-slate-100 sm:text-[28px]">
+          {run?.prompt || title || "Verification run"}
+        </h1>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 text-[12px] text-slate-500">
+          {model ? <RunState model={model} /> : <span>Loading the run…</span>}
+          <span className="font-mono text-[10.5px] text-slate-500">{workflowId}</span>
         </div>
         {run && run.status !== "RUNNING" && (
-          <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+          <div className="mt-5 flex flex-wrap items-end gap-x-10 gap-y-3 border-t pt-4" style={{ borderColor: "rgb(var(--card-rule))" }}>
             <Readout label="Confidence" value={`${(conf * 100).toFixed(1)}%`} state={confState} />
             <Readout label="Uncertainty" value={run.uncertainty ?? "—"} size="sm" />
             <Readout label="Claims" value={run.claimCount} size="sm" />
@@ -499,9 +533,14 @@ function Constellation({ workflowId }: { workflowId: string }) {
           {/* Beside the run on a wide screen and always in view; on a narrow one,
               first — the overview comes before the detail. */}
           <aside ref={asideRef} className="order-first scroll-mt-20 space-y-4 lg:sticky lg:top-20 lg:order-none lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto">
-            {sel === null ? (
-              <>
-                <Findings findings={findings} onSelect={setSel} />
+            <LayoutGroup id="run-aside">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {sel === null ? (
+                  <m.div key="findings" className="space-y-4"
+                         initial={{ opacity: 0 }}
+                         animate={{ opacity: 1, transition: { delay: 0.05, duration: 0.22 } }}
+                         exit={{ opacity: 0, transition: { duration: 0.12 } }}>
+                <Findings findings={findings} onSelect={setSel} morph />
                 {risks.length > 0 && (
                   <div>
                     <Micro>Risk flags</Micro>
@@ -517,9 +556,19 @@ function Constellation({ workflowId }: { workflowId: string }) {
                     </div>
                   </div>
                 )}
-              </>
-            ) : (
-              <div className="settle space-y-3">
+                  </m.div>
+                ) : (
+                  <m.div
+                    key={`detail-${sel}`}
+                    layoutId={`finding-${sel}`}
+                    className="card p-4"
+                    style={{ borderRadius: 18 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    transition={transitions.standard}
+                  >
+                    <m.div className="space-y-3" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.2 } }}>
                 <button type="button" onClick={() => setSel(null)} className="micro transition-colors hover:text-slate-300">
                   ← Findings
                 </button>
@@ -553,8 +602,11 @@ function Constellation({ workflowId }: { workflowId: string }) {
                 ) : (
                   <p className="text-[11px] leading-relaxed text-slate-500">Nothing is recorded for this yet.</p>
                 )}
-              </div>
-            )}
+                    </m.div>
+                  </m.div>
+                )}
+              </AnimatePresence>
+            </LayoutGroup>
           </aside>
         </div>
       )}

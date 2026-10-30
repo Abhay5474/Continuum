@@ -6,7 +6,6 @@ import { useRecentRequests } from "../system/traffic";
 import { Micro, StateDot, Trace, Meter, Note } from "../system/primitives";
 import { STATE } from "../system/tokens";
 import {
-  Allocation,
   BarList,
   Card,
   CardHead,
@@ -116,168 +115,230 @@ export default function CommandCenter() {
     [installed]
   );
 
+  // The sentence the page opens with: what, if anything, needs a person.
+  const worst = attention.slice().sort((a, b) => rank(b.state) - rank(a.state))[0];
+  const headline = t.loading
+    ? "Reading the system…"
+    : t.experimentActive && attention.length === 0
+      ? "A chaos experiment is running"
+      : reasons === 0
+        ? "Everything is running normally"
+        : attention.length === 1 && !t.experimentActive
+          ? `${worst.name} needs attention`
+          : `${reasons} things need attention`;
+  const lead = t.events[0]?.text ?? (installed.length ? `${installed.length} subsystems installed, ${healthyPct}% nominal.` : "");
+  const focus = (id: string) => {
+    setSelected(id);
+    document.querySelector("[data-guide='cc-topology']")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   return (
-    <div className="relative -mx-5 -mt-6 lg:min-h-[calc(100vh-56px)]">
-      {/* The spatial field the whole console sits on. */}
-      <div className="pointer-events-none absolute inset-0 grid-field opacity-70" />
+    <div className="space-y-4">
+      {/* The visual heading is the state sentence; a screen reader still needs
+          the page named, so the heading exists without being drawn twice. */}
+      <h1 className="sr-only">Command Centre</h1>
 
-      <div className="relative px-5 pt-5">
-        {/* The visual heading here is the state readout below, which is the
-            right call for an instrument. A screen reader still needs the page
-            named, so the heading exists — it just is not drawn twice. */}
-        <h1 className="sr-only">Command Centre</h1>
-        {/* ---- system header: the one-line state of the world ---- */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-guide="cc-state">
-          <div className="flex items-center gap-2.5">
-            <StateDot state={t.coreState} size={10} />
-            <span
-              className="text-[21px] font-semibold tracking-tight"
-              style={{ color: STATE[t.coreState].ink }}
-            >
-              {STATE[t.coreState].label}
-            </span>
+      {/* ---- the state of the world, in one sentence --------------------- */}
+      <section className="card relative overflow-hidden p-6 sm:p-7" data-guide="cc-state" data-morph-target>
+        <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-end">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11.5px] font-medium"
+                    style={{ background: `color-mix(in srgb, ${STATE[t.coreState].ink} 11%, transparent)`, color: STATE[t.coreState].ink }}>
+                <StateDot state={t.coreState} size={7} />
+                {STATE[t.coreState].label}
+              </span>
+              <span className="text-[12px] text-slate-500">
+                {installed.length} subsystems · polled every four seconds
+              </span>
+            </div>
+            <p className="display mt-4 max-w-[22ch] text-[34px] text-slate-100 sm:text-[42px]" aria-live="polite">
+              {headline}
+            </p>
+            {lead && <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-slate-500">{lead}</p>}
+            <div className="mt-6 flex flex-wrap items-center gap-2.5">
+              <Link
+                to="/gateway"
+                data-magnetic="0.2"
+                className="btn-primary press press-on-accent inline-flex h-[38px] items-center gap-2 rounded-[11px] px-4 text-[13px] font-medium"
+                style={{ backgroundColor: "var(--accent-strong)", color: "var(--accent-on)" }}
+              >
+                Open the gateway
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </Link>
+              <Link
+                to="/dag"
+                className="btn-secondary press inline-flex h-[38px] items-center rounded-[11px] border px-4 text-[13px] font-medium text-slate-200"
+                style={{ borderColor: "rgb(var(--card-edge))", background: "rgb(var(--card))" }}
+              >
+                Verification runs
+              </Link>
+            </div>
           </div>
-          <Pill tone={reasons === 0 ? "ok" : "warn"} dot>
-            {reasons === 0 ? "All nominal" : `${reasons} needing attention`}
-          </Pill>
-          <span className="text-xs text-slate-500">
-            {installed.length} subsystems · polled every four seconds
-          </span>
-          <Link
-            to="/gateway"
-            className="ml-auto rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-opacity hover:opacity-90"
-            style={{ background: "var(--accent-strong)", color: "var(--accent-on)" }}
-          >
-            Open the gateway
-          </Link>
-        </div>
 
-        {/* ---- the headline band ----------------------------------------
-            Eight figures, each with its own mark and — where there is a real
-            series behind it — its own shape. The hue is identity: spend is
-            always amber, throughput always violet, so the band is scanned by
-            colour before it is read. */}
-        <div className="mt-5" data-guide="cc-stats">
-          <Stats cols={4}>
-            <Stat
-              label="Requests"
-              glyph="activity"
-              tone="violet"
-              value={t.headline.requests.toLocaleString()}
-              series={arrivals.some((a: number) => a > 0) ? arrivals : recent.arrivals}
-              delta={reqTrend}
-              deltaNote="vs the previous window"
-            />
-            <Stat
-              label="Success"
-              glyph="check"
-              unit="%"
-              tone="green"
-              value={(t.headline.successRate * 100).toFixed(1)}
-              series={t.series.success}
-            />
-            <Stat
-              label="Absorbed failures"
-              glyph="shield"
-              tone="blue"
-              value={t.headline.failoversPrevented}
-              hint="Provider failures the engine handled before your app saw them"
-            />
-            <Stat
-              label="Spend"
-              glyph="coin"
-              tone="amber"
-              value={`$${t.headline.costUsd.toFixed(5)}`}
-              series={recent.cumulativeCost}
-              hint="Spend accumulating across your recent requests"
-            />
-            <Stat label="Tokens" glyph="layers" tone="cyan" value={t.headline.tokens.toLocaleString()} series={recent.tokens} hint="Tokens per request, recent first to last" />
-            <Stat label="Running" glyph="flow" tone="orange" value={t.headline.running} />
-            <Stat label="Completed" glyph="check" tone="green" value={t.headline.completed} />
-            <Stat
-              label="Failed"
-              glyph="alert"
-              tone={t.headline.failed > 0 ? "red" : "mute"}
-              value={t.headline.failed}
-            />
-          </Stats>
-        </div>
-
-        {/* ---- the three panels: what the fleet is made of, what it is
-            doing, and what just happened ---- */}
-        <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-3" data-guide="cc-panels">
-          <Card>
-            <CardHead
-              glyph="layers"
-              tone="violet"
-              title="Subsystem health"
-              sub={`${installed.length} installed of ${t.subsystems.length} in the architecture`}
-            />
-            <div className="mt-4">
-              <Allocation
-                slices={healthSlices}
-                centre={`${healthyPct}%`}
-                centreLabel="nominal"
-                unit="subsystems"
-              />
+          {/* Every subsystem as one segment of a status rail: the whole fleet
+              in a line, each segment the colour of its state. */}
+          <div className="min-w-0">
+            <div className="flex items-baseline justify-between">
+              <span className="micro">Subsystems</span>
+              <span className="readout text-[12px] text-slate-500">{healthyPct}% nominal</span>
             </div>
-          </Card>
-
-          <Card>
-            <CardHead
-              glyph="gauge"
-              tone="cyan"
-              title="Path activity"
-              sub="Traffic on each subsystem's own path, this poll"
-            />
-            <div className="mt-4">
-              {activity.length > 0 ? (
-                <BarList items={activity} />
-              ) : (
-                <p className="text-xs text-slate-500">
-                  Nothing is moving. Send a request through the gateway and the bars fill in.
-                </p>
-              )}
-            </div>
-          </Card>
-
-          <Card>
-            <CardHead
-              glyph="alert"
-              tone="orange"
-              title="System events"
-              sub="Newest first"
-              right={
-                <Pill tone="ok" dot>
-                  Live
-                </Pill>
-              }
-            />
-            <div className="mt-3">
-              {t.events.length > 0 ? (
-                <Feed>
-                  {t.events.map((e, i) => (
-                    <Event
-                      key={i}
-                      tone={EVENT_TONE[e.kind] ?? "info"}
-                      title={e.text}
-                      badge={STATE[e.kind]?.label}
+            <div className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.max(1, t.subsystems.length)}, minmax(0, 1fr))` }}>
+              {t.subsystems.map((s) => {
+                const state = s.installed ? s.state : "offline";
+                const on = selected === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => focus(s.id)}
+                    data-tip={`${s.name} · ${s.installed ? STATE[s.state].label : "absent"}`}
+                    aria-label={`${s.name}: ${s.installed ? STATE[s.state].label : "absent"}. Inspect`}
+                    data-no-press
+                    className="status-seg group flex flex-col items-center gap-1.5 rounded-[8px] pb-1 pt-0.5"
+                  >
+                    <span
+                      className="block h-9 w-full rounded-[6px] transition-[transform,box-shadow] duration-300 group-hover:-translate-y-0.5"
+                      style={{
+                        background: `linear-gradient(180deg, color-mix(in srgb, ${STATE[state].color} 88%, white), ${STATE[state].color})`,
+                        opacity: s.installed ? 1 : 0.35,
+                        boxShadow: on ? `0 0 0 2px rgb(var(--ink)), 0 0 0 3.5px ${STATE[state].ink}` : `0 6px 14px -8px ${STATE[state].color}`,
+                      }}
                     />
-                  ))}
-                </Feed>
-              ) : (
-                <p className="px-1 text-xs text-slate-500">
-                  Nothing has happened worth reporting. Degradations, failovers and chaos
-                  experiments appear here as they occur.
-                </p>
-              )}
+                    <span className="font-mono text-[10px] text-slate-500 group-hover:text-slate-200">{s.code}</span>
+                  </button>
+                );
+              })}
             </div>
-          </Card>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-slate-500">
+              {healthSlices.map((h) => (
+                <span key={h.key}>
+                  <span className="readout text-slate-200">{h.value}</span> {h.label.toLowerCase()}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
+      </section>
 
+      {/* ---- the figures. Each opens the page it is measured on, and the
+          card grows into that page's header on the way. ---------------- */}
+      <div data-guide="cc-stats">
+        <Stats cols={4}>
+          <Stat
+            to="/gateway"
+            label="Requests"
+            glyph="activity"
+            tone="violet"
+            value={t.headline.requests.toLocaleString()}
+            series={arrivals.some((a: number) => a > 0) ? arrivals : recent.arrivals}
+            delta={reqTrend}
+            deltaNote="vs the previous window"
+          />
+          <Stat
+            to="/gateway"
+            label="Success"
+            glyph="check"
+            unit="%"
+            tone="green"
+            value={(t.headline.successRate * 100).toFixed(1)}
+            series={t.series.success}
+          />
+          <Stat
+            to="/gateway"
+            label="Absorbed failures"
+            glyph="shield"
+            tone="blue"
+            value={t.headline.failoversPrevented}
+            hint="Provider failures the engine handled before your app saw them"
+          />
+          <Stat
+            to="/billing"
+            label="Spend"
+            glyph="coin"
+            tone="amber"
+            value={`$${t.headline.costUsd.toFixed(5)}`}
+            series={recent.cumulativeCost}
+            hint="Spend accumulating across your recent requests"
+          />
+          <Stat to="/gateway" label="Tokens" glyph="layers" tone="cyan" value={t.headline.tokens.toLocaleString()} series={recent.tokens} hint="Tokens per request, recent first to last" />
+          <Stat to="/workflows/console" label="Running" glyph="flow" tone="orange" value={t.headline.running} />
+          <Stat to="/workflows/console" label="Completed" glyph="check" tone="green" value={t.headline.completed} />
+          <Stat
+            to="/workflows/console"
+            label="Failed"
+            glyph="alert"
+            tone={t.headline.failed > 0 ? "red" : "mute"}
+            value={t.headline.failed}
+          />
+        </Stats>
+      </div>
+
+      {/* ---- what is moving, and what just happened ---- */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]" data-guide="cc-panels">
+        <Card>
+          <CardHead
+            glyph="gauge"
+            tone="cyan"
+            title="Path activity"
+            sub="Traffic on each subsystem's own path, this poll"
+          />
+          <div className="mt-4">
+            {activity.length > 0 ? (
+              <BarList items={activity} />
+            ) : (
+              <p className="text-xs text-slate-500">
+                Nothing is moving. Send a request through the gateway and the bars fill in.
+              </p>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHead
+            glyph="alert"
+            tone="orange"
+            title="System events"
+            sub="Newest first"
+            right={
+              <Pill tone="ok" dot>
+                Live
+              </Pill>
+            }
+          />
+          <div className="mt-3">
+            {t.events.length > 0 ? (
+              <Feed>
+                {t.events.map((e, i) => (
+                  <Event
+                    key={i}
+                    tone={EVENT_TONE[e.kind] ?? "info"}
+                    title={e.text}
+                    badge={STATE[e.kind]?.label}
+                  />
+                ))}
+              </Feed>
+            ) : (
+              <p className="px-1 text-xs text-slate-500">
+                Nothing has happened worth reporting. Degradations, failovers and chaos
+                experiments appear here as they occur.
+              </p>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <section className="card relative overflow-hidden p-0" aria-label="Topology">
+        <div className="pointer-events-none absolute inset-0 grid-field opacity-60" />
+        <div className="relative flex flex-wrap items-baseline justify-between gap-2 px-6 pt-5">
+          <h2 className="text-[15px] font-semibold tracking-[-0.015em] text-slate-100">Topology</h2>
+          <span className="text-[12px] text-slate-500">Every subsystem, on its path to the core</span>
+        </div>
         {/* ---- the topology and its instrument rails ---- */}
-        <div className="grid gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_320px]" data-guide="cc-topology">
-          <div className="relative flex flex-col justify-center py-2 lg:min-h-[68vh] lg:py-0">
+        <div className="relative grid gap-6 px-6 pb-6 pt-2 lg:grid-cols-[minmax(0,1fr)_300px]" data-guide="cc-topology">
+          <div className="relative flex flex-col justify-center py-2 lg:min-h-[60vh] lg:py-0">
             {t.loading ? (
               <div className="flex h-[52vh] items-center justify-center">
                 <span className="micro animate-pulse">Establishing telemetry link…</span>
@@ -374,9 +435,14 @@ export default function CommandCenter() {
             )}
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
+}
+
+/** How much a state asks for a person: critical first. */
+function rank(state: string): number {
+  return ({ critical: 4, degraded: 3, warning: 2 } as Record<string, number>)[state] ?? 0;
 }
 
 /** Focused view of one subsystem — the "zoom in" of the topology. */

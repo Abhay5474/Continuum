@@ -457,7 +457,7 @@ function ToastItem({ toast, onGone }: { toast: Toast; onGone: () => void }) {
 const THEME_KEY = "continuum.theme.choice";
 type Theme = "dark" | "light";
 
-function readTheme(): Theme {
+export function readTheme(): Theme {
   try {
     return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
   } catch {
@@ -473,6 +473,18 @@ function applyTheme(theme: Theme) {
 }
 
 if (typeof document !== "undefined") applyTheme(readTheme());
+
+/** Flips the theme from anywhere (the command palette), as the toggle does. */
+export function toggleTheme() {
+  const next: Theme = readTheme() === "dark" ? "light" : "dark";
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    /* private mode: the choice lasts for this page only */
+  }
+  applyTheme(next);
+  window.dispatchEvent(new Event("continuum:theme"));
+}
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const [theme, setTheme] = useState<Theme>(readTheme);

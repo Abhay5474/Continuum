@@ -16,3 +16,5 @@ export { installSurfaceLight } from "./surface";
 export { useLiquidIndicator } from "./indicator";
 export { installTooltips } from "./tooltip";
 export { installRipple } from "./ripple";
+export { transitions, springOf } from "./transitions";
+export { installMagnet } from "./magnet";

@@ -1,0 +1,507 @@
+/* ==========================================================================
+   The console's material and motion, second edition.
+
+   One light source (the accent, top left) and one cool counter-light; glass
+   chrome that floats a few pixels off the page; type set in Geist. Every
+   duration and curve is a motion token (src/system/physics/tokens.ts), so the
+   CSS here moves on the same springs as the script.
+   ========================================================================== */
+
+:root {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Chrome: the sidebar, the bar, menus, the palette. */
+  --chrome: 20 23 31;
+  --chrome-a: 0.62;
+  --chrome-strong-a: 0.9;
+  --chrome-rim: 255 255 255;
+  --chrome-rim-a: 0.07;
+  --chrome-shadow: 0 0 0 1px rgb(255 255 255 / 0.05), 0 1px 1px rgb(0 0 0 / 0.3), 0 26px 60px -22px rgb(0 0 0 / 0.75);
+  /* What the pointer is over, and what is chosen. */
+  --hl: 255 255 255;
+  --hl-a: 0.055;
+  --active-bg: rgb(255 255 255 / 0.085);
+  --active-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.35);
+  --icon-ink: rgb(132 147 169);
+  /* The room's light. */
+  --amb-near: 76 139 245;
+  --amb-near-a: 0.17;
+  --amb-far: 139 92 246;
+  --amb-far-a: 0.1;
+  --grain-a: 0.06;
+  --grain-blend: overlay;
+}
+
+:root[data-theme="light"] {
+  --chrome: 255 255 255;
+  --chrome-a: 0.6;
+  --chrome-strong-a: 0.92;
+  --chrome-rim: 255 255 255;
+  --chrome-rim-a: 0.95;
+  --chrome-shadow: 0 0 0 1px rgb(30 41 72 / 0.07), 0 1px 2px rgb(30 41 72 / 0.05), 0 22px 54px -22px rgb(30 41 72 / 0.26);
+  --hl: 30 41 72;
+  --hl-a: 0.05;
+  --active-bg: #ffffff;
+  --active-shadow: 0 0 0 1px rgb(30 41 72 / 0.07), 0 1px 2px rgb(30 41 72 / 0.08), 0 6px 16px -6px rgb(30 41 72 / 0.16);
+  --icon-ink: rgb(100 116 139);
+  --amb-near: 240 78 62;
+  --amb-near-a: 0.15;
+  --amb-far: 99 102 241;
+  --amb-far-a: 0.075;
+  --grain-a: 0.045;
+  --grain-blend: multiply;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-optical-sizing: auto;
+}
+code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); }
+/* Numbers that update in place keep their width. */
+.readout, .tabular { font-variant-numeric: tabular-nums; }
+
+/* ---- the ambient light ------------------------------------------------- */
+/* The Ambient component is the console's wallpaper now; the old one stands
+   down wherever it is mounted. */
+:root[data-liquid] body::before { display: none; }
+
+.ambient { background: rgb(var(--ink)); contain: strict; }
+.ambient-near,
+.ambient-far {
+  position: absolute;
+  inset: -8%;
+  will-change: transform;
+}
+.ambient-near {
+  background:
+    radial-gradient(40% 44% at 10% 4%, rgb(var(--amb-near) / var(--amb-near-a)), transparent 70%),
+    radial-gradient(26% 30% at 58% -4%, rgb(var(--amb-near) / calc(var(--amb-near-a) * 0.42)), transparent 70%);
+}
+.ambient-far {
+  background:
+    radial-gradient(44% 48% at 98% 96%, rgb(var(--amb-far) / var(--amb-far-a)), transparent 72%),
+    radial-gradient(30% 34% at 92% 18%, rgb(var(--amb-far) / calc(var(--amb-far-a) * 0.55)), transparent 70%);
+}
+.ambient-grain {
+  position: absolute;
+  inset: 0;
+  opacity: var(--grain-a);
+  mix-blend-mode: var(--grain-blend);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ambient-near, .ambient-far, .ambient-grain { display: none; }
+}
+
+/* ---- the shell ----------------------------------------------------------- */
+.shell-body { min-height: 100vh; }
+@media (min-width: 1024px) {
+  .shell-body {
+    padding-left: var(--side-w);
+    transition: padding-left var(--dur-modal) var(--ease-modal);
+  }
+}
+
+.sidebar,
+.drawer {
+  z-index: 40;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgb(var(--chrome) / var(--chrome-a)), rgb(var(--chrome) / calc(var(--chrome-a) - 0.1)));
+  -webkit-backdrop-filter: blur(30px) saturate(1.7);
+  backdrop-filter: blur(30px) saturate(1.7);
+  box-shadow: inset 0 1px 0 rgb(var(--chrome-rim) / var(--chrome-rim-a)), var(--chrome-shadow);
+}
+.sidebar {
+  position: fixed;
+  top: 12px;
+  bottom: 12px;
+  left: 12px;
+  width: calc(var(--side-w) - 24px);
+  flex-direction: column;
+  padding: 14px 10px 10px;
+  overflow: hidden;
+  transition: width var(--dur-modal) var(--ease-modal);
+}
+.drawer { background: rgb(var(--chrome) / var(--chrome-strong-a)); }
+.drawer-scrim { background: rgb(var(--scrim) / 0.28); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+
+.side-scroll { scrollbar-width: none; }
+.side-scroll::-webkit-scrollbar { display: none; }
+
+.side-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  margin: 1px 0;
+  border-radius: 10px;
+  font-size: 13.25px;
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  white-space: nowrap;
+  color: rgb(148 163 184);
+  transition: color var(--dur-fade) var(--ease-fade);
+}
+:root[data-theme="light"] .side-link { color: rgb(71 85 105); }
+.side-link:hover,
+.side-link.is-active { color: rgb(241 245 249); }
+:root[data-theme="light"] .side-link:hover,
+:root[data-theme="light"] .side-link.is-active { color: rgb(15 23 42); }
+.side-link .side-icon { color: var(--icon-ink); transition: color var(--dur-fade) var(--ease-fade); display: grid; place-items: center; }
+.side-link.is-active .side-icon { color: var(--accent); }
+.side-link:focus-visible { border-radius: 10px; }
+.side-active {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--active-bg);
+  box-shadow: var(--active-shadow);
+}
+.side-labs {
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hue-violet-ink);
+  background: var(--hue-violet-wash);
+}
+.side-section {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(112 128 151);
+  border-radius: 8px;
+}
+.side-section:hover { color: rgb(148 163 184); }
+:root[data-theme="light"] .side-section { color: rgb(100 116 139); }
+:root[data-theme="light"] .side-section:hover { color: rgb(51 65 85); }
+
+.side-tool {
+  display: grid;
+  place-items: center;
+  height: 32px;
+  width: 32px;
+  border-radius: 10px;
+  color: rgb(132 147 169);
+  transition: background-color var(--dur-fade) var(--ease-fade), color var(--dur-fade) var(--ease-fade);
+}
+.side-tool:hover { background: rgb(var(--hl) / var(--hl-a)); color: rgb(241 245 249); }
+:root[data-theme="light"] .side-tool:hover { color: rgb(15 23 42); }
+
+.side-app,
+.side-account {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 7px 10px;
+  transition: background-color var(--dur-fade) var(--ease-fade), box-shadow var(--dur-fade) var(--ease-fade);
+}
+.side-app {
+  background: rgb(var(--hl) / 0.035);
+  box-shadow: inset 0 0 0 1px rgb(var(--hl) / 0.07);
+}
+.side-app:hover,
+.side-app[aria-expanded="true"] { background: rgb(var(--hl) / 0.06); box-shadow: inset 0 0 0 1px rgb(var(--hl) / 0.11); }
+.side-account { padding: 7px 8px; }
+.side-account:hover,
+.side-account[aria-expanded="true"] { background: rgb(var(--hl) / var(--hl-a)); }
+.avatar {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  width: 30px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: radial-gradient(120% 120% at 20% 10%, color-mix(in srgb, var(--accent) 80%, #fff), var(--accent-strong) 70%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 1px 2px rgb(var(--accent-rgb) / 0.35);
+}
+
+/* The pointer's companion in lists and menus (HoverHighlight). */
+.hover-hl {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  border-radius: 10px;
+  pointer-events: none;
+  background: rgb(var(--hl) / var(--hl-a));
+  transition: opacity 180ms var(--ease-fade);
+}
+.side-scroll > a,
+.side-scroll > div { position: relative; z-index: 1; }
+
+/* ---- menus ----------------------------------------------------------------- */
+.popover {
+  border-radius: 16px;
+  background: rgb(var(--chrome) / var(--chrome-strong-a));
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  backdrop-filter: blur(26px) saturate(1.7);
+  box-shadow: inset 0 1px 0 rgb(var(--chrome-rim) / var(--chrome-rim-a)), var(--chrome-shadow);
+}
+.menu-row {
+  position: relative;
+  border-radius: 10px;
+  padding: 8px 10px;
+  outline: none;
+}
+.menu-row:focus-visible { box-shadow: var(--ring); }
+.menu-rule { height: 1px; margin: 6px 6px; background: rgb(var(--card-rule)); }
+
+/* ---- the bar --------------------------------------------------------------- */
+.topbar-frost {
+  background: rgb(var(--ink) / 0.7);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: 0 1px 0 rgb(var(--card-rule));
+}
+.crumb-link { padding: 2px 4px; margin: 0 -4px; transition: color var(--dur-fade) var(--ease-fade); }
+
+.tool-button {
+  height: 34px;
+  width: 34px;
+  border-radius: 11px;
+  border: 0;
+  background: rgb(var(--chrome) / 0.6);
+  box-shadow: inset 0 0 0 1px rgb(var(--hl) / 0.08), 0 1px 2px rgb(var(--hl) / 0.04);
+}
+
+.palette-trigger {
+  height: 34px;
+  background: rgb(var(--chrome) / 0.62);
+  box-shadow: inset 0 0 0 1px rgb(var(--hl) / 0.08), 0 1px 2px rgb(var(--hl) / 0.05);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
+  transition: box-shadow var(--dur-fade) var(--ease-fade), background-color var(--dur-fade) var(--ease-fade);
+}
+.palette-trigger:hover { box-shadow: inset 0 0 0 1px rgb(var(--hl) / 0.15), 0 2px 8px -2px rgb(var(--hl) / 0.12); }
+.kbd {
+  display: inline-block;
+  min-width: 18px;
+  border-radius: 6px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 16px;
+  text-align: center;
+  color: rgb(112 128 151);
+  background: rgb(var(--hl) / 0.06);
+  box-shadow: inset 0 -1px 0 rgb(var(--hl) / 0.1);
+}
+.palette {
+  background: rgb(var(--chrome) / var(--chrome-strong-a));
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  backdrop-filter: blur(32px) saturate(1.8);
+  box-shadow: inset 0 1px 0 rgb(var(--chrome-rim) / var(--chrome-rim-a)), var(--chrome-shadow), 0 40px 90px -30px rgb(15 23 42 / 0.35);
+}
+/* The field is the dialog: its focus is the palette being open, not a ring. */
+.palette input:focus-visible { box-shadow: none; }
+.palette-scrim {
+  background: rgb(var(--scrim) / 0.2);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.palette-active {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: rgb(var(--hl) / 0.065);
+  box-shadow: inset 0 0 0 1px rgb(var(--hl) / 0.05);
+}
+.palette-glyph { background: rgb(var(--hl) / 0.05); color: rgb(112 128 151); }
+.palette-glyph-on { background: var(--accent-wash); color: var(--accent-ink); }
+
+/* ---- navigation: view transitions --------------------------------------------
+   The shell is never captured: the old frame of the whole document is
+   dropped at once and the new one is the live page, so the sidebar's marker
+   and the breadcrumb animate for real while only the page area (#main) and
+   whatever is morphing are drawn as pictures. */
+::view-transition-old(root) { display: none; }
+::view-transition-new(root) { animation: none; }
+html[data-vt] #main { view-transition-name: page; }
+html[data-vt] { scroll-behavior: auto; }
+
+::view-transition-group(page) { animation: none; }
+::view-transition-image-pair(page) { isolation: auto; }
+::view-transition-old(page) { animation: vt-lift-out 170ms var(--ease-fade) both; }
+::view-transition-new(page) { animation: vt-fade-in 220ms var(--ease-fade) 50ms both; mix-blend-mode: normal; }
+
+html[data-vt="back"]::view-transition-old(page) { animation-name: vt-sink-out; }
+html[data-vt="lateral"]::view-transition-old(page) { animation: vt-side-out 190ms var(--ease-fade) both; }
+html[data-vt="lateral"]::view-transition-new(page) { animation: vt-side-in var(--dur-standard) var(--ease-standard) both; }
+/* While a card grows into the page, the rest of the old page gets out of the
+   way quickly so the card is the only thing moving. */
+html[data-vt-morph]::view-transition-old(page) { animation: vt-fade-out 140ms var(--ease-fade) both; }
+html[data-vt-morph]::view-transition-new(page) { animation: vt-fade-in 260ms var(--ease-fade) 120ms both; }
+
+/* The morph: the card's outline travels to the header's on the page spring;
+   both pictures stay at their own scale and are revealed by the travelling
+   outline, so text inside never stretches. The title flies separately, and
+   scales, because a title is meant to grow. */
+::view-transition-group(morph),
+::view-transition-group(morph-title) {
+  animation-duration: var(--dur-standard);
+  animation-timing-function: var(--ease-standard);
+}
+::view-transition-image-pair(morph) {
+  overflow: clip;
+  border-radius: 18px;
+}
+::view-transition-old(morph),
+::view-transition-new(morph) {
+  width: auto;
+  height: auto;
+  inset: 0 auto auto 0;
+  object-fit: none;
+  object-position: left top;
+}
+::view-transition-old(morph) { animation: vt-fade-out 220ms var(--ease-fade) both; }
+::view-transition-new(morph) { animation: vt-fade-in 300ms var(--ease-fade) 60ms both; }
+::view-transition-old(morph-title) { animation: vt-fade-out 200ms var(--ease-fade) both; }
+::view-transition-new(morph-title) { animation: vt-fade-in 260ms var(--ease-fade) 80ms both; }
+
+@keyframes vt-fade-out { to { opacity: 0; } }
+@keyframes vt-fade-in { from { opacity: 0; } }
+@keyframes vt-lift-out { to { opacity: 0; transform: translate3d(0, -8px, 0) scale(0.996); } }
+@keyframes vt-sink-out { to { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.996); } }
+@keyframes vt-side-out { to { opacity: 0; transform: translate3d(calc(var(--vt-dir, 1) * -32px), 0, 0); } }
+@keyframes vt-side-in { from { opacity: 0; transform: translate3d(calc(var(--vt-dir, 1) * 32px), 0, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}
+
+/* ---- surfaces ---------------------------------------------------------------
+   Panes of glass, a little more solid than before so figures read crisply,
+   with tighter corners: a pane is an instrument face, not a bubble. */
+:root[data-liquid] :is(.card, .plane) { border-radius: 18px !important; }
+:root[data-liquid] :is(.card, .plane) :is(.card, .plane) { border-radius: 13px !important; }
+:root[data-liquid][data-theme="light"] {
+  --lq-fill-a-hi: 0.84;
+  --lq-fill-a-lo: 0.66;
+  --lq-glint: 0.45;
+  --lq-thick: 0.6;
+  --lq-hair-a: 0.075;
+  --lq-shadow: 0 1px 2px rgb(30 41 72 / 0.05), 0 14px 34px -20px rgb(30 41 72 / 0.22);
+}
+
+/* A pane you can open answers the pointer: it rises a little toward it, its
+   rim catches the light where the pointer is, and it gives under a press.
+   Read-only panes do none of this. */
+:root {
+  --rim-hot: 143 183 255;
+  --rim-hot-a: 0.55;
+  --lift-hover: 3px;
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.4), 0 22px 44px -18px rgb(0 0 0 / 0.75);
+}
+:root[data-theme="light"] {
+  --rim-hot: 240 78 62;
+  --rim-hot-a: 0.42;
+  --shadow-lift: 0 1px 2px rgb(30 41 72 / 0.06), 0 24px 48px -22px rgb(30 41 72 / 0.32);
+}
+@media (hover: hover) {
+  :root[data-liquid] .card[data-surface]:not([data-surface="row"]):hover {
+    translate: 0 calc(var(--lift-hover) * -1);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / var(--lq-rim-hi)),
+      inset 0 -14px 22px -20px rgb(255 255 255 / var(--lq-thick)),
+      0 0 0 1px rgb(var(--lq-hair) / calc(var(--lq-hair-a) * 1.3)),
+      var(--shadow-lift);
+  }
+}
+:root[data-liquid] .card[data-surface]::after {
+  background:
+    radial-gradient(180px circle at var(--mx, 50%) var(--my, 0%), rgb(var(--rim-hot) / calc(var(--rim-hot-a) * var(--ma, 0))), transparent 72%),
+    linear-gradient(140deg,
+      rgb(255 255 255 / var(--lq-rim-hi)) 0%,
+      rgb(255 255 255 / var(--lq-rim-mid)) 28%,
+      rgb(255 255 255 / calc(var(--lq-rim-mid) * 0.5)) 62%,
+      rgb(255 255 255 / var(--lq-rim-lo)) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-liquid] .card[data-surface]:hover { translate: none; }
+}
+
+/* ---- type ------------------------------------------------------------------ */
+.micro {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+h1, h2, h3 { letter-spacing: -0.015em; }
+.display {
+  font-weight: 600;
+  letter-spacing: -0.032em;
+  line-height: 1.05;
+}
+
+/* ---- fields ---------------------------------------------------------------- */
+.field {
+  border-radius: var(--r-md);
+  background: rgb(var(--card) / 0.9);
+  box-shadow: inset 0 1px 1px rgb(var(--hl) / 0.04);
+  transition: border-color var(--dur-fade) var(--ease-fade), box-shadow var(--dur-standard) var(--ease-standard), background-color var(--dur-fade) var(--ease-fade);
+}
+.field:focus {
+  border-color: var(--accent-edge);
+  background: rgb(var(--card));
+  box-shadow: 0 0 0 4px var(--accent-wash), inset 0 1px 1px rgb(var(--hl) / 0.03);
+}
+
+/* ---- buttons ----------------------------------------------------------------
+   A filled button is lit from above: a faint highlight along its top edge and
+   a shadow in its own colour under it, so it reads as the one raised thing on
+   a flat row. */
+.btn-primary {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0) 55%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 2px rgb(var(--accent-rgb) / 0.28), 0 6px 16px -8px rgb(var(--accent-rgb) / 0.6);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.26), 0 1px 2px rgb(var(--accent-rgb) / 0.3), 0 10px 22px -10px rgb(var(--accent-rgb) / 0.7);
+}
+.btn-secondary {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 2px rgb(var(--hl) / 0.06);
+}
+:root:not([data-theme="light"]) .btn-secondary { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.3); }
+
+/* Magnetic controls (installMagnet) lean toward the pointer by a few pixels
+   and spring back when it leaves. */
+[data-magnetic] {
+  translate: var(--mag-x, 0px) var(--mag-y, 0px);
+  transition: translate var(--dur-standard) var(--ease-standard), scale var(--press-dur, 400ms) var(--press-ease, ease),
+    box-shadow var(--dur-standard) var(--ease-standard), background-color var(--dur-fade) var(--ease-fade),
+    border-color var(--dur-fade) var(--ease-fade), color var(--dur-fade) var(--ease-fade), filter var(--dur-fade) var(--ease-fade);
+}
+[data-magnetic][data-magnet-live] { transition-duration: 90ms, var(--press-dur, 400ms), var(--dur-standard), var(--dur-fade), var(--dur-fade), var(--dur-fade), var(--dur-fade); }
+
+/* Page titles written by hand at the old size take the new one, so every page
+   opens on the same scale whether or not it uses PageHeader. */
+#main h1:is(.text-\[20px\], .text-\[22px\], .text-lg) {
+  font-size: 27px;
+  line-height: 1.15;
+  letter-spacing: -0.028em;
+}
+@media (max-width: 639px) {
+  #main h1:is(.text-\[20px\], .text-\[22px\], .text-lg) { font-size: 23px; }
+}

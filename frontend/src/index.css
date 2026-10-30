@@ -302,16 +302,16 @@ textarea.field { padding-top: 8px; padding-bottom: 8px; line-height: 1.55; min-h
    that looks assembled and one that looks drawn: the eye reads a 30px control
    beside a 33px control as a mistake long before it can say why. */
 :root {
-  --h-sm: 26px;
-  --h-md: 30px;
-  --h-lg: 36px;
+  --h-sm: 28px;
+  --h-md: 32px;
+  --h-lg: 38px;
   /* Softer than it was, after OriginOS 7: continuous, generous corners read
      as one object you could pick up, where tight corners read as a box drawn
      on the page. Controls stay tighter than the surfaces that hold them. */
-  --r-sm: 6px;
-  --r-md: 8px;
-  --r-lg: 14px;
-  --r-xl: 18px;
+  --r-sm: 7px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 20px;
   /* Floating glass — menus, panels, toasts — rounder still. */
   --r-glass: 20px;
   /* Every focusable thing gets the same ring, drawn outside the control so it
