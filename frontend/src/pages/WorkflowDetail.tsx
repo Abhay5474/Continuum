@@ -5,9 +5,13 @@ import { Chip } from "../system/hub";
 import type { WorkflowDetail } from "../types";
 import StatusBadge from "../components/StatusBadge";
 import DataView from "../system/DataView";
-import { elapsed, humanMs, timeOf, toMillis } from "../system/time";
+import { elapsed, humanMs, timeOf } from "../system/time";
 import { Button } from "../system/controls";
 import { useToast } from "../components/ui";
+import { Waterfall, WaterfallLegend, type WaterfallRow } from "../components/Waterfall";
+import { ExecutionFacts, Findings, TimeBudget } from "../components/RunDetail";
+import { buildExecution, duration, type Execution } from "../system/execution/model";
+import { findingsOf } from "../system/execution/findings";
 
 const EVENT_ICON: Record<string, string> = {
   WORKFLOW_STARTED: "\u25B6",       // ▶
@@ -83,6 +87,10 @@ export default function WorkflowDetailPage() {
   }, [id, cancelledSaga]);
   const rolledBack: string | null =
     detail?.summary.workflowType === "DeclarativeRollback" ? (detail.input as any)?.cancelledWorkflowId ?? null : null;
+
+  // One step chosen in the timeline is shown in the events and activities too.
+  const [step, setStep] = useState<number | null>(null);
+  useEffect(() => setStep(null), [id]);
 
   const nav = useNavigate();
   const [rerunning, setRerunning] = useState(false);
@@ -292,7 +300,7 @@ export default function WorkflowDetailPage() {
         </div>
       )}
 
-      <RunTimeline events={detail.events} names={stepNames} />
+      <RunWaterfall detail={detail} names={stepNames} step={step} onStep={setStep} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="min-w-0 lg:col-span-2 card rounded-lg border border-edge bg-panel">
@@ -313,6 +321,7 @@ export default function WorkflowDetailPage() {
                 event={e}
                 previous={i > 0 ? detail.events[i - 1] : null}
                 stepNames={stepNames}
+                chosen={step != null && (unwrap(e.payload) as any)?.commandSeq === step}
               />
             ))}
           </ol>
@@ -321,7 +330,8 @@ export default function WorkflowDetailPage() {
         <div className="space-y-6">
           <Panel title="Activities">
             {detail.activities.map((a) => (
-              <div key={a.sequenceNumber} className="flex items-center gap-2 py-1 text-sm">
+              <div key={a.sequenceNumber} className="-mx-2 flex items-center gap-2 rounded px-2 py-1 text-sm"
+                   style={step === a.sequenceNumber ? { background: "var(--accent-wash)", boxShadow: "inset 2px 0 0 var(--accent)" } : undefined}>
                 <StatusBadge status={a.status} />
                 <span>{stepNames[a.sequenceNumber] ?? a.activityType}</span>
                 {a.retryCount > 0 && (
@@ -371,80 +381,88 @@ export default function WorkflowDetailPage() {
 }
 
 /**
- * The run as a timeline: one row per step, on one clock.
+ * The run as a waterfall: one row per step, on one clock.
  *
  * <p>The event list says what happened in order; this says how the run spent
- * its time — which step waited, which ran long, which failed and was retried
- * — the shape a list of seventeen timestamps hides. Built only from the
- * events: scheduled → started is the wait (faint), started → finished is the
- * work (solid), and a step still running reaches to the last event seen.
+ * its time — which step waited for a worker, which ran long, which failed and
+ * backed off before trying again. A retried step used to be one long bar from
+ * its first start to its last end, so a two-second backoff read as two seconds
+ * of work. Each attempt is now its own bar, the backoff a dashed line between
+ * them. Built from the execution timeline the API reads from the same events.
  */
-function RunTimeline({ events, names }: { events: any[]; names: Record<number, string> }) {
-  type Step = { seq: number; scheduled?: number; started?: number; ended?: number; failed?: boolean; attempts: number; type?: string };
-  const steps = new Map<number, Step>();
-  let t0 = Infinity;
-  let t1 = -Infinity;
-  for (const e of events ?? []) {
-    const t = toMillis(e.createdAt);
-    if (t == null) continue;
-    t0 = Math.min(t0, t);
-    t1 = Math.max(t1, t);
-    const p: any = unwrap(e.payload);
-    const seq = p?.commandSeq;
-    if (seq == null) continue;
-    const st: Step = steps.get(seq) ?? { seq, attempts: 0 };
-    if (e.eventType === "ACTIVITY_SCHEDULED" && st.scheduled == null) st.scheduled = t;
-    if (!st.type && p?.activityType) st.type = String(p.activityType);
-    if (e.eventType === "ACTIVITY_STARTED") {
-      st.attempts += 1;
-      if (st.started == null) st.started = t;
-    }
-    if (e.eventType === "ACTIVITY_COMPLETED") { st.ended = t; st.failed = false; }
-    if (e.eventType === "ACTIVITY_FAILED") { st.ended = t; st.failed = true; }
-    steps.set(seq, st);
-  }
-  const rows = [...steps.values()].sort((a, b) => (a.scheduled ?? a.started ?? 0) - (b.scheduled ?? b.started ?? 0));
-  if (rows.length === 0 || !Number.isFinite(t0)) return null;
-  const span = Math.max(1, t1 - t0);
-  const x = (t: number) => ((t - t0) / span) * 100;
-  const ms = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}s` : `${Math.round(n)}ms`);
+function RunWaterfall({ detail, names, step, onStep }: {
+  detail: WorkflowDetail;
+  names: Record<number, string>;
+  step: number | null;
+  onStep: (seq: number | null) => void;
+}) {
+  const execution = (detail as { execution?: Execution | null }).execution ?? null;
+  const model = useMemo(() => (execution ? buildExecution({ execution }) : null), [execution]);
+  const findings = useMemo(() => (model && execution ? findingsOf(model, { execution }) : []), [model, execution]);
+  if (!model || model.work.length === 0) return null;
+  const seqOf = (id: string) => Number(id.replace(/^step-/, ""));
+  const rows: WaterfallRow[] = [...model.work]
+    .sort((a, b) => a.scheduled - b.scheduled)
+    .map((w) => {
+      const seq = seqOf(w.id);
+      const label = names[seq] ?? w.title;
+      const ran = w.end != null && w.attempts[0] ? w.end - w.attempts[0].start : null;
+      return {
+        id: w.id,
+        level: 0,
+        label,
+        title: label,
+        scheduled: w.scheduled,
+        attempts: w.attempts,
+        critical: w.critical,
+        running: w.status === "running",
+        retrying: w.status === "retrying",
+        summary: `${label}, ${w.attempts.length} attempt${w.attempts.length === 1 ? "" : "s"}, ${w.status}`,
+        value: (
+          <span className="readout text-[11px]" style={{ color: w.status === "failed" ? "var(--state-critical-ink)" : "var(--text-3)" }}>
+            {w.status === "failed" ? "failed" : w.status === "running" ? "running" : w.status === "retrying" ? "retrying" : ran != null ? duration(ran) : "waiting"}
+            {w.attempts.length > 1 && <span className="ml-1.5 text-slate-500">×{w.attempts.length}</span>}
+          </span>
+        ),
+      };
+    });
+  const chosen = step != null ? model.work.find((w) => seqOf(w.id) === step) ?? null : null;
+  const issues = findings.filter((f) => f.id !== "outcome" && f.id !== "live");
   return (
     <div className="card rounded-lg border border-edge bg-panel p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="font-medium">Run timeline</div>
-        <span className="flex flex-wrap items-center gap-3 text-[10.5px] text-slate-500">
-          <span className="flex items-center gap-1"><span className="h-2 w-4 rounded-sm" style={{ background: "rgb(var(--card-edge))" }} />waiting</span>
-          <span className="flex items-center gap-1"><span className="h-2 w-4 rounded-sm" style={{ background: "var(--state-healthy-ink)" }} />ran</span>
-          <span className="flex items-center gap-1"><span className="h-2 w-4 rounded-sm" style={{ background: "var(--state-critical-ink)" }} />failed</span>
-          <span className="readout">{ms(span)} total</span>
-        </span>
+        <WaterfallLegend />
       </div>
-      <ol className="mt-3 space-y-1.5">
-        {rows.map((r) => {
-          const sched = r.scheduled ?? r.started ?? t0;
-          const start = r.started ?? sched;
-          const end = r.ended ?? t1;
-          const running = r.ended == null;
-          const ink = running ? "var(--state-active-ink)" : r.failed ? "var(--state-critical-ink)" : "var(--state-healthy-ink)";
-          return (
-            <li key={r.seq} className="grid items-center gap-x-3 sm:grid-cols-[150px_minmax(0,1fr)_64px]">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span className="truncate font-mono text-[11.5px] text-slate-300">{names[r.seq] ?? r.type ?? `step ${r.seq}`}</span>
-                {r.attempts > 1 && (
-                  <span className="shrink-0 rounded-full px-1.5 text-[9.5px] font-semibold" style={{ background: "var(--wash-warn)", color: "var(--state-warning-ink)" }}
-                        title={`${r.attempts} attempts`}>×{r.attempts}</span>
-                )}
-              </span>
-              <span className="relative h-3.5 rounded" style={{ background: "rgb(var(--card-rule) / .5)" }}>
-                <span className="absolute inset-y-1 rounded-sm" style={{ left: `${x(sched)}%`, width: `${Math.max(0, x(start) - x(sched))}%`, background: "rgb(var(--card-edge))" }} />
-                <span className="absolute inset-y-0 rounded" style={{ left: `${x(start)}%`, width: `max(3px, ${x(end) - x(start)}%)`, background: ink, opacity: 0.85,
-                        backgroundImage: running ? "repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / .4) 4px 7px)" : undefined }} />
-              </span>
-              <span className="readout hidden text-right text-[10.5px] text-slate-500 sm:block">{running ? "running" : ms(end - start)}</span>
-            </li>
-          );
-        })}
-      </ol>
+      <TimeBudget model={model} />
+      <div className="mt-3 overflow-hidden rounded-md border border-edge/60 pt-2">
+        <Waterfall
+          rows={rows}
+          span={model.span}
+          live={model.live}
+          madeAt={model.madeAt}
+          selected={new Set(chosen ? [chosen.id] : [])}
+          onSelect={(id) => onStep(id == null ? null : seqOf(id))}
+          ariaLabel={`How the run executed: ${model.work.length} steps over ${duration(model.span)}`}
+        />
+      </div>
+      {chosen ? (
+        <div className="settle mt-3 grid gap-4 border-t border-edge/60 pt-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[13px] font-semibold text-slate-200">{names[step!] ?? chosen.title}</span>
+              <button type="button" onClick={() => onStep(null)} className="text-[11px] text-slate-500 hover:text-slate-300">Close</button>
+            </div>
+            <p className="mt-1 text-[11.5px] text-slate-500">Its events are marked in the event timeline below.</p>
+          </div>
+          <ExecutionFacts work={chosen} model={model} />
+        </div>
+      ) : issues.length > 0 ? (
+        <div className="mt-3 border-t border-edge/60 pt-1">
+          <Findings findings={issues} onSelect={(target) => onStep(seqOf(target))}
+                    hint="Choose a finding to show its step here and its events below." />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -475,10 +493,13 @@ function EventRow({
   event,
   previous,
   stepNames,
+  chosen = false,
 }: {
   event: any;
   previous: any | null;
   stepNames: Record<number, string>;
+  /** The step chosen in the timeline: its events stand out from the rest. */
+  chosen?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const payload = useMemo(() => unwrap(event.payload), [event.payload]);
@@ -487,7 +508,8 @@ function EventRow({
   const expandable = payload != null && typeof payload === "object";
 
   return (
-    <li className="group border-b border-edge/50 px-4 py-2">
+    <li className="group border-b border-edge/50 px-4 py-2"
+        style={chosen ? { background: "var(--accent-wash)", boxShadow: "inset 2px 0 0 var(--accent)" } : undefined}>
       <div className="flex items-baseline gap-3">
         <span className="w-8 shrink-0 text-right font-mono text-xs text-slate-500">
           {event.sequenceNumber}

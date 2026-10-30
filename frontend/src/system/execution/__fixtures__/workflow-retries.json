@@ -1,0 +1,142 @@
+{
+ "execution": {
+  "status": "COMPLETED",
+  "startedAt": 1793328489.790932,
+  "endedAt": 1793328502.744899,
+  "error": null,
+  "steps": [
+   {
+    "seq": 1,
+    "activityType": "customer.fetch",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793328489.921697,
+    "status": "COMPLETED",
+    "maxAttempts": 5,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793328490.39971,
+      "endedAt": 1793328490.784696,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-a2d71c92",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 2,
+    "activityType": "llm.complete",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793328490.991257,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793328491.406358,
+      "endedAt": 1793328491.893643,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-a2d71c92",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 3,
+    "activityType": "llm.complete",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793328492.032655,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793328492.418971,
+      "endedAt": 1793328492.791247,
+      "outcome": "FAILED",
+      "error": "CHAOS: injected activity failure",
+      "workerId": "worker-a2d71c92",
+      "retryAt": 1793328494.7932603
+     },
+     {
+      "attempt": 2,
+      "startedAt": 1793328494.944202,
+      "endedAt": 1793328495.34025,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-a2d71c92",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 4,
+    "activityType": "email.send",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793328495.626102,
+    "status": "COMPLETED",
+    "maxAttempts": 5,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793328495.954875,
+      "endedAt": 1793328496.322977,
+      "outcome": "FAILED",
+      "error": "CHAOS: injected activity failure",
+      "workerId": "worker-a2d71c92",
+      "retryAt": 1793328498.324502
+     },
+     {
+      "attempt": 2,
+      "startedAt": 1793328498.476603,
+      "endedAt": 1793328498.846753,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-a2d71c92",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 5,
+    "activityType": "customer.update",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793328499.186328,
+    "status": "COMPLETED",
+    "maxAttempts": 5,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793328499.490379,
+      "endedAt": 1793328499.859391,
+      "outcome": "FAILED",
+      "error": "CHAOS: injected activity failure",
+      "workerId": "worker-a2d71c92",
+      "retryAt": 1793328501.8608944
+     },
+     {
+      "attempt": 2,
+      "startedAt": 1793328502.013451,
+      "endedAt": 1793328502.380371,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-a2d71c92",
+      "retryAt": null
+     }
+    ]
+   }
+  ]
+ }
+}

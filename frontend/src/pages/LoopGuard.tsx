@@ -62,6 +62,8 @@ const SAMPLES: { label: string; steps: string[] }[] = [
   },
 ];
 
+const draftSteps = (draft: string) => draft.split("\n").map((x) => x.trim()).filter(Boolean);
+
 export default function LoopGuard() {
   const toast = useToast();
   const [status, setStatus] = useState<Status | null>(null);
@@ -69,6 +71,9 @@ export default function LoopGuard() {
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(SAMPLES[0].steps.join("\n"));
   const [verdict, setVerdict] = useState<any>(null);
+  // The steps the verdict is about. Editing the steps afterwards must not
+  // paint an old verdict onto new steps.
+  const [verdictFor, setVerdictFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -98,7 +103,7 @@ export default function LoopGuard() {
   };
 
   const inspect = async () => {
-    const steps = draft.split("\n").map((s) => s.trim()).filter(Boolean);
+    const steps = draftSteps(draft);
     if (steps.length === 0) {
       toast("Add at least one step.", "error");
       return;
@@ -107,6 +112,7 @@ export default function LoopGuard() {
     try {
       const v = await portal.loops.inspect({ workflowId: "console-probe", steps });
       setVerdict(v);
+      setVerdictFor(steps.join("\n"));
       await load();
     } catch (e: any) {
       // HALT mode answers 409 with the verdict. That is the feature working,
@@ -114,6 +120,7 @@ export default function LoopGuard() {
       const body = e?.body ?? e?.data ?? null;
       if (body && typeof body === "object" && "kind" in body) {
         setVerdict({ ...body, halted: true });
+        setVerdictFor(steps.join("\n"));
         await load();
       } else {
         toast(e?.message ?? "Could not inspect those steps.", "error");
@@ -226,7 +233,7 @@ export default function LoopGuard() {
           className="w-full font-mono field"
         />
 
-        <StepBeads steps={draft.split("\n").map((x) => x.trim()).filter(Boolean)} looping={verdict?.looping} />
+        <StepBeads steps={draftSteps(draft)} looping={verdictFor === draftSteps(draft).join("\n") && !!verdict?.looping} />
 
         <div className="flex flex-wrap items-center gap-3">
           <button

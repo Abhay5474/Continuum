@@ -243,6 +243,13 @@ export default function MmuProfiler() {
             </div>
           </section>
 
+          {/* ---- the window over time ---- */}
+          {recent.length > 1 && (
+            <section className="mt-9">
+              <WindowHistory recent={recent} open={openReq} onOpen={setOpenReq} />
+            </section>
+          )}
+
           {/* ---- fault economics ---- */}
           <section className="mt-9">
             <Stats>
@@ -459,6 +466,92 @@ export default function MmuProfiler() {
           </>
         )}
       </SidePanel>
+    </div>
+  );
+}
+
+/**
+ * The window, request by request: what each request would have sent unpaged,
+ * and how much of it was actually sent. The point of paging is that the second
+ * stays flat while the first grows with the conversation; this shows whether it
+ * did. A fault (the model asked for a page back) and a prefetch (a page brought
+ * in before it was asked for) are marked under the request they happened in.
+ */
+function WindowHistory({ recent, open, onOpen }: { recent: any[]; open: any | null; onOpen: (r: any) => void }) {
+  const rows = [...recent].reverse();
+  const max = Math.max(1, ...rows.map((r) => r.tokensWithoutMmu ?? 0));
+  const first = rows[0], last = rows[rows.length - 1];
+  // Once paging began, the band the window held to.
+  const from = rows.findIndex((r) => (r.tokensSent ?? 0) < (r.tokensWithoutMmu ?? 0));
+  const paged = from < 0 ? [] : rows.slice(from);
+  const low = Math.min(...paged.map((r) => r.tokensSent ?? 0));
+  const peak = Math.max(0, ...paged.map((r) => r.tokensSent ?? 0));
+  return (
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[13px] font-semibold tracking-tight text-slate-200">The window, request by request</h2>
+        <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10.5px] text-slate-500">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: "var(--accent-wash)", boxShadow: "inset 0 0 0 1px var(--accent-edge)" }} />
+            sent
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundImage: "repeating-linear-gradient(135deg, rgb(127 140 165 / 0.45) 0 1px, transparent 1px 4px)", boxShadow: "inset 0 0 0 1px rgb(var(--edge))" }} />
+            paged out
+          </span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--state-warning-ink)" }} />page fault</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--state-healthy-ink)" }} />prefetch</span>
+        </span>
+      </div>
+      <p className="mt-1 text-[11.5px] text-slate-500">
+        {paged.length === 0
+          ? "Every request fitted in the window, so nothing was paged out."
+          : <>The conversation grew from {(first.tokensWithoutMmu ?? 0).toLocaleString()} to {(last.tokensWithoutMmu ?? 0).toLocaleString()} tokens.
+              From request {from + 1}, when paging began, what was sent stayed between {low.toLocaleString()} and {peak.toLocaleString()}.</>}
+      </p>
+      <div className="relative mt-3 flex h-40 items-end gap-1 border-b pb-px" style={{ borderColor: "rgb(var(--edge))" }}
+           role="list" aria-label={`${rows.length} requests, oldest first`}>
+        {/* the most sent once paging began: the ceiling the window held to */}
+        {paged.length > 0 && (
+          <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" aria-hidden
+                style={{ bottom: `${(peak / max) * 100}%`, borderColor: "var(--accent-edge)" }} />
+        )}
+        {rows.map((r) => {
+          const whole = (r.tokensWithoutMmu ?? 0) / max;
+          const sent = (r.tokensSent ?? 0) / Math.max(1, r.tokensWithoutMmu ?? 0);
+          const on = open?.id === r.id;
+          return (
+            <button key={r.id} type="button" role="listitem" onClick={() => onOpen(on ? null : r)}
+                    aria-label={`${timeOf(r.createdAt)}: ${r.tokensWithoutMmu} tokens addressable, ${r.tokensSent} sent${r.pageFaults ? `, ${r.pageFaults} page faults` : ""}`}
+                    title={`${timeOf(r.createdAt)} · ${(r.tokensWithoutMmu ?? 0).toLocaleString()} → ${(r.tokensSent ?? 0).toLocaleString()} tokens${r.pageFaults ? ` · ${r.pageFaults} fault${r.pageFaults > 1 ? "s" : ""}, ${r.faultLatencyMs} ms` : ""}${r.prefetches ? ` · ${r.prefetches} prefetched` : ""}`}
+                    className="group relative flex h-full min-w-0 flex-1 flex-col justify-end">
+              <span className="flex w-full flex-col overflow-hidden rounded-t-[3px]"
+                    style={{ height: `${Math.max(2, whole * 100)}%`, boxShadow: on ? "0 0 0 1.5px var(--accent)" : "inset 0 0 0 1px rgb(var(--edge))" }}>
+                <span className="w-full flex-1" style={{ backgroundImage: "repeating-linear-gradient(135deg, rgb(127 140 165 / 0.35) 0 1px, transparent 1px 5px)" }} />
+                <span className="w-full" style={{ height: `${sent * 100}%`, background: on ? "color-mix(in srgb, var(--accent) 30%, transparent)" : "var(--accent-wash)", borderTop: "1px solid var(--accent-edge)" }} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {/* faults and prefetches, under the request they happened in */}
+      <div className="mt-1 flex h-3 gap-1" aria-hidden>
+        {rows.map((r) => (
+          <span key={r.id} className="flex min-w-0 flex-1 justify-center gap-0.5">
+            {Array.from({ length: Math.min(3, r.pageFaults ?? 0) }).map((_, i) => (
+              <span key={`f${i}`} className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--state-warning-ink)" }} />
+            ))}
+            {Array.from({ length: Math.min(3, r.prefetches ?? 0) }).map((_, i) => (
+              <span key={`p${i}`} className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--state-healthy-ink)" }} />
+            ))}
+          </span>
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-slate-500">
+        <span className="readout">{timeOf(first.createdAt)}</span>
+        <span>oldest → newest · choose a request to open it</span>
+        <span className="readout">{timeOf(last.createdAt)}</span>
+      </div>
     </div>
   );
 }

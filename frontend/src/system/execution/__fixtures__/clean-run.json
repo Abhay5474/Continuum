@@ -1,0 +1,606 @@
+{
+ "run": {
+  "status": "COMPLETED",
+  "prompt": "Can I get a refund for a damaged lehenga?",
+  "finalConfidence": 0.9814538009598991,
+  "uncertainty": "LOW"
+ },
+ "nodes": [
+  {
+   "nodeKey": "planner",
+   "nodeType": "PLANNER",
+   "claimId": null,
+   "label": "Task decomposition \u2192 3 claims",
+   "status": "DONE",
+   "validity": null,
+   "outputJson": "{\"task\":\"Can I get a refund for a damaged lehenga?\",\"claims\":[{\"id\":1,\"statement\":\"Orders over 5000 rupees are refunded within 7 days\",\"dependsOn\":[],\"checks\":[\"LOGIC_CONSISTENCY\",\"EVIDENCE_GROUNDING\",\"CONSTRAINT_CHECK\"]},{\"id\":2,\"statement\":\"A damaged lehenga is refunded without a return\",\"dependsOn\":[],\"checks\":[\"LOGIC_CONSISTENCY\",\"EVIDENCE_GROUNDING\"]},{\"id\":3,\"statement\":\"Store credit is issued instead of a refund\",\"dependsOn\":[2],\"checks\":[\"LOGIC_CONSISTENCY\",\"EVIDENCE_GROUNDING\",\"CONSTRAINT_CHECK\"]}]}",
+   "startedAt": 1793303739.179444,
+   "completedAt": 1793303740.339644
+  },
+  {
+   "nodeKey": "solver-1",
+   "nodeType": "SOLVER",
+   "claimId": 1,
+   "label": "Orders over 5000 rupees are refunded within 7 days",
+   "status": "PASS",
+   "validity": 0.83,
+   "outputJson": "{\"claimId\":1,\"reasoning\":\"The refund policy covers orders over 5000 rupees and pays out within 7 days of pickup. Orders over 5000 rupees are refunded within 7 days.\\nConfidence: 0.83\",\"conclusion\":\"Orders over 5000 rupees are refunded within 7 days.\",\"confidence\":0.83,\"provider\":\"groq\",\"model\":\"openai/gpt-oss-120b\",\"tokens\":320,\"costUsd\":2.0200000000000003E-5}",
+   "startedAt": 1793303740.733314,
+   "completedAt": 1793303742.363702
+  },
+  {
+   "nodeKey": "verify-1-logic_consistency",
+   "nodeType": "VERIFIER",
+   "claimId": 1,
+   "label": "LOGIC_CONSISTENCY \u00b7 claim 1",
+   "status": "PASS",
+   "validity": 0.75,
+   "outputJson": "{\"claimId\":1,\"check\":\"LOGIC_CONSISTENCY\",\"validity\":0.75,\"failureModes\":[],\"evidence\":[\"no explicit decision detected\"]}",
+   "startedAt": 1793303742.827506,
+   "completedAt": 1793303743.191983
+  },
+  {
+   "nodeKey": "verify-1-evidence_grounding",
+   "nodeType": "VERIFIER",
+   "claimId": 1,
+   "label": "EVIDENCE_GROUNDING \u00b7 claim 1",
+   "status": "PASS",
+   "validity": 0.9,
+   "outputJson": "{\"claimId\":1,\"check\":\"EVIDENCE_GROUNDING\",\"validity\":0.9,\"failureModes\":[],\"evidence\":[\"reasoning\u2194claim topical similarity 0.86\"]}",
+   "startedAt": 1793303742.831384,
+   "completedAt": 1793303743.209861
+  },
+  {
+   "nodeKey": "verify-1-constraint_check",
+   "nodeType": "VERIFIER",
+   "claimId": 1,
+   "label": "CONSTRAINT_CHECK \u00b7 claim 1",
+   "status": "PASS",
+   "validity": 0.95,
+   "outputJson": "{\"claimId\":1,\"check\":\"CONSTRAINT_CHECK\",\"validity\":0.95,\"failureModes\":[],\"evidence\":[\"salient-token preservation 1.00\"]}",
+   "startedAt": 1793303742.834504,
+   "completedAt": 1793303743.259782
+  },
+  {
+   "nodeKey": "solver-2",
+   "nodeType": "SOLVER",
+   "claimId": 2,
+   "label": "A damaged lehenga is refunded without a return",
+   "status": "PASS",
+   "validity": 0.79,
+   "outputJson": "{\"claimId\":2,\"reasoning\":\"A damaged lehenga is refunded once a photo of the damage is checked; no return pickup is booked. Yes, a damaged lehenga is refunded without a return.\\nConfidence: 0.79\",\"conclusion\":\"Yes, a damaged lehenga is refunded without a return.\",\"confidence\":0.79,\"provider\":\"groq\",\"model\":\"openai/gpt-oss-120b\",\"tokens\":320,\"costUsd\":2.0200000000000003E-5}",
+   "startedAt": 1793303740.736824,
+   "completedAt": 1793303741.96459
+  },
+  {
+   "nodeKey": "verify-2-logic_consistency",
+   "nodeType": "VERIFIER",
+   "claimId": 2,
+   "label": "LOGIC_CONSISTENCY \u00b7 claim 2",
+   "status": "PASS",
+   "validity": 0.75,
+   "outputJson": "{\"claimId\":2,\"check\":\"LOGIC_CONSISTENCY\",\"validity\":0.75,\"failureModes\":[],\"evidence\":[\"decision dimension #3 present on only one side;\"]}",
+   "startedAt": 1793303742.837685,
+   "completedAt": 1793303743.199044
+  },
+  {
+   "nodeKey": "verify-2-evidence_grounding",
+   "nodeType": "VERIFIER",
+   "claimId": 2,
+   "label": "EVIDENCE_GROUNDING \u00b7 claim 2",
+   "status": "PASS",
+   "validity": 0.9,
+   "outputJson": "{\"claimId\":2,\"check\":\"EVIDENCE_GROUNDING\",\"validity\":0.9,\"failureModes\":[],\"evidence\":[\"reasoning\u2194claim topical similarity 0.77\"]}",
+   "startedAt": 1793303742.840591,
+   "completedAt": 1793303743.244993
+  },
+  {
+   "nodeKey": "solver-3",
+   "nodeType": "SOLVER",
+   "claimId": 3,
+   "label": "Store credit is issued instead of a refund",
+   "status": "PASS",
+   "validity": 0.66,
+   "outputJson": "{\"claimId\":3,\"reasoning\":\"Store credit is only offered when the customer asks for it. No, store credit is not issued instead of a refund.\\nConfidence: 0.66\",\"conclusion\":\"No, store credit is not issued instead of a refund.\",\"confidence\":0.66,\"provider\":\"groq\",\"model\":\"openai/gpt-oss-120b\",\"tokens\":320,\"costUsd\":2.0200000000000003E-5}",
+   "startedAt": 1793303740.739618,
+   "completedAt": 1793303742.155467
+  },
+  {
+   "nodeKey": "verify-3-logic_consistency",
+   "nodeType": "VERIFIER",
+   "claimId": 3,
+   "label": "LOGIC_CONSISTENCY \u00b7 claim 3",
+   "status": "PASS",
+   "validity": 0.75,
+   "outputJson": "{\"claimId\":3,\"check\":\"LOGIC_CONSISTENCY\",\"validity\":0.75,\"failureModes\":[],\"evidence\":[\"decision dimension #3 present on only one side;\"]}",
+   "startedAt": 1793303742.843146,
+   "completedAt": 1793303743.235077
+  },
+  {
+   "nodeKey": "verify-3-evidence_grounding",
+   "nodeType": "VERIFIER",
+   "claimId": 3,
+   "label": "EVIDENCE_GROUNDING \u00b7 claim 3",
+   "status": "PASS",
+   "validity": 0.9,
+   "outputJson": "{\"claimId\":3,\"check\":\"EVIDENCE_GROUNDING\",\"validity\":0.9,\"failureModes\":[],\"evidence\":[\"reasoning\u2194claim topical similarity 0.70\"]}",
+   "startedAt": 1793303742.845592,
+   "completedAt": 1793303743.220105
+  },
+  {
+   "nodeKey": "verify-3-constraint_check",
+   "nodeType": "VERIFIER",
+   "claimId": 3,
+   "label": "CONSTRAINT_CHECK \u00b7 claim 3",
+   "status": "UNCERTAIN",
+   "validity": 0.5,
+   "outputJson": "{\"claimId\":3,\"check\":\"CONSTRAINT_CHECK\",\"validity\":0.5,\"failureModes\":[],\"evidence\":[\"no numbers or identifiers in the claim to preserve\"]}",
+   "startedAt": 1793303742.850382,
+   "completedAt": 1793303743.270525
+  },
+  {
+   "nodeKey": "aggregator",
+   "nodeType": "AGGREGATOR",
+   "claimId": null,
+   "label": "Bayesian resolution \u2192 98.1% (LOW)",
+   "status": "PASS",
+   "validity": 0.9814538009598991,
+   "outputJson": "{\"scores\":[{\"claimId\":1,\"prior\":0.83,\"posterior\":0.9986110925009754,\"survived\":true,\"notes\":[\"prior 0.83 (solver self-confidence)\",\"LOGIC_CONSISTENCY: validity 0.75 (supports)\",\"EVIDENCE_GROUNDING: validity 0.90 (supports)\",\"CONSTRAINT_CHECK: validity 0.95 (supports)\"]},{\"claimId\":2,\"prior\":0.79,\"posterior\":0.9813227446253858,\"survived\":true,\"notes\":[\"prior 0.79 (solver self-confidence)\",\"LOGIC_CONSISTENCY: validity 0.75 (supports)\",\"EVIDENCE_GROUNDING: validity 0.90 (supports)\"]},{\"claimId\":3,\"prior\":0.66,\"posterior\":0.9644275657533365,\"survived\":true,\"notes\":[\"prior 0.66 (solver self-confidence)\",\"LOGIC_CONSISTENCY: validity 0.75 (supports)\",\"EVIDENCE_GROUNDING: validity 0.90 (supports)\",\"CONSTRAINT_CHECK: validity 0.50 (supports)\"]}],\"finalConfidence\":0.9814538009598991,\"uncertainty\":\"LOW\",\"spine\":[1,2,3]}",
+   "startedAt": null,
+   "completedAt": null
+  },
+  {
+   "nodeKey": "synthesis",
+   "nodeType": "SYNTHESIS",
+   "claimId": null,
+   "label": "Human-readable narration",
+   "status": "DONE",
+   "validity": null,
+   "outputJson": "\"Orders over 5000 rupees are refunded within 7 days. Yes, a damaged lehenga is refunded without a return. No, store credit is not issued instead of a refund. \\n\\n\u2014 Verification summary (confidence 98.1%, uncertainty LOW) \u2014\\n\u2714 Claim 1 [P=1.00]: Orders over 5000 rupees are refunded within 7 days\\n    \u00b7 prior 0.83 (solver self-confidence)\\n    \u00b7 LOGIC_CONSISTENCY: validity 0.75 (supports)\\n    \u00b7 EVIDENCE_GROUNDING: validity 0.90 (supports)\\n    \u00b7 CONSTRAINT_CHECK: validity 0.95 (supports)\\n\u2714 Claim 2 [P=0.98]: A damaged lehenga is refunded without a return\\n    \u00b7 prior 0.79 (solver self-confidence)\\n    \u00b7 LOGIC_CONSISTENCY: validity 0.75 (supports)\\n    \u00b7 EVIDENCE_GROUNDING: validity 0.90 (supports)\\n\u2714 Claim 3 [P=0.96]: Store credit is issued instead of a refund\\n    \u00b7 prior 0.66 (solver self-confidence)\\n    \u00b7 LOGIC_CONSISTENCY: validity 0.75 (supports)\\n    \u00b7 EVIDENCE_GROUNDING: validity 0.90 (supports)\\n    \u00b7 CONSTRAINT_CHECK: validity 0.50 (supports)\\n\"",
+   "startedAt": 1793303743.390868,
+   "completedAt": 1793303743.67823
+  }
+ ],
+ "edges": [
+  {
+   "fromKey": "planner",
+   "toKey": "solver-1",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-1",
+   "toKey": "verify-1-logic_consistency",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-1-logic_consistency",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.75
+  },
+  {
+   "fromKey": "solver-1",
+   "toKey": "verify-1-evidence_grounding",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-1-evidence_grounding",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.9
+  },
+  {
+   "fromKey": "solver-1",
+   "toKey": "verify-1-constraint_check",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-1-constraint_check",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.95
+  },
+  {
+   "fromKey": "planner",
+   "toKey": "solver-2",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-2",
+   "toKey": "verify-2-logic_consistency",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-2-logic_consistency",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.75
+  },
+  {
+   "fromKey": "solver-2",
+   "toKey": "verify-2-evidence_grounding",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-2-evidence_grounding",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.9
+  },
+  {
+   "fromKey": "planner",
+   "toKey": "solver-3",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-3",
+   "toKey": "verify-3-logic_consistency",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-3-logic_consistency",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.75
+  },
+  {
+   "fromKey": "solver-3",
+   "toKey": "verify-3-evidence_grounding",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-3-evidence_grounding",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.9
+  },
+  {
+   "fromKey": "solver-3",
+   "toKey": "verify-3-constraint_check",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-3-constraint_check",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-2",
+   "toKey": "solver-3",
+   "edgeType": "DEPENDS",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "aggregator",
+   "toKey": "synthesis",
+   "edgeType": "FLOW",
+   "weight": 0.9814538009598991
+  }
+ ],
+ "execution": {
+  "status": "COMPLETED",
+  "startedAt": 1793303738.884762,
+  "endedAt": 1793303744.039716,
+  "error": null,
+  "steps": [
+   {
+    "seq": 1,
+    "activityType": "dag.plan",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303739.179444,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303739.603134,
+      "endedAt": 1793303740.339644,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 2,
+    "activityType": "dag.solve",
+    "claimId": 1,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303740.733314,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303741.129034,
+      "endedAt": 1793303742.363702,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 3,
+    "activityType": "dag.solve",
+    "claimId": 2,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303740.736824,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303741.133231,
+      "endedAt": 1793303741.96459,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 4,
+    "activityType": "dag.solve",
+    "claimId": 3,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303740.739618,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303741.124219,
+      "endedAt": 1793303742.155467,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 5,
+    "activityType": "dag.verify",
+    "claimId": 1,
+    "check": "LOGIC_CONSISTENCY",
+    "name": null,
+    "scheduledAt": 1793303742.827506,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.159197,
+      "endedAt": 1793303743.191983,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 6,
+    "activityType": "dag.verify",
+    "claimId": 1,
+    "check": "EVIDENCE_GROUNDING",
+    "name": null,
+    "scheduledAt": 1793303742.831384,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.163934,
+      "endedAt": 1793303743.209861,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 7,
+    "activityType": "dag.verify",
+    "claimId": 1,
+    "check": "CONSTRAINT_CHECK",
+    "name": null,
+    "scheduledAt": 1793303742.834504,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.176406,
+      "endedAt": 1793303743.259782,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 8,
+    "activityType": "dag.verify",
+    "claimId": 2,
+    "check": "LOGIC_CONSISTENCY",
+    "name": null,
+    "scheduledAt": 1793303742.837685,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.17215,
+      "endedAt": 1793303743.199044,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 9,
+    "activityType": "dag.verify",
+    "claimId": 2,
+    "check": "EVIDENCE_GROUNDING",
+    "name": null,
+    "scheduledAt": 1793303742.840591,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.185544,
+      "endedAt": 1793303743.244993,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 10,
+    "activityType": "dag.verify",
+    "claimId": 3,
+    "check": "LOGIC_CONSISTENCY",
+    "name": null,
+    "scheduledAt": 1793303742.843146,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.181872,
+      "endedAt": 1793303743.235077,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 11,
+    "activityType": "dag.verify",
+    "claimId": 3,
+    "check": "EVIDENCE_GROUNDING",
+    "name": null,
+    "scheduledAt": 1793303742.845592,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.168911,
+      "endedAt": 1793303743.220105,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 12,
+    "activityType": "dag.verify",
+    "claimId": 3,
+    "check": "CONSTRAINT_CHECK",
+    "name": null,
+    "scheduledAt": 1793303742.850382,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.228003,
+      "endedAt": 1793303743.270525,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 13,
+    "activityType": "dag.synthesize",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303743.390868,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303743.664057,
+      "endedAt": 1793303743.67823,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   }
+  ]
+ },
+ "claims": [
+  {
+   "id": 1,
+   "statement": "Orders over 5000 rupees are refunded within 7 days",
+   "dependsOn": [],
+   "checks": [
+    "LOGIC_CONSISTENCY",
+    "EVIDENCE_GROUNDING",
+    "CONSTRAINT_CHECK"
+   ]
+  },
+  {
+   "id": 2,
+   "statement": "A damaged lehenga is refunded without a return",
+   "dependsOn": [],
+   "checks": [
+    "LOGIC_CONSISTENCY",
+    "EVIDENCE_GROUNDING"
+   ]
+  },
+  {
+   "id": 3,
+   "statement": "Store credit is issued instead of a refund",
+   "dependsOn": [
+    2
+   ],
+   "checks": [
+    "LOGIC_CONSISTENCY",
+    "EVIDENCE_GROUNDING",
+    "CONSTRAINT_CHECK"
+   ]
+  }
+ ]
+}

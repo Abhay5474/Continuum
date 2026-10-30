@@ -1547,3 +1547,58 @@ pre,
 html {
   scroll-behavior: smooth;
 }
+
+/* ------------------------------------------------------------------ *
+ * Waterfall: a run on one clock (components/Waterfall.tsx)
+ *
+ * Work is neutral, so the exceptions — a failed attempt, a backoff, a failed
+ * check — are the only colour on it. The critical path is drawn darker, not in
+ * a hue: it is emphasis, not a state.
+ * ------------------------------------------------------------------ */
+:root {
+  --bar-work: 92 106 128;
+  --bar-hot: 203 213 225;
+  --bar-wait: 64 74 92;
+}
+:root[data-theme="light"] {
+  --bar-work: 163 175 192;
+  --bar-hot: 51 65 85;
+  --bar-wait: 203 213 225;
+}
+.wf-cols { display: grid; grid-template-columns: 108px minmax(0, 1fr) 70px; align-items: center; }
+@media (min-width: 640px) {
+  .wf-cols { grid-template-columns: 196px minmax(0, 1fr) 116px; }
+  .wf-cols-links { grid-template-columns: 196px minmax(0, 1fr) 116px 32px; }
+}
+.wf-axis { padding-bottom: 6px; }
+.wf-row { border-top: 1px solid rgb(var(--card-rule)); outline: none; transition: background-color 150ms ease; }
+.wf-row:hover { background: rgb(var(--card-rule) / 0.45); }
+.wf-row:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-edge); }
+.wf-row.wf-on, .wf-row.wf-on:hover { background: var(--accent-wash); box-shadow: inset 2px 0 0 var(--accent); }
+.wf-bar {
+  position: absolute; top: 50%; height: 10px; transform: translateY(-50%);
+  border-radius: 2px; background: rgb(var(--bar-work));
+  transition: left 200ms ease, width 200ms ease;
+}
+.wf-bar-thin { height: 6px; }
+.wf-hot { background: rgb(var(--bar-hot)); }
+.wf-failed {
+  background: repeating-linear-gradient(135deg, var(--state-warning-ink) 0 1.5px, transparent 1.5px 4.5px);
+  box-shadow: inset 0 0 0 1px var(--state-warning-ink);
+}
+.wf-running {
+  background-color: var(--state-active-ink);
+  background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / 0.35) 4px 7px);
+}
+.wf-wait { position: absolute; top: 50%; height: 2px; transform: translateY(-50%); border-radius: 1px; background: rgb(var(--bar-wait)); }
+.wf-backoff { position: absolute; top: 50%; height: 0; transform: translateY(-1px); border-top: 2px dashed var(--state-warning-ink); }
+.wf-marker { position: absolute; top: 5px; bottom: 5px; width: 2px; margin-left: -1px; border-radius: 1px; background: rgb(var(--topo-text)); }
+.wf-links { position: absolute; top: 0; right: 0; display: none; pointer-events: none; overflow: visible; }
+@media (min-width: 640px) { .wf-links { display: block; } }
+.wf-swatch { display: inline-block; width: 16px; height: 8px; border-radius: 2px; background: rgb(var(--bar-work)); }
+.wf-swatch.wf-wait-swatch { height: 2px; background: rgb(var(--bar-wait)); }
+.wf-swatch.wf-backoff-swatch { height: 0; border-radius: 0; background: none; border-top: 2px dashed var(--state-warning-ink); }
+.wf-swatch.wf-link-swatch { width: 7px; height: 11px; border-radius: 0 3px 3px 0; background: none; border: 1.5px solid var(--state-critical-ink); border-left: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .wf-bar, .wf-row { transition: none; }
+}

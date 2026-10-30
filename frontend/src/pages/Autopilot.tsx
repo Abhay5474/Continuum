@@ -5,7 +5,7 @@ import { portal } from "../api";
 import { PageHeader, Note } from "../system/primitives";
 import { AccountWide } from "../system/AccountWide";
 import { StackedBar, BarChart } from "../system/charts";
-import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone, RecordPanel, Field, openable, rowClick } from "../system/hub";
+import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone, RecordPanel, Field, openable, rowClick, Route, Stage, Hop } from "../system/hub";
 
 /**
  * Autopilot — beginner-friendly control plane UI. Reuses the developer session
@@ -133,6 +133,8 @@ export default function Autopilot() {
             </Panel>
           </div>
 
+          <OptimizationCycle status={status} recs={recs} canary={canary} bundles={bundles} rollbacks={rollbacks} />
+
           {/* current policy */}
           {status.activePolicy && (
             <Panel title="Current policy">
@@ -180,7 +182,7 @@ export default function Autopilot() {
           </div>
 
           {/* recommendations */}
-          <Panel title="Recommendations">
+          <Panel title="Recommendations" id="ap-propose">
             {recs.filter((r) => r.status === "PENDING").length === 0 && (
               <div className="text-xs text-slate-500">No pending recommendations. Autopilot is watching your traffic.</div>
             )}
@@ -236,7 +238,7 @@ export default function Autopilot() {
             )}
           />
           {/* canary status */}
-          <Panel title="Canary rollouts">
+          <Panel title="Canary rollouts" id="ap-canary">
             {canary.length === 0 && <div className="text-xs text-slate-500">No canary runs yet.</div>}
             {canary.slice(0, 5).map((c) => (
               <div key={c.id} {...openable(() => setOpenItem({ kind: "canary", ...c }))} className="mb-2 cursor-pointer rounded hover:bg-slate-500/[0.055]">
@@ -254,7 +256,7 @@ export default function Autopilot() {
 
           {/* history timeline + rollbacks */}
           <div className="grid gap-4 lg:grid-cols-2">
-            <Panel title="Policy history">
+            <Panel title="Policy history" id="ap-promote">
               {/* Versions as a line of dots, newest last: which were kept,
                   which were tried and rolled back, at a glance. */}
               {bundles.length > 0 && (
@@ -340,7 +342,7 @@ export default function Autopilot() {
           </div>
 
           {rollbacks.length > 0 && (
-            <Panel title="Rollback events">
+            <Panel title="Rollback events" id="ap-rollback">
               {rollbacks.slice(0, 5).map((r) => (
                 <div key={r.id} {...openable(() => setOpenItem({ kind: "rollback", ...r }))} className="flex cursor-pointer flex-wrap items-center gap-2 rounded text-xs text-slate-400 hover:bg-slate-500/[0.055]">
                   <Pill tone={r.automatic ? "warn" : "info"}>{r.automatic ? "automatic" : "manual"}</Pill>
@@ -470,14 +472,70 @@ function Wizard({ onEnable, onCancel, busy }: {
 }
 
 /** A titled panel, on the shared card plane. */
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
+function Panel({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
+  const card = (
     <Card>
       <div className="mb-2 text-sm font-medium">{title}</div>
       {children}
     </Card>
   );
+  // An anchor the optimization cycle can take a person to.
+  return id ? <div id={id} className="scroll-mt-24">{card}</div> : card;
 }
+
+/**
+ * The optimization cycle, and where it stands: what has been observed, what is
+ * proposed, what is on trial, what was kept and what was rolled back. Every
+ * figure is the account's own; the stage it is in now is the one marked.
+ * Choosing a stage goes to its record below.
+ */
+function OptimizationCycle({ status, recs, canary, bundles, rollbacks }: {
+  status: any;
+  recs: any[];
+  canary: any[];
+  bundles: any[];
+  rollbacks: any[];
+}) {
+  const t = status.telemetry ?? {};
+  const pending = recs.filter((r) => r.status === "PENDING").length;
+  const trial = canary.find((c) => c.status === "RUNNING") ?? null;
+  const version = (id: number | null | undefined) => bundles.find((b) => b.id === id)?.version;
+  // Versions that earned their place: promoted after a trial, not the seed it started from.
+  const promoted = bundles.filter((b) => b.source !== "seed" && (b.status === "ACTIVE" || b.status === "PROMOTED" || b.status === "SUPERSEDED")).length;
+  const now: "observe" | "propose" | "test" = trial ? "test" : pending ? "propose" : "observe";
+  const go = (id: string) => document.getElementById(id)?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "start",
+  });
+  const said = trial
+    ? `Testing v${version(trial.candidateBundleId) ?? trial.candidateBundleId} on ${trial.percentage}% of traffic against v${version(trial.baselineBundleId) ?? trial.baselineBundleId}. It is kept only if it does at least as well; otherwise it is rolled back on its own.`
+    : pending
+      ? `${pending} proposal${pending === 1 ? "" : "s"} ${status.autoApply ? "will go to a canary on their own" : "waiting for your decision"}. Nothing changes for your traffic until one is accepted.`
+      : `Watching your traffic. A change is proposed once the evidence for one is strong enough.`;
+  return (
+    <div>
+      <div className="micro mb-2">The optimization cycle</div>
+      <Route>
+        <Stage label="Observe" state={t.totalRequests ? "on" : "off"} selected={now === "observe"}
+               sub={t.totalRequests ? `${t.totalRequests} requests · ${Math.round((t.successRate ?? 0) * 100)}% answered` : "no traffic yet"} />
+        <Hop label="evidence" />
+        <Stage label="Propose" state={pending ? "on" : "off"} selected={now === "propose"} onClick={() => go("ap-propose")}
+               sub={pending ? `${pending} waiting` : "none pending"} />
+        <Hop label={status.autoApply ? "auto" : "accepted"} />
+        <Stage label="Canary" state={trial ? "on" : "off"} selected={now === "test"} onClick={() => go("ap-canary")}
+               sub={trial ? `v${version(trial.candidateBundleId) ?? "?"} on ${trial.percentage}% of traffic` : "nothing on trial"} />
+        <Hop label="if better" />
+        <Stage label="Promote" state={status.activeBundleId ? "on" : "off"} onClick={() => go("ap-promote")}
+               sub={status.activeBundleId ? `v${version(status.activeBundleId) ?? "?"} in service${promoted ? ` · ${promoted} promoted` : ""}` : "baseline"} />
+        <Hop label="if worse" />
+        <Stage label="Roll back" state={rollbacks.length ? "bad" : "off"} onClick={rollbacks.length ? () => go("ap-rollback") : undefined}
+               sub={rollbacks.length ? `${rollbacks.length} rolled back` : "none yet"} />
+      </Route>
+      <p className="mt-2 text-[12px] text-slate-400" aria-live="polite">{said}</p>
+    </div>
+  );
+}
+
 function ConfidenceBadge({ value }: { value: number }) {
   const pct = Math.round((value ?? 0) * 100);
   const ink = pct >= 66 ? "var(--state-healthy-ink)" : pct >= 33 ? "var(--state-warning-ink)" : "var(--text-3)";

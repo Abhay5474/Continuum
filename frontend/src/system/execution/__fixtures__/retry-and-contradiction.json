@@ -1,0 +1,824 @@
+{
+ "run": {
+  "status": "COMPLETED",
+  "prompt": "Is it safe to bandage a dog's paw cut at home?",
+  "finalConfidence": 0.9377782740424818,
+  "uncertainty": "LOW"
+ },
+ "nodes": [
+  {
+   "nodeKey": "planner",
+   "nodeType": "PLANNER",
+   "claimId": null,
+   "label": "Task decomposition \u2192 4 claims",
+   "status": "DONE",
+   "validity": null,
+   "outputJson": "{\"task\":\"Is it safe to bandage a dog's paw cut at home?\",\"claims\":[{\"id\":1,\"statement\":\"Saline is safe for cleaning a dog's paw cut\",\"dependsOn\":[],\"checks\":[\"LOGIC_CONSISTENCY\",\"EVIDENCE_GROUNDING\",\"CONSTRAINT_CHECK\"]},{\"id\":2,\"statement\":\"A loose bandage over the paw prevents swelling\",\"dependsOn\":[],\"checks\":[\"LOGIC_CONSISTENCY\",\"EVIDENCE_GROUNDING\"]},{\"id\":3,\"statement\":\"Hydrogen peroxide is safe and speeds healing of a paw cut\",\"dependsOn\":[],\"checks\":[\"LOGIC_CONSISTENCY\",\"EVIDENCE_GROUNDING\",\"CONSTRAINT_CHECK\"]},{\"id\":4,\"statement\":\"Bleeding that lasts more than 10 minutes needs a vet\",\"dependsOn\":[1],\"checks\":[\"LOGIC_CONSISTENCY\",\"EVIDENCE_GROUNDING\",\"CONSTRAINT_CHECK\"]}]}",
+   "startedAt": 1793303729.988498,
+   "completedAt": 1793303731.320009
+  },
+  {
+   "nodeKey": "solver-1",
+   "nodeType": "SOLVER",
+   "claimId": 1,
+   "label": "Saline is safe for cleaning a dog's paw cut",
+   "status": "PASS",
+   "validity": 0.86,
+   "outputJson": "{\"claimId\":1,\"reasoning\":\"Sterile saline is isotonic, so cleaning a dog's paw cut with saline does not damage the tissue around it. Vets use saline to flush debris from a paw cut before it is bandaged. Saline is safe for cleaning a dog's paw cut.\\nConfidence: 0.86\",\"conclusion\":\"Saline is safe for cleaning a dog's paw cut.\",\"confidence\":0.86,\"provider\":\"groq\",\"model\":\"openai/gpt-oss-120b\",\"tokens\":320,\"costUsd\":2.0200000000000003E-5}",
+   "startedAt": 1793303731.566843,
+   "completedAt": 1793303733.139244
+  },
+  {
+   "nodeKey": "verify-1-logic_consistency",
+   "nodeType": "VERIFIER",
+   "claimId": 1,
+   "label": "LOGIC_CONSISTENCY \u00b7 claim 1",
+   "status": "PASS",
+   "validity": 0.75,
+   "outputJson": "{\"claimId\":1,\"check\":\"LOGIC_CONSISTENCY\",\"validity\":0.75,\"failureModes\":[],\"evidence\":[\"decision dimension #1 present on only one side;\"]}",
+   "startedAt": 1793303736.27145,
+   "completedAt": 1793303736.588214
+  },
+  {
+   "nodeKey": "verify-1-evidence_grounding",
+   "nodeType": "VERIFIER",
+   "claimId": 1,
+   "label": "EVIDENCE_GROUNDING \u00b7 claim 1",
+   "status": "PASS",
+   "validity": 0.9,
+   "outputJson": "{\"claimId\":1,\"check\":\"EVIDENCE_GROUNDING\",\"validity\":0.9,\"failureModes\":[],\"evidence\":[\"reasoning\u2194claim topical similarity 0.80\"]}",
+   "startedAt": 1793303736.276043,
+   "completedAt": 1793303736.661465
+  },
+  {
+   "nodeKey": "verify-1-constraint_check",
+   "nodeType": "VERIFIER",
+   "claimId": 1,
+   "label": "CONSTRAINT_CHECK \u00b7 claim 1",
+   "status": "UNCERTAIN",
+   "validity": 0.5,
+   "outputJson": "{\"claimId\":1,\"check\":\"CONSTRAINT_CHECK\",\"validity\":0.5,\"failureModes\":[],\"evidence\":[\"no numbers or identifiers in the claim to preserve\"]}",
+   "startedAt": 1793303736.279632,
+   "completedAt": 1793303736.691201
+  },
+  {
+   "nodeKey": "solver-2",
+   "nodeType": "SOLVER",
+   "claimId": 2,
+   "label": "A loose bandage over the paw prevents swelling",
+   "status": "PASS",
+   "validity": 0.74,
+   "outputJson": "{\"claimId\":2,\"reasoning\":\"A bandage over the paw that is too tight cuts off circulation, while a loose bandage protects the cut. Keeping the paw covered and the bandage loose limits swelling. A loose bandage over the paw prevents swelling and keeps the cut clean.\\nConfidence: 0.74\",\"conclusion\":\"A loose bandage over the paw prevents swelling and keeps the cut clean.\",\"confidence\":0.74,\"provider\":\"groq\",\"model\":\"openai/gpt-oss-120b\",\"tokens\":320,\"costUsd\":2.0200000000000003E-5}",
+   "startedAt": 1793303731.572289,
+   "completedAt": 1793303735.960038
+  },
+  {
+   "nodeKey": "verify-2-logic_consistency",
+   "nodeType": "VERIFIER",
+   "claimId": 2,
+   "label": "LOGIC_CONSISTENCY \u00b7 claim 2",
+   "status": "PASS",
+   "validity": 0.75,
+   "outputJson": "{\"claimId\":2,\"check\":\"LOGIC_CONSISTENCY\",\"validity\":0.75,\"failureModes\":[],\"evidence\":[\"no explicit decision detected\"]}",
+   "startedAt": 1793303736.283076,
+   "completedAt": 1793303736.702206
+  },
+  {
+   "nodeKey": "verify-2-evidence_grounding",
+   "nodeType": "VERIFIER",
+   "claimId": 2,
+   "label": "EVIDENCE_GROUNDING \u00b7 claim 2",
+   "status": "PASS",
+   "validity": 0.9,
+   "outputJson": "{\"claimId\":2,\"check\":\"EVIDENCE_GROUNDING\",\"validity\":0.9,\"failureModes\":[],\"evidence\":[\"reasoning\u2194claim topical similarity 0.78\"]}",
+   "startedAt": 1793303736.286985,
+   "completedAt": 1793303736.725553
+  },
+  {
+   "nodeKey": "solver-3",
+   "nodeType": "SOLVER",
+   "claimId": 3,
+   "label": "Hydrogen peroxide is safe and speeds healing of a paw cut",
+   "status": "PASS",
+   "validity": 0.58,
+   "outputJson": "{\"claimId\":3,\"reasoning\":\"Hydrogen peroxide kills cells in the wound bed, and in a paw cut that slows healing. Its fizzing is often mistaken for cleaning, but it damages healthy tissue. Hydrogen peroxide is dangerous for a dog's paw cut and slows healing.\\nConfidence: 0.58\",\"conclusion\":\"Hydrogen peroxide is dangerous for a dog's paw cut and slows healing.\",\"confidence\":0.58,\"provider\":\"groq\",\"model\":\"openai/gpt-oss-120b\",\"tokens\":320,\"costUsd\":2.0200000000000003E-5}",
+   "startedAt": 1793303731.577219,
+   "completedAt": 1793303733.668503
+  },
+  {
+   "nodeKey": "verify-3-logic_consistency",
+   "nodeType": "VERIFIER",
+   "claimId": 3,
+   "label": "LOGIC_CONSISTENCY \u00b7 claim 3",
+   "status": "PASS",
+   "validity": 0.75,
+   "outputJson": "{\"claimId\":3,\"check\":\"LOGIC_CONSISTENCY\",\"validity\":0.75,\"failureModes\":[],\"evidence\":[\"decision dimension #1 present on only one side;\"]}",
+   "startedAt": 1793303736.290556,
+   "completedAt": 1793303736.67622
+  },
+  {
+   "nodeKey": "verify-3-evidence_grounding",
+   "nodeType": "VERIFIER",
+   "claimId": 3,
+   "label": "EVIDENCE_GROUNDING \u00b7 claim 3",
+   "status": "PASS",
+   "validity": 0.9,
+   "outputJson": "{\"claimId\":3,\"check\":\"EVIDENCE_GROUNDING\",\"validity\":0.9,\"failureModes\":[],\"evidence\":[\"reasoning\u2194claim topical similarity 0.60\"]}",
+   "startedAt": 1793303736.293908,
+   "completedAt": 1793303736.738776
+  },
+  {
+   "nodeKey": "verify-3-constraint_check",
+   "nodeType": "VERIFIER",
+   "claimId": 3,
+   "label": "CONSTRAINT_CHECK \u00b7 claim 3",
+   "status": "UNCERTAIN",
+   "validity": 0.5,
+   "outputJson": "{\"claimId\":3,\"check\":\"CONSTRAINT_CHECK\",\"validity\":0.5,\"failureModes\":[],\"evidence\":[\"no numbers or identifiers in the claim to preserve\"]}",
+   "startedAt": 1793303736.297404,
+   "completedAt": 1793303736.762661
+  },
+  {
+   "nodeKey": "solver-4",
+   "nodeType": "SOLVER",
+   "claimId": 4,
+   "label": "Bleeding that lasts more than 10 minutes needs a vet",
+   "status": "PASS",
+   "validity": 0.81,
+   "outputJson": "{\"claimId\":4,\"reasoning\":\"Bleeding from a paw usually stops with gentle pressure. If the bleeding will not stop, the cut may be deep and needs a vet. Persistent bleeding needs a vet.\\nConfidence: 0.81\",\"conclusion\":\"Persistent bleeding needs a vet.\",\"confidence\":0.81,\"provider\":\"groq\",\"model\":\"openai/gpt-oss-120b\",\"tokens\":320,\"costUsd\":2.0200000000000003E-5}",
+   "startedAt": 1793303731.586971,
+   "completedAt": 1793303733.345081
+  },
+  {
+   "nodeKey": "verify-4-logic_consistency",
+   "nodeType": "VERIFIER",
+   "claimId": 4,
+   "label": "LOGIC_CONSISTENCY \u00b7 claim 4",
+   "status": "PASS",
+   "validity": 0.75,
+   "outputJson": "{\"claimId\":4,\"check\":\"LOGIC_CONSISTENCY\",\"validity\":0.75,\"failureModes\":[],\"evidence\":[\"no explicit decision detected\"]}",
+   "startedAt": 1793303736.300821,
+   "completedAt": 1793303736.713491
+  },
+  {
+   "nodeKey": "verify-4-evidence_grounding",
+   "nodeType": "VERIFIER",
+   "claimId": 4,
+   "label": "EVIDENCE_GROUNDING \u00b7 claim 4",
+   "status": "PASS",
+   "validity": 0.8945004445006668,
+   "outputJson": "{\"claimId\":4,\"check\":\"EVIDENCE_GROUNDING\",\"validity\":0.8945004445006668,\"failureModes\":[],\"evidence\":[\"reasoning\u2194claim topical similarity 0.44\"]}",
+   "startedAt": 1793303736.304126,
+   "completedAt": 1793303736.749453
+  },
+  {
+   "nodeKey": "verify-4-constraint_check",
+   "nodeType": "VERIFIER",
+   "claimId": 4,
+   "label": "CONSTRAINT_CHECK \u00b7 claim 4",
+   "status": "FAIL",
+   "validity": 0.1,
+   "outputJson": "{\"claimId\":4,\"check\":\"CONSTRAINT_CHECK\",\"validity\":0.1,\"failureModes\":[\"numeric/identifier constraints from the claim were dropped or altered\"],\"evidence\":[\"salient-token preservation 0.00\"]}",
+   "startedAt": 1793303736.306909,
+   "completedAt": 1793303737.092413
+  },
+  {
+   "nodeKey": "conflict-1-3",
+   "nodeType": "CONFLICT",
+   "claimId": null,
+   "label": "Claims 1 \u2194 3 contradict",
+   "status": "PASS",
+   "validity": 0.7898979485566356,
+   "outputJson": "{\"fromClaim\":1,\"toClaim\":3,\"type\":\"CONTRADICTS\",\"weight\":0.7898979485566356}",
+   "startedAt": null,
+   "completedAt": null
+  },
+  {
+   "nodeKey": "aggregator",
+   "nodeType": "AGGREGATOR",
+   "claimId": null,
+   "label": "Bayesian resolution \u2192 93.8% (LOW)",
+   "status": "PASS",
+   "validity": 0.9377782740424818,
+   "outputJson": "{\"scores\":[{\"claimId\":1,\"prior\":0.86,\"posterior\":0.9758091448707039,\"survived\":true,\"notes\":[\"prior 0.86 (solver self-confidence)\",\"LOGIC_CONSISTENCY: validity 0.75 (supports)\",\"EVIDENCE_GROUNDING: validity 0.90 (supports)\",\"CONSTRAINT_CHECK: validity 0.50 (supports)\",\"contradiction penalty vs claim 3\"]},{\"claimId\":2,\"prior\":0.74,\"posterior\":0.9754607978975041,\"survived\":true,\"notes\":[\"prior 0.74 (solver self-confidence)\",\"LOGIC_CONSISTENCY: validity 0.75 (supports)\",\"EVIDENCE_GROUNDING: validity 0.90 (supports)\"]},{\"claimId\":3,\"prior\":0.58,\"posterior\":0.8925378893673206,\"survived\":true,\"notes\":[\"prior 0.58 (solver self-confidence)\",\"LOGIC_CONSISTENCY: validity 0.75 (supports)\",\"EVIDENCE_GROUNDING: validity 0.90 (supports)\",\"CONSTRAINT_CHECK: validity 0.50 (supports)\",\"contradiction penalty vs claim 1\"]},{\"claimId\":4,\"prior\":0.81,\"posterior\":0.907305264034399,\"survived\":true,\"notes\":[\"prior 0.81 (solver self-confidence)\",\"LOGIC_CONSISTENCY: validity 0.75 (supports)\",\"EVIDENCE_GROUNDING: validity 0.89 (supports)\",\"CONSTRAINT_CHECK: validity 0.10 (weakens)\"]}],\"finalConfidence\":0.9377782740424818,\"uncertainty\":\"LOW\",\"spine\":[1,2,3,4]}",
+   "startedAt": null,
+   "completedAt": null
+  },
+  {
+   "nodeKey": "synthesis",
+   "nodeType": "SYNTHESIS",
+   "claimId": null,
+   "label": "Human-readable narration",
+   "status": "DONE",
+   "validity": null,
+   "outputJson": "\"Saline is safe for cleaning a dog's paw cut. A loose bandage over the paw prevents swelling and keeps the cut clean. Hydrogen peroxide is dangerous for a dog's paw cut and slows healing. Persistent bleeding needs a vet. \\n\\n\u2014 Verification summary (confidence 93.8%, uncertainty LOW) \u2014\\n\u2714 Claim 1 [P=0.98]: Saline is safe for cleaning a dog's paw cut\\n    \u00b7 prior 0.86 (solver self-confidence)\\n    \u00b7 LOGIC_CONSISTENCY: validity 0.75 (supports)\\n    \u00b7 EVIDENCE_GROUNDING: validity 0.90 (supports)\\n    \u00b7 CONSTRAINT_CHECK: validity 0.50 (supports)\\n    \u00b7 contradiction penalty vs claim 3\\n\u2714 Claim 2 [P=0.98]: A loose bandage over the paw prevents swelling\\n    \u00b7 prior 0.74 (solver self-confidence)\\n    \u00b7 LOGIC_CONSISTENCY: validity 0.75 (supports)\\n    \u00b7 EVIDENCE_GROUNDING: validity 0.90 (supports)\\n\u2714 Claim 3 [P=0.89]: Hydrogen peroxide is safe and speeds healing of a paw cut\\n    \u00b7 prior 0.58 (solver self-confidence)\\n    \u00b7 LOGIC_CONSISTENCY: validity 0.75 (supports)\\n    \u00b7 EVIDENCE_GROUNDING: validity 0.90 (supports)\\n    \u00b7 CONSTRAINT_CHECK: validity 0.50 (supports)\\n    \u00b7 contradiction penalty vs claim 1\\n\u2714 Claim 4 [P=0.91]: Bleeding that lasts more than 10 minutes needs a vet\\n    \u00b7 prior 0.81 (solver self-confidence)\\n    \u00b7 LOGIC_CONSISTENCY: validity 0.75 (supports)\\n    \u00b7 EVIDENCE_GROUNDING: validity 0.89 (supports)\\n    \u00b7 CONSTRAINT_CHECK: validity 0.10 (weakens)\\n\"",
+   "startedAt": 1793303737.580974,
+   "completedAt": 1793303738.11296
+  }
+ ],
+ "edges": [
+  {
+   "fromKey": "planner",
+   "toKey": "solver-1",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-1",
+   "toKey": "verify-1-logic_consistency",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-1-logic_consistency",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.75
+  },
+  {
+   "fromKey": "solver-1",
+   "toKey": "verify-1-evidence_grounding",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-1-evidence_grounding",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.9
+  },
+  {
+   "fromKey": "solver-1",
+   "toKey": "verify-1-constraint_check",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-1-constraint_check",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "planner",
+   "toKey": "solver-2",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-2",
+   "toKey": "verify-2-logic_consistency",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-2-logic_consistency",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.75
+  },
+  {
+   "fromKey": "solver-2",
+   "toKey": "verify-2-evidence_grounding",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-2-evidence_grounding",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.9
+  },
+  {
+   "fromKey": "planner",
+   "toKey": "solver-3",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-3",
+   "toKey": "verify-3-logic_consistency",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-3-logic_consistency",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.75
+  },
+  {
+   "fromKey": "solver-3",
+   "toKey": "verify-3-evidence_grounding",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-3-evidence_grounding",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.9
+  },
+  {
+   "fromKey": "solver-3",
+   "toKey": "verify-3-constraint_check",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-3-constraint_check",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "planner",
+   "toKey": "solver-4",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-4",
+   "toKey": "verify-4-logic_consistency",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-4-logic_consistency",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.75
+  },
+  {
+   "fromKey": "solver-4",
+   "toKey": "verify-4-evidence_grounding",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-4-evidence_grounding",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.8945004445006668
+  },
+  {
+   "fromKey": "solver-4",
+   "toKey": "verify-4-constraint_check",
+   "edgeType": "FLOW",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "verify-4-constraint_check",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.1
+  },
+  {
+   "fromKey": "solver-1",
+   "toKey": "solver-4",
+   "edgeType": "DEPENDS",
+   "weight": 0.5
+  },
+  {
+   "fromKey": "solver-1",
+   "toKey": "conflict-1-3",
+   "edgeType": "CONTRADICTS",
+   "weight": 0.7898979485566356
+  },
+  {
+   "fromKey": "solver-3",
+   "toKey": "conflict-1-3",
+   "edgeType": "CONTRADICTS",
+   "weight": 0.7898979485566356
+  },
+  {
+   "fromKey": "conflict-1-3",
+   "toKey": "aggregator",
+   "edgeType": "FLOW",
+   "weight": 0.7898979485566356
+  },
+  {
+   "fromKey": "aggregator",
+   "toKey": "synthesis",
+   "edgeType": "FLOW",
+   "weight": 0.9377782740424818
+  }
+ ],
+ "execution": {
+  "status": "COMPLETED",
+  "startedAt": 1793303729.69655,
+  "endedAt": 1793303738.638126,
+  "error": null,
+  "steps": [
+   {
+    "seq": 1,
+    "activityType": "dag.plan",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303729.988498,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303730.468976,
+      "endedAt": 1793303731.320009,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 2,
+    "activityType": "dag.solve",
+    "claimId": 1,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303731.566843,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303731.989057,
+      "endedAt": 1793303733.139244,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 3,
+    "activityType": "dag.solve",
+    "claimId": 2,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303731.572289,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303731.998495,
+      "endedAt": 1793303732.644638,
+      "outcome": "FAILED",
+      "error": "All providers in failover chain failed",
+      "workerId": "worker-4f6efeef",
+      "retryAt": 1793303734.6468437
+     },
+     {
+      "attempt": 2,
+      "startedAt": 1793303735.022122,
+      "endedAt": 1793303735.960038,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 4,
+    "activityType": "dag.solve",
+    "claimId": 3,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303731.577219,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303732.012465,
+      "endedAt": 1793303733.668503,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 5,
+    "activityType": "dag.solve",
+    "claimId": 4,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303731.586971,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303732.004506,
+      "endedAt": 1793303733.345081,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 6,
+    "activityType": "dag.verify",
+    "claimId": 1,
+    "check": "LOGIC_CONSISTENCY",
+    "name": null,
+    "scheduledAt": 1793303736.27145,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.555548,
+      "endedAt": 1793303736.588214,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 7,
+    "activityType": "dag.verify",
+    "claimId": 1,
+    "check": "EVIDENCE_GROUNDING",
+    "name": null,
+    "scheduledAt": 1793303736.276043,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.596229,
+      "endedAt": 1793303736.661465,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 8,
+    "activityType": "dag.verify",
+    "claimId": 1,
+    "check": "CONSTRAINT_CHECK",
+    "name": null,
+    "scheduledAt": 1793303736.279632,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.565443,
+      "endedAt": 1793303736.691201,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 9,
+    "activityType": "dag.verify",
+    "claimId": 2,
+    "check": "LOGIC_CONSISTENCY",
+    "name": null,
+    "scheduledAt": 1793303736.283076,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.578734,
+      "endedAt": 1793303736.702206,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 10,
+    "activityType": "dag.verify",
+    "claimId": 2,
+    "check": "EVIDENCE_GROUNDING",
+    "name": null,
+    "scheduledAt": 1793303736.286985,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.623831,
+      "endedAt": 1793303736.725553,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 11,
+    "activityType": "dag.verify",
+    "claimId": 3,
+    "check": "LOGIC_CONSISTENCY",
+    "name": null,
+    "scheduledAt": 1793303736.290556,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.614213,
+      "endedAt": 1793303736.67622,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 12,
+    "activityType": "dag.verify",
+    "claimId": 3,
+    "check": "EVIDENCE_GROUNDING",
+    "name": null,
+    "scheduledAt": 1793303736.293908,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.634757,
+      "endedAt": 1793303736.738776,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 13,
+    "activityType": "dag.verify",
+    "claimId": 3,
+    "check": "CONSTRAINT_CHECK",
+    "name": null,
+    "scheduledAt": 1793303736.297404,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.650918,
+      "endedAt": 1793303736.762661,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 14,
+    "activityType": "dag.verify",
+    "claimId": 4,
+    "check": "LOGIC_CONSISTENCY",
+    "name": null,
+    "scheduledAt": 1793303736.300821,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.602061,
+      "endedAt": 1793303736.713491,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 15,
+    "activityType": "dag.verify",
+    "claimId": 4,
+    "check": "EVIDENCE_GROUNDING",
+    "name": null,
+    "scheduledAt": 1793303736.304126,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303736.643923,
+      "endedAt": 1793303736.749453,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 16,
+    "activityType": "dag.verify",
+    "claimId": 4,
+    "check": "CONSTRAINT_CHECK",
+    "name": null,
+    "scheduledAt": 1793303736.306909,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303737.073073,
+      "endedAt": 1793303737.092413,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   },
+   {
+    "seq": 17,
+    "activityType": "dag.synthesize",
+    "claimId": null,
+    "check": null,
+    "name": null,
+    "scheduledAt": 1793303737.580974,
+    "status": "COMPLETED",
+    "maxAttempts": 3,
+    "attempts": [
+     {
+      "attempt": 1,
+      "startedAt": 1793303738.085744,
+      "endedAt": 1793303738.11296,
+      "outcome": "COMPLETED",
+      "error": null,
+      "workerId": "worker-4f6efeef",
+      "retryAt": null
+     }
+    ]
+   }
+  ]
+ },
+ "claims": [
+  {
+   "id": 1,
+   "statement": "Saline is safe for cleaning a dog's paw cut",
+   "dependsOn": [],
+   "checks": [
+    "LOGIC_CONSISTENCY",
+    "EVIDENCE_GROUNDING",
+    "CONSTRAINT_CHECK"
+   ]
+  },
+  {
+   "id": 2,
+   "statement": "A loose bandage over the paw prevents swelling",
+   "dependsOn": [],
+   "checks": [
+    "LOGIC_CONSISTENCY",
+    "EVIDENCE_GROUNDING"
+   ]
+  },
+  {
+   "id": 3,
+   "statement": "Hydrogen peroxide is safe and speeds healing of a paw cut",
+   "dependsOn": [],
+   "checks": [
+    "LOGIC_CONSISTENCY",
+    "EVIDENCE_GROUNDING",
+    "CONSTRAINT_CHECK"
+   ]
+  },
+  {
+   "id": 4,
+   "statement": "Bleeding that lasts more than 10 minutes needs a vet",
+   "dependsOn": [
+    1
+   ],
+   "checks": [
+    "LOGIC_CONSISTENCY",
+    "EVIDENCE_GROUNDING",
+    "CONSTRAINT_CHECK"
+   ]
+  }
+ ]
+}
