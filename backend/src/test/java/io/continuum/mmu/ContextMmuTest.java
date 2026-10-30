@@ -173,6 +173,37 @@ class ContextMmuTest {
     }
 
     @Test
+    void aModelThatKeepsAskingForPagesNeverHandsItsControlTokenToTheCaller() {
+        var session = mmu.open("dev-1", longConversation("What's the weather like?"));
+        String stubId = stubStore.keySet().iterator().next();
+        String ask = "[PAGE_REQUEST: id=\"" + stubId + "\"]";
+
+        AtomicInteger dispatches = new AtomicInteger();
+        LlmResponse resolved = session.interceptFaults(new LlmResponse(ask, List.of(), 1, 1, "mock", "m", "stop"), req -> {
+            dispatches.incrementAndGet();
+            return new LlmResponse(ask, List.of(), 1, 1, "mock", "m", "stop");
+        });
+
+        assertEquals(3, dispatches.get(), "two fault rounds, then one last chance to answer");
+        assertFalse(resolved.content().contains("PAGE_REQUEST"), "the control token never reaches the caller");
+        assertEquals(ContextMMU.UNRESTORED, resolved.content());
+    }
+
+    @Test
+    void afterTheFaultBudgetTheModelIsAskedToAnswerFromWhatIsResident() {
+        var session = mmu.open("dev-1", longConversation("What's the weather like?"));
+        String ask = "[PAGE_REQUEST: id=\"seg_that_does_not_exist\"]";
+
+        LlmResponse resolved = session.interceptFaults(new LlmResponse(ask, List.of(), 1, 1, "mock", "m", "stop"), req -> {
+            assertTrue(req.messages().get(req.messages().size() - 1).content().startsWith("[PAGE_LIMIT]"),
+                    "the model is told no more pages will come");
+            return new LlmResponse("It is sunny. " + ask, List.of(), 1, 1, "mock", "m", "stop");
+        });
+
+        assertEquals("It is sunny.", resolved.content(), "a stray request is cut from an otherwise good answer");
+    }
+
+    @Test
     void coherenceMaterializesBasePlusSubsequentMutations() {
         var session = mmu.open("dev-1", longConversation("weather?"));
         String stubId = stubStore.keySet().iterator().next();

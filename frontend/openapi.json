@@ -78,6 +78,36 @@
         },
         "type" : "object"
       },
+      "Attempt" : {
+        "properties" : {
+          "attempt" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "endedAt" : {
+            "description" : "Epoch seconds, possibly fractional",
+            "type" : "number"
+          },
+          "error" : {
+            "type" : "string"
+          },
+          "outcome" : {
+            "type" : "string"
+          },
+          "retryAt" : {
+            "description" : "Epoch seconds, possibly fractional",
+            "type" : "number"
+          },
+          "startedAt" : {
+            "description" : "Epoch seconds, possibly fractional",
+            "type" : "number"
+          },
+          "workerId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ChaosState" : {
         "properties" : {
           "activityFailureRate" : {
@@ -2073,37 +2103,25 @@
       },
       "Run" : {
         "properties" : {
-          "finishedAt" : {
+          "endedAt" : {
             "description" : "Epoch seconds, possibly fractional",
             "type" : "number"
           },
-          "id" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "listCalls" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "outcome" : {
-            "type" : "string"
-          },
-          "probeCalls" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "requestedBy" : {
+          "error" : {
             "type" : "string"
           },
           "startedAt" : {
             "description" : "Epoch seconds, possibly fractional",
             "type" : "number"
           },
-          "summary" : {
+          "status" : {
             "type" : "string"
           },
-          "trigger" : {
-            "type" : "string"
+          "steps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Step"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -2340,6 +2358,45 @@
         },
         "type" : "object"
       },
+      "Step" : {
+        "properties" : {
+          "activityType" : {
+            "type" : "string"
+          },
+          "attempts" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Attempt"
+            },
+            "type" : "array"
+          },
+          "check" : {
+            "type" : "string"
+          },
+          "claimId" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxAttempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "scheduledAt" : {
+            "description" : "Epoch seconds, possibly fractional",
+            "type" : "number"
+          },
+          "seq" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "StepCheck" : {
         "properties" : {
           "commandSeq" : {
@@ -2562,6 +2619,9 @@
               "$ref" : "#/components/schemas/EventView"
             },
             "type" : "array"
+          },
+          "execution" : {
+            "$ref" : "#/components/schemas/Run"
           },
           "input" : {
             "type" : "object"

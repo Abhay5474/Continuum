@@ -42,10 +42,14 @@ public final class Dtos {
                              int attempts, String idempotencyKey, Instant createdAt, Instant dispatchedAt) {
     }
 
+    /**
+     * @param execution every step's attempts, waits and retries, read from the
+     *                  same events; what the console draws the run's timeline from
+     */
     public record WorkflowDetail(WorkflowSummary summary, Object input, Object result, String error,
                                  List<EventView> events, List<ActivityTaskView> activities,
                                  List<OutboxView> outbox, double costUsd, long tokens,
-                                 StuckView stuck) {
+                                 StuckView stuck, io.continuum.api.ExecutionTimeline.Run execution) {
     }
 
     public record CostByProvider(String provider, long tokens, double costUsd, long calls) {

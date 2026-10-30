@@ -4152,6 +4152,19 @@ export interface components {
             id: number;
             workflowId: string;
         };
+        Attempt: {
+            /** Format: int32 */
+            attempt: number;
+            /** @description Epoch seconds, possibly fractional */
+            endedAt: number;
+            error: string;
+            outcome: string;
+            /** @description Epoch seconds, possibly fractional */
+            retryAt: number;
+            /** @description Epoch seconds, possibly fractional */
+            startedAt: number;
+            workerId: string;
+        };
         ChaosState: {
             /** Format: double */
             activityFailureRate: number;
@@ -4932,19 +4945,12 @@ export interface components {
         };
         Run: {
             /** @description Epoch seconds, possibly fractional */
-            finishedAt: number;
-            /** Format: int64 */
-            id: number;
-            /** Format: int32 */
-            listCalls: number;
-            outcome: string;
-            /** Format: int32 */
-            probeCalls: number;
-            requestedBy: string;
+            endedAt: number;
+            error: string;
             /** @description Epoch seconds, possibly fractional */
             startedAt: number;
-            summary: string;
-            trigger: string;
+            status: string;
+            steps: components["schemas"]["Step"][];
         };
         RunRequest: {
             input: {
@@ -5038,6 +5044,21 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        Step: {
+            activityType: string;
+            attempts: components["schemas"]["Attempt"][];
+            check: string;
+            /** Format: int32 */
+            claimId: number;
+            /** Format: int32 */
+            maxAttempts: number;
+            name: string;
+            /** @description Epoch seconds, possibly fractional */
+            scheduledAt: number;
+            /** Format: int64 */
+            seq: number;
+            status: string;
+        };
         StepCheck: {
             /** Format: int64 */
             commandSeq: number;
@@ -5120,6 +5141,7 @@ export interface components {
             costUsd: number;
             error: string;
             events: components["schemas"]["EventView"][];
+            execution: components["schemas"]["Run"];
             input: Record<string, never>;
             outbox: components["schemas"]["OutboxView"][];
             result: Record<string, never>;

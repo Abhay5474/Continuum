@@ -104,6 +104,13 @@ public class DagVerifierActivity implements Activity {
     private double constraintCheck(Input in, List<String> failures, List<String> evidence) {
         double preserved = DecisionPolarity.salientTokenPreservation(
                 in.statement(), in.reasoning() + " " + in.conclusion());
+        if (preserved < 0) {
+            // A claim with no number or identifier in it has nothing to drop.
+            // This read as "constraints dropped" at validity 0.1, so most plain
+            // claims failed a check that did not apply to them.
+            evidence.add("no numbers or identifiers in the claim to preserve");
+            return 0.5;
+        }
         evidence.add(String.format("salient-token preservation %.2f", preserved));
         if (preserved < 0.5) {
             failures.add("numeric/identifier constraints from the claim were dropped or altered");

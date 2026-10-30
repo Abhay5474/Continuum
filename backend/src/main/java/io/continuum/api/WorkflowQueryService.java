@@ -109,7 +109,8 @@ public class WorkflowQueryService {
         WorkflowInstanceEntity instance = instances.findById(workflowId)
                 .orElseThrow(() -> new IllegalArgumentException("No such workflow: " + workflowId));
 
-        List<EventView> eventViews = events.findByWorkflowIdOrderBySequenceNumberAsc(workflowId).stream()
+        List<WorkflowEventEntity> history = events.findByWorkflowIdOrderBySequenceNumberAsc(workflowId);
+        List<EventView> eventViews = history.stream()
                 .map(e -> new EventView(e.getSequenceNumber(), e.getEventType().name(),
                         parse(e.getPayload()), e.getCreatedAt()))
                 .toList();
@@ -135,7 +136,7 @@ public class WorkflowQueryService {
 
         return new WorkflowDetail(toSummary(instance, stuck != null), parse(instance.getInput()),
                 parse(instance.getResult()), instance.getError(), eventViews, activityViews, outboxViews,
-                cost, tokens, stuck);
+                cost, tokens, stuck, ExecutionTimeline.fromEntities(history, json));
     }
 
     @Transactional(readOnly = true)

@@ -279,13 +279,40 @@ public class ConsensusDagService {
                 : runs.findTop50ByDeveloperIdOrderByCreatedAtDesc(developerId);
     }
 
+    /**
+     * The run's trace: the projection written when it finished, and how it
+     * executed — every step's attempts, read from the event log — which is
+     * there from the first event, so a run can be followed while it works.
+     */
     @Transactional(readOnly = true)
     public Map<String, Object> trace(String workflowId) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("run", runs.findByWorkflowId(workflowId).orElse(null));
         out.put("nodes", nodes.findByWorkflowIdOrderByIdAsc(workflowId));
         out.put("edges", edges.findByWorkflowId(workflowId));
+        List<WorkflowEventEntity> history = events.findByWorkflowIdOrderBySequenceNumberAsc(workflowId);
+        out.put("execution", io.continuum.api.ExecutionTimeline.fromEntities(history, json));
+        out.put("claims", planOf(history));
         return out;
+    }
+
+    /** The claims the planner made, once it has made them: what names each lane before the run ends. */
+    private List<Claim> planOf(List<WorkflowEventEntity> history) {
+        for (WorkflowEventEntity e : history) {
+            if (e.getEventType() != EventType.ACTIVITY_COMPLETED) {
+                continue;
+            }
+            try {
+                var p = json.read(e.getPayload(), Payloads.ActivityCompleted.class);
+                if (io.continuum.dag.activities.DagPlanActivity.TYPE.equals(p.activityType()) && p.result() != null) {
+                    var plan = json.read(p.result(), DagModels.Plan.class);
+                    return plan == null || plan.claims() == null ? List.of() : plan.claims();
+                }
+            } catch (Exception ignored) {
+                // an unreadable plan leaves the lanes numbered rather than named
+            }
+        }
+        return List.of();
     }
 
     // ---- event-log timing extraction ----

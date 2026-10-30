@@ -73,6 +73,8 @@ public class ContextMMU {
 
     private static final Logger log = LoggerFactory.getLogger(ContextMMU.class);
     static final Pattern PAGE_REQUEST = Pattern.compile("\\[PAGE_REQUEST:\\s*id=\"([^\"]+)\"\\s*]");
+    /** Said instead of an answer that was nothing but a request for a page that could not be had. */
+    static final String UNRESTORED = "The earlier part of the conversation this answer needed could not be restored.";
     private static final Pattern MEMORY_REF = Pattern.compile("\\[MEMORY_REF:\\s*id=\"([^\"]+)\"");
     private static final int RECENT_KEEP = 4;      // newest messages never evicted
     private static final int SEGMENT_TOKENS = 800; // eviction granularity
@@ -207,7 +209,27 @@ public class ContextMMU {
                 current = redispatch.apply(faultRequest);
                 faultLatencyMs += (System.nanoTime() - t0) / 1_000_000;
             }
+            // Still asking for a page — the fault budget is spent, or the page
+            // does not exist — the model's control token would otherwise reach
+            // the caller as the answer. It is told no more pages will come and
+            // asked once more; a request left in that answer is cut out.
+            if (asksForPage(current)) {
+                working.add(new Message(Role.ASSISTANT, current.content(), List.of()));
+                working.add(Message.system("[PAGE_LIMIT] No further paged context can be restored for this "
+                        + "answer. Answer now from the context you have; do not emit PAGE_REQUEST tokens."));
+                current = redispatch.apply(virtualized.withMessages(List.copyOf(working)));
+                if (asksForPage(current)) {
+                    String rest = PAGE_REQUEST.matcher(current.content()).replaceAll("").trim();
+                    current = new LlmResponse(rest.isEmpty() ? UNRESTORED : rest, current.toolCalls(),
+                            current.promptTokens(), current.completionTokens(), current.provider(),
+                            current.model(), current.finishReason());
+                }
+            }
             return current;
+        }
+
+        private static boolean asksForPage(LlmResponse r) {
+            return r != null && r.content() != null && PAGE_REQUEST.matcher(r.content()).find();
         }
 
         /** Final checkpoint: dirty detection + telemetry. Never throws. */
