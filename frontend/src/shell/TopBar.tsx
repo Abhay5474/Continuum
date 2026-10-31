@@ -59,8 +59,8 @@ export function TopBar({
 
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[13px]">
           {crumbs.map((c, i) => (
-            <span key={i} className={`flex min-w-0 items-center gap-1.5 ${i < crumbs.length - 2 ? "hidden sm:flex" : ""}`}>
-              {i > 0 && <span aria-hidden className="select-none text-slate-500/70">/</span>}
+            <span key={i} className={`min-w-0 items-center gap-1.5 ${i < crumbs.length - 1 ? "hidden md:flex" : "flex"}`}>
+              {i > 0 && <span aria-hidden className="hidden select-none text-slate-500/70 md:inline">/</span>}
               <span className="relative inline-grid min-w-0 overflow-hidden">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <m.span

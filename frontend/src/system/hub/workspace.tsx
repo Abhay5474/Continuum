@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useLiquidIndicator } from "../physics";
 import { HUES, Hue, Tone, hueAt, toneInk, toneWash } from "./tone";
 import { Chip, GLYPHS, GlyphName } from "./glyphs";
-import { Card, Grid } from "./structure";
+import { Card } from "./structure";
 
 /* ------------------------------------------------------------------ *
  * Workspace layout
@@ -337,7 +337,10 @@ export function Stats({ children, cols }: { children: ReactNode; cols?: 2 | 3 | 
     const hue = hueAt(i++);
     return props.tone === undefined ? cloneElement(child, { tone: hue } as never) : child;
   });
-  return <Grid cols={width}>{painted}</Grid>;
+  // Two up even on a phone: a figure is short, and a column of eight cards
+  // a screen tall each buries the page under its own summary.
+  const at = { 2: "", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4", 5: "sm:grid-cols-3 lg:grid-cols-5" }[width];
+  return <div className={`grid grid-cols-2 gap-3 ${at}`}>{painted}</div>;
 }
 
 /**

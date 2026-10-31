@@ -56,11 +56,11 @@ export function PaletteTrigger({ onOpen, compact = false }: { onOpen: () => void
       aria-label={`Search or jump to a page (${PALETTE_KEY})`}
       aria-haspopup="dialog"
       data-no-press
-      className={`palette-trigger flex items-center gap-2 text-left ${compact ? "w-9 justify-center px-0" : "w-[240px] px-3"}`}
+      className={`palette-trigger flex shrink-0 items-center gap-2 text-left ${compact ? "w-[34px] justify-center px-0" : "w-[240px] px-3"}`}
       style={{ borderRadius: 12 }}
       transition={transitions.modal}
     >
-      <m.span layout="position" className="flex min-w-0 flex-1 items-center gap-2">
+      <m.span layout="position" className={`flex min-w-0 items-center gap-2 ${compact ? "" : "flex-1"}`}>
         <SearchGlyph />
         {!compact && <span className="truncate text-[12.5px] text-slate-500">Search or jump to…</span>}
       </m.span>
