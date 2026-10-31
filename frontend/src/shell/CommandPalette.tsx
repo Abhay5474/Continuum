@@ -137,15 +137,16 @@ export function CommandPalette({
     ];
     for (const s of SECTIONS) {
       for (const p of s.places) {
+        // Found by its address too: people who know the console type /mmu.
         pages.push({
           id: p.to, group: "Pages", label: p.label, hint: s.label, glyph: p.glyph,
-          keywords: `${p.desc} ${s.label} ${(p.views ?? []).map((v) => v.label).join(" ")}`.toLowerCase(),
+          keywords: `${p.desc} ${s.label} ${(p.views ?? []).map((v) => v.label).join(" ")} ${p.paths.join(" ")}`.toLowerCase(),
           run: go(p.to),
         });
         for (const v of (p.views ?? []).slice(1)) {
           pages.push({
             id: v.to, group: "Pages", label: v.label, hint: p.label, glyph: p.glyph,
-            keywords: `${p.label} ${p.desc} ${s.label}`.toLowerCase(), run: go(v.to),
+            keywords: `${p.label} ${p.desc} ${s.label} ${v.to}`.toLowerCase(), run: go(v.to),
           });
         }
       }

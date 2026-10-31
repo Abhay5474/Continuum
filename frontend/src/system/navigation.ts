@@ -40,6 +40,36 @@ let installed = false;
 
 const supported = () => typeof document !== "undefined" && typeof document.startViewTransition === "function";
 
+/**
+ * Whether the page is drawn without a GPU. A view transition snapshots the
+ * page it leaves; a software rasteriser takes a tenth of a second or more to do
+ * that, which is a visible stall at the moment of a click. On such a machine
+ * navigation stays instant (the entrance still plays: it is cheap anywhere).
+ *
+ * <p>{@code localStorage["continuum.motion"] = "full"} keeps transitions on
+ * regardless, for anyone who prefers them over the stall.
+ */
+let software: boolean | null = null;
+function drawsInSoftware(): boolean {
+  if (software !== null) return software;
+  try {
+    if (localStorage.getItem("continuum.motion") === "full") return (software = false);
+  } catch {
+    /* storage blocked: decide from the renderer */
+  }
+  try {
+    const gl = document.createElement("canvas").getContext("webgl");
+    if (!gl) return (software = true);
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) ?? "");
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    software = /swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer);
+  } catch {
+    software = false;
+  }
+  return software;
+}
+
 function classify(a: HTMLAnchorElement): Omit<Intent, "at"> {
   if (a.closest('[data-nav="section"]')) return { kind: "section", dir: 0, source: null };
   const strip = a.closest('nav[aria-label$=" views"]');
@@ -84,7 +114,7 @@ export function installViewTransitions(router: AppRouter) {
   const navigate = router.navigate.bind(router);
   router.navigate = ((to: Parameters<AppRouter["navigate"]>[0], opts?: Parameters<AppRouter["navigate"]>[1]) => {
     if (typeof to === "number") return navigate(to);
-    return navigate(to, { ...opts, viewTransition: opts?.viewTransition ?? !prefersReducedMotion() });
+    return navigate(to, { ...opts, viewTransition: opts?.viewTransition ?? (!prefersReducedMotion() && !drawsInSoftware()) });
   }) as AppRouter["navigate"];
 
   document.addEventListener(

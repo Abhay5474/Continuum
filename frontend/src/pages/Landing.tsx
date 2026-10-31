@@ -52,6 +52,7 @@ export default function Landing() {
     <div className="relative">
       <Ambient />
       <LandingHeader />
+      <main>
 
       {/* ---------- ENTRY ---------- */}
       <section ref={hero} className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-16 pt-24 text-center sm:pt-28">
@@ -304,6 +305,8 @@ export default function Landing() {
           </div>
         </div>
       </Scene>
+
+      </main>
 
       <footer className="glass-bar relative z-30">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-8 text-xs text-slate-500">

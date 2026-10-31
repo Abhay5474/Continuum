@@ -90,7 +90,6 @@ code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); }
   position: absolute;
   inset: 0;
   opacity: var(--grain-a);
-  mix-blend-mode: var(--grain-blend);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 @media (prefers-reduced-transparency: reduce) {
@@ -106,14 +105,21 @@ code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); }
   }
 }
 
+/* No backdrop blur on the sidebar: nothing but the ambient light ever passes
+   behind it, and a blur of soft gradients is the same soft gradients. The
+   blur cost a re-filter of the whole pane on every scrolled and transitioned
+   frame, for no visible difference. The drawer, which does cover the page,
+   keeps its blur. */
 .sidebar,
 .drawer {
   z-index: 40;
   border-radius: 20px;
   background: linear-gradient(180deg, rgb(var(--chrome) / var(--chrome-a)), rgb(var(--chrome) / calc(var(--chrome-a) - 0.1)));
-  -webkit-backdrop-filter: blur(30px) saturate(1.7);
-  backdrop-filter: blur(30px) saturate(1.7);
   box-shadow: inset 0 1px 0 rgb(var(--chrome-rim) / var(--chrome-rim-a)), var(--chrome-shadow);
+}
+.drawer {
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
 }
 .sidebar {
   position: fixed;
@@ -269,9 +275,9 @@ code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); }
 
 /* ---- the bar --------------------------------------------------------------- */
 .topbar-frost {
-  background: rgb(var(--ink) / 0.7);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  backdrop-filter: blur(20px) saturate(1.6);
+  background: rgb(var(--ink) / 0.72);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
   box-shadow: 0 1px 0 rgb(var(--card-rule));
 }
 .crumb-link { padding: 2px 4px; margin: 0 -4px; transition: color var(--dur-fade) var(--ease-fade); }
@@ -287,10 +293,8 @@ code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); }
 
 .palette-trigger {
   height: 34px;
-  background: rgb(var(--chrome) / 0.62);
+  background: rgb(var(--chrome) / 0.72);
   box-shadow: inset 0 0 0 1px rgb(var(--hl) / 0.08), 0 1px 2px rgb(var(--hl) / 0.05);
-  -webkit-backdrop-filter: blur(14px) saturate(1.5);
-  backdrop-filter: blur(14px) saturate(1.5);
   transition: box-shadow var(--dur-fade) var(--ease-fade), background-color var(--dur-fade) var(--ease-fade);
 }
 .palette-trigger:hover { box-shadow: inset 0 0 0 1px rgb(var(--hl) / 0.15), 0 2px 8px -2px rgb(var(--hl) / 0.12); }
@@ -337,6 +341,7 @@ code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); }
    whatever is morphing are drawn as pictures. */
 ::view-transition-old(root) { display: none; }
 ::view-transition-new(root) { animation: none; }
+::view-transition-group(root) { animation: none; }
 html[data-vt] #main { view-transition-name: page; }
 html[data-vt] { scroll-behavior: auto; }
 
