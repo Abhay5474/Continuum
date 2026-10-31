@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Chip } from "../system/hub";
 import type { WorkflowDetail } from "../types";
@@ -27,6 +27,9 @@ const EVENT_ICON: Record<string, string> = {
 
 export default function WorkflowDetailPage() {
   const { id } = useParams();
+  // What the list that opened this run already knew, so the header is here
+  // from the first frame for the row to grow into while the rest loads.
+  const preview = useLocation().state as { title?: string; status?: string } | null;
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
   const [healing, setHealing] = useState<any | null>(null);
   const [err, setErr] = useState<{ missing: boolean; message: string } | null>(null);
@@ -165,64 +168,83 @@ export default function WorkflowDetailPage() {
         </p>
       </div>
     );
+  // One header for the loading and the loaded page, so it is the same element
+  // throughout: the row this run was opened from grows into it, and a view
+  // transition whose target is swapped out mid-flight is abandoned.
+  const def = detail ? definitionOf(detail) : null;
+  const status = detail
+    ? isCancelled(detail.error) ? "CANCELLED" : detail.stuck ? "STUCK" : detail.summary.status
+    : preview?.status;
+  const back = (
+    <Link to="/dashboard" data-nav="back" className="micro -mb-4 inline-flex items-center gap-1.5 transition-colors hover:text-slate-300">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M10 3.5 5.5 8l4.5 4.5" />
+      </svg>
+      Back
+    </Link>
+  );
+  const header = (
+    <div className="card flex flex-wrap items-center gap-3 p-5" data-morph-target>
+      {status && <StatusBadge key="status" status={status} />}
+      <div key="title" className="flex items-center gap-2.5">
+        <Chip glyph="flow" tone="accent" size={30} />
+        {/* A declarative run is named by its definition — "Declarative" is
+            the engine's word for every one of them. */}
+        <h1 data-morph-title className="w-fit text-[20px] font-semibold tracking-[-0.011em]">
+          {def ? def.name : detail ? detail.summary.workflowType : preview?.title ?? "Workflow"}
+          {def && detail && (
+            <span className="ml-2 align-middle text-xs font-medium text-slate-500">
+              v{def.version} · {detail.summary.workflowType}
+            </span>
+          )}
+        </h1>
+      </div>
+      <span key="id" className="font-mono text-xs text-slate-400">{detail?.summary.workflowId ?? id}</span>
+      {stale && (
+        <span key="stale" className="text-xs text-amber-300" role="status" title={err?.message}>
+          Connection lost — showing the last update
+        </span>
+      )}
+      {detail && !finished && (
+        <Button key="stop" variant="danger" size="sm" busy={cancelling} onClick={cancel} className="ml-auto"
+          title="Stops the run. Waiting steps are withdrawn; with saga rollback on, completed steps are undone.">
+          Stop workflow
+        </Button>
+      )}
+      {detail && finished && !(detail.summary.status === "FAILED" && detail.error && !isCancelled(detail.error)) && (
+        <Button key="again" size="sm" busy={rerunning} onClick={rerun} className="ml-auto"
+          title="Starts a new run with the same input. This one is kept as it is.">
+          Run again
+        </Button>
+      )}
+      {healing?.healed && (
+        <span key="healed" className="contents">
+          <span className="animate-pulse rounded bg-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-indigo-300">
+            PARADOX RESOLVED
+          </span>
+          <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
+            HISTORY ALIGNED ×{healing.resolutionCount}
+          </span>
+        </span>
+      )}
+    </div>
+  );
+
   if (!detail)
     return err ? (
       <div className="text-sm text-rose-300" role="alert">Could not load this workflow: {err.message}. Retrying…</div>
     ) : (
-      <div className="text-sm text-slate-400" role="status">Loading workflow {id}…</div>
+      <div className="space-y-8">
+        {back}
+        {header}
+        <div className="text-sm text-slate-400" role="status">Loading workflow {id}…</div>
+      </div>
     );
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link to="/dashboard" className="text-sm text-slate-400 hover:text-slate-200">
-          ← Back
-        </Link>
-        <StatusBadge status={isCancelled(detail.error) ? "CANCELLED" : detail.stuck ? "STUCK" : detail.summary.status} />
-        <div className="flex items-center gap-2.5">
-          <Chip glyph="flow" tone="accent" size={28} />
-          {/* A declarative run is named by its definition — "Declarative" is
-              the engine's word for every one of them. */}
-          {definitionOf(detail) ? (
-            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">
-              {definitionOf(detail)!.name}
-              <span className="ml-2 align-middle text-xs font-medium text-slate-500">
-                v{definitionOf(detail)!.version} · {detail.summary.workflowType}
-              </span>
-            </h1>
-          ) : (
-            <h1 className="text-[20px] font-semibold tracking-[-0.011em]">{detail.summary.workflowType}</h1>
-          )}
-        </div>
-        <span className="font-mono text-xs text-slate-400">{detail.summary.workflowId}</span>
-        {stale && (
-          <span className="text-xs text-amber-300" role="status" title={err?.message}>
-            Connection lost — showing the last update
-          </span>
-        )}
-        {!finished && (
-          <Button variant="danger" size="sm" busy={cancelling} onClick={cancel} className="ml-auto"
-            title="Stops the run. Waiting steps are withdrawn; with saga rollback on, completed steps are undone.">
-            Stop workflow
-          </Button>
-        )}
-        {finished && !(detail.summary.status === "FAILED" && detail.error && !isCancelled(detail.error)) && (
-          <Button size="sm" busy={rerunning} onClick={rerun} className="ml-auto"
-            title="Starts a new run with the same input. This one is kept as it is.">
-            Run again
-          </Button>
-        )}
-        {healing?.healed && (
-          <>
-            <span className="animate-pulse rounded bg-indigo-500/20 px-2 py-0.5 text-xs font-semibold text-indigo-300">
-              PARADOX RESOLVED
-            </span>
-            <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
-              HISTORY ALIGNED ×{healing.resolutionCount}
-            </span>
-          </>
-        )}
-      </div>
+      {back}
+      {header}
 
       {(rollbackId || rolledBack) && (
         <div className="-mt-4 flex items-center gap-2 text-[12.5px] text-slate-400">

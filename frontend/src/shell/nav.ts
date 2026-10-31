@@ -118,3 +118,12 @@ export function locate(pathname: string, operator = false): { section: string; p
   }
   return found;
 }
+
+/**
+ * Where a detail page belongs when its path sits under a place's first view
+ * but the list it came from is another view: a workflow run (/workflows/:id)
+ * is opened from Run history, not from Definitions.
+ */
+export const DETAIL_PARENT: Record<string, { to: string; label: string }> = {
+  "/workflows": { to: "/workflows/console", label: "Run history" },
+};

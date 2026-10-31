@@ -126,7 +126,7 @@ export function Sidebar({
           {SECTIONS.map((s) => {
             const open = compact || !closed.includes(s.label) || s.places.some((p) => isAt(p, pathname));
             return (
-              <div key={s.label} className="mt-3">
+              <div key={s.label} className="mt-2">
                 {compact ? (
                   <div className="mx-auto my-2 h-px w-6" style={{ background: "rgb(var(--card-rule))" }} aria-hidden />
                 ) : (

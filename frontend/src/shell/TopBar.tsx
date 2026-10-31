@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { NavProgress } from "../system/NavProgress";
 import { transitions } from "../system/physics";
-import { locate } from "./nav";
+import { DETAIL_PARENT, locate } from "./nav";
 
 /**
  * The bar above the page: where you are, and the tools for this page.
@@ -33,15 +33,19 @@ export function TopBar({
   const { scrollY } = useScroll();
   const frost = useTransform(scrollY, [0, 36], [0, 1]);
 
-  // A detail page under a place (a run, a workflow): its id, shortened.
-  const placePath = where ? (where.place.views ?? [{ to: where.place.to }]).map((v) => v.to).find((p) => pathname.startsWith(p + "/")) : undefined;
+  // A detail page under a place (a run, a workflow): its id, shortened. A path
+  // that is itself one of the place's views is that view, not a detail.
+  const views = where ? (where.place.views ?? [{ to: where.place.to, label: where.place.label }]) : [];
+  const placePath = views.some((v) => v.to === pathname) ? undefined : views.map((v) => v.to).find((p) => pathname.startsWith(p + "/"));
   const detail = placePath ? decodeURIComponent(pathname.slice(placePath.length + 1)).replace(/^dag-/, "").slice(0, 8) : null;
+  const parent = placePath ? DETAIL_PARENT[placePath] : undefined;
 
   const crumbs: { text: string; to?: string; strong?: boolean; mono?: boolean }[] = [];
   if (where) {
     crumbs.push({ text: where.section });
     crumbs.push({ text: where.place.label, to: detail || where.view ? where.place.to : undefined, strong: !detail && !where.view });
-    if (where.view && where.view !== where.place.label) crumbs.push({ text: where.view, strong: !detail });
+    if (parent) crumbs.push({ text: parent.label, to: parent.to });
+    else if (where.view && where.view !== where.place.label) crumbs.push({ text: where.view, to: detail ? placePath : undefined, strong: !detail });
     if (detail) crumbs.push({ text: detail, strong: true, mono: true });
   }
 

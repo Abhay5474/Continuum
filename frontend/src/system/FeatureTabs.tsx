@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useLiquidIndicator } from "./physics";
 import { featureFor } from "./features";
+import { useHoverHighlight } from "./interaction/HoverHighlight";
 
 /**
  * The sibling views of the feature you are looking at.
@@ -19,6 +20,7 @@ export default function FeatureTabs() {
   const feature = featureFor(pathname);
   const strip = useRef<HTMLDivElement>(null);
   const pill = useRef<HTMLSpanElement>(null);
+  const { bind, highlight } = useHoverHighlight(strip, "a");
 
   // The pill travels from the view you were on to the one you chose. This
   // strip is remounted by the very navigation it performs, so the indicator is
@@ -52,9 +54,11 @@ export default function FeatureTabs() {
         </span>
         <div
           ref={strip}
-          className="relative flex flex-wrap items-center gap-0.5 rounded-full p-[3px]"
+          className="feature-tabs relative flex flex-wrap items-center gap-0.5 rounded-full p-[3px]"
           style={{ background: "var(--wash-mute)" }}
+          {...bind}
         >
+          {highlight}
           <span
             ref={pill}
             aria-hidden
@@ -68,7 +72,7 @@ export default function FeatureTabs() {
               end
               data-indicator-key={v.to}
               className={({ isActive }) =>
-                `press relative z-[1] rounded-full px-3 py-1 text-[12px] font-medium ${
+                `press relative z-[1] rounded-full px-3.5 py-1.5 text-[12.5px] font-medium ${
                   isActive ? "text-slate-100" : "text-slate-400 hover:text-slate-200"
                 }`
               }

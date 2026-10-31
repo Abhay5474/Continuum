@@ -6,8 +6,8 @@ import { Chip } from "../system/hub";
 import { Donut } from "../system/charts";
 import type { CostReport, Meta, Stats, WorkflowSummary } from "../types";
 import StatusBadge from "../components/StatusBadge";
-import { SkeletonCards, SkeletonRows, EmptyState, ErrorState, Spinner, useToast, CodeBlock } from "../components/ui";
-import { Select } from "../system/controls";
+import { SkeletonCards, SkeletonRows, EmptyState, ErrorState, useToast, CodeBlock } from "../components/ui";
+import { ActionButton, Select } from "../system/controls";
 import DeliveriesPanel from "../components/DeliveriesPanel";
 
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
@@ -27,7 +27,6 @@ export default function Dashboard() {
   const slowest = Math.max(1, ...workflows.map(runMs).filter(Number.isFinite));
   const [type, setType] = useState("CustomerAnalysis");
   const [customerId, setCustomerId] = useState("C-1001");
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
@@ -53,7 +52,6 @@ export default function Dashboard() {
   }, []);
 
   async function start() {
-    setBusy(true);
     try {
       const input =
         type === "CustomerAnalysis"
@@ -64,8 +62,7 @@ export default function Dashboard() {
       await refresh();
     } catch (e: any) {
       toast(e?.message ?? "Failed to start workflow", "error");
-    } finally {
-      setBusy(false);
+      throw e;
     }
   }
 
@@ -144,11 +141,12 @@ export default function Dashboard() {
                 <Link
                   key={w.workflowId}
                   to={`/workflows/${w.workflowId}`}
+                  state={{ title: w.workflowType, status: w.stuck ? "STUCK" : w.status }}
                   data-morph
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-edge/50"
+                  className="press flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-slate-500/[0.06]"
                 >
                   <StatusBadge status={w.stuck ? "STUCK" : w.status} />
-                  <span className="min-w-0 truncate text-sm font-medium">{w.workflowType}</span>
+                  <span data-morph-title className="min-w-0 truncate text-sm font-medium">{w.workflowType}</span>
                   <span className="font-mono text-xs text-slate-400">{w.workflowId.slice(0, 8)}</span>
                   <RunLength w={w} slowest={slowest} delay={wi * 50} />
                   <span className="ml-auto whitespace-nowrap text-xs text-slate-400">{w.currentSequence} events</span>
@@ -180,14 +178,9 @@ export default function Dashboard() {
               onChange={(e) => setCustomerId(e.target.value)}
               className="mt-1 w-full field"
             />
-            <button
-              onClick={start}
-              disabled={busy}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--accent-strong)] px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
-            >
-              {busy && <Spinner />}
-              {busy ? "Starting…" : "Start workflow"}
-            </button>
+            <ActionButton onAction={start} size="lg" doneLabel="Started" className="mt-4 w-full">
+              Start workflow
+            </ActionButton>
           </div>
 
           <div className="card rounded-lg border border-edge bg-panel p-4">

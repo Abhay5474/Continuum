@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { CodeBlock, ThemeToggle } from "../components/ui";
 import { API_ORIGIN } from "../api";
@@ -5,6 +6,8 @@ import { Magnetic } from "../system/motion";
 import { BrandMark } from "../system/brand";
 import { useLiquidSurface } from "../system/primitives";
 import IntroVideo from "../components/IntroVideo";
+import { Ambient } from "../shell/Ambient";
+import { prefersReducedMotion } from "../system/physics";
 import { Facts, Scene } from "../world/Scene";
 import ContextMmuDemo from "../world/demos/ContextMmuDemo";
 import WorkflowDemo from "../world/demos/WorkflowDemo";
@@ -26,22 +29,42 @@ import LoadDemo from "../world/demos/LoadDemo";
  */
 export default function Landing() {
   useLiquidSurface();
+  // The headline's sheen sits where the pointer is across the page, so the
+  // claim catches the light as you move toward it. Written to a variable and
+  // eased by the stylesheet; nothing re-renders.
+  const hero = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = hero.current;
+    if (!el || prefersReducedMotion()) return;
+    let raf = 0;
+    const move = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => el.style.setProperty("--sheen", `${(100 - (e.clientX / window.innerWidth) * 100).toFixed(1)}%`));
+    };
+    window.addEventListener("pointermove", move, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", move);
+    };
+  }, []);
   return (
     <div className="relative">
+      <Ambient />
       <LandingHeader />
 
       {/* ---------- ENTRY ---------- */}
-      <section className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <section ref={hero} className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-16 pt-24 text-center sm:pt-28">
         <div className="animate-fade-up">
           <div className="glass inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] tracking-wide text-slate-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-stream-dot" />
             Event-sourced · deterministic replay · exactly-once
           </div>
 
-          <h1 className="mx-auto mt-8 max-w-5xl text-[3.1rem] font-semibold leading-[0.94] tracking-[-0.035em] text-slate-50 sm:text-[6.1rem]">
-            An operating layer
-            <br />
-            <span className="text-gradient">for AI systems.</span>
+          {/* Each line rises out of its own baseline, the way type is set. */}
+          <h1 className="line-reveal mx-auto mt-8 max-w-5xl text-[3.1rem] font-semibold leading-[0.98] tracking-[-0.04em] text-slate-50 sm:text-[6.1rem]">
+            <span><span style={{ ["--i" as string]: 0 }}>An operating layer</span></span>
+            <span><span className="text-gradient text-sheen" style={{ ["--i" as string]: 1 }}>for AI systems.</span></span>
           </h1>
 
           <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-slate-400">
@@ -54,14 +77,18 @@ export default function Landing() {
             <Magnetic pull={7}>
               <Link
                 to="/signin"
-                className="inline-block rounded-lg bg-gradient-to-r from-aurora to-neon px-6 py-3 text-sm font-semibold text-ink shadow-glow"
+                className="btn-primary press press-on-accent inline-flex h-[46px] items-center gap-2 rounded-[12px] px-6 text-sm font-semibold"
+                style={{ backgroundColor: "var(--accent-strong)", color: "var(--accent-on)" }}
               >
                 Get an API key
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
               </Link>
             </Magnetic>
             <Link
               to="/docs"
-              className="glass press rounded-lg px-6 py-3 text-sm font-medium text-slate-200 transition-colors hover:text-neon"
+              className="glass press inline-flex h-[46px] items-center rounded-[12px] px-6 text-sm font-medium text-slate-200 transition-colors hover:text-neon"
             >
               Read the docs
             </Link>
@@ -314,7 +341,9 @@ function LandingHeader() {
           <ThemeToggle />
           <Link
             to="/signin"
-            className="whitespace-nowrap rounded-lg bg-gradient-to-r from-aurora to-neon px-3 py-1.5 text-sm font-semibold text-ink shadow-glow-sm transition-transform hover:-translate-y-0.5 sm:px-4"
+            data-magnetic="0.15"
+            className="btn-primary press press-on-accent whitespace-nowrap rounded-[10px] px-3 py-1.5 text-sm font-semibold sm:px-4"
+            style={{ backgroundColor: "var(--accent-strong)", color: "var(--accent-on)" }}
           >
             Sign in
           </Link>

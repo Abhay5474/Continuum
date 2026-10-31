@@ -3,6 +3,7 @@ import { ActiveBundle, FeedbackForm, TargetsEditor } from "../components/Autopil
 import { visibleInterval } from "../system/poll";
 import { portal } from "../api";
 import { PageHeader, Note } from "../system/primitives";
+import { ActionButton } from "../system/controls";
 import { AccountWide } from "../system/AccountWide";
 import { StackedBar, BarChart } from "../system/charts";
 import { Card, CardHead, Chip, Grid, Pill, Spark, type GlyphName, type Tone, RecordPanel, Field, openable, rowClick, Route, Stage, Hop } from "../system/hub";
@@ -163,10 +164,25 @@ export default function Autopilot() {
                 <Fact k="cost cap" v={`$${status.activePolicy.costCapUsd}`} />
                 <Fact k="latency cap" v={`${status.activePolicy.latencyCapMs} ms`} />
               </div>
-              <button onClick={() => act(portal.autopilot.propose)} disabled={busy}
-                className="mt-3 rounded-md bg-[color:var(--accent-strong)] px-3 py-1.5 text-sm text-white">
+              {/* The button reports the proposal itself: working, then proposed
+                  or failed. The error text below still says why. */}
+              <ActionButton
+                className="mt-3"
+                disabled={busy}
+                doneLabel="Proposal made"
+                onAction={async () => {
+                  setErr("");
+                  try {
+                    await portal.autopilot.propose();
+                    refresh();
+                  } catch (e: any) {
+                    setErr(e?.message ?? String(e));
+                    throw e;
+                  }
+                }}
+              >
                 Run optimization now
-              </button>
+              </ActionButton>
               <ActiveBundle key={status.activeBundleId} />
             </Panel>
           )}

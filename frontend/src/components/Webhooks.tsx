@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { portal } from "../api";
 import { InfoTip, Switch } from "../system/primitives";
 import { Pill } from "../system/hub";
-import { Table, TD, TH, TR } from "../system/controls";
+import { ActionButton, Table, TD, TH, TR } from "../system/controls";
 import { CodeBlock, CopyButton, useToast } from "./ui";
 import { dateTimeOf } from "../system/time";
 
@@ -35,7 +35,6 @@ export default function Webhooks() {
   const [events, setEvents] = useState<string[]>([]);
   const [url, setUrl] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
   const [secret, setSecret] = useState<{ id: number; value: string } | null>(null);
   const [open, setOpen] = useState<number | null>(null);
 
@@ -56,7 +55,6 @@ export default function Webhooks() {
     toast(`${what}: ${e?.body?.message ?? e?.body?.error ?? e?.message ?? "request failed"}`, "error");
 
   const add = async () => {
-    setBusy(true);
     try {
       const r = await portal.webhooks.create(url.trim(), picked);
       setSecret({ id: r.endpoint.id, value: r.secret });
@@ -64,8 +62,7 @@ export default function Webhooks() {
       await load();
     } catch (e) {
       failed(e, "Endpoint not added");
-    } finally {
-      setBusy(false);
+      throw e;
     }
   };
 
@@ -98,13 +95,9 @@ export default function Webhooks() {
             placeholder="https://example.com/continuum-events"
             className="field min-w-0 flex-1"
           />
-          <button
-            onClick={add}
-            disabled={busy || !validUrl || picked.length === 0}
-            className="rounded-[var(--r-md)] bg-[color:var(--accent-strong)] px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-50"
-          >
-            {busy ? "Adding…" : "Add endpoint"}
-          </button>
+          <ActionButton onAction={add} disabled={!validUrl || picked.length === 0} doneLabel="Added">
+            Add endpoint
+          </ActionButton>
         </div>
         <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-slate-300">
           <legend className="sr-only">Events to send</legend>
