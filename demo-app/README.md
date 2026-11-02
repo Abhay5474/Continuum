@@ -19,6 +19,36 @@ The **Feature tour** button at the top lists all 36 Continuum features. Press
 clicks through the desk, starts a refund, and the X-ray shows what Continuum
 did. **▶ Play all** runs every feature in order, about 5 minutes in total.
 
+## Fill every console page with demo data
+
+For a presentation where every page should already have something on it, run
+`seed_demo_data.py`. It uses Continuum the way an app would: about 50 gateway
+requests (customer questions, repeats the cache answers, personal data the
+firewall redacts, an injection it screens, pasted logs, priorities, every
+routing mode), three verification runs, a long conversation for the context
+optimizer, looping agents, memories, durable workflows (one that retries), a
+saga rolled back, a few injected model failures, ratings, and an Autopilot
+proposal on a canary. It takes a few minutes with a real provider.
+
+**It only adds.** Nothing is deleted or cleared; run it again and more is
+added. Feature switches it turns on stay on. The verification engine and
+context optimizer are put back the way they were.
+
+Windows: double-click `seed-demo-data.bat`, or in PowerShell:
+
+```powershell
+cd demo-app
+.\seed-demo-data.ps1 -Email you@example.com          # add  -Pace 3  on a free provider tier
+```
+
+Linux / macOS: `python3 seed_demo_data.py --email you@example.com`
+
+You need the backend running with a Gemini or Groq key. The Compensation (saga)
+page needs Continuum to call a small local service, so start the backend with
+`CONTINUUM_DECLARATIVE_ALLOW_PRIVATE_TARGETS=true` (as above) to fill it too;
+otherwise that one part is skipped and the rest still runs. If the email has no
+account yet, the script offers to create it.
+
 ## What it is made of
 
 ```
