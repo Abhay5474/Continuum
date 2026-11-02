@@ -664,6 +664,13 @@ function DetailPanel({
             : "No connection"}
         </Field>
 
+        {s.status === "READY" && s.probeStatus !== null && !(s.probeFindings?.length > 0) && (
+          <Field label="What the last probe returned">
+            Nothing found, which is expected: the answer was in a shape Continuum reads, and the probe&apos;s test
+            image is blank. Run the pipeline with a real photo to see findings.
+          </Field>
+        )}
+
         {s.probeFindings?.length > 0 && (
           <Field label="What the last probe returned">
             <div className="space-y-1.5">

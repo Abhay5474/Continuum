@@ -148,6 +148,38 @@ public class RoboflowProvider implements SpecialistProvider {
     }
 
     /**
+     * A model response carries {@code predictions} (a list, or a map for a
+     * multi-label classifier) even when it is empty; a Workflow's carries one
+     * somewhere in its outputs.
+     */
+    @Override
+    public boolean recognises(Object responseBody) {
+        if (!(responseBody instanceof Map<?, ?> body)) {
+            return false;
+        }
+        if (body.get("outputs") instanceof List<?> outputs) {
+            return carriesPredictions(outputs, 0);
+        }
+        return body.get("predictions") instanceof List<?> || body.get("predictions") instanceof Map<?, ?>;
+    }
+
+    private static boolean carriesPredictions(Object node, int depth) {
+        if (depth > 8 || node == null) {
+            return false;
+        }
+        if (node instanceof Map<?, ?> map) {
+            if (map.containsKey("predictions")) {
+                return true;
+            }
+            return map.values().stream().anyMatch(v -> carriesPredictions(v, depth + 1));
+        }
+        if (node instanceof List<?> list) {
+            return list.stream().anyMatch(v -> carriesPredictions(v, depth + 1));
+        }
+        return false;
+    }
+
+    /**
      * A Workflow's answer: {@code {"outputs": [{"<output name>": ...}]}}, one
      * entry per image, each output named by whoever built the workflow. A model
      * block's output is the model API's own shape ({@code predictions} and the

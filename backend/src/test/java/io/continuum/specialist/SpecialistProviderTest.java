@@ -132,6 +132,24 @@ class SpecialistProviderTest {
     }
 
     @Test
+    @DisplayName("an empty answer in a known shape is recognised: nothing there, not unreadable")
+    void emptyAnswersAreRecognised() {
+        // Roboflow's real Workflow answer to the probe's blank image.
+        Object workflowEmpty = Map.of("outputs", List.of(Map.of(
+                "predictions", Map.of("image", Map.of(), "predictions", List.of()),
+                "inference_id", "7e95c8d2", "model_id", "animal-injury-detection-yczqh/1")),
+                "profiler_trace", List.of());
+        assertThat(roboflow.parse(workflowEmpty)).isEmpty();
+        assertThat(roboflow.recognises(workflowEmpty)).isTrue();
+        assertThat(roboflow.recognises(Map.of("predictions", List.of()))).isTrue();
+        // Something else entirely is still not understood.
+        assertThat(roboflow.recognises(Map.of("message", "hello"))).isFalse();
+        assertThat(roboflow.recognises("<html>")).isFalse();
+
+        assertThat(http.recognises(Map.of("detections", List.of()))).isTrue();
+    }
+
+    @Test
     @DisplayName("a real Roboflow response parses to the detections Roboflow reported")
     void roboflowParsesARecordedResponse() throws Exception {
         // Captured from Roboflow's hosted API (RF-DETR nano, animal-injury/1)

@@ -85,6 +85,22 @@ public class GenericHttpProvider implements SpecialistProvider {
         return new Call(url, "POST", new LinkedHashMap<>(), input);
     }
 
+    /** A results list under a recognised key is an answer even when it is empty. */
+    @Override
+    public boolean recognises(Object responseBody) {
+        if (responseBody instanceof List<?>) {
+            return true;
+        }
+        if (responseBody instanceof Map<?, ?> body) {
+            for (String key : LIST_KEYS) {
+                if (body.get(key) instanceof List<?>) {
+                    return true;
+                }
+            }
+        }
+        return SpecialistProvider.super.recognises(responseBody);
+    }
+
     @Override
     public List<Finding> parse(Object responseBody) {
         List<Finding> out = new ArrayList<>();

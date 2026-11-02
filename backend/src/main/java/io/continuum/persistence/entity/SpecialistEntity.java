@@ -164,8 +164,12 @@ public class SpecialistEntity {
         this.status = Status.DRAFT;
     }
 
+    /**
+     * @param recognised whether the adapter knew the response's shape; with no
+     *                   findings, that is "nothing there", not "not understood"
+     */
     public void recordProbe(int httpStatus, long ms, String rawResponse, String findingsJson,
-                            int findingCount, String error) {
+                            int findingCount, boolean recognised, String error) {
         this.probeStatus = httpStatus;
         this.probeMs = ms;
         this.probeResponse = truncate(rawResponse);
@@ -175,7 +179,7 @@ public class SpecialistEntity {
         this.updatedAt = Instant.now();
         if (error != null) {
             this.status = Status.FAILED;
-        } else if (findingCount > 0) {
+        } else if (findingCount > 0 || recognised) {
             this.status = Status.READY;
         } else {
             this.status = Status.UNPARSEABLE;

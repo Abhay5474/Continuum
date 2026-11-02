@@ -100,6 +100,19 @@ public interface SpecialistProvider {
     }
 
     /**
+     * Whether the response is in a shape this adapter knows, whatever it found.
+     *
+     * <p>A probe needs this to tell "understood, nothing there" from "could not
+     * read the answer". A detector probed with a blank image rightly finds
+     * nothing; with only the finding count to go on, a correctly connected
+     * Roboflow model was reported as an answer not understood. The default
+     * keeps the old rule, findings or not, for adapters that do not say.
+     */
+    default boolean recognises(Object responseBody) {
+        return !parseEvidence(responseBody).isEmpty();
+    }
+
+    /**
      * A further call this provider needs before it has an answer.
      *
      * <p>Most providers answer in one round trip. Some cannot: AssemblyAI takes

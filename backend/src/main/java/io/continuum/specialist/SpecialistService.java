@@ -143,8 +143,9 @@ public class SpecialistService {
         } catch (Exception e) {
             findingsJson = "[]";
         }
+        boolean recognised = recognised(s, r);
         s.recordProbe(r.httpStatus() == null ? 0 : r.httpStatus(), r.latencyMs(),
-                r.rawBody(), findingsJson, r.evidence().size() + r.dropped(), r.error());
+                r.rawBody(), findingsJson, r.evidence().size() + r.dropped(), recognised, r.error());
         repo.save(s);
 
         Map<String, Object> out = describe(s);
@@ -158,7 +159,29 @@ public class SpecialistService {
         out.put("probeDropped", r.dropped());
         out.put("probeUnscored", r.unscored());
         out.put("sampleRequired", false);
+        // Said outright, so a READY probe with no findings is not mistaken for
+        // a model that cannot see: the sample is blank, there is nothing to find.
+        out.put("probeRecognisedEmpty", r.error() == null && r.evidence().isEmpty() && r.dropped() == 0 && recognised);
         return out;
+    }
+
+    /** Whether the provider's answer was in a shape its adapter knows, findings or not. */
+    private boolean recognised(SpecialistEntity s, SpecialistInvoker.Result r) {
+        if (r.error() != null || r.rawBody() == null) {
+            return false;
+        }
+        try {
+            var connection = connections.require(s.getDeveloperId(), s.getConnectionId());
+            Object body;
+            try {
+                body = mapper.readValue(r.rawBody(), Object.class);
+            } catch (Exception notJson) {
+                body = r.rawBody();
+            }
+            return SpecialistProviders.byName(connection.getProvider()).recognises(body);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     @Transactional(readOnly = true)
