@@ -28,10 +28,12 @@ library only) that holds the key so the browser never sees it.
 2. **Issue an API key** in the console: *API Keys & Providers → Apps & API
    keys*. Copy it; you will paste it into PawCare's own terminal window in step 4,
    never into a web page or a chat.
-3. **For photo checks, have a pipeline.** In the console, under *Pipelines*, the
-   pipeline that uses your injury detection model (for example the Roboflow
-   specialist you already connected). Note its name. In the pipeline's settings,
-   turn on:
+3. **For photo checks, create a pipeline.** A *specialist* (your Roboflow model,
+   on the Specialists page) is not a pipeline: the pipeline is what runs it, hands
+   its findings to the language model and returns the answer. In the console:
+   *Pipelines → New pipeline*, name it with letters, digits, `-` and `_` only
+   (e.g. `animal-injury`, no spaces), input **an image**, and add your injury
+   specialist as its step. Then, in the pipeline's settings, turn on:
    - **Confidence policy**, so weak findings are hedged rather than asserted;
    - **Answer verification → Enforce**, so an answer that claims more than the
      photo showed is replaced.
@@ -44,7 +46,7 @@ library only) that holds the key so the browser never sees it.
 4. **Start PawCare.** On Windows, double-click `start.bat` (or run
    `.\start.ps1` in PowerShell). Elsewhere: `python3 server.py`.
 
-   The first start asks for Continuum's address, the API key (typing is hidden)
+   The first start asks for Continuum's API address (`http://localhost:8080`, the backend, not the console's `:5173`), the API key (typing is hidden)
    and the pipeline name, and saves them in `pawcare.local`, which git ignores.
    Your browser opens at **http://localhost:5070**.
 
@@ -81,6 +83,7 @@ issue a new one.
 |---|---|
 | "Continuum is not reachable" in the sidebar | Start the backend; check the address in `pawcare.local`. |
 | "Photo checks off" | No pipeline name was entered. Delete `pawcare.local` and start again. |
+| "Continuum has no pipeline called …" | Create the pipeline (step 3), or delete `pawcare.local` and enter the name exactly as the Pipelines page shows it. The specialist's name will not work. |
 | A photo check says *The detection model did not answer* | Open the trace in the console (Pipelines → the run): the specialist step says why (wrong model path, Roboflow key, quota). |
 | `Port 5070 is in use` | PawCare is already running, or set `PAWCARE_PORT` / `-Port` to another port. |
 | *Measure confidence* shows nothing | Set *Answer Assurance → Confidence* to **On demand**. |

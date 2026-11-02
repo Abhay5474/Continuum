@@ -34,6 +34,7 @@ import getpass
 import json
 import os
 import pathlib
+import re
 import sys
 import threading
 import urllib.error
@@ -79,11 +80,24 @@ def load_config() -> dict:
     if not cfg["api_key"] and sys.stdin.isatty():
         print("\nFirst start: PawCare needs a Continuum API key.")
         print("Issue one in the Continuum console under API Keys & Providers › Apps & API keys.\n")
-        url = input(f"  Continuum address [{cfg['continuum_url']}]: ").strip()
+        url = input(f"  Continuum API address (the backend, not the console) [{cfg['continuum_url']}]: ").strip()
         if url:
             cfg["continuum_url"] = url.rstrip("/")
+        if re.search(r":(5173|4173)\b", cfg["continuum_url"]):
+            # The console's own address. Its dev server happens to forward /api,
+            # which hides the mistake until something else goes wrong.
+            fixed = re.sub(r":(5173|4173)\b", ":8080", cfg["continuum_url"])
+            print(f"    That is the console's address; the API is on port 8080. Using {fixed}.")
+            cfg["continuum_url"] = fixed
         cfg["api_key"] = getpass.getpass("  API key (cnt_live_…, input hidden): ").strip()
-        cfg["pipeline"] = input("  Pipeline name for photo checks (as named on the Pipelines page; blank to skip): ").strip()
+        print("  Pipeline for photo checks: the name on the Pipelines page (not the specialist's name).")
+        while True:
+            name = input("  Pipeline name (letters, digits, - and _; blank to skip): ").strip()
+            if not name or PIPELINE_NAME.fullmatch(name):
+                cfg["pipeline"] = name
+                break
+            print(f"    '{name}' is not a pipeline name: no spaces, only letters, digits, - and _ "
+                  f"(for example {re.sub(r'[^A-Za-z0-9_-]+', '-', name).strip('-') or 'animal-injury'}).")
         CONFIG_FILE.write_text(json.dumps(cfg, indent=1), encoding="utf-8")
         print(f"\n  Saved to {CONFIG_FILE.name} (git-ignored). Delete it to enter new details.\n")
     if not cfg["api_key"]:
@@ -92,6 +106,7 @@ def load_config() -> dict:
 
 
 CFG: dict = {}
+PIPELINE_NAME = re.compile(r"[A-Za-z0-9_-]+")
 
 
 # --------------------------------------------------------------------------- #
@@ -259,8 +274,15 @@ def do_photo(body: dict) -> dict:
               "Answer for the owner: what was seen, how sure that is, what to do now, and when to see a vet.")
     raw, ctype = multipart({"prompt": prompt}, body.get("filename") or "photo.jpg", content,
                            body.get("contentType") or "image/jpeg")
-    parsed, headers = continuum("POST", f"/api/gateway/pipeline/{urllib.parse.quote(CFG['pipeline'])}/upload",
-                                raw=raw, content_type=ctype, timeout=240)
+    try:
+        parsed, headers = continuum("POST", f"/api/gateway/pipeline/{urllib.parse.quote(CFG['pipeline'])}/upload",
+                                    raw=raw, content_type=ctype, timeout=240)
+    except Failed as e:
+        if "No pipeline called" in e.message:
+            raise Failed(e.status, f"Continuum has no pipeline called '{CFG['pipeline']}'. In the console, open "
+                         "Pipelines → New pipeline, add your detection specialist as its step, and name it exactly "
+                         "that (a specialist is not a pipeline). Or delete pawcare.local and enter the right name.")
+        raise
     # What each detector saw, from its step in the trace: every label with its
     # confidence, and any detector that failed or was skipped, said so.
     findings, detectors = [], []
@@ -412,6 +434,9 @@ def main():
         raise SystemExit(f"Port {PORT} is in use. Is PawCare already running? (Or set PAWCARE_PORT to another port.)")
     print(f"PawCare is running: http://localhost:{PORT}")
     print(f"  Continuum: {CFG['continuum_url']}   pipeline: {CFG.get('pipeline') or '(none: photo checks off)'}")
+    if CFG.get("pipeline") and not PIPELINE_NAME.fullmatch(CFG["pipeline"]):
+        print(f"  ! '{CFG['pipeline']}' cannot be a pipeline name (no spaces; letters, digits, - and _ only).")
+        print("    Photo checks will fail. Delete pawcare.local and start again to enter the right name.")
     print("  Ctrl+C to stop.\n")
     if os.environ.get("PAWCARE_NO_BROWSER") != "1":
         threading.Timer(0.6, lambda: webbrowser.open(f"http://localhost:{PORT}")).start()
