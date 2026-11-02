@@ -85,6 +85,53 @@ class SpecialistProviderTest {
     }
 
     @Test
+    @DisplayName("a Roboflow Workflow path sends JSON inputs with the key in the body, not a raw image")
+    @SuppressWarnings("unchecked")
+    void roboflowWorkflowCall() {
+        var call = roboflow.buildCall(connection("roboflow", "https://serverless.roboflow.com"),
+                "abhay-gabkg/workflows/animal-injury-detection", Map.of("imageBase64", "iVBOR", "minConfidence", 0.5));
+
+        assertThat(call.url()).isEqualTo("https://serverless.roboflow.com/abhay-gabkg/workflows/animal-injury-detection");
+        assertThat(call.headers()).containsEntry("Content-Type", "application/json");
+        Map<String, Object> body = (Map<String, Object>) call.body();
+        assertThat((Map<String, Object>) ((Map<String, Object>) body.get("inputs")).get("image"))
+                .containsEntry("type", "base64").containsEntry("value", "iVBOR");
+        assertThat(body).doesNotContainKey("api_key");
+
+        Map<String, Object> signed = (Map<String, Object>) roboflow.authorise(call, "rf_secret").body();
+        assertThat(signed).containsEntry("api_key", "rf_secret");
+        // The newer infer/workflows/... form is a Workflow too; a model version is not.
+        assertThat(RoboflowProvider.isWorkflow("infer/workflows/abhay-gabkg/animal-injury-detection")).isTrue();
+        assertThat(RoboflowProvider.isWorkflow("animal-injury/1")).isFalse();
+        // A model call is left as it was: its key travels in the query string.
+        var model = roboflow.buildCall(connection("roboflow", null), "animal-injury/1", Map.of("imageBase64", "x"));
+        assertThat(roboflow.authorise(model, "rf_secret")).isSameAs(model);
+    }
+
+    @Test
+    @DisplayName("a Workflow's nested outputs parse to the model's findings, counted once")
+    void roboflowParsesWorkflowOutputs() {
+        Map<String, Object> detections = Map.of(
+                "image", Map.of("width", 640, "height", 480),
+                "predictions", List.of(
+                        Map.of("class", "open wound", "confidence", 0.91, "x", 100, "y", 120, "width", 40, "height", 30),
+                        Map.of("class", "swelling", "confidence", 0.44, "x", 300, "y", 200, "width", 60, "height", 50)));
+        Object body = Map.of("outputs", List.of(Map.of(
+                // The model's response under an output named by the workflow's author ...
+                "predictions", detections,
+                // ... the same detections again, as a second output ...
+                "model_predictions", detections,
+                // ... and outputs that are not findings at all.
+                "visualization", Map.of("type", "base64", "value", "iVBOR"),
+                "count", 2)));
+
+        List<SpecialistProvider.Finding> findings = roboflow.parse(body);
+
+        assertThat(findings).extracting(SpecialistProvider.Finding::label).containsExactly("open wound", "swelling");
+        assertThat(findings.get(0).confidence()).isEqualTo(0.91);
+    }
+
+    @Test
     @DisplayName("a real Roboflow response parses to the detections Roboflow reported")
     void roboflowParsesARecordedResponse() throws Exception {
         // Captured from Roboflow's hosted API (RF-DETR nano, animal-injury/1)

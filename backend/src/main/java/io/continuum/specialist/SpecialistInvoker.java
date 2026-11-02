@@ -158,6 +158,7 @@ public class SpecialistInvoker {
                 Math.max(1, Math.min(300, specialist.getTimeoutSeconds())));
 
         for (int round = 1; round <= rounds; round++) {
+            call = adapter.authorise(call, secret);
             String url = call.url();
             Map<String, String> headers = new LinkedHashMap<>(call.headers());
 

@@ -55,6 +55,20 @@ public interface SpecialistProvider {
     Call buildCall(SpecialistConnectionEntity connection, String modelPath, Map<String, Object> input);
 
     /**
+     * Places the credential inside the request, for a provider that wants it
+     * there rather than in a header or the query string.
+     *
+     * <p>Called by the invoker for every round, after the connection's own auth
+     * style has been applied. Almost every provider leaves the call untouched;
+     * Roboflow's Workflows API reads {@code api_key} from the JSON body.
+     *
+     * @param secret the connection's credential, or null when it has none
+     */
+    default Call authorise(Call call, String secret) {
+        return call;
+    }
+
+    /**
      * Maps a provider response onto normalised findings.
      *
      * <p>Implementations must not throw on an unexpected shape. A provider that

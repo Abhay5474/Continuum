@@ -66,8 +66,29 @@ public class RoboflowProvider implements SpecialistProvider {
     @Override
     public Call buildCall(SpecialistConnectionEntity connection, String modelPath, Map<String, Object> input) {
         String base = connection.getBaseUrl() == null ? defaultBaseUrl() : connection.getBaseUrl();
+        String path = modelPath == null ? "" : modelPath.trim().replaceAll("^/+", "").replaceAll("/+$", "");
+        Object image = input.get("imageBase64");
+
+        if (isWorkflow(path)) {
+            // A Workflow (workspace/workflows/id, or infer/workflows/workspace/id)
+            // takes JSON: the image is one of the workflow's named inputs, and
+            // the key goes in the body (see authorise). Sent the model API's raw
+            // base64 body, Roboflow answers 422 "Input should be a valid
+            // dictionary", which is how a Workflow path used to fail.
+            Map<String, Object> value = new LinkedHashMap<>();
+            value.put("type", "base64");
+            value.put("value", image == null ? "" : image.toString());
+            Map<String, Object> inputs = new LinkedHashMap<>();
+            inputs.put(WORKFLOW_IMAGE_INPUT, value);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("inputs", inputs);
+            Map<String, String> headers = new LinkedHashMap<>();
+            headers.put("Content-Type", "application/json");
+            return new Call(base.replaceAll("/+$", "") + "/" + path, "POST", headers, body);
+        }
+
         StringBuilder url = new StringBuilder(base.replaceAll("/+$", ""))
-                .append('/').append(modelPath.replaceAll("^/+", ""));
+                .append('/').append(path);
 
         // Confidence and overlap are Roboflow's own filters. Passing the
         // developer's threshold down means the provider does the filtering
@@ -82,8 +103,30 @@ public class RoboflowProvider implements SpecialistProvider {
         headers.put("Content-Type", "application/x-www-form-urlencoded");
 
         // The base64 image is the request body; Roboflow reads it raw.
-        Object image = input.get("imageBase64");
         return new Call(url.toString(), "POST", headers, image == null ? "" : image.toString());
+    }
+
+    /**
+     * The name of the workflow input the image is sent as. Roboflow's Workflow
+     * builder names a workflow's image input {@code image} unless renamed.
+     */
+    static final String WORKFLOW_IMAGE_INPUT = "image";
+
+    /** Whether a model path names a Roboflow Workflow rather than a model version. */
+    static boolean isWorkflow(String modelPath) {
+        return modelPath != null && ("/" + modelPath + "/").contains("/workflows/");
+    }
+
+    /** A Workflow reads its key from the JSON body, not the query string. */
+    @Override
+    @SuppressWarnings("unchecked")
+    public Call authorise(Call call, String secret) {
+        if (secret == null || !(call.body() instanceof Map<?, ?> body) || !body.containsKey("inputs")) {
+            return call;
+        }
+        Map<String, Object> withKey = new LinkedHashMap<>((Map<String, Object>) body);
+        withKey.put("api_key", secret);
+        return new Call(call.url(), call.method(), call.headers(), withKey);
     }
 
     /**
@@ -98,6 +141,62 @@ public class RoboflowProvider implements SpecialistProvider {
      */
     @Override
     public List<Finding> parse(Object responseBody) {
+        if (responseBody instanceof Map<?, ?> body && body.get("outputs") instanceof List<?> outputs) {
+            return parseWorkflow(outputs);
+        }
+        return parseModel(responseBody);
+    }
+
+    /**
+     * A Workflow's answer: {@code {"outputs": [{"<output name>": ...}]}}, one
+     * entry per image, each output named by whoever built the workflow. A model
+     * block's output is the model API's own shape ({@code predictions} and the
+     * rest) somewhere inside, so every object carrying {@code predictions} is
+     * read as a model response. Other outputs (a drawn image, counts, text) are
+     * passed over. A finding reported by two outputs, raw and filtered, is
+     * counted once.
+     */
+    private List<Finding> parseWorkflow(List<?> outputs) {
+        List<Finding> found = new ArrayList<>();
+        collectWorkflow(outputs, found, 0);
+        Map<String, Finding> unique = new LinkedHashMap<>();
+        for (Finding f : found) {
+            String key = f.label() + "|" + Math.round(f.confidence() * 10_000) + "|" + f.region();
+            unique.putIfAbsent(key, f);
+        }
+        List<Finding> out = new ArrayList<>(unique.values());
+        out.sort((a, b) -> Double.compare(b.confidence(), a.confidence()));
+        return out;
+    }
+
+    private void collectWorkflow(Object node, List<Finding> out, int depth) {
+        if (depth > 8 || node == null) {
+            return;
+        }
+        if (node instanceof Map<?, ?> map) {
+            Object predictions = map.get("predictions");
+            // An output named "predictions" holding the model's whole response
+            // ({"image": ..., "predictions": [...]}) is a wrapper, not a
+            // multi-label score map: look inside it.
+            if (predictions instanceof Map<?, ?> inner && inner.containsKey("predictions")) {
+                collectWorkflow(inner, out, depth + 1);
+                return;
+            }
+            if (predictions != null) {
+                out.addAll(parseModel(map));
+                return;
+            }
+            for (Object v : map.values()) {
+                collectWorkflow(v, out, depth + 1);
+            }
+        } else if (node instanceof List<?> list) {
+            for (Object v : list) {
+                collectWorkflow(v, out, depth + 1);
+            }
+        }
+    }
+
+    private List<Finding> parseModel(Object responseBody) {
         List<Finding> out = new ArrayList<>();
         if (!(responseBody instanceof Map<?, ?> body)) {
             return out;
@@ -129,7 +228,10 @@ public class RoboflowProvider implements SpecialistProvider {
                     continue;
                 }
                 Object conf = e.getValue() instanceof Map<?, ?> m ? m.get("confidence") : e.getValue();
-                out.add(new Finding(cls, conf instanceof Number n ? n.doubleValue() : 0.0, null));
+                // Only scored classes. Anything else in the map is not a class.
+                if (conf instanceof Number n) {
+                    out.add(new Finding(cls, n.doubleValue(), null));
+                }
             }
         }
         // Strongest first: the context builder and the confidence policy both
