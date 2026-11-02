@@ -33,7 +33,8 @@ library only) that holds the key so the browser never sees it.
    its findings to the language model and returns the answer. In the console:
    *Pipelines → New pipeline*, name it with letters, digits, `-` and `_` only
    (e.g. `animal-injury`, no spaces), input **an image**, and add your injury
-   specialist as its step. Then, in the pipeline's settings, turn on:
+   specialist as its step. A new pipeline starts **off**: open it and switch it
+   **on**. Then, in the pipeline's settings, also turn on:
    - **Confidence policy**, so weak findings are hedged rather than asserted;
    - **Answer verification → Enforce**, so an answer that claims more than the
      photo showed is replaced.

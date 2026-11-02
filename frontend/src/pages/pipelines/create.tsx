@@ -19,7 +19,8 @@ export function NewPipeline({
   specialists: Specialist[];
   busy: boolean;
   onClose: () => void;
-  onAdd: (b: { name: string; description: string; inputKind: string; systemPrompt: string; steps: number[] }) => void;
+  /** Resolves true once the pipeline exists; the form stays open, as filled in, when it does not. */
+  onAdd: (b: { name: string; description: string; inputKind: string; systemPrompt: string; steps: number[] }) => Promise<boolean>;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -30,8 +31,17 @@ export function NewPipeline({
   const toggleStep = (id: number) =>
     setSteps((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
-  const submit = () => {
-    onAdd({ name: name.trim(), description, inputKind, systemPrompt, steps });
+  // The same rule the server applies, checked as it is typed: the name goes in
+  // a URL. Refused only after submitting, the form used to close and clear
+  // anyway, so the pipeline seemed created and simply never appeared.
+  const trimmed = name.trim();
+  const nameOk = /^[A-Za-z0-9_-]{1,120}$/.test(trimmed);
+  const suggestion = trimmed.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120);
+
+  const submit = async () => {
+    if (!nameOk) return;
+    const created = await onAdd({ name: trimmed, description, inputKind, systemPrompt, steps });
+    if (!created) return;
     setName("");
     setDescription("");
     setSystemPrompt("");
@@ -50,7 +60,7 @@ export function NewPipeline({
           <span className="text-[11.5px] text-slate-600">
             {steps.length === 0 ? "Pick at least one specialist" : `${steps.length} in the chain`}
           </span>
-          <Primary disabled={busy || !name.trim() || steps.length === 0} onClick={submit}>
+          <Primary disabled={busy || !nameOk || steps.length === 0} onClick={() => void submit()}>
             Create pipeline
           </Primary>
         </div>
@@ -61,11 +71,27 @@ export function NewPipeline({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="animal-triage"
+          aria-invalid={trimmed !== "" && !nameOk}
+          aria-describedby="pipeline-name-hint"
           className="w-full focus:border-[color:var(--accent-edge)] field"
         />
-        <p className="mt-1 text-[11.5px] text-slate-600">
-          This goes in the URL your application calls, so letters, digits, hyphen and underscore only.
-        </p>
+        {trimmed !== "" && !nameOk ? (
+          <p id="pipeline-name-hint" className="mt-1 text-[11.5px]" style={{ color: "var(--state-critical-ink)" }}>
+            No spaces or symbols: letters, digits, hyphen and underscore only.
+            {suggestion && (
+              <>
+                {" "}
+                <button type="button" className="underline" onClick={() => setName(suggestion)}>
+                  Use “{suggestion}”
+                </button>
+              </>
+            )}
+          </p>
+        ) : (
+          <p id="pipeline-name-hint" className="mt-1 text-[11.5px] text-slate-600">
+            This goes in the URL your application calls, so letters, digits, hyphen and underscore only.
+          </p>
+        )}
       </Field>
 
       <Field label="Input your app sends">

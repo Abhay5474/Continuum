@@ -282,6 +282,9 @@ def do_photo(body: dict) -> dict:
             raise Failed(e.status, f"Continuum has no pipeline called '{CFG['pipeline']}'. In the console, open "
                          "Pipelines → New pipeline, add your detection specialist as its step, and name it exactly "
                          "that (a specialist is not a pipeline). Or delete pawcare.local and enter the right name.")
+        if "is not enabled" in e.message:
+            raise Failed(e.status, f"The pipeline '{CFG['pipeline']}' is switched off. In the console, open Pipelines, "
+                         "choose it and turn it on (new pipelines start off).")
         raise
     # What each detector saw, from its step in the trace: every label with its
     # confidence, and any detector that failed or was skipped, said so.

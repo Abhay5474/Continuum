@@ -58,14 +58,17 @@ export default function Pipelines() {
 
   const ready = specialists.filter((s) => s.status !== "DRAFT");
 
-  const act = async (fn: () => Promise<unknown>, ok?: string) => {
+  /** Runs an action; resolves true when it succeeded, so a form knows whether to close. */
+  const act = async (fn: () => Promise<unknown>, ok?: string): Promise<boolean> => {
     setBusy(true);
     try {
       await fn();
       if (ok) toast(ok);
       await load();
+      return true;
     } catch (e: any) {
       toast(e?.message ?? "That did not work.", "error");
+      return false;
     } finally {
       setBusy(false);
     }
