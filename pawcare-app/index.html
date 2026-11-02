@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PawCare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fbf8f6;
+  --panel: #ffffff;
+  --ink: #1f1a17;
+  --ink-2: #5e554f;
+  --ink-3: #93887f;
+  --line: #ece4de;
+  --line-2: #f4eee9;
+  --coral: #ef6a4c;
+  --coral-ink: #c94a2e;
+  --coral-soft: #fdeee9;
+  --coral-softer: #fff6f3;
+  --good: #23855b;
+  --good-soft: #e7f5ee;
+  --warn: #a8670b;
+  --warn-soft: #fdf3e2;
+  --bad: #c2362b;
+  --bad-soft: #fdecea;
+  --shadow: 0 1px 2px rgba(31, 26, 23, .05), 0 4px 16px rgba(31, 26, 23, .05);
+  --radius: 14px;
+  --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- layout ---------- */
+.app { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+aside {
+  border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column;
+  min-height: 0;
+}
+main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.brand { display: flex; align-items: center; gap: 10px; padding: 18px 18px 14px; }
+.brand-mark {
+  width: 34px; height: 34px; border-radius: 10px; background: var(--coral); color: #fff;
+  display: grid; place-items: center;
+}
+.brand-name { font-weight: 650; font-size: 17px; letter-spacing: -.01em; }
+.brand-sub { font-size: 12px; color: var(--ink-3); margin-top: -2px; }
+
+.status {
+  margin: 0 14px 10px; padding: 8px 10px; border-radius: 10px; background: var(--line-2);
+  font-size: 12.5px; color: var(--ink-2); display: grid; gap: 3px;
+}
+.status-row { display: flex; align-items: center; gap: 7px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.dot.on { background: var(--good); }
+.dot.off { background: var(--bad); }
+.dot.idle { background: var(--warn); }
+
+.side-section { padding: 10px 14px; border-top: 1px solid var(--line-2); }
+.side-section.grow { flex: 1; overflow: auto; min-height: 0; }
+.side-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.side-title { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+
+.pet-list { display: grid; gap: 4px; }
+.pet {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid transparent;
+  background: none; text-align: left; width: 100%;
+}
+.pet:hover { background: var(--line-2); }
+.pet[aria-current="true"] { background: var(--coral-softer); border-color: var(--coral-soft); }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--coral-soft); color: var(--coral-ink);
+  display: grid; place-items: center; font-weight: 600; font-size: 14px; flex: none;
+}
+.pet-name { font-weight: 550; }
+.pet-meta { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.memories { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.memories li {
+  font-size: 13px; color: var(--ink-2); background: var(--line-2); border-radius: 9px; padding: 7px 9px;
+  word-break: break-word;
+}
+.memories li.photo { background: var(--coral-softer); }
+.empty-note { font-size: 13px; color: var(--ink-3); }
+.remember-form { display: flex; gap: 6px; margin-top: 8px; }
+.remember-form input { flex: 1; min-width: 0; }
+
+/* ---------- controls ---------- */
+.btn {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 7px 12px;
+  font-size: 13.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;
+  transition: background .15s, border-color .15s;
+}
+.btn:hover { background: var(--line-2); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.primary { background: var(--coral); border-color: var(--coral); color: #fff; }
+.btn.primary:hover { background: var(--coral-ink); border-color: var(--coral-ink); }
+.btn.ghost { border-color: transparent; background: none; }
+.btn.ghost:hover { background: var(--line-2); }
+.btn.small { padding: 4px 9px; font-size: 12.5px; border-radius: 8px; }
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
+  display: inline-grid; place-items: center; color: var(--ink-2);
+}
+.icon-btn:hover { background: var(--line-2); color: var(--ink); }
+.field {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 10px; font-size: 14px;
+  width: 100%;
+}
+.field:focus { outline: none; border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+svg { flex: none; }
+
+/* ---------- chat header ---------- */
+.chat-head {
+  display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line);
+  background: rgba(251, 248, 246, .9); backdrop-filter: blur(8px);
+}
+.chat-head h1 { font-size: 17px; margin: 0; font-weight: 620; letter-spacing: -.01em; }
+.chat-head .sub { font-size: 12.5px; color: var(--ink-3); }
+.chat-head .spacer { flex: 1; }
+.menu-btn { display: none; }
+
+/* ---------- thread ---------- */
+.thread { flex: 1; overflow: auto; padding: 24px; scroll-behavior: smooth; }
+.thread-inner { max-width: 760px; margin: 0 auto; display: grid; gap: 18px; }
+
+.welcome { text-align: center; padding: 48px 12px 12px; }
+.welcome h2 { font-size: 24px; letter-spacing: -.02em; margin: 14px 0 6px; font-weight: 640; }
+.welcome p { color: var(--ink-2); max-width: 520px; margin: 0 auto; }
+.welcome-mark {
+  width: 56px; height: 56px; border-radius: 16px; background: var(--coral-soft); color: var(--coral);
+  display: inline-grid; place-items: center;
+}
+.suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 22px; }
+.suggestion {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 7px 13px; font-size: 13.5px;
+  color: var(--ink-2);
+}
+.suggestion:hover { border-color: var(--coral); color: var(--coral-ink); }
+.capabilities { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 28px auto 0; max-width: 640px; text-align: left; }
+.capability { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 13px; color: var(--ink-2); }
+.capability b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 2px; font-size: 13.5px; }
+
+.msg { display: flex; gap: 10px; }
+.msg.user { justify-content: flex-end; }
+.bubble {
+  max-width: 78%; background: var(--coral); color: #fff; padding: 9px 14px; border-radius: 16px 16px 4px 16px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.bubble img { display: block; max-width: 220px; max-height: 180px; border-radius: 10px; margin-bottom: 6px; }
+.msg.urgent .bubble { box-shadow: 0 0 0 2px var(--bad-soft); }
+.tag-urgent {
+  display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  background: rgba(255, 255, 255, .22); border-radius: 6px; padding: 1px 6px; margin-bottom: 4px;
+}
+
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 14px 16px; width: 100%; min-width: 0;
+}
+.answer { word-break: break-word; }
+.answer p { margin: 0 0 9px; }
+.answer p:last-child { margin-bottom: 0; }
+.answer ul, .answer ol { margin: 0 0 9px; padding-left: 20px; }
+.answer li { margin: 2px 0; }
+.answer h3 { font-size: 14.5px; margin: 12px 0 4px; }
+.answer h3:first-child { margin-top: 0; }
+.answer code { font-family: var(--mono); font-size: 13px; background: var(--line-2); padding: 1px 5px; border-radius: 5px; }
+
+.card-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid var(--line-2); font-size: 12.5px; color: var(--ink-3);
+}
+.card-foot .spacer { flex: 1; }
+.meta-bit { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px;
+  font-weight: 550; white-space: nowrap;
+}
+.badge.good { background: var(--good-soft); color: var(--good); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.badge.neutral { background: var(--line-2); color: var(--ink-2); }
+.badge.coral { background: var(--coral-soft); color: var(--coral-ink); }
+
+.rate { display: inline-flex; gap: 2px; }
+.rate button {
+  border: none; background: none; width: 28px; height: 28px; border-radius: 8px; color: var(--ink-3);
+  display: grid; place-items: center;
+}
+.rate button:hover { background: var(--line-2); color: var(--ink); }
+.rate button[aria-pressed="true"] { color: var(--coral); background: var(--coral-soft); }
+
+details.applied { margin-top: 10px; }
+details.applied summary, details.trace summary {
+  cursor: pointer; font-size: 12.5px; color: var(--ink-2); font-weight: 550; list-style: none; display: inline-flex;
+  align-items: center; gap: 6px;
+}
+details summary::-webkit-details-marker { display: none; }
+details summary .chev { transition: transform .15s; }
+details[open] summary .chev { transform: rotate(90deg); }
+.applied-list { display: grid; gap: 5px; margin: 8px 0 0; padding: 0; list-style: none; }
+.applied-list li {
+  font-size: 12.5px; color: var(--ink-2); padding: 6px 9px; background: var(--line-2); border-radius: 8px;
+  border-left: 3px solid var(--coral);
+}
+.memory-note {
+  margin-top: 10px; font-size: 12.5px; color: var(--ink-2); background: var(--coral-softer); border-radius: 9px;
+  padding: 7px 10px;
+}
+
+/* photo check */
+.check-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 12px; }
+.check-head img { width: 112px; height: 112px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); flex: none; }
+.check-title { font-weight: 620; font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.check-sub { font-size: 13px; color: var(--ink-2); }
+.findings { display: grid; gap: 7px; margin: 10px 0 0; padding: 0; list-style: none; }
+.finding { display: grid; grid-template-columns: minmax(0, 1fr) 140px 52px; align-items: center; gap: 10px; font-size: 13.5px; }
+.finding-label { font-weight: 550; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finding-label small { display: block; font-weight: 400; color: var(--ink-3); font-size: 11.5px; text-transform: none; }
+.bar { height: 6px; background: var(--line-2); border-radius: 999px; overflow: hidden; }
+.bar > span { display: block; height: 100%; border-radius: inherit; }
+.bar .strong { background: var(--good); }
+.bar .medium { background: var(--warn); }
+.bar .weak { background: var(--ink-3); }
+.pct { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); text-align: right; }
+.section-label {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3);
+  margin: 14px 0 6px;
+}
+.verify { border-radius: 10px; padding: 9px 11px; font-size: 13px; margin-top: 12px; }
+.verify.good { background: var(--good-soft); color: #1b6b48; }
+.verify.warn { background: var(--warn-soft); color: #7d4d06; }
+.verify.bad { background: var(--bad-soft); color: #9a2a21; }
+.verify ul { margin: 4px 0 0; padding-left: 18px; }
+details.trace { margin-top: 10px; }
+.steps { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.steps li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; font-size: 12.5px; align-items: baseline; }
+.steps .n { font-family: var(--mono); color: var(--ink-3); font-size: 11.5px; }
+.steps .k { font-family: var(--mono); font-size: 11px; color: var(--coral-ink); margin-right: 6px; }
+.steps .s { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.steps .s.fail { color: var(--bad); }
+
+.typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+.typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); animation: blink 1.2s infinite; }
+.typing span:nth-child(2) { animation-delay: .2s; }
+.typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.working-label { font-size: 13px; color: var(--ink-3); margin-left: 8px; }
+.error-card { border-color: var(--bad-soft); background: #fffafa; color: #9a2a21; font-size: 14px; }
+
+/* ---------- composer ---------- */
+.composer-wrap { padding: 12px 24px 18px; background: linear-gradient(to top, var(--bg) 70%, rgba(251, 248, 246, 0)); }
+.composer {
+  max-width: 760px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: var(--shadow); padding: 10px 10px 8px; transition: border-color .15s, box-shadow .15s;
+}
+.composer:focus-within { border-color: #f3b4a5; box-shadow: 0 0 0 3px var(--coral-soft), var(--shadow); }
+.composer.drag { border-color: var(--coral); border-style: dashed; background: var(--coral-softer); }
+.composer textarea {
+  width: 100%; border: none; resize: none; outline: none; background: none; padding: 4px 6px; max-height: 180px;
+  min-height: 26px; font-size: 15px;
+}
+.attachment {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0 4px 8px; padding: 5px 8px 5px 5px;
+  background: var(--line-2); border-radius: 10px; font-size: 13px; max-width: 100%;
+}
+.attachment img { width: 40px; height: 40px; object-fit: cover; border-radius: 7px; }
+.attachment .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.composer-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.composer-bar .spacer { flex: 1; }
+.toggle {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border-radius: 999px; font-size: 13px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); user-select: none;
+}
+.toggle:hover { background: var(--line-2); }
+.toggle[aria-pressed="true"] { border-color: var(--coral); background: var(--coral-soft); color: var(--coral-ink); }
+.toggle.urgent[aria-pressed="true"] { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
+.send {
+  width: 38px; height: 38px; border-radius: 11px; border: none; background: var(--coral); color: #fff;
+  display: grid; place-items: center;
+}
+.send:hover { background: var(--coral-ink); }
+.send:disabled { background: #f3c2b6; cursor: default; }
+.disclaimer { max-width: 760px; margin: 8px auto 0; text-align: center; font-size: 12px; color: var(--ink-3); }
+
+/* ---------- dialogs ---------- */
+dialog {
+  border: none; border-radius: 16px; padding: 0; width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(31, 26, 23, .25);
+  color: var(--ink); background: var(--panel);
+}
+dialog::backdrop { background: rgba(31, 26, 23, .35); }
+.dlg-head { padding: 18px 20px 4px; }
+.dlg-head h2 { margin: 0; font-size: 18px; letter-spacing: -.01em; }
+.dlg-head p { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-2); }
+.dlg-body { padding: 14px 20px; display: grid; gap: 12px; }
+.dlg-foot { padding: 12px 20px 18px; display: flex; justify-content: flex-end; gap: 8px; }
+.dlg-foot .left { margin-right: auto; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+label.lbl { display: grid; gap: 5px; font-size: 13px; font-weight: 550; color: var(--ink-2); }
+.summary-box {
+  max-height: 55vh; overflow: auto; background: var(--line-2); border-radius: 10px; padding: 12px 14px; font-size: 14px;
+}
+dialog.wide { width: min(680px, calc(100vw - 32px)); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); opacity: 0;
+  background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 10px; font-size: 13.5px; pointer-events: none;
+  transition: opacity .2s, transform .2s; z-index: 20;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------- small screens ---------- */
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  aside {
+    position: fixed; inset: 0 auto 0 0; width: min(310px, 86vw); z-index: 10; transform: translateX(-100%);
+    transition: transform .2s; box-shadow: 0 0 40px rgba(31, 26, 23, .2);
+  }
+  aside.open { transform: none; }
+  .menu-btn { display: inline-grid; }
+  .thread, .composer-wrap, .chat-head { padding-left: 16px; padding-right: 16px; }
+  .capabilities { grid-template-columns: 1fr; }
+  .finding { grid-template-columns: minmax(0, 1fr) 70px 46px; }
+  .bubble { max-width: 90%; }
+  .chat-head .hide-sm { display: none; }
+}
+@media (max-width: 480px) {
+  .hide-xs { display: none; }
+  .composer-bar { flex-wrap: nowrap; gap: 5px; }
+  .toggle { padding: 5px 8px; font-size: 12.5px; }
+  .toggle span::first-letter { text-transform: uppercase; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="side" aria-label="Pets and memory">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="10" r="2.2"/><circle cx="9.5" cy="5.6" r="2.2"/><circle cx="14.5" cy="5.6" r="2.2"/><circle cx="18.5" cy="10" r="2.2"/><path d="M12 11.2c-2.9 0-6 3.6-6 6.3 0 1.6 1.2 2.6 2.8 2.6 1.3 0 2-.6 3.2-.6s1.9.6 3.2.6c1.6 0 2.8-1 2.8-2.6 0-2.7-3.1-6.3-6-6.3z"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">PawCare</div>
+        <div class="brand-sub">Pet first aid, powered by Continuum</div>
+      </div>
+    </div>
+
+    <div class="status" id="status" aria-live="polite">
+      <div class="status-row"><span class="dot" id="dot-continuum"></span><span id="txt-continuum">Checking Continuum…</span></div>
+      <div class="status-row"><span class="dot" id="dot-pipeline"></span><span id="txt-pipeline">Photo checks</span></div>
+    </div>
+
+    <div class="side-section">
+      <div class="side-head">
+        <span class="side-title">Your pets</span>
+        <button class="btn small" id="add-pet" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add
+        </button>
+      </div>
+      <div class="pet-list" id="pet-list"></div>
+    </div>
+
+    <div class="side-section grow">
+      <div class="side-head">
+        <span class="side-title">Remembered</span>
+        <button class="btn small ghost" id="refresh-mem" type="button" title="Reload what Continuum remembers">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
+          Refresh
+        </button>
+      </div>
+      <ul class="memories" id="memories"></ul>
+      <form class="remember-form" id="remember-form">
+        <label class="sr-only" for="remember-input">A fact to remember</label>
+        <input class="field" id="remember-input" placeholder="e.g. Allergic to chicken" autocomplete="off">
+        <button class="btn" type="submit">Save</button>
+      </form>
+      <p class="empty-note" style="margin-top:8px">Facts and photo checks are kept in Continuum's memory and used in later answers.</p>
+    </div>
+  </aside>
+
+  <main>
+    <header class="chat-head">
+      <button class="icon-btn menu-btn" id="menu" type="button" aria-label="Show pets">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="avatar" id="head-avatar" aria-hidden="true">?</div>
+      <div>
+        <h1 id="head-name">PawCare</h1>
+        <div class="sub" id="head-sub">Add a pet to begin</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn" id="vet-summary" type="button" title="A handover note for your vet">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+        <span class="hide-sm">Vet summary</span>
+      </button>
+      <button class="btn ghost" id="clear-chat" type="button" title="Start a new conversation">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="hide-sm">New chat</span>
+      </button>
+    </header>
+
+    <div class="thread" id="thread" aria-live="polite">
+      <div class="thread-inner" id="thread-inner"></div>
+    </div>
+
+    <div class="composer-wrap">
+      <form class="composer" id="composer">
+        <div id="attachment-slot"></div>
+        <label class="sr-only" for="input">Message</label>
+        <textarea id="input" rows="1" placeholder="Describe what happened, or attach a photo…"></textarea>
+        <div class="composer-bar">
+          <input type="file" id="file" accept="image/*" hidden>
+          <button class="icon-btn" type="button" id="attach" title="Attach a photo for a photo check" aria-label="Attach a photo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-5-9 9"/></svg>
+          </button>
+          <button class="toggle" type="button" id="t-measure" aria-pressed="false" title="Ask the model several times and report how much it agrees with itself">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
+            <span><span class="hide-xs">Measure </span>confidence</span>
+          </button>
+          <button class="toggle urgent" type="button" id="t-urgent" aria-pressed="false" title="Schedule this ahead of everything else, with a short deadline">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+            Emergency
+          </button>
+          <div class="spacer"></div>
+          <button class="send" type="submit" id="send" aria-label="Send" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </form>
+      <p class="disclaimer">PawCare gives first-aid guidance, not a diagnosis. If your pet is in distress, call your vet or an emergency clinic now.</p>
+    </div>
+  </main>
+</div>
+
+<dialog id="pet-dialog">
+  <form method="dialog" id="pet-form">
+    <div class="dlg-head">
+      <h2 id="pet-dialog-title">Add a pet</h2>
+      <p>The more PawCare knows, the better it can tailor advice.</p>
+    </div>
+    <div class="dlg-body">
+      <label class="lbl">Name<input class="field" name="name" required maxlength="40" autocomplete="off" autofocus></label>
+      <div class="grid-2">
+        <label class="lbl">Species
+          <select class="field" name="species">
+            <option>Dog</option><option>Cat</option><option>Rabbit</option><option>Bird</option>
+            <option>Guinea pig</option><option>Horse</option><option>Other</option>
+          </select>
+        </label>
+        <label class="lbl">Breed<input class="field" name="breed" maxlength="60" autocomplete="off"></label>
+      </div>
+      <div class="grid-2">
+        <label class="lbl">Age<input class="field" name="age" placeholder="e.g. 4 years" maxlength="30" autocomplete="off"></label>
+        <label class="lbl">Weight<input class="field" name="weight" placeholder="e.g. 12 kg" maxlength="30" autocomplete="off"></label>
+      </div>
+      <label class="lbl">Notes for every answer
+        <textarea class="field" name="notes" rows="2" maxlength="400" placeholder="Conditions, medicines, allergies"></textarea>
+      </label>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn ghost left" type="button" id="pet-delete" hidden>Remove pet</button>
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="summary-dialog" class="wide">
+  <div class="dlg-head">
+    <h2>Vet handover note</h2>
+    <p>Written from this conversation and what Continuum remembers. Check it before you share it.</p>
+  </div>
+  <div class="dlg-body">
+    <div class="summary-box answer" id="summary-body"></div>
+    <div class="card-foot" id="summary-foot" style="margin-top:0"></div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn" type="button" id="summary-copy">Copy</button>
+    <button class="btn" type="button" id="summary-download">Download .txt</button>
+    <button class="btn primary" type="button" id="summary-close">Done</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ------------------------------------------------------------------ store
+  const store = {
+    get(key, fallback) {
+      try { const v = localStorage.getItem("pawcare." + key); return v == null ? fallback : JSON.parse(v); }
+      catch { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem("pawcare." + key, JSON.stringify(value)); return true; }
+      catch { return false; }
+    },
+    remove(key) { try { localStorage.removeItem("pawcare." + key); } catch { /* ignore */ } },
+  };
+
+  const state = {
+    pets: store.get("pets", []),
+    current: store.get("current", null),
+    messages: [],
+    attachment: null,       // { dataUrl, base64, name, type, thumb }
+    measure: store.get("measure", false),
+    urgent: false,
+    busy: false,
+    status: null,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v;
+      else if (k === "html") n.innerHTML = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) n.append(kid.nodeType ? kid : String(kid));
+    return n;
+  };
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  const icons = {
+    up: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v11H4V10zM7 10l4-7a2 2 0 0 1 3 2l-1 4h6a2 2 0 0 1 2 2.3l-1.4 7A2 2 0 0 1 17.6 21H7"/></svg>',
+    down: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V3h3v11zM17 14l-4 7a2 2 0 0 1-3-2l1-4H5a2 2 0 0 1-2-2.3l1.4-7A2 2 0 0 1 6.4 3H17"/></svg>',
+    chev: '<svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+    close: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    paw: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="10" r="2.2"/><circle cx="9.5" cy="5.6" r="2.2"/><circle cx="14.5" cy="5.6" r="2.2"/><circle cx="18.5" cy="10" r="2.2"/><path d="M12 11.2c-2.9 0-6 3.6-6 6.3 0 1.6 1.2 2.6 2.8 2.6 1.3 0 2-.6 3.2-.6s1.9.6 3.2.6c1.6 0 2.8-1 2.8-2.6 0-2.7-3.1-6.3-6-6.3z"/></svg>',
+    edit: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  };
+
+  // ------------------------------------------------------------------ api
+  async function api(path, body) {
+    let res;
+    try {
+      res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    } catch {
+      throw new Error("PawCare's server is not running. Start it with start.bat (or python server.py).");
+    }
+    let data = {};
+    try { data = await res.json(); } catch { /* empty */ }
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status}).`);
+    return data;
+  }
+
+  // ------------------------------------------------------------------ helpers
+  function toast(text) {
+    const t = $("toast");
+    t.textContent = text;
+    t.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove("show"), 2200);
+  }
+  const pet = () => state.pets.find((p) => p.id === state.current) || null;
+  const initial = (p) => (p?.name || "?").trim().charAt(0).toUpperCase() || "?";
+  const petLine = (p) => [p.species, p.breed, p.age].filter(Boolean).join(" · ");
+  const band = (c) => (c >= 0.7 ? "strong" : c >= 0.4 ? "medium" : "weak");
+  const bandName = { strong: "Strong", medium: "Possible", weak: "Weak" };
+  const pct = (c) => Math.round(Number(c) * 100) + "%";
+  const ms = (v) => (v == null ? null : v >= 1000 ? (v / 1000).toFixed(1) + " s" : Math.round(v) + " ms");
+  const money = (v) => (v == null ? null : v === 0 ? "$0" : v < 0.0001 ? "<$0.0001" : "$" + Number(v).toFixed(4));
+
+  // A small, safe markdown subset: headings, bold, italics, code, lists, paragraphs.
+  function md(text) {
+    const lines = esc(text || "").split(/\r?\n/);
+    const out = [];
+    let list = null;
+    const inline = (s) => s
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+    const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+    let para = [];
+    const flush = () => { if (para.length) { out.push("<p>" + inline(para.join("<br>")) + "</p>"); para = []; } };
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      let m;
+      if (!line.trim()) { flush(); close(); continue; }
+      if ((m = line.match(/^\s*#{1,4}\s+(.*)$/))) { flush(); close(); out.push("<h3>" + inline(m[1]) + "</h3>"); continue; }
+      if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) { flush(); if (list !== "ul") { close(); out.push("<ul>"); list = "ul"; } out.push("<li>" + inline(m[1]) + "</li>"); continue; }
+      if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { flush(); if (list !== "ol") { close(); out.push("<ol>"); list = "ol"; } out.push("<li>" + inline(m[1]) + "</li>"); continue; }
+      close();
+      para.push(line);
+    }
+    flush(); close();
+    return out.join("");
+  }
+
+  // ------------------------------------------------------------------ pets
+  function savePets() { store.set("pets", state.pets); store.set("current", state.current); }
+  function loadMessages() { state.messages = state.current ? store.get("chat." + state.current, []) : []; }
+  function saveMessages() {
+    if (!state.current) return;
+    // Keep the last 80 turns; drop the oldest thumbnails first if storage is full.
+    let msgs = state.messages.slice(-80);
+    while (!store.set("chat." + state.current, msgs) && msgs.some((m) => m.thumb)) {
+      const i = msgs.findIndex((m) => m.thumb);
+      msgs = msgs.map((m, j) => (j === i ? { ...m, thumb: null } : m));
+    }
+  }
+
+  function renderPets() {
+    const list = $("pet-list");
+    list.replaceChildren();
+    if (!state.pets.length) {
+      list.append(el("p", { class: "empty-note" }, "No pets yet. Add one so answers fit your animal."));
+    }
+    for (const p of state.pets) {
+      const row = el("button", {
+        class: "pet", type: "button", "aria-current": p.id === state.current ? "true" : "false",
+        onclick: () => selectPet(p.id),
+        ondblclick: () => openPetDialog(p),
+      },
+        el("span", { class: "avatar", "aria-hidden": "true" }, initial(p)),
+        el("span", { style: "min-width:0;flex:1" },
+          el("div", { class: "pet-name" }, p.name),
+          el("div", { class: "pet-meta" }, petLine(p) || "Tap the pencil to add details")),
+        el("span", {
+          class: "icon-btn", role: "button", tabindex: "0", title: "Edit " + p.name, "aria-label": "Edit " + p.name,
+          style: "width:28px;height:28px;border:none;background:none", html: icons.edit,
+          onclick: (e) => { e.stopPropagation(); openPetDialog(p); },
+          onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openPetDialog(p); } },
+        }));
+      list.append(row);
+    }
+    const p = pet();
+    $("head-avatar").textContent = initial(p);
+    $("head-name").textContent = p ? p.name : "PawCare";
+    $("head-sub").textContent = p ? (petLine(p) || "No details yet") : "Add a pet to begin";
+    $("vet-summary").disabled = !p;
+    $("clear-chat").disabled = !p;
+    $("remember-input").disabled = !p;
+    updateSend();
+  }
+
+  function selectPet(id) {
+    state.current = id;
+    savePets();
+    loadMessages();
+    renderPets();
+    renderThread();
+    loadMemories();
+    $("side").classList.remove("open");
+    $("input").focus();
+  }
+
+  let editing = null;
+  function openPetDialog(p = null) {
+    editing = p;
+    const f = $("pet-form");
+    f.reset();
+    $("pet-dialog-title").textContent = p ? "Edit " + p.name : "Add a pet";
+    $("pet-delete").hidden = !p;
+    if (p) for (const k of ["name", "species", "breed", "age", "weight", "notes"]) if (f.elements[k]) f.elements[k].value = p[k] || "";
+    $("pet-dialog").showModal();
+  }
+
+  $("pet-dialog").addEventListener("close", () => {
+    if ($("pet-dialog").returnValue !== "save") return;
+    const f = $("pet-form");
+    const data = Object.fromEntries(["name", "species", "breed", "age", "weight", "notes"].map((k) => [k, f.elements[k].value.trim()]));
+    if (!data.name) return;
+    if (editing) {
+      Object.assign(editing, data);
+    } else {
+      const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).slice(0, 12);
+      state.pets.push({ id, ...data });
+      state.current = id;
+      loadMessages();
+    }
+    savePets();
+    renderPets();
+    renderThread();
+    loadMemories();
+  });
+
+  $("pet-delete").addEventListener("click", () => {
+    if (!editing) return;
+    if (!confirm(`Remove ${editing.name} and this browser's chat history with them? What Continuum remembers stays in your account.`)) return;
+    store.remove("chat." + editing.id);
+    state.pets = state.pets.filter((p) => p.id !== editing.id);
+    if (state.current === editing.id) state.current = state.pets[0]?.id || null;
+    $("pet-dialog").close("cancel");
+    savePets();
+    loadMessages();
+    renderPets();
+    renderThread();
+    loadMemories();
+  });
+
+  // ------------------------------------------------------------------ memory
+  async function loadMemories() {
+    const ul = $("memories");
+    const p = pet();
+    ul.replaceChildren();
+    if (!p) { ul.append(el("li", { class: "empty-note", style: "background:none;padding:0" }, "Choose a pet to see what is remembered.")); return; }
+    ul.append(el("li", { class: "empty-note", style: "background:none;padding:0" }, "Loading…"));
+    try {
+      const { memories } = await api("/api/memories", { pet: p });
+      if (pet() !== p) return;
+      ul.replaceChildren();
+      if (!memories?.length) ul.append(el("li", { class: "empty-note", style: "background:none;padding:0" }, `Nothing yet. Save a fact about ${p.name}, or run a photo check.`));
+      for (const m of memories || []) ul.append(el("li", { class: m.startsWith("Photo check") ? "photo" : "" }, m));
+    } catch (e) {
+      ul.replaceChildren(el("li", { class: "empty-note", style: "background:none;padding:0" }, "Memory unavailable: " + e.message));
+    }
+  }
+
+  $("refresh-mem").addEventListener("click", loadMemories);
+  $("remember-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const p = pet();
+    const input = $("remember-input");
+    const fact = input.value.trim();
+    if (!p || !fact) return;
+    input.disabled = true;
+    try {
+      const r = await api("/api/remember", { pet: p, fact });
+      input.value = "";
+      toast(r.reinforced ? "Already known; Continuum reinforced it" : `Saved. ${p.name}'s answers will take it into account.`);
+      loadMemories();
+    } catch (err) { toast(err.message); }
+    finally { input.disabled = false; input.focus(); }
+  });
+
+  // ------------------------------------------------------------------ thread
+  function renderThread() {
+    const inner = $("thread-inner");
+    inner.replaceChildren();
+    const p = pet();
+    if (!state.messages.length) {
+      inner.append(welcome(p));
+      return;
+    }
+    for (const m of state.messages) inner.append(renderMessage(m));
+    scrollDown();
+  }
+
+  function welcome(p) {
+    const asks = p
+      ? [`${p.name} is limping on a back leg`, `${p.name} ate chocolate an hour ago`, "How do I clean a small cut?", "What should a pet first-aid kit have?"]
+      : [];
+    return el("div", { class: "welcome" },
+      el("div", { class: "welcome-mark", html: icons.paw }),
+      el("h2", {}, p ? `How is ${p.name} doing?` : "Welcome to PawCare"),
+      el("p", {}, p
+        ? "Describe what you see, or attach a photo of an injury for a photo check. Answers take into account everything PawCare remembers about " + p.name + "."
+        : "Add your pet first. PawCare remembers them, so every answer fits their species, size and history."),
+      p ? el("div", { class: "suggestions" }, asks.map((a) => el("button", { class: "suggestion", type: "button", onclick: () => { $("input").value = a; autosize(); updateSend(); $("input").focus(); } }, a)))
+        : el("div", { class: "suggestions" }, el("button", { class: "btn primary", type: "button", onclick: () => openPetDialog() }, "Add your pet")),
+      el("div", { class: "capabilities" },
+        el("div", { class: "capability" }, el("b", {}, "Photo check"), "Your detection model looks first. The answer is built only from what it found, with how sure it was."),
+        el("div", { class: "capability" }, el("b", {}, "Remembers your pet"), "Allergies, past injuries and earlier photo checks come back into later answers."),
+        el("div", { class: "capability" }, el("b", {}, "Honest about doubt"), "Turn on Measure confidence to see how far the model agrees with itself.")));
+  }
+
+  function renderMessage(m) {
+    if (m.role === "user") {
+      return el("div", { class: "msg user" + (m.urgent ? " urgent" : "") },
+        el("div", { class: "bubble" },
+          m.urgent ? el("div", { class: "tag-urgent" }, "Emergency") : null,
+          m.thumb ? el("img", { src: m.thumb, alt: "Photo sent" }) : (m.photo ? el("div", { style: "font-size:12.5px;opacity:.85" }, "[photo]") : null),
+          m.text || m.content));
+    }
+    if (m.kind === "error") return el("div", { class: "msg" }, el("div", { class: "card error-card" }, m.content));
+    if (m.kind === "photo") return el("div", { class: "msg" }, photoCard(m));
+    return el("div", { class: "msg" }, answerCard(m));
+  }
+
+  function rateButtons(m) {
+    if (!m.requestId) return null;
+    const wrap = el("span", { class: "rate" });
+    const make = (score, label, icon) => el("button", {
+      type: "button", title: label, "aria-label": label, "aria-pressed": m.rated === score ? "true" : "false", html: icon,
+      onclick: async (e) => {
+        const button = e.currentTarget;
+        if (m.rated === score) return;
+        try {
+          await api("/api/feedback", { requestId: m.requestId, score, comment: score > 0 ? "Helpful (PawCare)" : "Not helpful (PawCare)" });
+          m.rated = score;
+          saveMessages();
+          for (const b of wrap.children) b.setAttribute("aria-pressed", "false");
+          button.setAttribute("aria-pressed", "true");
+          toast("Thanks. Continuum uses ratings to tune routing.");
+        } catch (err) { toast(err.message); }
+      },
+    });
+    wrap.append(make(1, "Helpful", icons.up), make(-1, "Not helpful", icons.down));
+    return wrap;
+  }
+
+  function appliedBlock(applied) {
+    if (!applied?.length) return null;
+    return el("details", { class: "applied" },
+      el("summary", { html: icons.chev + ` What Continuum did <span class="badge coral">${applied.length}</span>` }),
+      el("ul", { class: "applied-list" }, applied.map((a) => el("li", {}, a))));
+  }
+
+  function confidenceBadge(m) {
+    if (m.confidence == null) return null;
+    const c = Number(m.confidence);
+    const cls = m.lowConfidence ? "warn" : c >= 0.7 ? "good" : c >= 0.4 ? "warn" : "bad";
+    return el("span", { class: "badge " + cls, title: "How far the model's repeated answers agreed with each other" },
+      (m.lowConfidence ? "Low confidence " : "Confidence ") + pct(c));
+  }
+
+  function footer(m, extra = []) {
+    const bits = [
+      m.model ? el("span", { class: "meta-bit mono", title: "Model that answered" }, m.model) : null,
+      ms(m.latencyMs) ? el("span", { class: "meta-bit" }, ms(m.latencyMs)) : null,
+      money(m.cost) ? el("span", { class: "meta-bit", title: "Cost of this answer" }, money(m.cost)) : null,
+      m.cached ? el("span", { class: "badge neutral", title: "Answered from Continuum's semantic cache" }, "From cache") : null,
+      m.failovers ? el("span", { class: "badge warn", title: "Continuum switched provider to answer" }, `Failed over ×${m.failovers}`) : null,
+      m.urgent ? el("span", { class: "badge bad" }, "Prioritised") : null,
+      confidenceBadge(m),
+      ...extra,
+      el("span", { class: "spacer" }),
+      rateButtons(m),
+    ];
+    return el("div", { class: "card-foot" }, bits);
+  }
+
+  function answerCard(m) {
+    return el("div", { class: "card" },
+      el("div", { class: "answer", html: md(m.content) }),
+      m.memories?.length ? el("div", { class: "memory-note" }, `Used ${m.memories.length} remembered ${m.memories.length === 1 ? "fact" : "facts"} about ${m.petName || "your pet"}.`) : null,
+      appliedBlock(m.applied),
+      footer(m));
+  }
+
+  function photoCard(m) {
+    const findings = m.findings || [];
+    const top = m.evidenceConfidence;
+    const policyBand = m.policy?.band;
+    let title, titleBadge;
+    if (m.analysisRan === false) {
+      title = "The detection model did not answer";
+      titleBadge = el("span", { class: "badge bad" }, "Not examined");
+    } else if (!findings.length && !m.anythingFound) {
+      title = "Nothing detected";
+      titleBadge = el("span", { class: "badge neutral" }, "No findings");
+    } else {
+      title = `${findings.length || m.findingCount || 0} ${findings.length === 1 ? "finding" : "findings"}`;
+      const b = band(top ?? findings[0]?.confidence ?? 0);
+      titleBadge = el("span", { class: "badge " + (b === "strong" ? "good" : b === "medium" ? "warn" : "neutral") },
+        (policyBand ? policyBand.charAt(0) + policyBand.slice(1).toLowerCase() : bandName[b]) + " evidence");
+    }
+
+    const detectorNotes = (m.detectors || []).filter((d) => d.status && d.status !== "OK").map((d) =>
+      el("div", { class: "check-sub", style: "color:var(--bad)" }, `${d.name}: ${d.status === "SKIPPED" ? "skipped" : d.error || "failed"}`));
+
+    const v = m.verification;
+    let verify = null;
+    if (v && v.verdict) {
+      const cls = v.verdict === "OK" ? "good" : v.verdict === "WARN" ? "warn" : "bad";
+      const head = v.verdict === "OK" ? "Checked against the evidence: the answer stays within what the photo showed."
+        : v.replaced ? "The first answer claimed more than the evidence supports, so it was replaced."
+        : v.verdict === "WARN" ? "Checked against the evidence, with notes:" : "The answer did not hold up against the evidence:";
+      verify = el("div", { class: "verify " + cls }, el("div", {}, head),
+        v.issues?.length ? el("ul", {}, v.issues.map((i) => el("li", {}, i.detail || i.kind))) : null);
+    }
+
+    const steps = (m.trace || []).map((s) => el("li", {},
+      el("span", { class: "n" }, s.ordinal ?? ""),
+      el("span", {}, el("span", { class: "k" }, s.kind), s.label),
+      el("span", { class: "s" + (s.status && !["OK", "PASS"].includes(s.status) ? " fail" : "") },
+        [s.status, s.confidence != null ? pct(s.confidence) : null, s.latencyMs ? ms(s.latencyMs) : null].filter(Boolean).join(" · "))));
+
+    return el("div", { class: "card" },
+      el("div", { class: "check-head" },
+        m.thumb ? el("img", { src: m.thumb, alt: "The photo that was checked" }) : null,
+        el("div", { style: "min-width:0;flex:1" },
+          el("div", { class: "check-title" }, "Photo check · " + title, titleBadge),
+          el("div", { class: "check-sub" }, m.policy?.reason || (findings.length ? "Detected by your model, strongest first." : "")),
+          detectorNotes,
+          findings.length ? el("ul", { class: "findings" }, findings.slice(0, 8).map((f) => {
+            const b = band(f.confidence);
+            return el("li", { class: "finding" },
+              el("span", { class: "finding-label", title: f.label }, f.label, el("small", {}, bandName[b] + (f.source ? " · " + f.source : ""))),
+              el("span", { class: "bar", role: "img", "aria-label": pct(f.confidence) + " confidence" }, el("span", { class: b, style: `width:${Math.max(3, Math.min(100, f.confidence * 100))}%` })),
+              el("span", { class: "pct" }, pct(f.confidence)));
+          })) : null)),
+      el("div", { class: "section-label" }, "What to do"),
+      el("div", { class: "answer", html: md(m.content || "No answer was returned.") }),
+      verify,
+      steps.length ? el("details", { class: "trace" },
+        el("summary", { html: icons.chev + " How this answer was made" + (m.traceId ? ` <span class="mono" style="color:var(--ink-3);font-weight:400">${esc(m.traceId).slice(0, 18)}</span>` : "") }),
+        el("ol", { class: "steps" }, steps)) : null,
+      appliedBlock(m.applied),
+      m.remembered ? el("div", { class: "memory-note" }, `Saved to ${m.petName || "your pet"}'s history, so later questions know what this photo showed.`) : null,
+      footer(m));
+  }
+
+  function workingCard(label) {
+    return el("div", { class: "msg", id: "working" },
+      el("div", { class: "card", style: "width:auto" },
+        el("span", { class: "typing", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
+        el("span", { class: "working-label" }, label)));
+  }
+
+  function scrollDown() { requestAnimationFrame(() => { const t = $("thread"); t.scrollTop = t.scrollHeight; }); }
+
+  // ------------------------------------------------------------------ attachment
+  async function readImage(file) {
+    if (!file || !file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+    const dataUrl = await new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(file); });
+    const img = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => fail(new Error("That image could not be opened.")); i.src = dataUrl; });
+    const draw = (max, quality) => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      return c.toDataURL("image/jpeg", quality);
+    };
+    // Large photos are scaled to 2048 px: detection models work at far less,
+    // and it keeps the upload well under the 8 MB limit.
+    let send = dataUrl, type = file.type, name = file.name;
+    if (file.size > 4 * 1024 * 1024 || Math.max(img.width, img.height) > 2048 || !/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      send = draw(2048, 0.9); type = "image/jpeg"; name = name.replace(/\.\w+$/, "") + ".jpg";
+    }
+    return { dataUrl: send, base64: send.split(",")[1], name, type, thumb: draw(240, 0.72) };
+  }
+
+  function renderAttachment() {
+    const slot = $("attachment-slot");
+    slot.replaceChildren();
+    const a = state.attachment;
+    if (a) {
+      slot.append(el("div", { class: "attachment" },
+        el("img", { src: a.thumb, alt: "" }),
+        el("span", { class: "name" }, a.name),
+        el("button", { class: "icon-btn", type: "button", style: "width:26px;height:26px;border:none", "aria-label": "Remove photo", html: icons.close,
+          onclick: () => { state.attachment = null; renderAttachment(); updateSend(); } })));
+      $("input").placeholder = "What would you like to know about this photo? (optional)";
+    } else {
+      $("input").placeholder = "Describe what happened, or attach a photo…";
+    }
+  }
+
+  async function attach(file) {
+    try {
+      state.attachment = await readImage(file);
+      renderAttachment();
+      updateSend();
+      $("input").focus();
+    } catch (e) { toast(e.message); }
+  }
+
+  $("attach").addEventListener("click", () => $("file").click());
+  $("file").addEventListener("change", (e) => { if (e.target.files[0]) attach(e.target.files[0]); e.target.value = ""; });
+  const composer = $("composer");
+  ["dragenter", "dragover"].forEach((t) => composer.addEventListener(t, (e) => { e.preventDefault(); composer.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach((t) => composer.addEventListener(t, (e) => { e.preventDefault(); composer.classList.remove("drag"); }));
+  composer.addEventListener("drop", (e) => { const f = e.dataTransfer?.files?.[0]; if (f) attach(f); });
+  $("input").addEventListener("paste", (e) => {
+    const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith("image/"));
+    if (f) { e.preventDefault(); attach(f); }
+  });
+
+  // ------------------------------------------------------------------ composer
+  function autosize() { const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(180, t.scrollHeight) + "px"; }
+  function updateSend() { $("send").disabled = state.busy || !pet() || (!$("input").value.trim() && !state.attachment); }
+  $("input").addEventListener("input", () => { autosize(); updateSend(); });
+  $("input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!$("send").disabled) composer.requestSubmit(); }
+  });
+
+  function setToggle(id, on) { $(id).setAttribute("aria-pressed", on ? "true" : "false"); }
+  $("t-measure").addEventListener("click", () => { state.measure = !state.measure; store.set("measure", state.measure); setToggle("t-measure", state.measure); });
+  $("t-urgent").addEventListener("click", () => { state.urgent = !state.urgent; setToggle("t-urgent", state.urgent); });
+  setToggle("t-measure", state.measure);
+
+  // What goes to the model as conversation: photo checks are summarised as text.
+  function history() {
+    return state.messages.filter((m) => m.kind !== "error").map((m) => {
+      if (m.role === "user") return { role: "user", content: (m.photo ? "[Sent a photo for a photo check] " : "") + (m.text || m.content || "") };
+      if (m.kind === "photo") {
+        const seen = (m.findings || []).slice(0, 6).map((f) => `${f.label} (${pct(f.confidence)})`).join(", ") || "nothing detected";
+        return { role: "assistant", content: `Photo check found: ${seen}.\n\n${m.content || ""}` };
+      }
+      return { role: "assistant", content: m.content || "" };
+    }).filter((m) => m.content.trim());
+  }
+
+  composer.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const p = pet();
+    if (!p || state.busy) return;
+    const text = $("input").value.trim();
+    const photo = state.attachment;
+    if (!text && !photo) return;
+
+    const urgent = state.urgent;
+    const userMsg = { role: "user", content: text || (photo ? "Please check this photo." : ""), text, photo: !!photo, thumb: photo?.thumb || null, urgent, at: Date.now() };
+    if (!state.messages.length) $("thread-inner").replaceChildren();
+    state.messages.push(userMsg);
+    $("thread-inner").append(renderMessage(userMsg));
+    $("input").value = ""; autosize();
+    state.attachment = null; renderAttachment();
+    state.urgent = false; setToggle("t-urgent", false);
+    state.busy = true; updateSend();
+    $("thread-inner").append(workingCard(photo ? "Checking the photo with your detection model…" : state.measure ? "Asking several times to measure confidence…" : "Thinking…"));
+    scrollDown();
+
+    let reply;
+    try {
+      if (photo) {
+        const r = await api("/api/photo", { pet: p, imageBase64: photo.base64, filename: photo.name, contentType: photo.type, question: text });
+        reply = { role: "assistant", kind: "photo", content: r.answer, thumb: photo.thumb, petName: p.name, ...pick(r,
+          "traceId", "findings", "detectors", "findingCount", "evidenceConfidence", "anythingFound", "analysisRan", "policy",
+          "verification", "model", "latencyMs", "cost", "trace", "applied", "remembered") };
+        if (r.remembered) loadMemories();
+      } else {
+        const r = await api("/api/chat", { pet: p, messages: history(), measure: state.measure, urgent });
+        reply = { role: "assistant", kind: "chat", content: r.answer, petName: p.name, urgent, ...pick(r,
+          "requestId", "model", "provider", "latencyMs", "cost", "failovers", "cached", "confidence", "lowConfidence", "applied", "memories") };
+      }
+    } catch (err) {
+      reply = { role: "assistant", kind: "error", content: err.message };
+    }
+    $("working")?.remove();
+    if (pet() === p) {
+      state.messages.push(reply);
+      $("thread-inner").append(renderMessage(reply));
+      saveMessages();
+      scrollDown();
+    } else {
+      // The pet was switched while waiting; file the answer under the right pet.
+      const msgs = store.get("chat." + p.id, []);
+      msgs.push(userMsg, reply);
+      store.set("chat." + p.id, msgs.slice(-80));
+    }
+    state.busy = false; updateSend();
+  });
+
+  function pick(o, ...keys) { const r = {}; for (const k of keys) if (o[k] !== undefined) r[k] = o[k]; return r; }
+
+  $("clear-chat").addEventListener("click", () => {
+    if (!state.messages.length) return;
+    if (!confirm("Start a new conversation? This chat is cleared from this browser; what Continuum remembers stays.")) return;
+    state.messages = [];
+    saveMessages();
+    renderThread();
+  });
+
+  // ------------------------------------------------------------------ vet summary
+  let summaryText = "";
+  $("vet-summary").addEventListener("click", async () => {
+    const p = pet();
+    if (!p) return;
+    const btn = $("vet-summary");
+    btn.disabled = true;
+    const label = btn.querySelector("span");
+    const was = label.textContent;
+    label.textContent = "Writing…";
+    try {
+      const r = await api("/api/vet-summary", { pet: p, messages: history() });
+      summaryText = r.summary || "";
+      $("summary-body").innerHTML = md(summaryText);
+      const foot = $("summary-foot");
+      foot.replaceChildren(
+        r.model ? el("span", { class: "meta-bit mono" }, r.model) : "",
+        el("span", { class: "badge coral", title: "Routed for quality rather than cost" }, "Quality routing"),
+        el("span", { class: "spacer" }),
+        rateButtons({ requestId: r.requestId }) || "");
+      if (r.applied?.length) foot.after(appliedBlock(r.applied));
+      $("summary-dialog").showModal();
+    } catch (e) { toast(e.message); }
+    finally { btn.disabled = false; label.textContent = was; }
+  });
+  $("summary-close").addEventListener("click", () => $("summary-dialog").close());
+  $("summary-dialog").addEventListener("close", () => $("summary-dialog").querySelectorAll("details.applied").forEach((d) => d.remove()));
+  $("summary-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(summaryText); toast("Copied"); } catch { toast("Copy is blocked here; use Download."); }
+  });
+  $("summary-download").addEventListener("click", () => {
+    const p = pet();
+    const a = el("a", { href: URL.createObjectURL(new Blob([summaryText], { type: "text/plain" })), download: `vet-note-${(p?.name || "pet").toLowerCase().replace(/\W+/g, "-")}.txt` });
+    document.body.append(a); a.click(); a.remove();
+  });
+
+  // ------------------------------------------------------------------ status
+  async function checkStatus() {
+    try {
+      const res = await fetch("/api/status");
+      const s = await res.json();
+      state.status = s;
+      $("dot-continuum").className = "dot " + (s.continuum ? "on" : "off");
+      $("txt-continuum").textContent = s.continuum ? "Connected to Continuum" : "Continuum is not reachable";
+      $("dot-pipeline").className = "dot " + (s.pipeline ? "on" : "idle");
+      $("txt-pipeline").textContent = s.pipeline ? `Photo checks: ${s.pipeline}` : "Photo checks off (no pipeline set)";
+      $("attach").title = s.pipeline ? "Attach a photo for a photo check" : "Photo checks need a pipeline; see the README";
+    } catch {
+      $("dot-continuum").className = "dot off";
+      $("txt-continuum").textContent = "PawCare's server is not running";
+    }
+  }
+
+  // ------------------------------------------------------------------ boot
+  $("add-pet").addEventListener("click", () => openPetDialog());
+  $("menu").addEventListener("click", () => $("side").classList.toggle("open"));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("side").classList.remove("open"); });
+
+  if (state.current && !pet()) state.current = state.pets[0]?.id || null;
+  loadMessages();
+  renderPets();
+  renderThread();
+  renderAttachment();
+  loadMemories();
+  checkStatus();
+  setInterval(checkStatus, 30000);
+})();
+</script>
+</body>
+</html>
