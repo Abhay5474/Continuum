@@ -163,7 +163,7 @@ body.white #hint { color: #fff; background: rgba(0,0,0,.6); }
 @media print { #hud, #hint, .panel { display: none !important; } }
 </style>
 </head>
-<body>
+<body class="white">
 <div id="wrap">
 <div id="stage" aria-live="polite">
 
@@ -897,7 +897,7 @@ body.white #hint { color: #fff; background: rgba(0,0,0,.6); }
   <span id="pageno"></span>
   <button type="button" id="btn-help" title="Keyboard shortcuts (?)">?</button>
 </div>
-<div id="hint">→ / Space / click: next &nbsp;·&nbsp; ← back &nbsp;·&nbsp; F full screen &nbsp;·&nbsp; P presenter notes &nbsp;·&nbsp; ? all keys</div>
+<div id="hint">→ / Space / click: next &nbsp;·&nbsp; ← back &nbsp;·&nbsp; F full screen &nbsp;·&nbsp; P presenter notes &nbsp;·&nbsp; B chalkboard &nbsp;·&nbsp; ? all keys</div>
 
 <div class="panel" id="notes-panel"><h3>Speaker notes</h3><div id="notes-body"></div></div>
 <div class="panel" id="menu"><h3>Slides</h3><ol id="menu-list"></ol></div>
@@ -912,7 +912,7 @@ body.white #hint { color: #fff; background: rgba(0,0,0,.6); }
     <tr><td>F</td><td>full screen</td></tr>
     <tr><td>P</td><td>presenter window (notes, timer, next slide) for a second screen</td></tr>
     <tr><td>N</td><td>notes on this screen (for rehearsing)</td></tr>
-    <tr><td>B</td><td>chalkboard ↔ whiteboard (whiteboard is easier to read on bright projectors)</td></tr>
+    <tr><td>B</td><td>whiteboard ↔ chalkboard</td></tr>
     <tr><td>S</td><td>drawing speed: 1× → 1.5× → 2× → instant</td></tr>
     <tr><td>R</td><td>redraw this slide</td></tr>
   </table>
@@ -934,7 +934,7 @@ body.white #hint { color: #fff; background: rgba(0,0,0,.6); }
     set(k, v) { try { localStorage.setItem("continuum-deck." + k, JSON.stringify(v)); } catch { /* fine */ } },
   };
   let speedIx = Math.min(store.get("speed", 0), SPEEDS.length - 1);
-  if (store.get("white", false)) document.body.classList.add("white");
+  document.body.classList.toggle("white", store.get("white", true)); // whiteboard unless switched
 
   /* ------------------------------------------------------------ fit to the window */
   let scale = 1;
