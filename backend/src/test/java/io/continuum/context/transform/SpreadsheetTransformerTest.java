@@ -273,6 +273,71 @@ class SpreadsheetTransformerTest {
     }
 
     @Test
+    @DisplayName("a blank row left out of the file still separates two tables")
+    void absentRowsSeparateTables() throws Exception {
+        byte[] bytes;
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("s");
+            // Rows 0-3 and 6-9; rows 4 and 5 are never created, as in a real workbook.
+            String[][] first = {{"region", "revenue"}, {"west", "10"}, {"east", "20"}, {"north", "30"}};
+            String[][] second = {{"method", "share"}, {"upi", "61"}, {"card", "13"}, {"cod", "22"}};
+            for (int i = 0; i < 4; i++) {
+                Row a = sheet.createRow(i);
+                a.createCell(0).setCellValue(first[i][0]);
+                Row b = sheet.createRow(i + 6);
+                b.createCell(0).setCellValue(second[i][0]);
+                a.createCell(2).setCellValue(i == 0 ? "note" : "n" + i);
+                if (i == 0) {
+                    a.createCell(1).setCellValue(first[i][1]);
+                    b.createCell(1).setCellValue(second[i][1]);
+                } else {
+                    a.createCell(1).setCellValue(Double.parseDouble(first[i][1]));
+                    b.createCell(1).setCellValue(Double.parseDouble(second[i][1]));
+                }
+            }
+            wb.write(out);
+            bytes = out.toByteArray();
+        }
+
+        CanonicalTable t = (CanonicalTable) transformer.transform(bytes, "two.xlsx");
+
+        assertThat(t.sheets().get(0).tables()).hasSize(2);
+        assertThat(t.sheets().get(0).tables().get(1).columns().get(0).name()).isEqualTo("method");
+        // Each table is as wide as its own data, not the sheet.
+        assertThat(t.sheets().get(0).tables().get(1).columns()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("a percentage cell is written as shown (3.4), not as its stored fraction (0.034)")
+    void percentCellsAreScaled() throws Exception {
+        byte[] bytes;
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("s");
+            CellStyle pct = wb.createCellStyle();
+            pct.setDataFormat(wb.createDataFormat().getFormat("0.0%"));
+            Row h = sheet.createRow(0);
+            h.createCell(0).setCellValue("region");
+            h.createCell(1).setCellValue("return rate");
+            double[] v = {0.034, 0.041, 0.052};
+            for (int i = 0; i < v.length; i++) {
+                Row r = sheet.createRow(i + 1);
+                r.createCell(0).setCellValue("r" + i);
+                Cell c = r.createCell(1);
+                c.setCellValue(v[i]);
+                c.setCellStyle(pct);
+            }
+            wb.write(out);
+            bytes = out.toByteArray();
+        }
+
+        CanonicalTable t = (CanonicalTable) transformer.transform(bytes, "rates.xlsx");
+        String rendered = t.render(RenderBudget.standard());
+
+        assertThat(t.sheets().get(0).tables().get(0).columns().get(1).unit()).isEqualTo("%");
+        assertThat(rendered).contains("3.4").doesNotContain("0.034");
+    }
+
+    @Test
     @DisplayName("recognises workbooks and delimited text, and declines other things")
     void detectsItsOwnInput() throws Exception {
         assertThat(transformer.supports(financialWorkbook(), "a.xlsx")).isTrue();

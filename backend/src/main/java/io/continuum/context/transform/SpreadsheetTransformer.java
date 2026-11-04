@@ -220,7 +220,17 @@ public class SpreadsheetTransformer implements ContextTransformer {
             }
         }
 
+        int previousRow = -1;
         for (Row row : sheet) {
+            // A workbook stores only the rows that have something in them, so
+            // the blank row a person leaves between two tables is not there to
+            // iterate over. Without this every block on the sheet ran together:
+            // a title glued onto the header, a second table onto the first.
+            if (previousRow >= 0 && row.getRowNum() > previousRow + 1) {
+                grid.add(List.of());
+                sourceRows.add(previousRow + 1);
+            }
+            previousRow = row.getRowNum();
             if (row.getZeroHeight()) {
                 // Hidden rows are excluded — hiding is nearly always deliberate
                 // — but counted, because a developer whose totals do not add up
@@ -311,9 +321,18 @@ public class SpreadsheetTransformer implements ContextTransformer {
                                             int from, int to, String source,
                                             List<Ambiguity> ambiguities,
                                             List<SourceRef> provenance) {
+        // The width of this table, not of the sheet: up to the last column that
+        // holds anything in these rows. A narrow table under a wide one used
+        // to carry the wide one's empty columns as "Column 4", "Column 5", ….
         int width = 0;
         for (int i = from; i <= to; i++) {
-            width = Math.max(width, grid.get(i).size());
+            List<String> row = grid.get(i);
+            for (int c = row.size() - 1; c >= width; c--) {
+                if (row.get(c) != null && !row.get(c).isBlank()) {
+                    width = c + 1;
+                    break;
+                }
+            }
         }
         if (width == 0) {
             return null;
@@ -347,7 +366,11 @@ public class SpreadsheetTransformer implements ContextTransformer {
                         "This column is numeric but carries no unit in its header or number "
                                 + "format, so no unit has been assigned."));
             }
-            if (headerUnit != null && formatUnit != null && !headerUnit.equals(formatUnit)) {
+            // "₹ crore" in the header and "₹" in the format agree: the header
+            // names the currency the format shows and adds the scale.
+            boolean sameCurrency = headerUnit != null && formatUnit != null
+                    && headerUnit.strip().startsWith(formatUnit.strip());
+            if (headerUnit != null && formatUnit != null && !headerUnit.equals(formatUnit) && !sameCurrency) {
                 ambiguities.add(new Ambiguity(Ambiguity.Kind.UNIT, sheetName + " · " + cleanName,
                         "The header says \"" + headerUnit + "\" and the cell format says \""
                                 + formatUnit + "\". The header has been used."));
@@ -824,6 +847,12 @@ public class SpreadsheetTransformer implements ContextTransformer {
             return cell.getLocalDateTimeCellValue().toLocalDate().toString();
         }
         double d = cell.getNumericCellValue();
+        // A cell shown as 3.4% holds 0.034. The column's unit is "%", so the
+        // stored fraction would read as 0.034 % — a hundred times too small.
+        // Written as the person sees it instead.
+        if (isPercentFormat(cell)) {
+            d = BigDecimal.valueOf(d).movePointRight(2).doubleValue();
+        }
         if (d == Math.rint(d) && Math.abs(d) < 1e15) {
             return String.valueOf((long) d);
         }
@@ -838,6 +867,12 @@ public class SpreadsheetTransformer implements ContextTransformer {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** A number format that shows the value as a percentage (a "%" outside quoted text). */
+    static boolean isPercentFormat(Cell cell) {
+        String fmt = numberFormat(cell);
+        return fmt != null && fmt.replaceAll("\"[^\"]*\"", "").replaceAll("\\\\%", "").contains("%");
     }
 
     private static String safeFormula(Cell cell) {
