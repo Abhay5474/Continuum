@@ -49,7 +49,7 @@ FEATURES = [
     ("ai-chaos", "AI chaos", "A hallucination drill on the live assistant", "AI Chaos Lab"),
     ("admission", "Admission control", "AI triage of the whole inbox at once", "Traffic Control → Admission"),
     ("priority-deadlines", "Priority & deadlines", "An urgent ticket with a deadline", "Traffic Control → Priority"),
-    ("billing", "Plans & quota", "Back office → plan and usage", "Billing"),
+    ("billing", "Usage & metering", "Back office → usage this month", "Billing"),
     ("memory", "Long-term memory", "Tell the assistant a delivery preference", "Memory"),
     ("adaptive-policy", "Adaptive policy", "Teach a house rule, then chat", "Adaptive Policy"),
     ("autopilot", "Autopilot feedback", "Rate an answer 👍 or 👎", "Routing → Optimization"),

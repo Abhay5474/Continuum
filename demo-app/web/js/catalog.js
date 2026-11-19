@@ -71,8 +71,8 @@ export const FEATURES = [
     blurb: "A burst of nine tickets is let in at a pace the AI provider can handle." },
   { key: "priority-deadlines", group: "traffic", icon: "⏱️", name: "Priority & deadlines",
     blurb: "Urgent tickets go first; a deadline that cannot be met is refused up front." },
-  { key: "billing", group: "traffic", icon: "📊", name: "Plans & quota", need: "presenter",
-    blurb: "Every AI call is metered against the store's monthly plan." },
+  { key: "billing", group: "traffic", icon: "📊", name: "Usage & metering", need: "presenter",
+    blurb: "Every AI call is metered: tokens, requests and cost this month." },
 
   { key: "memory", group: "learn", icon: "💾", name: "Long-term memory",
     blurb: "The assistant remembers that Priya wants deliveries after 6 pm, next time too." },

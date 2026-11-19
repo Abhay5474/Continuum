@@ -25,6 +25,10 @@ import java.util.Map;
  *
  * <p>Refusals answer 429 with {@code Retry-After}, so a client can back off
  * properly instead of hammering.
+ *
+ * <p>The per-caller API limit is a usage limit, so it follows
+ * {@code CONTINUUM_USAGE_LIMITS} and is off by default. The sign-in limit always
+ * applies: it protects passwords, not capacity.
  */
 public class RateLimitFilter extends OncePerRequestFilter {
 
@@ -39,11 +43,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final RateLimiter limiter;
     private final PortalSessionService sessions;
     private final ObjectMapper mapper;
+    private final boolean limitApi;
 
     public RateLimitFilter(RateLimiter limiter, PortalSessionService sessions, ObjectMapper mapper) {
+        this(limiter, sessions, mapper, true);
+    }
+
+    public RateLimitFilter(RateLimiter limiter, PortalSessionService sessions, ObjectMapper mapper, boolean limitApi) {
         this.limiter = limiter;
         this.sessions = sessions;
         this.mapper = mapper;
+        this.limitApi = limitApi;
     }
 
     @Override
@@ -56,6 +66,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
         boolean credentialRoute = isCredentialRoute(path);
+        if (!credentialRoute && !limitApi) {
+            chain.doFilter(request, response);
+            return;
+        }
 
         String key;
         int burst;

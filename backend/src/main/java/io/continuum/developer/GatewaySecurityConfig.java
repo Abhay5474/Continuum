@@ -29,9 +29,10 @@ public class GatewaySecurityConfig {
      */
     @Bean
     public FilterRegistrationBean<RateLimitFilter> rateLimitFilter(
-            RateLimiter limiter, PortalSessionService sessions, ObjectMapper mapper) {
+            RateLimiter limiter, PortalSessionService sessions, ObjectMapper mapper,
+            @org.springframework.beans.factory.annotation.Value("${continuum.billing.enforce-limits:false}") boolean usageLimits) {
         FilterRegistrationBean<RateLimitFilter> reg = new FilterRegistrationBean<>();
-        reg.setFilter(new RateLimitFilter(limiter, sessions, mapper));
+        reg.setFilter(new RateLimitFilter(limiter, sessions, mapper, usageLimits));
         reg.addUrlPatterns("/api/*", "/v1/*");
         reg.setOrder(0);
         return reg;

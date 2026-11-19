@@ -251,10 +251,10 @@ export async function loadPlan() {
   out.innerHTML = `<div class="plan">
       <svg class="donut" viewBox="0 0 120 120"><defs><linearGradient id="plangrad" x1="0" x2="1"><stop offset="0" stop-color="#22c55e"/><stop offset="1" stop-color="#11875a"/></linearGradient></defs>
         <circle class="d-bg" cx="60" cy="60" r="48"/><circle class="d-fg" cx="60" cy="60" r="48" transform="rotate(-90 60 60)" stroke-dasharray="${C}" stroke-dashoffset="${C}" data-to="${C * (1 - frac)}"/>
-        <text x="60" y="58" text-anchor="middle">${Math.round(frac * 100)}%</text><text x="60" y="76" text-anchor="middle" style="font-size:10px;font-weight:600;fill:var(--ink-3)">of quota</text></svg>
-      <div><span class="pill ok">${h(b.plan)} plan</span>
-        <div style="margin-top:8px"><b>${(b.tokensUsed || 0).toLocaleString("en-IN")}</b> <span class="muted small">of ${(b.monthlyTokenQuota || 0).toLocaleString("en-IN")} tokens</span></div>
-        <div class="small muted">${(b.requestsThisPeriod || 0).toLocaleString("en-IN")} requests this month · ${b.overQuota ? "over quota" : "within quota"}</div></div>
+        <text x="60" y="58" text-anchor="middle">${b.unlimited ? "∞" : Math.round(frac * 100) + "%"}</text><text x="60" y="76" text-anchor="middle" style="font-size:10px;font-weight:600;fill:var(--ink-3)">${b.unlimited ? "no limit" : "of quota"}</text></svg>
+      <div><span class="pill ok">${b.unlimited ? "Unlimited" : h(b.plan) + " plan"}</span>
+        <div style="margin-top:8px"><b>${(b.tokensUsed || 0).toLocaleString("en-IN")}</b> <span class="muted small">${b.unlimited ? "tokens this month" : "of " + (b.monthlyTokenQuota || 0).toLocaleString("en-IN") + " tokens"}</span></div>
+        <div class="small muted">${(b.requestsThisPeriod || 0).toLocaleString("en-IN")} requests this month · ${b.unlimited ? "no quota or rate limit" : b.overQuota ? "over quota" : "within quota"}</div></div>
     </div>
     <div class="bars" title="Tokens per day">${days.map((d) => `<i style="height:${Math.max(4, (d.tokens / max) * 100)}%" title="${d.day}: ${d.tokens} tokens"></i>`).join("")}</div>`;
   animateIn(out);

@@ -25,6 +25,10 @@ import java.util.Map;
  * request; developers over their quota get a clean 402/429 instead of silent
  * overage. Everything defaults to a generous FREE plan, so existing behaviour is
  * unchanged for anyone who never opens the billing page.
+ *
+ * <p>Limits are only enforced when {@code continuum.billing.enforce-limits} is
+ * true ({@code CONTINUUM_USAGE_LIMITS=true}). Off by default: every account is
+ * unlimited, there are no plan tiers, and usage is still metered and shown.
  */
 @Service
 public class BillingService {
@@ -60,12 +64,31 @@ public class BillingService {
     private final DeveloperBillingRepository billing;
     private final GatewayRequestLogRepository requests;
     private final PaymentProvider payments;
+    private final boolean enforceLimits;
 
+    /** Plans and quotas enforced (as with {@code CONTINUUM_USAGE_LIMITS=true}). */
     public BillingService(DeveloperBillingRepository billing, GatewayRequestLogRepository requests,
                           PaymentProvider payments) {
+        this(billing, requests, payments, true);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public BillingService(DeveloperBillingRepository billing, GatewayRequestLogRepository requests,
+                          PaymentProvider payments,
+                          @org.springframework.beans.factory.annotation.Value("${continuum.billing.enforce-limits:false}")
+                          boolean enforceLimits) {
         this.billing = billing;
         this.requests = requests;
         this.payments = payments;
+        this.enforceLimits = enforceLimits;
+        if (!enforceLimits) {
+            log.info("Billing: usage limits are off (CONTINUUM_USAGE_LIMITS=false); every account is unlimited");
+        }
+    }
+
+    /** False when the server runs without plans and quotas. */
+    public boolean limitsEnforced() {
+        return enforceLimits;
     }
 
     @Transactional
@@ -166,7 +189,7 @@ public class BillingService {
 
     /** Hard gate the gateway calls before serving. No-op unless over quota. */
     public void assertWithinQuota(String developerId) {
-        if (developerId == null) {
+        if (developerId == null || !enforceLimits) {
             return;
         }
         try {
@@ -189,6 +212,9 @@ public class BillingService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> usage(String developerId) {
+        if (!enforceLimits) {
+            return unlimitedUsage(developerId);
+        }
         DeveloperBillingEntity b = getOrCreate(developerId);
         Instant since = monthStart();
         // Plan usage is measured against the account's quota, so it is the
@@ -217,6 +243,33 @@ public class BillingService {
         out.put("periodStart", since.toString());
         out.put("daily", daily(developerId, since));
         out.put("plans", plans());
+        out.put("unlimited", false);
+        return out;
+    }
+
+    /** Usage without a plan or a quota: what was used, and nothing to run out of. */
+    private Map<String, Object> unlimitedUsage(String developerId) {
+        Instant since = monthStart();
+        long usedTokens = io.continuum.apps.AppContext.unscoped(() -> requests.tokensForDeveloperSince(developerId, since));
+        double usedCost = io.continuum.apps.AppContext.unscoped(() -> requests.costForDeveloperSince(developerId, since));
+        long reqs = io.continuum.apps.AppContext.unscoped(
+                () -> requests.countByDeveloperIdAndCreatedAtGreaterThanEqual(developerId, since));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("unlimited", true);
+        out.put("plan", "UNLIMITED");
+        out.put("planSource", null);
+        out.put("paymentConfigured", payments.configured());
+        out.put("paymentProvider", payments.name());
+        out.put("monthlyTokenQuota", null);
+        out.put("tokensUsed", usedTokens);
+        out.put("tokensRemaining", null);
+        out.put("usageFraction", 0.0);
+        out.put("overQuota", false);
+        out.put("requestsThisPeriod", reqs);
+        out.put("costThisPeriodUsd", usedCost);
+        out.put("periodStart", since.toString());
+        out.put("daily", daily(developerId, since));
+        out.put("plans", List.of());
         return out;
     }
 

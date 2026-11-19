@@ -37,6 +37,10 @@ spring:
         size: ${SCHEDULER_POOL_SIZE:8}
 
 continuum:
+  billing:
+    # Plans, monthly token quotas and the per-caller API rate limit. Off by default:
+    # every account is unlimited. Set CONTINUUM_USAGE_LIMITS=true to enforce them.
+    enforce-limits: ${CONTINUUM_USAGE_LIMITS:false}
   engine:
     poll-interval-ms: ${ENGINE_POLL_INTERVAL_MS:500}
     batch-size: ${ENGINE_BATCH_SIZE:10}

@@ -142,7 +142,7 @@ the back office are the store's own features and only use the API key.
 | Spend less | semantic cache, model cascade, prompt compression, context optimizer, context transformers, routing modes | help centre, chat, 62-message chat, back office → data for the AI, desk drafts |
 | Trust the answers | quality gate, confidence, verification engine, semantic breaker | every answer, desk → careful draft, help centre |
 | Never go down | failover, degradation ladder, hedging, AI chaos drills | chat with a provider taken down |
-| Handle the rush | admission control, priority & deadlines, plans & quota | desk → AI triage all, urgent ticket, back office → plan & usage |
+| Handle the rush | admission control, priority & deadlines, usage & metering | desk → AI triage all, urgent ticket, back office → usage this month |
 | Remember and learn | long-term memory, adaptive policy, autopilot | chat (preferences, house rules, 👍 / 👎) |
 | Run real processes | durable workflows, saga compensation, exactly-once steps, signed webhooks | My orders → Return & refund, back office → store systems |
 | Bring your own models | pipelines, specialists | back office → receipt check |

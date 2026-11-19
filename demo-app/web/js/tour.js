@@ -681,10 +681,12 @@ export const SCENARIOS = {
   billing: { steps: 1, async run(t) {
     await t.go("office");
     await t.wait(400);
-    t.say(1, "Every call is metered against the store's Continuum plan.");
+    t.say(1, "Every call the store makes is metered by Continuum.");
     const b = await office.loadPlan();
     await t.wait(2000);
-    return { ok: !!b, title: "Usage you can see", text: b ? `<b>${(b.tokensUsed || 0).toLocaleString("en-IN")}</b> of ${(b.monthlyTokenQuota || 0).toLocaleString("en-IN")} tokens used this month on the ${h(b.plan)} plan, ${(b.requestsThisPeriod || 0).toLocaleString("en-IN")} requests.` : "The plan could not be read." };
+    return { ok: !!b, title: "Usage you can see", text: !b ? "The usage could not be read." : b.unlimited
+      ? `<b>${(b.tokensUsed || 0).toLocaleString("en-IN")}</b> tokens and ${(b.requestsThisPeriod || 0).toLocaleString("en-IN")} requests this month, with no quota or rate limit on this server.`
+      : `<b>${(b.tokensUsed || 0).toLocaleString("en-IN")}</b> of ${(b.monthlyTokenQuota || 0).toLocaleString("en-IN")} tokens used this month on the ${h(b.plan)} plan, ${(b.requestsThisPeriod || 0).toLocaleString("en-IN")} requests.` };
   } },
 
   memory: { steps: 3, async run(t) {

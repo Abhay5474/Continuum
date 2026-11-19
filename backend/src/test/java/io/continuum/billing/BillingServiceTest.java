@@ -80,4 +80,24 @@ class BillingServiceTest {
         assertEquals("PRO", updated.getPlan());
         assertEquals(BillingService.Plan.PRO.monthlyTokenQuota, updated.getMonthlyTokenQuota());
     }
+
+    @Test
+    void withLimitsOffNothingIsBlockedAndThereAreNoPlans() {
+        BillingService unlimited = new BillingService(billing, requests, new UnconfiguredPaymentProvider(), false);
+        DeveloperBillingEntity b = new DeveloperBillingEntity("dev-1"); // FREE, 100k
+        withPlan("dev-1", b);
+        when(requests.tokensForDeveloperSince(eq("dev-1"), any())).thenReturn(5_000_000L);
+        when(requests.costForDeveloperSince(eq("dev-1"), any())).thenReturn(1.5);
+        when(requests.countByDeveloperIdAndCreatedAtGreaterThanEqual(eq("dev-1"), any())).thenReturn(900L);
+
+        assertDoesNotThrow(() -> unlimited.assertWithinQuota("dev-1"));
+        var u = unlimited.usage("dev-1");
+        assertEquals(true, u.get("unlimited"));
+        assertEquals("UNLIMITED", u.get("plan"));
+        assertEquals(false, u.get("overQuota"));
+        assertEquals(5_000_000L, u.get("tokensUsed"));
+        assertEquals(900L, u.get("requestsThisPeriod"));
+        assertTrue(((java.util.List<?>) u.get("plans")).isEmpty());
+        assertFalse(unlimited.limitsEnforced());
+    }
 }

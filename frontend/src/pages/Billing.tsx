@@ -118,6 +118,45 @@ export default function Billing() {
   const pct = Math.round((data?.usageFraction ?? 0) * 100);
   const hue = 140 - (data?.usageFraction ?? 0) * 140; // green → red as it fills
   const plans: any[] = data?.plans ?? [];
+  // The server can run without plans and quotas (CONTINUUM_USAGE_LIMITS off):
+  // then usage is still shown, but there is nothing to run out of or upgrade.
+  const unlimited = !!data?.unlimited;
+
+  if (unlimited) {
+    return (
+      <div className="space-y-6 animate-fade-up">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <Chip glyph="coin" tone="accent" size={28} />
+            <h1 className="text-[20px] font-semibold tracking-[-0.011em] text-slate-100">Billing &amp; Usage</h1>
+          </div>
+          <p className="mt-1 text-[13px] text-slate-500">Usage this month · no plan or quota limits</p>
+        </div>
+        <AccountWide what="Your usage" />
+        <div className="plane p-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-slate-500">Plan</div>
+              <div className="text-2xl font-semibold text-slate-100">Unlimited</div>
+            </div>
+            <div className="ml-auto text-right">
+              <div className="text-xs text-slate-500">This month</div>
+              <div className="text-sm"><span className="font-semibold text-slate-100">{Number(data?.tokensUsed ?? 0).toLocaleString()}</span> tokens</div>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-slate-400">
+            <span>{data?.requestsThisPeriod ?? 0} requests</span>
+            <span>${Number(data?.costThisPeriodUsd ?? 0).toFixed(5)} cost</span>
+            <Pill tone="ok" dot>No quota, no rate limit</Pill>
+          </div>
+          <Note className="mt-3">
+            No request is refused for plan, quota or rate; usage is still measured.
+          </Note>
+        </div>
+        <MonthToDate data={data} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -284,7 +323,7 @@ function MonthToDate({ data }: { data: any }) {
   const projected = (used / today) * daysInMonth;
   const runsOutOn = quota > 0 && used > 0 ? Math.ceil(quota / (used / today)) : null;
   const k = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(Math.round(n)));
-  const tight = quota > 0 && projected > quota;
+  const tight = !data?.unlimited && quota > 0 && projected > quota;
   return (
     <div className="plane p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -294,7 +333,9 @@ function MonthToDate({ data }: { data: any }) {
             day {today} of {daysInMonth}
           </Pill>
           <Pill tone={tight ? "bad" : "ok"}>
-            {tight
+            {data?.unlimited
+              ? `on pace for ${k(projected)} this month`
+              : tight
               ? `at this pace the quota runs out around day ${runsOutOn}`
               : `on pace for ${k(projected)} of ${k(quota)}`}
           </Pill>
