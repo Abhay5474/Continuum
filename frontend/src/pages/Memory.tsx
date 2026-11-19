@@ -30,6 +30,16 @@ function Score({ value, tone = "blue", width = 56 }: { value: number; tone?: Ton
 
 export default function Memory() {
   const [scope, setScope] = useState("agent-001");
+  // The scopes this account already files memories under. A memory only reaches
+  // an app that recalls from the same scope, so they are shown to pick from.
+  const [scopes, setScopes] = useState<{ scope: string; memories: number }[]>([]);
+  const refreshScopes = useCallback(
+    () => api.get<{ scope: string; memories: number }[]>("/api/memory/scopes").then(setScopes).catch(() => {}),
+    [],
+  );
+  useEffect(() => {
+    refreshScopes();
+  }, [refreshScopes]);
   const [content, setContent] = useState("");
   const [tier, setTier] = useState("EPISODIC");
   const [query, setQuery] = useState("");
@@ -77,6 +87,7 @@ export default function Memory() {
       }
       const r = await api.post<any>("/api/memory/store", { scope, tier, content, salience: 0.6 });
       setContent("");
+      refreshScopes();
       toast(r?.reinforced ? "Already remembered: that memory was reinforced" : `Stored in ${tierLabel(r?.tier ?? tier)}`, "success");
       await load(scope);
     });
@@ -119,6 +130,30 @@ export default function Memory() {
         <button onClick={compress} disabled={busy !== null} className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-edge disabled:opacity-60">
           {busy === "compress" ? "Compressing…" : "Compress episodic"}
         </button>
+        <div className="flex w-full flex-wrap items-center gap-1.5 pt-1 text-[12px]">
+          <span className="text-slate-500">In use:</span>
+          {scopes.length === 0 && <span className="text-slate-500">none yet</span>}
+          {scopes.map((s) => (
+            <button
+              key={s.scope}
+              onClick={() => setScope(s.scope)}
+              className={`rounded-full border px-2.5 py-0.5 font-mono ${s.scope === scope ? "border-[color:var(--accent-strong)] text-slate-100" : "border-edge text-slate-400 hover:text-slate-200"}`}
+            >
+              {s.scope} <span className="text-slate-500">· {s.memories}</span>
+            </button>
+          ))}
+          {!scopes.some((s) => s.scope === "brightcart") && (
+            <button onClick={() => setScope("brightcart")}
+              className="rounded-full border border-dashed border-edge px-2.5 py-0.5 font-mono text-slate-500 hover:text-slate-200">
+              brightcart
+            </button>
+          )}
+        </div>
+        <p className="w-full text-[12px] text-slate-500">
+          A memory reaches an app only through the scope it recalls from. The Brightcart assistant reads{" "}
+          <span className="font-mono">brightcart</span> (facts about the store, for every customer) and{" "}
+          <span className="font-mono">customer-&lt;id&gt;</span> (one customer, e.g. customer-C-1001 for Priya).
+        </p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

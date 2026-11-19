@@ -51,13 +51,22 @@ def memory_scope(customer_id: str) -> str:
     return f"customer-{customer_id}"
 
 
-def system_prompt(cust: dict | None, memories: list) -> str:
+# Facts about the store itself, shared by every conversation. Anything stored in
+# this scope (from the Continuum console's Memory page, for example) reaches the
+# assistant whoever it is talking to.
+STORE_SCOPE = "brightcart"
+
+
+def system_prompt(cust: dict | None, memories: list, store_notes: list | None = None) -> str:
     who = (f"You are helping {cust['name']} ({cust['tier']} member since {cust['since']}, {cust['city']} "
            f"{cust['pin']}, customer id {cust['id']})." if cust else "The customer is not signed in.")
     known = ""
+    if store_notes:
+        known += "\nWhat we know about Brightcart itself (treat these as true and use them when asked):\n" + \
+                 "\n".join(f"- {m}" for m in store_notes)
     if memories:
-        known = "\nWhat we remember about this customer from earlier conversations:\n" + \
-                "\n".join(f"- {m}" for m in memories)
+        known += "\nWhat we remember about this customer from earlier conversations:\n" + \
+                 "\n".join(f"- {m}" for m in memories)
     return (
         "You are Brightcart's customer support assistant. Be warm, brief and specific. "
         "Use the tools to look up orders instead of guessing; never invent order details. "
@@ -78,7 +87,13 @@ class Assistant:
     def reply(self, customer_id: str, history: list, *, mode: str | None = None, use_tools: bool = True) -> dict:
         cust = store.customer(customer_id)
         last_user = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
-        memories = []
+        memories, store_notes = [], []
+        try:
+            found = self.c.recall(STORE_SCOPE, last_user or "about Brightcart",
+                                  action="Recall what we know about Brightcart", top_k=6)
+            store_notes = [m["content"] for m in found if isinstance(m, dict) and m.get("content")][:6]
+        except ContinuumError:
+            store_notes = []
         if cust:
             try:
                 found = self.c.recall(memory_scope(customer_id), last_user, action=f"Recall what we know about "
@@ -88,7 +103,7 @@ class Assistant:
             except ContinuumError:
                 memories = []
 
-        messages = [{"role": "system", "content": system_prompt(cust, memories)}] + [
+        messages = [{"role": "system", "content": system_prompt(cust, memories, store_notes)}] + [
             {"role": m["role"], "content": m["content"]} for m in history[-30:]
             if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)]
 

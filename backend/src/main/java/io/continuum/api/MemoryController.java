@@ -76,6 +76,16 @@ public class MemoryController {
         return Map.of("scope", scope, "tierChanges", memory.maintain(scoped(http, scope)));
     }
 
+    /** The scopes this account's memories are filed under, so a person can see where a memory lands. */
+    @GetMapping("/scopes")
+    public List<Map<String, Object>> scopes(HttpServletRequest http) {
+        String dev = RequestScope.developerId(http);
+        if (dev == null) {
+            return List.of();
+        }
+        return memory.scopes(dev + "::");
+    }
+
     @GetMapping("/{scope}")
     public List<MemoryEntryEntity> list(@PathVariable String scope, HttpServletRequest http) {
         return memory.list(scoped(http, scope));

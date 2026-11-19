@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Extension 5 — hierarchical long-context memory for long-running agents.
@@ -201,6 +202,16 @@ public class MemoryService {
     @Transactional(readOnly = true)
     public List<MemoryEntryEntity> list(String scope) {
         return repo.findByScope(scope);
+    }
+
+    /** The scopes under {@code prefix} that hold memories, prefix removed, busiest first. */
+    public List<Map<String, Object>> scopes(String prefix) {
+        return repo.scopesUnder(prefix, prefix.length()).stream().map(r -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("scope", String.valueOf(r[0]).substring(prefix.length()));
+            m.put("memories", ((Number) r[1]).longValue());
+            return m;
+        }).toList();
     }
 
     public record RetrievedMemory(Long id, String tier, String content, double score, double relevance) {
