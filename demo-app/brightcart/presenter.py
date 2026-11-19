@@ -109,6 +109,8 @@ class Presenter:
     def console(self, method: str, path: str, body=None, *, operator: bool = False, note: str | None = None):
         if operator:
             if not (self.operator_token and time.time() < self.operator_until):
+                self._renew_operator()
+            if not (self.operator_token and time.time() < self.operator_until):
                 raise PresenterError(403, "This control is engine-wide, so only a Continuum operator can use it. "
                                           "Sign in with an operator account.")
             token = self.operator_token
@@ -118,6 +120,21 @@ class Presenter:
         if note:
             self._note(note)
         return out
+
+    def _renew_operator(self) -> None:
+        """On a Continuum without an operator gate (the default), any signed-in account
+        gets an operator session without a password, so a lapsed one is simply renewed."""
+        if not self.token:
+            return
+        try:
+            status = self._call("GET", "/api/portal/developer/operator/status", token=self.token) or {}
+            if status.get("open"):
+                op = self._call("POST", "/api/portal/developer/operator/elevate", {"password": ""}, token=self.token)
+                with self._lock:
+                    self.operator_token = op.get("sessionToken")
+                    self.operator_until = time.time() + 29 * 60
+        except PresenterError:
+            pass
 
     def _call(self, method: str, path: str, body=None, *, token):
         data = None if body is None else json.dumps(body).encode()

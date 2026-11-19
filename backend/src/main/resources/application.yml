@@ -41,6 +41,11 @@ continuum:
     # Plans, monthly token quotas and the per-caller API rate limit. Off by default:
     # every account is unlimited. Set CONTINUUM_USAGE_LIMITS=true to enforce them.
     enforce-limits: ${CONTINUUM_USAGE_LIMITS:false}
+  operator:
+    # Engine-wide settings (routing objective, hedging, model catalogue, all accounts).
+    # Off by default: every signed-in account may use them, with no password step-up.
+    # Set CONTINUUM_OPERATOR_GATE=true so only named operators can.
+    gate: ${CONTINUUM_OPERATOR_GATE:false}
   engine:
     poll-interval-ms: ${ENGINE_POLL_INTERVAL_MS:500}
     batch-size: ${ENGINE_BATCH_SIZE:10}

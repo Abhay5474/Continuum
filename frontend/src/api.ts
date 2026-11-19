@@ -448,7 +448,7 @@ export const portal = {
 
   // Operator access on a person's account: no shared secret needed.
   operatorStatus: () =>
-    portalHttp<{ operator: boolean; anyOperator: boolean; setupOpen: boolean; sessionMinutes: number }>(
+    portalHttp<{ open?: boolean; operator: boolean; anyOperator: boolean; setupOpen: boolean; sessionMinutes: number }>(
       "/api/portal/developer/operator/status",
       "GET",
     ),

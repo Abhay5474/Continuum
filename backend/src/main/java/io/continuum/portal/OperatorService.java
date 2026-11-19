@@ -73,9 +73,29 @@ public class OperatorService {
 
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
+    /**
+     * When false (the default, {@code CONTINUUM_OPERATOR_GATE} unset), every
+     * signed-in account may use engine-wide settings: no grant, setup code or
+     * password step-up. Set it to true for a shared deployment where only named
+     * operators should change routing, hedging or the model catalogue.
+     */
+    private final boolean gated;
+
     public OperatorService(OperatorGrantRepository grants, DeveloperRepository developers,
                            DeveloperAuthRepository auth, PasswordHasher passwords,
                            PortalSessionService sessions, RateLimiter limiter) {
+        this(grants, developers, auth, passwords, sessions, limiter, true);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OperatorService(OperatorGrantRepository grants, DeveloperRepository developers,
+                           DeveloperAuthRepository auth, PasswordHasher passwords,
+                           PortalSessionService sessions, RateLimiter limiter,
+                           @org.springframework.beans.factory.annotation.Value("${continuum.operator.gate:false}") boolean gated) {
+        this.gated = gated;
+        if (!gated) {
+            log.info("Operator gate is off (CONTINUUM_OPERATOR_GATE=false): every signed-in account may use engine-wide settings");
+        }
         this.grants = grants;
         this.developers = developers;
         this.auth = auth;
@@ -87,7 +107,7 @@ public class OperatorService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onReady() {
-        if (grants.count() == 0) {
+        if (gated && grants.count() == 0) {
             newSetupCode();
         }
     }
@@ -120,6 +140,9 @@ public class OperatorService {
         if (developerId == null) {
             return false;
         }
+        if (!gated) {
+            return true;
+        }
         long now = System.currentTimeMillis();
         Cached c = cache.get(developerId);
         if (c == null || now - c.readAt() > GRANT_CACHE_MS) {
@@ -140,6 +163,7 @@ public class OperatorService {
     public Map<String, Object> status(String actor) {
         boolean any = anyOperator();
         return Map.of(
+                "open", !gated,
                 "operator", isOperator(actor),
                 "anyOperator", any,
                 "setupOpen", !any && setupCodeHash != null && Instant.now().isBefore(setupCodeExpires),
@@ -175,7 +199,9 @@ public class OperatorService {
         if (!isOperator(actor)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Your account does not have operator access.");
         }
-        checkPassword(actor, password);
+        if (gated) {
+            checkPassword(actor, password);
+        }
         return sessions.issueOperator(actor);
     }
 

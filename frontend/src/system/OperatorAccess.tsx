@@ -39,28 +39,71 @@ const OperatorContext = createContext<Ctx>({ operator: false, request: () => {},
 
 export const useOperator = () => useContext(OperatorContext);
 
+/**
+ * When the server runs without an operator gate (CONTINUUM_OPERATOR_GATE off,
+ * the default), every signed-in account may use engine-wide settings. Then the
+ * operator session is fetched silently — no dialog, no password — and renewed
+ * before it lapses. Resolves true when that happened.
+ */
+async function openElevate(): Promise<boolean> {
+  if (!portal.session()) return false;
+  try {
+    const s = await portal.operatorStatus();
+    if (!s.open) return false;
+    await portal.operatorElevate("");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function OperatorProvider({ children }: { children: ReactNode }) {
   const [operator, setOperator] = useState(hasOperator());
   const [open, setOpen] = useState(false);
+  // Bumped on every silent renewal, so the expiry timer below is re-armed.
+  const [renewals, setRenewals] = useState(0);
 
-  // Operator sessions are short. Drop the elevation the moment it lapses, so no
-  // switch looks live that the server would refuse.
+  // On an open server, unlock engine-wide controls as soon as someone is signed
+  // in, including right after signing in.
+  useEffect(() => {
+    const tryOpen = () => {
+      if (!hasOperator()) openElevate().then((ok) => ok && setOperator(true));
+    };
+    tryOpen();
+    window.addEventListener("focus", tryOpen);
+    const t = window.setInterval(tryOpen, 15000);
+    return () => {
+      window.removeEventListener("focus", tryOpen);
+      window.clearInterval(t);
+    };
+  }, []);
+
+  // Operator sessions are short. When one lapses, renew it on an open server;
+  // otherwise drop the elevation, so no switch looks live that the server would refuse.
   useEffect(() => {
     if (!operator) return;
     const at = portal.operatorExpiresAt();
     if (!at) return;
-    const t = window.setTimeout(() => {
+    const t = window.setTimeout(async () => {
       portal.dropOperator();
-      setOperator(false);
-    }, Math.max(0, at - Date.now()));
+      if (await openElevate()) {
+        setOperator(true);
+        setRenewals((n) => n + 1);
+      } else {
+        setOperator(false);
+      }
+    }, Math.max(0, at - Date.now() - 60_000));
     return () => window.clearTimeout(t);
-  }, [operator]);
+  }, [operator, renewals]);
 
   return (
     <OperatorContext.Provider
       value={{
         operator,
-        request: () => setOpen(true),
+        // On an open server there is nothing to ask: unlock straight away.
+        request: () => {
+          openElevate().then((ok) => (ok ? setOperator(true) : setOpen(true)));
+        },
         drop: () => {
           portal.dropOperator();
           setOperator(false);

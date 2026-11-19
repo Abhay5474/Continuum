@@ -37,6 +37,8 @@ import java.sql.DriverManager;
         "continuum.llm.failover-order=fake",
         // Webhook and HTTP-step tests call a receiver on this machine.
         "continuum.declarative.allow-private-targets=true",
+        // The gated, production-style modes, so their checks stay covered.
+        "continuum.operator.gate=true", "continuum.billing.enforce-limits=true",
         // The consensus DAG waits on workers the tests drive by hand; don't wait long.
         "continuum.dag.timeout-ms=1500",
         "logging.level.io.continuum=WARN"
