@@ -12,8 +12,12 @@ import java.time.Duration;
 /** Tiny JSON-over-HTTP helper shared by provider adapters. */
 public class HttpJson {
 
+    // Honours the JVM's standard proxy settings (https.proxyHost, http.nonProxyHosts),
+    // so a deployment behind an outbound proxy reaches its model providers. With none
+    // set, the default selector answers DIRECT and nothing changes.
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
+            .proxy(java.net.ProxySelector.getDefault())
             .build();
 
     private final ObjectMapper mapper;

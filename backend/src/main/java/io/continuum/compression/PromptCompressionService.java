@@ -142,9 +142,16 @@ public class PromptCompressionService {
                 // Preserve the most recent user instruction verbatim.
                 // A tool result is data a model must read exactly (JSON whose short
                 // keys the compressor would drop as filler), so it is never touched.
-                if (i == lastUserIdx || msg.content() == null || msg.role() == Role.TOOL) {
+                // Nor is the system prompt: it carries the app's instructions and the
+                // facts it grounds the answer in (recalled memories, policy), and the
+                // compressor drops whole sentences, so even a light ratio removed a
+                // stated fact and the assistant's role and the model answered without
+                // them. The savings are in the conversation and pasted material.
+                if (i == lastUserIdx || msg.content() == null || msg.role() == Role.TOOL
+                        || msg.role() == Role.SYSTEM) {
                     if (adaptive && msg.content() != null) {
-                        tally(developerId, CompressionPolicy.Region.QUESTION,
+                        tally(developerId, msg.role() == Role.SYSTEM
+                                        ? CompressionPolicy.Region.INSTRUCTION : CompressionPolicy.Region.QUESTION,
                                 PromptCompressor.estimateTokens(msg.content()),
                                 PromptCompressor.estimateTokens(msg.content()));
                     }
