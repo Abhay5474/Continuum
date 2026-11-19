@@ -105,8 +105,20 @@ def handle(endpoint: str, body: dict, idem_key: str | None) -> tuple[int, dict]:
 
 def _verify(body, oid, attempt):
     o = store.order(oid) if oid else None
+    # A practice run (the console's ready-made example input) can be repeated:
+    # a refund an earlier run left on the order is cleared first. Real refunds,
+    # from the shop, never carry the flag.
+    if o and str(body.get("practice") or "").lower() == "true" and not o["returnable"] \
+            and (o.get("refund") or {}).get("status") == "refunded":
+        store.set_refund(o["id"], None)
+        o = store.order(oid)
     if not o:
-        return 404, {"error": f"No order {oid}"}, f"order {oid} not found", None
+        known = ", ".join(x["id"] for x in store.all_orders())
+        if not oid or oid in ("NONE", "NULL", "UNDEFINED"):
+            msg = f'No orderId in the run input. Use an order that exists, e.g. {{"orderId": "BC-1042"}} ({known})'
+        else:
+            msg = f"No order {oid}. Orders in the shop: {known}"
+        return 404, {"error": msg}, msg, None
     if not o["returnable"]:
         return 422, {"error": "not_returnable", "reason": o["returnable_reason"]}, \
             f"refused: {o['returnable_reason']}", None
@@ -197,10 +209,11 @@ def workflow_spec(public_url: str) -> dict:
                        "restock in parallel, email the customer, book a courier pickup, note it in the CRM. "
                        "Its steps call the Brightcart shop, so python server.py must be running.",
         # Prefilled by the console's Run button: a delivered order that exists in the shop.
-        "exampleInput": {"orderId": "BC-1042", "reason": "Arrived chipped", "collectItem": True},
+        # practice: an earlier refund of this order is cleared first, so the example can be run again and again.
+        "exampleInput": {"orderId": "BC-1042", "reason": "Arrived chipped", "collectItem": True, "practice": True},
         "steps": [
             # A lookup: a GET, so a rollback knows it left nothing behind to undo.
-            {"id": "verify", "call": {"method": "GET", "url": svc + "orders/verify?orderId=${input.orderId}"},
+            {"id": "verify", "call": {"method": "GET", "url": svc + "orders/verify?orderId=${input.orderId}&practice=${input.practice}"},
              "retries": 2, "timeoutSeconds": 10},
             {"id": "fraud-hold", "type": "WAIT", "waitSeconds": 6, "dependsOn": ["verify"]},
             {"id": "refund", "dependsOn": ["fraud-hold"],

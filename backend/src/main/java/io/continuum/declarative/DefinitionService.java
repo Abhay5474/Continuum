@@ -146,6 +146,19 @@ public class DefinitionService {
         return new java.util.ArrayList<>(out);
     }
 
+    private static final java.util.regex.Pattern INPUT_REF =
+            java.util.regex.Pattern.compile("\\$\\{input\\.([A-Za-z0-9_]+)");
+
+    /** The input fields a spec reads ({@code ${input.x}}), in first-use order. */
+    static List<String> inputFields(String specJson) {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher m = INPUT_REF.matcher(specJson == null ? "" : specJson);
+        while (m.find()) {
+            out.add(m.group(1));
+        }
+        return new java.util.ArrayList<>(out);
+    }
+
     private Map<String, Object> summary(WorkflowDefinitionEntity d) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("name", d.getName());
@@ -157,6 +170,7 @@ public class DefinitionService {
             m.put("steps", s.getSteps().size());
             m.put("exampleInput", s.getExampleInput());
             m.put("targets", targets(s));
+            m.put("inputFields", inputFields(d.getSpecJson()));
         } catch (Exception e) {
             m.put("steps", 0);
         }

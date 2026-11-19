@@ -42,6 +42,28 @@ class Desk:
         self._refunds: list = []
         self._lock = threading.Lock()
 
+    def refresh_workflow(self) -> None:
+        """Republish the refund workflow when Continuum's copy predates this shop's.
+
+        A definition published by an older setup has no example input, so the
+        console's Run button starts it with {} and the first step finds no
+        order. Needs the presenter's console session; best effort.
+        """
+        p = self.presenter
+        if not p.token or not p.key_matches:
+            return
+        name = self.cfg["workflow_name"]
+        spec = services.workflow_spec(self.cfg["public_url"])
+        try:
+            defs = p.console("GET", "/api/portal/developer/workflows/definitions") or []
+            current = next((d for d in defs if isinstance(d, dict) and d.get("name") == name), None)
+            if current and current.get("exampleInput") == spec["exampleInput"]:
+                return
+            p.console("POST", f"/api/portal/developer/workflows/definitions/{name}", spec,
+                      note=f"Refund workflow {name} updated with a ready-to-run example order")
+        except PresenterError:
+            pass
+
     def start_refund(self, order_id: str, reason: str, collect_item: bool, source: str = "agent") -> dict:
         o = store.order(order_id)
         if not o:
@@ -353,7 +375,9 @@ class Handler(BaseHTTPRequestHandler):
         p = DESK.presenter
         if what == "login" and method == "POST":
             body = self._json()
-            return {"presenter": p.login(str(body.get("email") or ""), str(body.get("password") or ""))}
+            status = p.login(str(body.get("email") or ""), str(body.get("password") or ""))
+            DESK.refresh_workflow()
+            return {"presenter": status}
         if what == "logout" and method == "POST":
             return {"presenter": p.logout()}
         if what == "status" and method == "GET":

@@ -111,8 +111,31 @@ export default function WorkflowBuilder() {
     }
   };
 
+  // The card's starting input: the definition's own example, or else one
+  // empty field per ${input.x} it reads, so the fields it needs are visible.
   const inputFor = (d: any) =>
-    inputs[d.name] ?? JSON.stringify(d.exampleInput ?? {}, null, 1);
+    inputs[d.name] ??
+    JSON.stringify(
+      d.exampleInput ?? Object.fromEntries(((d.inputFields ?? []) as string[]).map((f) => [f, ""])),
+      null,
+      1,
+    );
+  // Fields the definition reads that the typed input leaves out or empty.
+  const missingFields = (d: any): string[] => {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(inputFor(d) || "{}");
+    } catch {
+      return [];
+    }
+    // A yes/no flag in the example (e.g. practice: true) is optional: left out, it reads as false.
+    const flags = new Set(
+      Object.entries(d.exampleInput ?? {}).filter(([, v]) => typeof v === "boolean").map(([k]) => k),
+    );
+    return ((d.inputFields ?? []) as string[]).filter(
+      (f) => !flags.has(f) && (parsed == null || parsed[f] === undefined || parsed[f] === null || parsed[f] === ""),
+    );
+  };
   const validJson = (t: string) => {
     if (!t.trim()) return true;
     try {
@@ -297,6 +320,12 @@ export default function WorkflowBuilder() {
                         className="mt-1 h-16 w-full font-mono text-[11px] field"
                         style={{ borderColor: validJson(inputFor(d)) ? "rgb(var(--edge))" : `${STATE.critical.color}55` }}
                       />
+                      {missingFields(d).length > 0 && (
+                        <div className="mt-1 text-[11.5px] leading-snug" style={{ color: STATE.warning.ink }}>
+                          Fill in {missingFields(d).join(", ")}: this workflow's steps read{" "}
+                          {missingFields(d).length === 1 ? "it" : "them"} from the run input.
+                        </div>
+                      )}
                     </div>
                     <div className="mt-auto flex gap-2">
                       <button onClick={() => run(d.name, inputFor(d))} disabled={busy || !validJson(inputFor(d))}
