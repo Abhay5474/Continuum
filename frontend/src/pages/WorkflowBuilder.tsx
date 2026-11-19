@@ -8,7 +8,7 @@ import { STATE, type StateKey } from "../system/tokens";
 import Tabs from "../system/Tabs";
 import { Morph } from "../system/motion";
 import { timeOf } from "../system/time";
-import WorkflowEditor, { TEMPLATES } from "../components/WorkflowEditor";
+import WorkflowEditor, { TEMPLATES, SAMPLE_KEYS } from "../components/WorkflowEditor";
 
 /**
  * Author and run durable workflows.
@@ -48,7 +48,10 @@ export default function WorkflowBuilder() {
   const [source, setSource] = useState(STARTER);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [runInput, setRunInput] = useState('{ "sku": "WIDGET-1", "qty": 2, "amount": 4999 }');
+  const [runInput, setRunInput] = useState(JSON.stringify(TEMPLATES[0].spec.exampleInput ?? {}, null, 1));
+  // Each definition is run with its own input: prefilled from the example it was
+  // published with, editable on its card.
+  const [inputs, setInputs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   const refresh = () => {
@@ -82,15 +85,6 @@ export default function WorkflowBuilder() {
   }, []);
 
 
-  const inputValid = useMemo(() => {
-    if (!runInput.trim()) return true;
-    try {
-      JSON.parse(runInput);
-      return true;
-    } catch {
-      return false;
-    }
-  }, [runInput]);
 
   const publish = async (): Promise<boolean> => {
     setError(null);
@@ -117,12 +111,46 @@ export default function WorkflowBuilder() {
     }
   };
 
-  const run = async (defName: string) => {
+  const inputFor = (d: any) =>
+    inputs[d.name] ?? JSON.stringify(d.exampleInput ?? {}, null, 1);
+  const validJson = (t: string) => {
+    if (!t.trim()) return true;
+    try {
+      JSON.parse(t);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const addSamples = async () => {
     setError(null);
     setNote(null);
     setBusy(true);
     try {
-      const input = runInput.trim() ? JSON.parse(runInput) : {};
+      const published: string[] = [];
+      for (const key of SAMPLE_KEYS) {
+        const t = TEMPLATES.find((x) => x.key === key);
+        if (!t) continue;
+        const r = await portal.defs.publish(t.name, t.spec);
+        published.push(`${r.name} v${r.version}`);
+      }
+      setNote(`Published ${published.join(", ")}. They call built-in sandbox services, so Run works right away.`);
+      refresh();
+    } catch (e: any) {
+      setError(e?.message ?? "Could not publish the samples");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const run = async (defName: string, text?: string) => {
+    setError(null);
+    setNote(null);
+    setBusy(true);
+    try {
+      const source = text ?? runInput;
+      const input = source.trim() ? JSON.parse(source) : {};
       const r = await portal.defs.run(defName, input);
       setNote(`Started ${r.definition} v${r.version} — ${r.workflowId}`);
       setTab("runs");
@@ -138,6 +166,7 @@ export default function WorkflowBuilder() {
     const d = await portal.defs.get(defName);
     setName(d.name);
     setSource(JSON.stringify(d.spec, null, 2));
+    if (d.spec?.exampleInput !== undefined) setRunInput(JSON.stringify(d.spec.exampleInput, null, 1));
     setTab("editor");
   };
 
@@ -196,38 +225,35 @@ export default function WorkflowBuilder() {
       <Morph k={tab}>
         {tab === "definitions" && (
           <section>
-            {/* Placed above the list because it is what Run sends, not a footnote. */}
-            {latest.length > 0 && (
-              <div className="mb-3">
-                <div className="flex items-baseline justify-between">
-                  <Micro>Run input</Micro>
-                  <span className="text-[10px]" style={{ color: inputValid ? STATE.healthy.ink : STATE.critical.ink }}>
-                    {inputValid ? "reachable as ${input.…}" : "invalid JSON"}
-                  </span>
-                </div>
-                <textarea
-                  aria-label="Run input (JSON)"
-                  value={runInput}
-                  onChange={(e) => setRunInput(e.target.value)}
-                  spellCheck={false}
-                  className="mt-1 h-14 w-full font-mono text-[11px] field"
-                  style={{ borderColor: inputValid ? "rgb(var(--edge))" : `${STATE.critical.color}55` }}
-                />
-              </div>
-            )}
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <p className="min-w-0 flex-1 text-[12px] text-slate-500">
+                Each workflow runs with the input on its card. Steps that call sandbox:// services are
+                answered by Continuum itself, so those workflows run with nothing else started.
+              </p>
+              <button onClick={addSamples} disabled={busy}
+                className="rounded-[var(--r-md)] border border-edge px-3.5 py-1.5 text-[13px] font-medium text-slate-200 hover:border-slate-500/60 disabled:opacity-50">
+                Add ready-to-run samples
+              </button>
+            </div>
             {latest.length === 0 ? (
               <div className="text-center">
                 <Micro>No definitions yet</Micro>
                 <p className="mx-auto mt-2 max-w-md text-xs text-slate-500">
-                  A definition is a graph of HTTP steps the engine runs durably. Start one in the
-                  editor.
+                  A definition is a graph of HTTP steps the engine runs durably. Add the samples to try
+                  one now, or start your own in the editor.
                 </p>
-                <button
-                  onClick={() => setTab("editor")}
-                  className="mt-3 rounded border border-edge px-3 py-1.5 text-xs hover:border-aurora/50"
-                >
-                  Open the editor
-                </button>
+                <div className="mt-3 flex justify-center gap-2">
+                  <button onClick={addSamples} disabled={busy}
+                    className="rounded-[var(--r-md)] bg-[color:var(--accent-strong)] px-3.5 py-1.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50">
+                    Add ready-to-run samples
+                  </button>
+                  <button
+                    onClick={() => setTab("editor")}
+                    className="rounded border border-edge px-3 py-1.5 text-xs hover:border-aurora/50"
+                  >
+                    Open the editor
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -247,8 +273,33 @@ export default function WorkflowBuilder() {
                         {runs.filter((r) => facts[r.workflowId]?.definition === d.name).length} runs
                       </span>
                     </div>
+                    {(() => {
+                      const targets: string[] = d.targets ?? [];
+                      const external = targets.filter((t) => t !== "sandbox");
+                      const local = external.filter((t) => /^(localhost|127\.|0\.0\.0\.0|\[?::1)/.test(t));
+                      return (
+                        <div className="text-[11.5px] leading-snug text-slate-400" style={external.length && !local.length ? undefined : { color: local.length ? STATE.warning.ink : STATE.healthy.ink }}>
+                          {external.length === 0
+                            ? "Calls sandbox services only · runs anywhere"
+                            : local.length
+                            ? `Calls ${local.join(", ")} · that service must be running, and Continuum started with CONTINUUM_DECLARATIVE_ALLOW_PRIVATE_TARGETS=true`
+                            : `Calls ${external.join(", ")}`}
+                        </div>
+                      );
+                    })()}
+                    <div>
+                      <Micro>Run input</Micro>
+                      <textarea
+                        aria-label={`Run input for ${d.name} (JSON)`}
+                        value={inputFor(d)}
+                        onChange={(e) => setInputs((m) => ({ ...m, [d.name]: e.target.value }))}
+                        spellCheck={false}
+                        className="mt-1 h-16 w-full font-mono text-[11px] field"
+                        style={{ borderColor: validJson(inputFor(d)) ? "rgb(var(--edge))" : `${STATE.critical.color}55` }}
+                      />
+                    </div>
                     <div className="mt-auto flex gap-2">
-                      <button onClick={() => run(d.name)} disabled={busy || !inputValid}
+                      <button onClick={() => run(d.name, inputFor(d))} disabled={busy || !validJson(inputFor(d))}
                         className="rounded-[var(--r-md)] bg-[color:var(--accent-strong)] px-3.5 py-1.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50">
                         Run
                       </button>

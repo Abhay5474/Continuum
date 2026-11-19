@@ -66,6 +66,22 @@ public class HttpStepActivity implements Activity {
             body = "{}";
         }
 
+        if (SandboxServices.handles(in.url())) {
+            // Answered inside Continuum: same durability, retries and replay, no network.
+            SandboxServices.Answer a = SandboxServices.call(in.url(), method, in.body(), in.idempotencyKey(), ctx.attempt());
+            String text = mapper.writeValueAsString(a.body());
+            if (a.status() >= 500) {
+                throw new IllegalStateException("Step target returned " + a.status() + ": " + truncate(text));
+            }
+            if (a.status() >= 400) {
+                throw new NonRetryable("Step target returned " + a.status() + ": " + truncate(text));
+            }
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("status", a.status());
+            out.put("body", a.body());
+            return out;
+        }
+
         GuardedHttpSender.Result res;
         try {
             res = sender.send(in.url(), method, headers, body, in.timeoutSeconds());

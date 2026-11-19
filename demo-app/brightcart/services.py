@@ -194,7 +194,10 @@ def workflow_spec(public_url: str) -> dict:
 
     return {
         "description": "Brightcart refund: verify the order, hold briefly for fraud checks, refund the card and "
-                       "restock in parallel, email the customer, book a courier pickup, note it in the CRM.",
+                       "restock in parallel, email the customer, book a courier pickup, note it in the CRM. "
+                       "Its steps call the Brightcart shop, so python server.py must be running.",
+        # Prefilled by the console's Run button: a delivered order that exists in the shop.
+        "exampleInput": {"orderId": "BC-1042", "reason": "Arrived chipped", "collectItem": True},
         "steps": [
             # A lookup: a GET, so a rollback knows it left nothing behind to undo.
             {"id": "verify", "call": {"method": "GET", "url": svc + "orders/verify?orderId=${input.orderId}"},

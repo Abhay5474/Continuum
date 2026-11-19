@@ -44,10 +44,10 @@ cd demo-app
 Linux / macOS: `python3 seed_demo_data.py --email you@example.com`
 
 You need the backend running with a Gemini or Groq key. The Compensation (saga)
-page needs Continuum to call a small local service, so start the backend with
-`CONTINUUM_DECLARATIVE_ALLOW_PRIVATE_TARGETS=true` (as above) to fill it too;
-otherwise that one part is skipped and the rest still runs. If the email has no
-account yet, the script offers to create it.
+run uses the `order-fulfilment` workflow, whose steps call Continuum's built-in
+`sandbox://` services, so it needs nothing else running and can be run again from
+the console afterwards. If the email has no account yet, the script offers to
+create it.
 
 ## What it is made of
 

@@ -27,53 +27,97 @@ export type Step = {
   timeoutSeconds?: number;
   compensate?: Call;
 };
-export type Spec = { description?: string; steps: Step[]; onComplete?: Call };
+export type Spec = { description?: string; steps: Step[]; onComplete?: Call; exampleInput?: unknown };
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-export const TEMPLATES: { key: string; label: string; spec: Spec }[] = [
+// Every template calls sandbox:// services, which Continuum answers itself, so a
+// template runs as soon as it is published, with nothing else deployed. Swap a
+// url for your own https:// endpoint when you have one.
+export const TEMPLATES: { key: string; label: string; name: string; spec: Spec }[] = [
   {
-    key: "parallel",
-    label: "Parallel, then confirm",
+    key: "fulfil",
+    label: "Order fulfilment (cancel → rollback)",
+    name: "order-fulfilment",
     spec: {
-      description: "Reserve stock and charge in parallel, then confirm",
+      description: "Reserve stock and take payment, wait 30 s for the warehouse, then ship. Cancel the run during the wait and the payment is refunded and the stock released.",
+      exampleInput: { orderId: "BC-3301", sku: "MUG-CERAMIC-350", qty: 2, amount: 998 },
       steps: [
-        { id: "reserve", call: { method: "POST", url: "https://api.example.com/reserve", body: { sku: "${input.sku}", qty: "${input.qty}" } }, retries: 3, timeoutSeconds: 30 },
-        { id: "charge", call: { method: "POST", url: "https://api.example.com/charge", body: { amount: "${input.amount}" } } },
-        { id: "cool-off", type: "WAIT", waitSeconds: 5, dependsOn: ["charge"] },
-        { id: "confirm", dependsOn: ["reserve", "cool-off"], condition: "${steps.charge.paid} == true", call: { method: "POST", url: "https://api.example.com/confirm", body: { hold: "${steps.reserve.holdId}" } } },
+        { id: "reserve-stock", call: { method: "POST", url: "sandbox://stock/reserve", body: { orderId: "${input.orderId}", sku: "${input.sku}", qty: "${input.qty}" } },
+          compensate: { method: "POST", url: "sandbox://stock/release", body: { holdId: "${steps.reserve-stock.holdId}" } }, retries: 2 },
+        { id: "take-payment", dependsOn: ["reserve-stock"], call: { method: "POST", url: "sandbox://payments/charge", body: { orderId: "${input.orderId}", amount: "${input.amount}" } },
+          compensate: { method: "POST", url: "sandbox://payments/refund", body: { paymentId: "${steps.take-payment.paymentId}", amount: "${input.amount}" } }, retries: 2 },
+        { id: "warehouse", type: "WAIT", waitSeconds: 30, dependsOn: ["take-payment"] },
+        { id: "ship", dependsOn: ["warehouse"], call: { method: "POST", url: "sandbox://courier/book", body: { orderId: "${input.orderId}" } } },
       ],
-      onComplete: { url: "https://api.example.com/webhooks/done" },
+      onComplete: { method: "POST", url: "sandbox://webhooks/order-shipped", body: { orderId: "${input.orderId}" } },
+    },
+  },
+  {
+    key: "retry",
+    label: "Flaky payment (retries)",
+    name: "payment-with-retries",
+    spec: {
+      description: "The payment service fails twice before it answers. The engine retries with backoff, and the run still completes with the payment taken exactly once.",
+      exampleInput: { orderId: "BC-4471", amount: 499 },
+      steps: [
+        { id: "verify-order", call: { method: "GET", url: "sandbox://orders/verify?orderId=${input.orderId}" } },
+        { id: "charge", dependsOn: ["verify-order"], call: { method: "POST", url: "sandbox://payments/charge", body: { orderId: "${input.orderId}", amount: "${input.amount}", failTimes: 2 } }, retries: 4 },
+        { id: "receipt", dependsOn: ["charge"], call: { method: "POST", url: "sandbox://email/send", body: { to: "${steps.verify-order.customerEmail}", payment: "${steps.charge.paymentId}" } } },
+      ],
     },
   },
   {
     key: "saga",
-    label: "Booking with rollback",
+    label: "Trip booking (declined → rollback)",
+    name: "trip-booking-rollback",
     spec: {
-      description: "Book a trip; undo what succeeded if a later step fails",
+      description: "Book a flight and a hotel, then charge the card. With declineCard true the charge is declined, so the hotel and the flight are cancelled in reverse order.",
+      exampleInput: { trip: "Goa", amount: 18500, declineCard: true },
       steps: [
-        { id: "flight", call: { method: "POST", url: "https://api.example.com/flights", body: { trip: "${input.trip}" } }, compensate: { method: "DELETE", url: "https://api.example.com/flights/${steps.flight.id}" } },
-        { id: "hotel", dependsOn: ["flight"], call: { method: "POST", url: "https://api.example.com/hotels", body: { trip: "${input.trip}" } }, compensate: { method: "DELETE", url: "https://api.example.com/hotels/${steps.hotel.id}" } },
-        { id: "charge", dependsOn: ["hotel"], call: { method: "POST", url: "https://api.example.com/charge", body: { amount: "${input.amount}" } } },
+        { id: "flight", call: { method: "POST", url: "sandbox://flights/book", body: { trip: "${input.trip}" } }, compensate: { method: "POST", url: "sandbox://flights/cancel", body: { booking: "${steps.flight.reference}" } } },
+        { id: "hotel", dependsOn: ["flight"], call: { method: "POST", url: "sandbox://hotels/book", body: { trip: "${input.trip}" } }, compensate: { method: "POST", url: "sandbox://hotels/cancel", body: { booking: "${steps.hotel.reference}" } } },
+        { id: "charge", dependsOn: ["hotel"], call: { method: "POST", url: "sandbox://payments/charge", body: { amount: "${input.amount}", fail: "${input.declineCard}" } }, retries: 1 },
       ],
     },
   },
   {
-    key: "approval",
-    label: "Wait, then notify",
+    key: "parallel",
+    label: "Parallel, then confirm",
+    name: "parallel-confirm",
     spec: {
-      description: "Score a request, wait an hour if it is risky, then notify",
+      description: "Reserve stock and charge in parallel, wait 5 s, then confirm only if the payment went through",
+      exampleInput: { sku: "WIDGET-1", qty: 2, amount: 4999 },
       steps: [
-        { id: "score", call: { method: "POST", url: "https://api.example.com/risk", body: { user: "${input.user}" } } },
-        { id: "hold", type: "WAIT", waitSeconds: 3600, dependsOn: ["score"], condition: "${steps.score.risk} > 0.8" },
-        { id: "notify", dependsOn: ["hold"], call: { method: "POST", url: "https://api.example.com/notify" } },
+        { id: "reserve", call: { method: "POST", url: "sandbox://stock/reserve", body: { sku: "${input.sku}", qty: "${input.qty}" } }, retries: 3, timeoutSeconds: 30 },
+        { id: "charge", call: { method: "POST", url: "sandbox://payments/charge", body: { amount: "${input.amount}" } } },
+        { id: "cool-off", type: "WAIT", waitSeconds: 5, dependsOn: ["charge"] },
+        { id: "confirm", dependsOn: ["reserve", "cool-off"], condition: "${steps.charge.paid} == true", call: { method: "POST", url: "sandbox://orders/confirm", body: { hold: "${steps.reserve.holdId}" } } },
       ],
-      onComplete: { method: "POST", url: "https://api.example.com/webhooks/done" },
+      onComplete: { url: "sandbox://webhooks/done" },
     },
   },
-  { key: "blank", label: "Blank", spec: { steps: [{ id: "step-1", call: { method: "POST", url: "https://" } }] } },
+  {
+    key: "approval",
+    label: "Score, hold if risky, notify",
+    name: "risk-hold-notify",
+    spec: {
+      description: "Score a request; hold it for an hour only if the score is above 80, then notify",
+      exampleInput: { user: "priya" },
+      steps: [
+        { id: "score", call: { method: "POST", url: "sandbox://risk/score", body: { user: "${input.user}" } } },
+        { id: "hold", type: "WAIT", waitSeconds: 3600, dependsOn: ["score"], condition: "${steps.score.score} > 80" },
+        { id: "notify", dependsOn: ["hold"], call: { method: "POST", url: "sandbox://notify/send", body: { user: "${input.user}" } } },
+      ],
+      onComplete: { method: "POST", url: "sandbox://webhooks/done" },
+    },
+  },
+  { key: "blank", label: "Blank", name: "my-workflow", spec: { exampleInput: {}, steps: [{ id: "step-1", call: { method: "POST", url: "sandbox://my-service/do-something" } }] } },
 ];
+
+/** The templates published by "Add ready-to-run samples". */
+export const SAMPLE_KEYS = ["fulfil", "retry", "saga"];
 
 /* ------------------------------------------------------------------ *
  * Validation — the server's rules (WorkflowSpec.validate), run as you type
@@ -273,6 +317,7 @@ export default function WorkflowEditor({
               if (t && (count(problems) === 0 || confirm("Replace the current definition with this template?"))) {
                 commit(t.spec);
                 setSelected(0);
+                if (t.spec.exampleInput !== undefined) setRunInput(JSON.stringify(t.spec.exampleInput, null, 1));
               }
             }}
           >

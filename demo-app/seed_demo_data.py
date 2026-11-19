@@ -45,12 +45,10 @@ import getpass
 import json
 import pathlib
 import sys
-import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = pathlib.Path(__file__).resolve().parent
 # Git-ignored (*.local): the API key this script issued, so a second run uses
@@ -513,52 +511,45 @@ class Seeder:
                        if soft("replay", self.console.call, "POST", f"/api/replay/verify/{wid}") is not None)
         done(f"{replayed} runs replayed and checked (Replay audit)")
 
-    def saga(self, stub_port: int):
+    def saga(self):
         part("Compensation (a run cancelled half way, its completed steps undone)")
-        server = ThreadingHTTPServer(("127.0.0.1", stub_port), _Stub)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        svc = f"http://127.0.0.1:{stub_port}/"
-
-        def call(path, body=None):
-            return {"method": "POST", "url": svc + path, "body": body or {"orderId": "${input.orderId}"}}
+        # The steps call Continuum's built-in sandbox services, so this workflow
+        # keeps working from the console after the script has finished, with no
+        # local service and no private-address setting.
+        def call(path, body):
+            return {"method": "POST", "url": "sandbox://" + path, "body": body}
 
         spec = {
-            "description": "Fulfil an order: reserve stock and take payment, wait for the warehouse, then ship. "
-                           "Cancelled before shipping, the payment is refunded and the stock released.",
+            "description": "Reserve stock and take payment, wait 30 s for the warehouse, then ship. Cancel the run "
+                           "during the wait and the payment is refunded and the stock released.",
+            "exampleInput": {"orderId": "BC-3301", "sku": "MUG-CERAMIC-350", "qty": 2, "amount": 998},
             "steps": [
-                {"id": "reserve-stock", "call": call("stock/reserve"), "compensate": call("stock/release"), "retries": 2},
-                {"id": "take-payment", "dependsOn": ["reserve-stock"], "call": call("payments/charge"),
-                 "compensate": call("payments/refund"), "retries": 2},
-                {"id": "warehouse", "type": "WAIT", "waitSeconds": 25, "dependsOn": ["take-payment"]},
-                {"id": "ship", "dependsOn": ["warehouse"], "call": call("courier/book")},
+                {"id": "reserve-stock",
+                 "call": call("stock/reserve", {"orderId": "${input.orderId}", "sku": "${input.sku}", "qty": "${input.qty}"}),
+                 "compensate": call("stock/release", {"holdId": "${steps.reserve-stock.holdId}"}), "retries": 2},
+                {"id": "take-payment", "dependsOn": ["reserve-stock"],
+                 "call": call("payments/charge", {"orderId": "${input.orderId}", "amount": "${input.amount}"}),
+                 "compensate": call("payments/refund", {"paymentId": "${steps.take-payment.paymentId}",
+                                                        "amount": "${input.amount}"}), "retries": 2},
+                {"id": "warehouse", "type": "WAIT", "waitSeconds": 30, "dependsOn": ["take-payment"]},
+                {"id": "ship", "dependsOn": ["warehouse"], "call": call("courier/book", {"orderId": "${input.orderId}"})},
             ],
+            "onComplete": call("webhooks/order-shipped", {"orderId": "${input.orderId}"}),
         }
         try:
             self.console.call("POST", "/api/portal/developer/workflows/definitions/order-fulfilment", spec)
             done("Published the order-fulfilment workflow (Workflows › Definitions)")
-            ran = self.app.call("POST", "/api/gateway/workflows/order-fulfilment/run", {"input": {"orderId": "BC-3301"}})
+            ran = self.app.call("POST", "/api/gateway/workflows/order-fulfilment/run", {"input": spec["exampleInput"]})
             wid = (ran or {}).get("workflowId")
             if not wid:
                 raise Refused(0, "the run did not start")
-            # Wait until both undoable steps have run and the run is waiting on the warehouse.
-            for _ in range(40):
-                if _Stub.hits >= 2:
-                    break
-                time.sleep(1)
-            if _Stub.hits < 2:
-                raise Refused(0, "Continuum could not call the demo steps on 127.0.0.1. Start Continuum with "
-                                 "CONTINUUM_DECLARATIVE_ALLOW_PRIVATE_TARGETS=true to fill this page")
-            time.sleep(3)  # let the payment step's completion be recorded before cancelling
+            time.sleep(8)  # both undoable steps finish in moments; the run is now waiting on the warehouse
             self.app.call("POST", f"/api/gateway/workflows/{urllib.parse.quote(wid)}/cancel",
                           {"reason": "customer cancelled before shipping"})
-            time.sleep(8)
+            time.sleep(6)
             done(f"Run {wid[:8]} cancelled while waiting; payment refunded and stock released")
         except Refused as e:
             skipped("saga run", e)
-        finally:
-            time.sleep(2)
-            server.shutdown()
-            server.server_close()
 
     # ---- autopilot ------------------------------------------------------------------
     def autopilot(self):
@@ -582,26 +573,6 @@ class Seeder:
         done("Autopilot has the traffic to learn from" + (" and a proposal waiting" if pending else ""))
 
 
-class _Stub(BaseHTTPRequestHandler):
-    """Stands in for the store's stock, payment and courier services during the saga run."""
-    hits = 0
-
-    def log_message(self, *args):
-        pass
-
-    def _ok(self):
-        _Stub.hits += 1
-        body = json.dumps({"ok": True, "reference": f"ref-{_Stub.hits}"}).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    do_GET = _ok
-    do_POST = _ok
-
-
 # --------------------------------------------------------------------------- #
 
 def main() -> None:
@@ -616,7 +587,6 @@ def main() -> None:
                    choices=["traffic", "chaos", "verification", "context", "loops", "memory", "workflows", "saga",
                             "autopilot"], help="parts to leave out")
     p.add_argument("--new-key", action="store_true", help="issue a new API key instead of reusing the last one")
-    p.add_argument("--stub-port", type=int, default=5099, help="local port for the saga's demo services")
     a = p.parse_args()
 
     email = a.email or input("  Continuum email: ").strip()
@@ -655,7 +625,7 @@ def main() -> None:
     started = time.time()
     plan = [("traffic", seeder.traffic), ("chaos", seeder.chaos), ("traffic", seeder.feedback),
             ("verification", seeder.verification), ("context", seeder.context_optimizer), ("loops", seeder.loops),
-            ("memory", seeder.memory), ("workflows", seeder.workflows), ("saga", lambda: seeder.saga(a.stub_port)),
+            ("memory", seeder.memory), ("workflows", seeder.workflows), ("saga", seeder.saga),
             ("autopilot", seeder.autopilot)]
     for name, step in plan:
         if name not in a.skip:

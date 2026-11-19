@@ -109,6 +109,43 @@ public class DefinitionService {
                         "No such workflow definition: " + name + (version == null ? "" : " v" + version)));
     }
 
+    /**
+     * Where a definition's steps send their calls ("sandbox" for the built-in
+     * stand-ins), so the console can say what has to be running before a run
+     * can succeed.
+     */
+    static List<String> targets(WorkflowSpec s) {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        java.util.function.Consumer<WorkflowSpec.Call> add = c -> {
+            if (c == null || c.getUrl() == null || c.getUrl().isBlank()) {
+                return;
+            }
+            String url = c.getUrl().trim();
+            if (SandboxServices.handles(url)) {
+                out.add("sandbox");
+                return;
+            }
+            String rest = url.replaceFirst("^[A-Za-z][A-Za-z0-9+.-]*://", "");
+            int cut = rest.length();
+            for (char ch : new char[] {'/', '?', '#'}) {
+                int i = rest.indexOf(ch);
+                if (i >= 0 && i < cut) {
+                    cut = i;
+                }
+            }
+            String host = rest.substring(0, cut);
+            if (!host.isBlank()) {
+                out.add(host);
+            }
+        };
+        for (WorkflowSpec.Step st : s.getSteps()) {
+            add.accept(st.getCall());
+            add.accept(st.getCompensate());
+        }
+        add.accept(s.getOnComplete());
+        return new java.util.ArrayList<>(out);
+    }
+
     private Map<String, Object> summary(WorkflowDefinitionEntity d) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("name", d.getName());
@@ -118,6 +155,8 @@ public class DefinitionService {
             WorkflowSpec s = mapper.readValue(d.getSpecJson(), WorkflowSpec.class);
             m.put("description", s.getDescription());
             m.put("steps", s.getSteps().size());
+            m.put("exampleInput", s.getExampleInput());
+            m.put("targets", targets(s));
         } catch (Exception e) {
             m.put("steps", 0);
         }

@@ -37,6 +37,15 @@ public class WorkflowSpec {
     private String description;
     private List<Step> steps = new ArrayList<>();
     private Call onComplete;
+    private Object exampleInput;
+
+    /**
+     * Optional: an input this workflow is meant to be run with. The console
+     * prefills it on Run, so a definition can be tried without reading its steps.
+     * Not used by the engine.
+     */
+    public Object getExampleInput() { return exampleInput; }
+    public void setExampleInput(Object exampleInput) { this.exampleInput = exampleInput; }
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
@@ -210,6 +219,12 @@ public class WorkflowSpec {
                     + "' is not one of GET, POST, PUT, PATCH, DELETE.");
         }
         String url = call.getUrl().trim();
+        if (SandboxServices.handles(url)) {
+            if (url.substring(SandboxServices.SCHEME.length()).replaceAll("^/+", "").isBlank()) {
+                throw new InvalidSpecException(where + ": '" + url + "' needs a service, e.g. sandbox://payments/charge.");
+            }
+            return; // answered inside Continuum
+        }
         if (url.contains("${")) {
             return; // resolved per run; checked when it is
         }
@@ -220,7 +235,7 @@ public class WorkflowSpec {
                 throw new IllegalArgumentException();
             }
         } catch (Exception e) {
-            throw new InvalidSpecException(where + ": '" + url + "' is not an absolute http(s) URL.");
+            throw new InvalidSpecException(where + ": '" + url + "' is not an absolute http(s) URL or a sandbox:// service.");
         }
     }
 
