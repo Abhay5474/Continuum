@@ -151,7 +151,8 @@ export default function Memory() {
         </div>
         <p className="w-full text-[12px] text-slate-500">
           A memory reaches an app only through the scope it recalls from. The Brightcart assistant reads{" "}
-          <span className="font-mono">brightcart</span> (facts about the store, for every customer) and{" "}
+          <span className="font-mono">brightcart</span> and <span className="font-mono">brightcart-support</span> (facts
+          about the store, for every customer) and{" "}
           <span className="font-mono">customer-&lt;id&gt;</span> (one customer, e.g. customer-C-1001 for Priya).
         </p>
       </div>

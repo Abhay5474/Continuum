@@ -52,9 +52,12 @@ def memory_scope(customer_id: str) -> str:
 
 
 # Facts about the store itself, shared by every conversation. Anything stored in
-# this scope (from the Continuum console's Memory page, for example) reaches the
-# assistant whoever it is talking to.
+# one of these scopes (from the Continuum console's Memory page, for example)
+# reaches the assistant whoever it is talking to. "brightcart-support" is the
+# scope the demo seed writes its support notes to, so a fact added next to them
+# is read too.
 STORE_SCOPE = "brightcart"
+STORE_SCOPES = (STORE_SCOPE, "brightcart-support")
 
 
 def system_prompt(cust: dict | None, memories: list, store_notes: list | None = None) -> str:
@@ -62,8 +65,9 @@ def system_prompt(cust: dict | None, memories: list, store_notes: list | None = 
            f"{cust['pin']}, customer id {cust['id']})." if cust else "The customer is not signed in.")
     known = ""
     if store_notes:
-        known += "\nWhat we know about Brightcart itself (treat these as true and use them when asked):\n" + \
-                 "\n".join(f"- {m}" for m in store_notes)
+        known += ("\nFacts about Brightcart and this project, from Brightcart's memory. They are true: when the "
+                  "customer asks about any of them, answer directly from them. Do not say a tool is needed for "
+                  "these, and do not say you cannot know them:\n" + "\n".join(f"- {m}" for m in store_notes))
     if memories:
         known += "\nWhat we remember about this customer from earlier conversations:\n" + \
                  "\n".join(f"- {m}" for m in memories)
@@ -88,12 +92,17 @@ class Assistant:
         cust = store.customer(customer_id)
         last_user = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
         memories, store_notes = [], []
-        try:
-            found = self.c.recall(STORE_SCOPE, last_user or "about Brightcart",
-                                  action="Recall what we know about Brightcart", top_k=6)
-            store_notes = [m["content"] for m in found if isinstance(m, dict) and m.get("content")][:6]
-        except ContinuumError:
-            store_notes = []
+        for scope in STORE_SCOPES:
+            try:
+                found = self.c.recall(scope, last_user or "about Brightcart",
+                                      action="Recall what we know about Brightcart", top_k=6)
+            except ContinuumError:
+                continue
+            for m in found:
+                text = m.get("content") if isinstance(m, dict) else None
+                if text and text not in store_notes:
+                    store_notes.append(text)
+        store_notes = store_notes[:8]
         if cust:
             try:
                 found = self.c.recall(memory_scope(customer_id), last_user, action=f"Recall what we know about "
