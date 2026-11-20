@@ -32,12 +32,17 @@ async function api(method, p, body, token) {
   const text = await r.text();
   try { return JSON.parse(text); } catch { return text; }
 }
+// Chaos off, and the semantic breaker cleared so no model stays benched after the failover scene.
+async function resetChaos() {
+  await api("POST", "/api/chaos/reset", undefined, SESSION);
+  await api("DELETE", "/api/portal/developer/breaker", undefined, SESSION);
+}
 const login = await api("POST", "/api/portal/developer/login", { email: EMAIL, password: PASSWORD });
 const SESSION = login.sessionToken;
 if (!SESSION) throw new Error("Could not sign in to Continuum: " + JSON.stringify(login));
 await fetch(SHOP + "/app/presenter/login", { method: "POST", headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ email: EMAIL, password: PASSWORD }) });
-await api("POST", "/api/chaos/reset", undefined, SESSION);
+await resetChaos();
 
 // ---------------------------------------------------------------- browser on the virtual screen
 const browser = await chromium.launch({
@@ -149,8 +154,12 @@ async function ask(text) {
     return m.length > n && !m[m.length - 1].classList.contains("typing") && m[m.length - 1].innerText.trim().length > 3;
   }, before, { timeout: 120000 });
   await sleep(1200);
-  return shop.locator("#chat-body .msg.bot").last().innerText();
+  const answer = await shop.locator("#chat-body .msg.bot").last().innerText();
+  // A take with a failed answer is not usable: stop at once rather than spend more model quota on it.
+  if (/every available model failed/i.test(answer) && !failoverScene) throw new Error("MODEL_FAILURE: " + answer.slice(0, 200));
+  return answer;
 }
+let failoverScene = false;
 const X_CALL = "#x-current .x-call";
 
 // ================================================================= the film
@@ -239,6 +248,7 @@ await clear();
 // 5 ---------------------------------------------------------------- failover
 await chapter(5, "Never go down", "Provider failover");
 await show(con);
+failoverScene = true;
 await api("POST", "/api/chaos/provider-failure-rate?rate=0.5", undefined, SESSION);
 await con.goto(CONSOLE + "/chaos", { waitUntil: "networkidle" });
 await chapter(5, "Never go down", "Provider failover");
@@ -267,7 +277,8 @@ for (const q of ["Is the brass diya set made of real brass?", "Can I gift-wrap t
   }
 }
 await clear();
-await api("POST", "/api/chaos/reset", undefined, SESSION);
+await resetChaos();
+failoverScene = false;
 await show(con);
 await con.goto(CONSOLE + "/gateway", { waitUntil: "networkidle" });
 await chapter(5, "Never go down", "Provider failover");
@@ -413,5 +424,5 @@ await card({
 fs.mkdirSync(path.dirname(MARKS), { recursive: true });
 fs.writeFileSync(MARKS, JSON.stringify(marks, null, 1));
 log("done");
-await api("POST", "/api/chaos/reset", undefined, SESSION);
+await resetChaos();
 await browser.close();
