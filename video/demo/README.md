@@ -15,13 +15,16 @@ caption. Chapters are written into the MP4, so a player can jump between feature
 | 3 | Prompt firewall | shop desk, console Prompt Guard |
 | 4 | Semantic cache | shop help centre |
 | 5 | Provider failover (30% of calls failed on purpose) | console Chaos, shop chat, console Gateway |
-| 6 | Answer confidence | shop |
-| 7 | Long-term memory (stored in the console, recalled by the shop) | console Memory, shop chat |
-| 8 | Durable workflows (a refund) | shop orders, console run timeline |
-| 9 | Saga compensation (undo when a step keeps failing) | shop orders |
-| 10 | Evidence pipeline with a specialist model | shop back office |
-| 11 | Decision provenance | X-ray |
-| 12 | Command Centre | console |
+| 6 | Quality circuit breaker (a model whose answers degrade is benched) | shop help centre + X-ray |
+| 7 | Answer confidence | shop desk |
+| 8 | Verification engine (claims checked by separate agents) | shop help centre + X-ray |
+| 9 | Long-term memory (stored in the console, recalled by the shop) | console Memory, shop chat |
+| 10 | Durable workflows (a refund) | shop orders, console run timeline |
+| 11 | Saga compensation (undo when a step keeps failing) | shop orders |
+| 12 | Loop detection (a stuck agent is stopped) | shop desk |
+| 13 | Evidence pipeline with a specialist model | shop back office |
+| 14 | Decision provenance | X-ray |
+| 15 | Command Centre | console |
 
 ## Recording it yourself
 
@@ -42,7 +45,7 @@ export DEMO_EMAIL=you@example.com DEMO_PASSWORD='your console password'
 ```
 
 The script signs the shop's presenter in, drives a real browser on a virtual 1920x1080
-screen, and captures it with ffmpeg at 30 fps. It takes about eight minutes, because
+screen, and captures it with ffmpeg at 30 fps. It takes about seven minutes, because
 every answer is a real model call. URLs can be changed with `SHOP_URL`, `CONSOLE_URL`
 and `CONTINUUM_URL`.
 
