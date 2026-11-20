@@ -1,0 +1,27 @@
+"Brightcart: regional sales, Q3 FY2026-27 (Jul-Sep)",,,,,,,,
+"Source: order ledger, exported 4 Oct 2026",,,,,,,,
+,,,,,,,,
+Region,City,Revenue (₹ lakh),,,Orders,,,Return rate
+,,Jul,Aug,Sep,Jul,Aug,Sep,
+North,Delhi,41.2,44.8,52.6,3110,3342,3905,0.052
+North,Jaipur,12.4,13.1,15.9,1020,1077,1288,0.041
+North,Lucknow,9.8,10.6,12.2,811,866,995,0.047
+North,North subtotal,63.4,68.5,80.7,4941,5285,6188,0.047
+West,Mumbai,48.5,51,60.3,3560,3710,4402,0.058
+West,Pune,22.7,24.1,29.8,1802,1890,2311,0.044
+West,Ahmedabad,14.3,15,17.6,1150,1203,1390,0.039
+West,West subtotal,85.5,90.1,107.7,6512,6803,8103,0.047
+South,Bengaluru,39.9,42.3,49.7,2990,3150,3702,0.049
+South,Chennai,21.6,22.9,26.4,1688,1772,2031,0.043
+South,Hyderabad,19.8,21.2,25.1,1540,1631,1920,0.046
+South,South subtotal,81.3,86.4,101.2,6218,6553,7653,0.046
+All regions,Grand total,230.2,245,289.6,17671,18641,21944,
+,,,,,,,,
+,,,,,,,,
+"Top categories, September",,,,,,,,
+Category,Revenue (₹ lakh),Share of revenue,Avg order value (₹),,,,,
+Festive & pooja,71.4,0.253,1380,,,,,
+Kitchen,58.9,0.209,1720,,,,,
+Ethnic wear,49.2,0.175,2240,,,,,
+Electronics,44,0.156,2980,,,,,
+Home décor,31.7,0.112,1190,,,,,
