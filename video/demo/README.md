@@ -14,7 +14,7 @@ caption. Chapters are written into the MP4, so a player can jump between feature
 | 2 | Real data, not guesses (tool calling) | shop chat |
 | 3 | Prompt firewall | shop desk, console Prompt Guard |
 | 4 | Semantic cache | shop help centre |
-| 5 | Provider failover (50% of calls failed on purpose) | console Chaos, shop chat, console Gateway |
+| 5 | Provider failover (30% of calls failed on purpose) | console Chaos, shop chat, console Gateway |
 | 6 | Answer confidence | shop |
 | 7 | Long-term memory (stored in the console, recalled by the shop) | console Memory, shop chat |
 | 8 | Durable workflows (a refund) | shop orders, console run timeline |

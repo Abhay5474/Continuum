@@ -256,15 +256,15 @@ await clear();
 await chapter(5, "Never go down", "Provider failover");
 await show(con);
 failoverScene = true;
-await api("POST", "/api/chaos/provider-failure-rate?rate=0.5", undefined, SESSION);
+await api("POST", "/api/chaos/provider-failure-rate?rate=0.3", undefined, SESSION);
 await con.goto(CONSOLE + "/chaos", { waitUntil: "networkidle" });
 await chapter(5, "Never go down", "Provider failover");
 await sleep(1500);
 const rate = await tag("Provider Failure Rate", { minW: 260, minH: 60, id: "r" });
 await focus(rate || "main", { pad: 10 });
-await callout(rate, "50% of AI calls will now fail", "on purpose, with Continuum's chaos lab", "right", 100);
+await callout(rate, "30% of AI calls will now fail", "on purpose, with Continuum's chaos lab", "right", 100);
 await caption("Chaos lab", "We break the AI provider on purpose",
-  "Half of all calls to Gemini will now fail. In a normal app, half of the customers would see an error.", 7000);
+  "Almost one in three calls to Gemini will now fail. In a normal app, those customers would see an error.", 7000);
 await clear();
 await show(shop);
 await caption("Never go down", "The customer keeps chatting",
@@ -332,6 +332,9 @@ await clear();
 await show(shop);
 await caption("Memory", "Now ask the shop assistant",
   "The shop's code did not change. Continuum recalls the fact and gives it to the model.");
+// A fresh conversation, so the answer is the only thing in the chat.
+await shop.evaluate(() => import("/js/chat.js").then((m) => m.newConversation()));
+await sleep(600);
 const who = await ask("Who is the operator of Brightcart?");
 log("memory answer:", who.slice(0, 120));
 await focus("#chat", { pad: 6 });
