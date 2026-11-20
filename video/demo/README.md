@@ -15,12 +15,12 @@ caption. Chapters are written into the MP4, so a player can jump between feature
 | 3 | Prompt firewall | shop desk, console Prompt Guard |
 | 4 | Semantic cache | shop help centre |
 | 5 | Provider failover (30% of calls failed on purpose) | console Chaos, shop chat, console Gateway |
-| 6 | Quality circuit breaker (a model whose answers degrade is benched) | shop help centre + X-ray |
-| 7 | Answer confidence | shop desk |
-| 8 | Verification engine (claims checked by separate agents) | shop help centre + X-ray |
-| 9 | Long-term memory (stored in the console, recalled by the shop) | console Memory, shop chat |
-| 10 | Durable workflows (a refund) | shop orders, console run timeline |
-| 11 | Saga compensation (undo when a step keeps failing) | shop orders |
+| 6 | Answer confidence | shop desk |
+| 7 | Long-term memory (stored in the console, recalled by the shop) | console Memory, shop chat |
+| 8 | Durable workflows (a refund) | shop orders, console run timeline |
+| 9 | Saga compensation (undo when a step keeps failing) | shop orders |
+| 10 | Verification engine (claims checked by separate agents) | shop help centre + X-ray |
+| 11 | Quality circuit breaker (a model whose answers degrade is benched) | shop help centre + X-ray |
 | 12 | Loop detection (a stuck agent is stopped) | shop desk |
 | 13 | Evidence pipeline with a specialist model | shop back office |
 | 14 | Decision provenance | X-ray |

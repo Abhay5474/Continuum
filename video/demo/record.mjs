@@ -299,25 +299,9 @@ await caption("Continuum console", failoverShown ? "Every failure is counted" : 
 await clear();
 log("failover shown:", failoverShown);
 
-// 6 ---------------------------------------------------------------- semantic breaker
-await show(shop);
-await chapter(6, "Never go down", "Quality circuit breaker");
-await caption("Never go down", "What if the model does not fail, but gets worse?",
-  "An outage is easy to spot. A model quietly giving vague, broken answers is not. Continuum scores every answer and watches the trend.");
-await runTour("semantic-breaker");
-await focus("#result", { pad: 8 });
-await caption("Quality circuit breaker", "A degrading model, benched",
-  "Its answers fell below what it normally gives, so Continuum stopped sending it customers. It gets another chance after a cool-down.", 7500);
-await closeResult();
-await focus(X_CALL, { pad: 6 });
-await callout(X_CALL, "The benched model was skipped", "this answer came from a healthy one", "left", 140);
-await caption("Quality circuit breaker", "The next customer gets a good answer", "", 5000);
-await clear();
-await resetChaos(); // un-bench the model and stop the chaos drill before the next chapter
-
 // 6 ---------------------------------------------------------------- confidence
 await show(shop);
-await chapter(7, "Trust the answers", "Answer confidence");
+await chapter(6, "Trust the answers", "Answer confidence");
 await caption("Trust the answers", "How sure is the AI?",
   "Continuum asks the model the same question several times. If the answers agree, it is sure. If they disagree, it is guessing.");
 await runTour("confidence");
@@ -334,24 +318,11 @@ await caption("Answer confidence", "A confidence score for every important answe
   "High agreement: safe to send. Low agreement: flag it or check before acting.", 7000);
 await clear();
 
-// 8 ---------------------------------------------------------------- verification engine
-await show(shop);
-await chapter(8, "Trust the answers", "Verification engine");
-await caption("Trust the answers", "Do not just answer: check the answer",
-  "For a policy question, Continuum splits the answer into claims and has separate agents check each claim against the store's rules.");
-await runTour("verification-engine");
-await focus(X_CALL, { pad: 6 });
-await callout(X_CALL, "Claims checked by separate agents", "before the customer saw the answer", "left", 140);
-await caption("Verification engine", "Checked by a team of agents",
-  "An answer that fails its checks is corrected or flagged, so a confident mistake does not reach the customer.", 7500);
-await closeResult();
-await clear();
-
 // 7 ---------------------------------------------------------------- memory
-await chapter(9, "Remember and learn", "Long-term memory");
+await chapter(7, "Remember and learn", "Long-term memory");
 await show(con);
 await con.goto(CONSOLE + "/memory", { waitUntil: "networkidle" });
-await chapter(9, "Remember and learn", "Long-term memory");
+await chapter(7, "Remember and learn", "Long-term memory");
 await sleep(1500);
 await caption("Memory", "Teach the app a fact, once",
   "We store one fact in Continuum's memory, in the <b>brightcart</b> scope that the shop assistant reads for every customer.");
@@ -380,7 +351,7 @@ await caption("Long-term memory", "The assistant now knows",
 await clear();
 
 // 8 ---------------------------------------------------------------- durable workflows
-await chapter(10, "Run real processes", "Durable workflows");
+await chapter(8, "Run real processes", "Durable workflows");
 await caption("Durable workflows", "A refund is many steps across many systems",
   "Check the order, wait for fraud checks, refund the card, restock, email the customer, book a courier, note it in the CRM.");
 await runTour("workflows");
@@ -396,7 +367,7 @@ const latest = (Array.isArray(runs) ? runs : []).find((r) => r.workflowType === 
 if (latest) {
   await show(con);
   await con.goto(CONSOLE + "/workflows/" + latest.workflowId, { waitUntil: "networkidle" });
-  await chapter(10, "Run real processes", "Durable workflows");
+  await chapter(8, "Run real processes", "Durable workflows");
   await sleep(2500);
   await caption("Continuum console", "The same run, step by step",
     "Each step with its timing, retries and result: the full history behind one refund.", 7000);
@@ -405,7 +376,7 @@ if (latest) {
 
 // 9 ---------------------------------------------------------------- saga
 await show(shop);
-await chapter(11, "Run real processes", "Undo when things fail");
+await chapter(9, "Run real processes", "Undo when things fail");
 await caption("Saga compensation", "What if a later step keeps failing?",
   "This time the courier service is down. Continuum retries it, then <b>undoes</b> what was already done, newest first.");
 await runTour("saga");
@@ -419,6 +390,35 @@ if (undo) { await focus(undo, { pad: 8 }); await sleep(3000); }
 await closeResult();
 await clear();
 
+// 10 ---------------------------------------------------------------- verification engine
+await show(shop);
+await chapter(10, "Trust the answers", "Verification engine");
+await caption("Trust the answers", "Do not just answer: check the answer",
+  "For a policy question, Continuum splits the answer into claims and has separate agents check each claim against the store's rules.");
+await runTour("verification-engine");
+await focus(X_CALL, { pad: 6 });
+await callout(X_CALL, "Claims checked by separate agents", "before the customer saw the answer", "left", 140);
+await caption("Verification engine", "Checked by a team of agents",
+  "An answer that fails its checks is corrected or flagged, so a confident mistake does not reach the customer.", 7500);
+await closeResult();
+await clear();
+
+// 11 ---------------------------------------------------------------- semantic breaker
+await show(shop);
+await chapter(11, "Never go down", "Quality circuit breaker");
+await caption("Never go down", "What if the model does not fail, but gets worse?",
+  "An outage is easy to spot. A model quietly giving vague, broken answers is not. Continuum scores every answer and watches the trend.");
+await runTour("semantic-breaker");
+await focus("#result", { pad: 8 });
+await caption("Quality circuit breaker", "A degrading model, benched",
+  "Its answers fell below what it normally gives, so Continuum stopped sending it customers. It gets another chance after a cool-down.", 7500);
+await closeResult();
+await focus(X_CALL, { pad: 6 });
+await callout(X_CALL, "The benched model was skipped", "this answer came from a healthy one", "left", 140);
+await caption("Quality circuit breaker", "The next customer gets a good answer", "", 5000);
+await clear();
+await resetChaos(); // un-bench the model and stop the chaos drill before the next chapter
+
 // 12 ---------------------------------------------------------------- loop detection
 await show(shop);
 await chapter(12, "Keep agents safe", "Loop detection");
@@ -431,7 +431,7 @@ await caption("Loop detection", "A stuck agent, stopped",
 await closeResult();
 await clear();
 
-// 10 ---------------------------------------------------------------- specialists
+// 13 ---------------------------------------------------------------- specialists
 await chapter(13, "Bring your own models", "Evidence before answers");
 await caption("Pipelines and specialists", "Give the AI eyes",
   "A receipt is uploaded. Continuum first runs a <b>specialist model</b> that reads it, turns what it found into evidence, and only then asks the language model.");
@@ -442,7 +442,7 @@ await caption("Evidence pipeline", "One request in, a checked verdict out",
 await closeResult();
 await clear();
 
-// 11 ---------------------------------------------------------------- provenance
+// 14 ---------------------------------------------------------------- provenance
 await chapter(14, "See why", "Decision provenance");
 await caption("Nothing is a black box", "Why did the AI answer that?",
   "Continuum records every decision it took for a request: which model, why, what was checked, what it cost.");
@@ -453,7 +453,7 @@ await caption("Decision provenance", "Every decision, recorded and explainable",
 await closeResult();
 await clear();
 
-// 12 ---------------------------------------------------------------- the console overview
+// 15 ---------------------------------------------------------------- the console overview
 await show(con);
 await con.goto(CONSOLE + "/dashboard", { waitUntil: "networkidle" });
 await chapter(15, "Operate", "Command Centre");
