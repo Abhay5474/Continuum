@@ -316,7 +316,6 @@ if (await shop.locator(gaugeSel).count()) {
 }
 await caption("Answer confidence", "A confidence score for every important answer",
   "High agreement: safe to send. Low agreement: flag it or check before acting.", 7000);
-await closeResult();
 await clear();
 
 // 7 ---------------------------------------------------------------- memory

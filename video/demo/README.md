@@ -1,6 +1,6 @@
 # Continuum feature demo video
 
-`out/continuum-demo.mp4`: a captioned walk-through of Continuum's features, recorded live
+`../continuum-demo.mp4` (recordings land in `out/continuum-demo.mp4`): a captioned walk-through of Continuum's features, recorded live
 against a running stack. The Brightcart shop (an app built on Continuum) is used to show
 how an application benefits; the focus is what Continuum does with each AI call.
 
