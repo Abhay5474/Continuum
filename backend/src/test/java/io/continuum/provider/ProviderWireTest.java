@@ -228,6 +228,40 @@ class ProviderWireTest {
         }
 
         @Test
+        @DisplayName("a replayed function call carries a thought signature, which Gemini 3 requires")
+        void replayedCallCarriesThoughtSignature() throws Exception {
+            JsonNode sent = body(new LlmRequest("m", List.of(
+                    Message.user("Weather in Paris and Rome?"),
+                    new Message(Role.ASSISTANT, null, List.of(
+                            new ToolCall("call_1", "get_weather", "{\"city\":\"Paris\"}"),
+                            new ToolCall("call_2", "get_weather", "{\"city\":\"Rome\"}"))),
+                    new Message(Role.TOOL, "18C", null, null, "call_1"),
+                    new Message(Role.TOOL, "22C", null, null, "call_2")),
+                    50, null, List.of(WEATHER), "auto", null));
+
+            JsonNode parts = sent.at("/contents/1/parts");
+            // Without it Gemini 3 answers HTTP 400 "Function call is missing a thought_signature".
+            assertThat(parts.at("/0/thoughtSignature").asText()).isEqualTo("skip_thought_signature_validator");
+            // Only the first call of a turn carries one.
+            assertThat(parts.at("/1/thoughtSignature").isMissingNode()).isTrue();
+            assertThat(parts.at("/1/functionCall/args/city").asText()).isEqualTo("Rome");
+        }
+
+        @Test
+        @DisplayName("max_tokens bounds the visible answer: Flash thinking is off, other thinking models get headroom")
+        void thinkingDoesNotEatTheAnswer() throws Exception {
+            JsonNode flash = body(new LlmRequest("gemini-2.5-flash", List.of(Message.user("x")), 300, null, null, null, null))
+                    .path("generationConfig");
+            assertThat(flash.path("maxOutputTokens").asInt()).isEqualTo(300);
+            assertThat(flash.at("/thinkingConfig/thinkingBudget").asInt(-1)).isZero();
+
+            JsonNode three = body(new LlmRequest("gemini-3-flash-preview", List.of(Message.user("x")), 300, null, null, null, null))
+                    .path("generationConfig");
+            assertThat(three.path("maxOutputTokens").asInt()).isEqualTo(300 + 2048);
+            assertThat(three.has("thinkingConfig")).isFalse();
+        }
+
+        @Test
         @DisplayName("JSON mode sets the response MIME type, with the caller's schema")
         void jsonMode() throws Exception {
             JsonNode sent = body(new LlmRequest("m", List.of(Message.user("x")), 50, null, null, null,

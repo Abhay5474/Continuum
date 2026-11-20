@@ -151,7 +151,7 @@ public class GeminiCatalogClient implements ProviderCatalogClient {
         // method alone cannot tell them apart; testing them as chat models
         // used up a check's test calls on models that never answer a chat.
         if (s.contains("image") || s.contains("imagen") || s.contains("nano-banana") || s.startsWith("veo")) return ModelKind.IMAGE;
-        if (s.contains("native-audio") || s.contains("-live") || s.contains("audio") || s.startsWith("lyria")) return ModelKind.AUDIO;
+        if (s.contains("native-audio") || s.contains("-live") || s.contains("audio") || s.contains("transcribe") || s.startsWith("lyria")) return ModelKind.AUDIO;
         if (s.startsWith("gemma") || s.startsWith("aqa") || s.contains("robotics")
                 || s.contains("computer-use") || s.startsWith("learnlm") || s.contains("deep-research")
                 || s.startsWith("antigravity") || s.contains("-agent")) return ModelKind.OTHER;

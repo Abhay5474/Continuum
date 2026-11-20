@@ -42,6 +42,13 @@ import java.util.Set;
 @Component
 public class GeminiProvider implements LlmProvider {
 
+    /** Gemini's documented stand-in signature for function calls it did not issue in this request. */
+    static final String SKIP_SIGNATURE = "skip_thought_signature_validator";
+
+    /** Output tokens added for a thinking model's reasoning, which Gemini counts against the answer's limit. */
+    static final int THINKING_HEADROOM = 2048;
+
+
     /** Used only when nothing is configured and the catalogue has nothing usable yet. */
     static final String FALLBACK_MODEL = "gemini-3.5-flash";
     private static final java.util.regex.Pattern SAFE_MODEL = java.util.regex.Pattern.compile("[A-Za-z0-9._/:-]{1,120}");
@@ -247,10 +254,22 @@ public class GeminiProvider implements LlmProvider {
                 }
             }
             if (msg.toolCalls() != null) {
+                boolean first = true;
                 for (ToolCall call : msg.toolCalls()) {
-                    ObjectNode fc = parts.addObject().putObject("functionCall");
+                    ObjectNode part = parts.addObject();
+                    ObjectNode fc = part.putObject("functionCall");
                     fc.put("name", call.name());
                     fc.set("args", parseArgs(m, call.argumentsJson()));
+                    // Gemini 3 refuses a replayed function call without the thought
+                    // signature it issued with it (HTTP 400). The OpenAI wire format
+                    // the caller speaks has nowhere to carry it, and after a failover
+                    // the earlier turn may come from another model anyway, so the
+                    // signature Gemini documents for calls it did not issue is sent.
+                    // Only the first call of a turn carries one, as Gemini does.
+                    if (first) {
+                        part.put("thoughtSignature", SKIP_SIGNATURE);
+                        first = false;
+                    }
                 }
             }
             if (parts.isEmpty()) {
@@ -291,7 +310,21 @@ public class GeminiProvider implements LlmProvider {
         }
 
         ObjectNode genConfig = body.putObject("generationConfig");
-        if (request.maxTokens() != null) genConfig.put("maxOutputTokens", request.maxTokens());
+        if (request.maxTokens() != null) {
+            genConfig.put("maxOutputTokens", request.maxTokens());
+            // Gemini counts a thinking model's hidden reasoning against
+            // maxOutputTokens; OpenAI's max_tokens, which the caller set, bounds the
+            // visible answer. Left alone, a 2.5 Flash answer is cut off mid-sentence
+            // once the reasoning has spent the budget. Flash models can switch
+            // thinking off; the others get room for it on top of the answer.
+            String resolved = modelFor(request);
+            String name = resolved == null ? "" : resolved.toLowerCase(java.util.Locale.ROOT);
+            if (name.startsWith("gemini-2.5-flash")) {
+                genConfig.putObject("thinkingConfig").put("thinkingBudget", 0);
+            } else if (name.startsWith("gemini-2.5") || name.startsWith("gemini-3")) {
+                genConfig.put("maxOutputTokens", request.maxTokens() + THINKING_HEADROOM);
+            }
+        }
         if (request.temperature() != null) genConfig.put("temperature", request.temperature());
         ResponseFormat format = request.responseFormat();
         if (format != null && format.isJson()) {

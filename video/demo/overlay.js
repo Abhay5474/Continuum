@@ -18,6 +18,7 @@
     background:linear-gradient(180deg,rgba(17,20,33,.94),rgba(10,12,22,.96));color:#fff;border-radius:18px;padding:20px 30px 22px;
     box-shadow:0 18px 60px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);transition:all .45s cubic-bezier(.2,.8,.2,1)}
   .dm-cap.show{opacity:1;transform:translate(-50%,0)}
+  .dm-cap.top{bottom:auto;top:96px}
   .dm-cap .k{font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#ff9a7f;font-weight:700;margin-bottom:6px}
   .dm-cap .t{font-size:30px;font-weight:700;line-height:1.25}
   .dm-cap .s{font-size:22px;line-height:1.45;color:#d7dbe7;margin-top:6px}
@@ -129,6 +130,10 @@
     caption({ kicker = "", title = "", text = "" } = {}) {
       mount();
       cap.innerHTML = `${kicker ? `<div class="k">${kicker}</div>` : ""}${title ? `<div class="t">${title}</div>` : ""}${text ? `<div class="s">${text}</div>` : ""}`;
+      // Never cover what is in the spotlight: a subject in the lower part of the
+      // screen moves the caption to the top.
+      const r = target ? rectOf(target) : null;
+      cap.classList.toggle("top", !!r && r.bottom > innerHeight - 260 && r.top > 200);
       cap.classList.add("show");
     },
     hideCaption() { cap.classList.remove("show"); },

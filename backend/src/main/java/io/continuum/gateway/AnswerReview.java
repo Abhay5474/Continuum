@@ -245,10 +245,21 @@ public class AnswerReview {
             double extraCost = 0;
             io.continuum.uncertainty.AdaptiveStopping.Decision stopped = null;
             for (int i = 0; i < extra; i++) {
-                LlmResponse r = chaos.apply(developerId, router.complete(
-                        new LlmRequest(model, canonical.messages(), canonical.maxTokens(),
-                                cfg.getTemperature(), null, null, canonical.responseFormat()),
-                        List.of(provider), keyFor(devKeys, provider)));
+                LlmResponse r;
+                try {
+                    r = chaos.apply(developerId, router.complete(
+                            new LlmRequest(model, canonical.messages(), canonical.maxTokens(),
+                                    cfg.getTemperature(), null, null, canonical.responseFormat()),
+                            List.of(provider), keyFor(devKeys, provider)));
+                } catch (RuntimeException sampleFailed) {
+                    // One refused sample (a provider's per-minute limit, say) should
+                    // not cost the whole measurement: with two answers there is
+                    // already agreement to measure. With fewer, give up as before.
+                    if (answers.size() >= 2) {
+                        break;
+                    }
+                    throw sampleFailed;
+                }
                 answers.add(r.content());
                 extraCost += router.estimateCost(provider, r.model(), r.promptTokens(), r.completionTokens());
 

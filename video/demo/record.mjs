@@ -137,7 +137,12 @@ async function runTour(key, timeout = 240000) {
   await shop.evaluate((k) => import("/js/tour.js").then((m) => { window.__tourRun = m.runFeature(k); }), key);
   await shop.waitForSelector("#result:not([hidden])", { timeout });
   await sleep(400);
-  return shop.evaluate(() => document.getElementById("result").innerText.replace(/\s+/g, " "));
+  const out = await shop.evaluate(() => document.getElementById("result").innerText.replace(/\s+/g, " "));
+  const chat = await shop.evaluate(() => [...document.querySelectorAll("#chat-body .msg.bot")].slice(-1).map((m) => m.innerText).join(""));
+  if (!failoverScene && /every available model failed/i.test(out + " " + (key === "tools" ? chat : "")))
+    throw new Error(`MODEL_FAILURE in tour ${key}: ` + out.slice(0, 200));
+  log(`tour ${key}:`, out.slice(0, 140));
+  return out;
 }
 async function closeResult() {
   await shop.click("#r-close").catch(() => {});
@@ -164,6 +169,8 @@ const X_CALL = "#x-current .x-call";
 
 // ================================================================= the film
 log("start");
+// The film starts on the title card: everything captured before it (browser start-up, sign-in) is trimmed.
+const filmStart = Date.now() / 1000 + 0.8;
 await card({
   title: "Continuum",
   subtitle: "The reliability layer between your app and AI models",
@@ -423,6 +430,7 @@ await card({
 
 fs.mkdirSync(path.dirname(MARKS), { recursive: true });
 fs.writeFileSync(MARKS, JSON.stringify(marks, null, 1));
+fs.writeFileSync(path.join(path.dirname(MARKS), "film-start.txt"), String(filmStart));
 log("done");
 await resetChaos();
 await browser.close();
