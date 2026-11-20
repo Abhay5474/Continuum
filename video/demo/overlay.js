@@ -133,7 +133,7 @@
       // Never cover what is in the spotlight: a subject in the lower part of the
       // screen moves the caption to the top.
       const r = target ? rectOf(target) : null;
-      cap.classList.toggle("top", !!r && r.bottom > innerHeight - 260 && r.top > 200);
+      cap.classList.toggle("top", !!r && r.top + r.height > innerHeight - 260 && r.top > 200);
       cap.classList.add("show");
     },
     hideCaption() { cap.classList.remove("show"); },

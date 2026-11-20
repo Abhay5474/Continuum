@@ -305,7 +305,15 @@ await chapter(6, "Trust the answers", "Answer confidence");
 await caption("Trust the answers", "How sure is the AI?",
   "Continuum asks the model the same question several times. If the answers agree, it is sure. If they disagree, it is guessing.");
 await runTour("confidence");
-await focus("#result", { pad: 8 });
+await closeResult();
+// The score itself, on the reply draft the agent is about to send.
+const gaugeSel = ".draft .gauge";
+if (await shop.locator(gaugeSel).count()) {
+  await focus(gaugeSel, { pad: 14 });
+  await callout(gaugeSel, "Confidence, measured live", "the model was asked again and agreed with itself", "right", 120);
+} else {
+  await focus("#result", { pad: 8 });
+}
 await caption("Answer confidence", "A confidence score for every important answer",
   "High agreement: safe to send. Low agreement: flag it or check before acting.", 7000);
 await closeResult();
